@@ -4,6 +4,210 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.22.0](https://github.com/pina-rs/pina/releases/tag/v0.22.0) (2026-09-29)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Pin client generation to the Kit 8 toolchain
+
+_Packages:_ 🔴 _pina_cli_, 🟢 _pina_codama_nodes_, 🟢 _pina_codama_renderer_cpi_, 🟢 _pina_codama_renderer_cli_
+
+`CodamaError` gains the `StaleKitScaffold` variant (now carrying an `ecosystem` label and a string `minimum`), which is a breaking change for downstream exhaustive matches over the error enum.
+
+The Dart scaffolds move the Solana Kit Dart packages to `">=0.10.0 <1.0.0"` — a range rather than a caret pin, so pre-1.0 minor releases flow in without regeneration — and raise their SDK floor to Dart 3.13, which the Kit 0.10 line requires. The fail-closed scaffold guard covers both ecosystems: it rejects a `@solana/kit` range or a `solana_kit_*` pubspec range (inline or nested `version:`) that provably cannot resolve what the generated sources compile against, judging ranges by what they can resolve so bounded and union ranges that reach the floor still pass.
+
+The `npx` and `pnpm dlx` fallbacks installed `codama@1.10.1` with `@codama/renderers-js@2.3.1` and `codama-renderers-dart@0.5.5`, so every freshly scaffolded TypeScript client pinned `@solana/kit` to the Kit 7 line even though the workspace itself targets Kit 8. The pinned install specs move to `codama@1.11.0`, `@codama/renderers-js@2.5.0`, and `codama-renderers-dart@0.5.6`, the workspace's local renderer floors match, and all committed clients are regenerated from the Kit 8 renderer with their scaffolded manifests consciously aligned to the current ranges.
+
+Because scaffolded manifests are never rewritten by later runs, a manifest created by an older renderer keeps its stale Kit pin forever while the regenerated sources around it move forward. Generation now fails closed when an existing scaffold pins a Kit version older than the generated sources require — `@solana/kit` for TypeScript, the `solana_kit_*` packages for Dart — naming the manifest and the range to update instead of leaving a client that cannot compile. `overwrite` mode remains the explicit way to start a scaffold over on the current ranges.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #533](https://github.com/pina-rs/pina/pull/533)
+
+### Features
+
+#### Spell value validation rules as comparisons
+
+_Packages:_ 🟠 _pina_, 🟠 _pina_cli_, 🟠 _pina_macros_, ⚪ _pina_skill_
+
+A value rule is now a comparison over the field's `value` or its `len`, so the annotation reads as the check it generates:
+
+```rust
+#[account(discriminator = Kind::State)]
+struct Counter {
+	#[pina(validate(value >= 1 && value <= 10, len <= 64, value != 0))]
+	pub amount: u64,
+}
+```
+
+This replaces the `min`/`max`/`min_len`/`max_len`/`exact_len` parameter spellings, which made the annotation read like an assignment to a name nothing ever assigns and left inclusive-versus-exclusive to a naming convention. Comparisons carry the direction in the operator, chain bounds into one rule (`100 < value <= u64::MAX`), and can express what the named bounds could not — `value != 0` for a declarative non-zero check.
+
+##### The named bounds are deprecated, not removed
+
+`min`, `max`, `min_len`, `max_len`, and `exact_len` still parse and generate the identical checks, so nothing breaks. Each one warns at the parameter the author wrote and names its replacement:
+
+```text
+warning: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `min` is deprecated;
+write the bound as a comparison, as in `value >= 1`
+ --> src/lib.rs:8:22
+  |
+8 |     #[pina(validate(min = 1, max = 10))]
+  |                      ^^^
+```
+
+`error = ERROR` keeps its spelling: it names the failure to raise, not a comparison. The warning is the ordinary `deprecated` lint, so `#[allow(deprecated)]` silences it and `-D warnings` fails on it. The check compiles to an empty const block and costs no compute units.
+
+##### No compatibility effect
+
+The IDL and migration manifests do not record value rules, and the checks the deprecated spellings generate are the same ones comparisons generate, so migrating an annotation changes nothing on the wire.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #537](https://github.com/pina-rs/pina/pull/537)
+
+#### Serve the agent skill from the CLI, fix migration docs
+
+_Packages:_ 🟠 _pina_cli_, 🟢 _pina_skill_
+
+##### `pina skill`
+
+The agent skill now ships inside the `pina` binary, so an agent holding only the toolkit can reach the same guidance a skill installation would give it:
+
+```sh
+pina skill                            # list the bundled topics
+pina skill read pina                  # the entrypoint, raw Markdown on stdout
+pina skill read migrations            # any reference, byte for byte
+pina skill install --dir ~/.claude/skills/pina
+```
+
+`read` prints the document itself with no terminal rendering so agents can parse it; `install` writes the whole tree and refuses to replace an existing skill unless `--force` is passed. `pina --help` and `pina docs` advertise the command. The embedded documents are a committed copy of `packages/pina__skill` kept in step by `scripts/docs/sync-skill.mjs`; `verify:docs` fails when the copy drifts.
+
+##### Skill corrections
+
+The manual-transition ABI is now written down instead of left to be inferred: a transition's `data` includes the discriminator and version envelope while the offsets printed in a generated stub's comment block are payload relative, so a `u64` shown at `32..40` is `data[34..42]`. Compact contracts get their own `target_size`/`working_size` shape, `--envelope-ack` is covered, growth budgets are sized against a whole stale ladder, and `tests/abi_layout.rs` is documented as a generated drift gate that `pina migrations check` enforces.
+
+`references/project-setup.md` no longer recommends `#![cfg_attr(not(test), no_std)]` — every program in this repository except the fuzzing-gated `migrations_program` writes plain `#![no_std]` and gates only a host `cdylib`'s `extern crate std` — and the retired integer manifest formats are replaced with the `abiVersion` string both documents carry.
+
+An evaluation harness for the skill lives in `evals/pina-skill`; seventeen scenarios grade real changes to throwaway programs against the real CLI, and its `FINDINGS.md` records the measured result and its limits.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #538](https://github.com/pina-rs/pina/pull/538)
+
+### Fixes
+
+#### Slice PDA-creation seeds and signers with exclusive bounds
+
+_Packages:_ 🟢 _pina_
+
+The PDA-creation CPI spine assembled its derivation seeds, combined-seed signer, and signer list with inclusive ranges (`[a..=len]`). Every inclusive slice over a seed or signer array monomorphizes its own 216-byte `RangeInclusive<usize>::index` copy plus panic plumbing — three copies, roughly 1.3 KB of deployed text, in every program that creates a PDA through the checked or compact builders.
+
+The spine now slices with exclusive bounds (`[a..len + 1]`, each guarded by the `len < MAX` check that already ran in the same function), which inline to a few instructions. Measured on the framework-comparison counter fixture with the exact comparison profile and proven by its verifier: the ELF shrinks 12,720 → 11,400 bytes (−10.4%) and `initialize` drops 3,295 → 3,203 compute units (−92) with byte-identical behavior; `increment` is unchanged. Behavior is identical because `[a..=len]` and `[a..len + 1]` denote the same half-open prefix; only the code shape changes.
+
+The program-size guide documents the exclusive-bound shape for generated and user code, and the `pina_lean` comparison fixture — the measurement bed for ADR 0010's lean-entrypoint strategy — now combines this fix with a bounded entrypoint budget (`nostd_entrypoint!(process_instruction, 3)`) to measure the counter at 9,976 bytes (−21.6% from stock), 1,280 bytes from Anchor v2's 8,696 with the same account model and stricter validation.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #547](https://github.com/pina-rs/pina/pull/547) · _Related issues:_ [#544](https://github.com/pina-rs/pina/issues/544)
+
+#### Emit instruction argument doc comments in the generated IDL
+
+_Packages:_ 🟢 _pina_cli_, 🟢 _pina_cli_renderer_
+
+`pina idl` parsed the `///` doc comments on `#[instruction(...)]` struct fields but dropped them when lowering each field into a Codama `instructionArgumentNode`, so every instruction argument was published with no docs. The generator now copies those comments onto the argument node, matching how account and event fields already carry their docs.
+
+Generated clients pick the docs up on the next `pina generate`: the Rust, CPI, and TypeScript instruction data types gain doc comments on their argument fields, and the generated Rust, TypeScript, and Dart CLIs show the doc text as each argument's `--help` description instead of the bare argument name. Regenerate your IDL and clients after upgrading to pick them up.
+
+Because those docs are copied verbatim from the program source, an intra-doc link such as ``[`KIND_VAULT`]`` resolves in the program crate but not in the generated Rust CLI. The CLI renderer now allows `rustdoc::broken_intra_doc_links` in its generated files, as the CPI renderer already does, so documenting the CLI with `-D warnings` keeps passing.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #536](https://github.com/pina-rs/pina/pull/536)
+
+### Testing
+
+#### Widen the headroom in the bounded-capture timing assertion
+
+_Packages:_ ⚪ _pina_, ⚪ _pina_cli_
+
+`doctor::tests::command_capture_bounds_pipes_held_by_descendants` asserts that a capture returns before it would have waited out the descendant holding the inherited pipes. It proved the bound with a 100 ms deadline, a descendant sleeping 500 ms, and a ceiling of 400 ms on the whole call, which leaves 300 ms for the process spawn the capture also pays for. A Windows runner took longer than that to start the test binary, so the job failed on `main` while the identical tree passed the same job on the pull request.
+
+The descendant now sleeps 2 s and the ceiling is 1 s, so the assertion still separates a bounded capture from one that waited the holder out — the 900 ms gap between them is what the check depends on — while leaving the spawn several hundred milliseconds of room. The deadline itself is unchanged at 100 ms, so nothing about the behavior under test is relaxed: mutating the capture to ignore its deadline still fails the assertion, which was verified by trying it.
+
+The assertion message now reports the measured time, the ceiling, and the holder's sleep, so a future failure says which of the three moved.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #550](https://github.com/pina-rs/pina/pull/550) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#548](https://github.com/pina-rs/pina/issues/548)
+
+### Notes
+
+#### Build every example program with fat link-time optimization
+
+_Packages:_ ⚪ _pina_, ⚪ _pina_macros_, ⚪ _pina_test_
+
+Every example program was built for SBF without link-time optimization, even those whose `crate-type = ["cdylib"]` allows it: the `cargo build-<program>` aliases and `scripts/build-runtime-compute-units.ts` never passed `--lto`, so the PR size benchmark recorded ELFs 12-37% larger than what `pina build` (which applies its `Production` profile) produces for the same program.
+
+All 27 example programs now ship `crate-type = ["cdylib"]` only. Their `tests/surfpool` crates include the real source with `#[path = "../../../src/lib.rs"]` instead of depending on an rlib, mirroring each program's `pina` features in the harness manifest so the included source compiles identically; the twelve `tests/*.rs` integration tests that imported the program crate use the same include (re-exporting the program module at the test crate root where the program's submodules use `crate::` paths). Every build alias and every CU-measurement build passes `--lto`, and the example inventory derives the flag from each manifest (`ltoEligible`), so the benchmark always measures the artifact users actually deploy.
+
+Measured on the same commit, same toolchain, three deterministic Surfpool runs each:
+
+| Program         | Without LTO | With LTO | Δ size | Static CU Δ |
+| --------------- | ----------- | -------- | ------ | ----------- |
+| escrow          | 73,976      | 46,680   | −37%   | −34%        |
+| staking-rewards | 87,264      | 59,120   | −32%   | −29%        |
+| vesting         | 57,632      | 46,824   | −19%   | −14%        |
+| multisig        | 195,752     | 166,792  | −15%   | −10%        |
+| hello-solana    | 5,656       | 4,712    | −17%   | −18%        |
+
+Runtime compute units do not regress: fat LTO's single codegen unit lets inlining collapse cross-crate glue that the unoptimized link kept as call sequences, so escrow's Make drops 29,535 → 29,105 CU and Take 32,230 → 31,658 CU. Every entrypoint frame stays within the 4 KB stack limit (deepest: vesting at 3,992; multisig sits exactly at 4,096 with no offset beyond it — its manifest documents the re-check rule for any future instruction growth, and its 17 Surfpool plus 38 e2e tests pass against the LTO ELF).
+
+##### Share one allocation spine across creation builders
+
+The compact and fixed-layout PDA creation builders duplicated their entire allocation sequence once per generic instantiation: seed marshalling, signer assembly, rent computation, and the system-program CPI — ~5 KB per copy, three copies in the multisig example alone. `CompactCreationTarget::allocate_zeroed` and `PdaCreationTarget::allocate` now carry that runtime-only spine as shared functions, leaving the generic half (patch commit, discriminator init) thin. Multisig's three `CreateCompactProgramAccountWithBump` instantiations dropped from 15,736 to 7,280 outlined bytes plus one 3,000-byte shared copy — 5,252 bytes gone. Each spine keeps the shape its users measured best with. The compact-creation spine (`allocate_zeroed`) stays a real outlined call — with no `inline` attribute, LLVM keeps it outside the generic instantiations, so multisig's three copies collapse into the single shared 3,000-byte function. The PDA-creation spine (`PdaCreationTarget::allocate`) carries `#[inline(always)]` instead, because a single-instantiation program has no duplicate to collapse and pays only the call boundary: outlining it measured +80 CU and +768 bytes on the counter fixture's `initialize`. After the split, the fixture measures exactly its previous 12,720 bytes and 3,295 CU, and the escrow Surfpool suite still passes 10/10 against the rebuilt artifact.
+
+##### `#[path]` harnesses can expand migration-aware discriminators again
+
+`verify_migration_contracts` resolved `migrations/manifest.json` from raw `CARGO_MANIFEST_DIR`, so a Surfpool harness that source-includes a cdylib-only program expanded the program's `#[discriminator]` with the harness's manifest directory and reported the program's declared migration ladder as missing — blocking the documented `#[path]` test pattern for every migration-aware program. It now uses `discover_program_dir()`, the same upward walk `#[account]` and the account ladder already use, so the manifest is found through the include just as it is through an rlib. The two unit tests and one trybuild fixture that asserted the old raw-path error now assert the unlocatable-manifest error the walk produces when no manifest exists anywhere above the expanding crate.
+
+##### Privacy pool prover module compiles in source-including harnesses
+
+The host-only `prover` module is gated on the `prover` cargo feature, which a source-including harness cannot enable _on the program_ (features belong to a dependency, and a cdylib-only program is not a dependency). The Surfpool harness now declares `prover` as one of its **own** features — a `#[path]` include resolves `cfg(feature = ...)` against the including crate, so the harness's feature opens the module — while carrying the `ark-*` crates the module imports as plain dependencies. The program's gate itself is unchanged (`all(feature = "prover", not(target_os = "solana"))`): admitting every `cfg(test)` build would break the program's own lib-test target, which compiles under default features where the optional `ark-*` dependencies are absent. The SBF artifact is unaffected (`not(target_os = "solana")` still excludes the module from every on-chain build), and the `[[test]] required-features` on the program's own e2e suite is unchanged.
+
+##### Program self-tests moved beside the programs they pin
+
+Converting the programs to cdylib-only left the workspace compute-unit harness (`tests/compute_units.rs`) linking against programs that no longer produce rlibs, so it now source-includes them with `#[path]` like the Surfpool harnesses. That exposed a rule the embedded `#[cfg(test)]` modules had been silently exempt from: their assertions pin enveloped codegen (envelope geometry, version bytes), and migration-aware codegen only expands when `migrations/manifest.json` is discoverable by walking up from the expanding crate — true for any crate inside the program's tree, false for a workspace-root harness. The programs' self-tests moved to `tests/` beside each program (migration-aware assertions to `tests/generated_views.rs` / `tests/self_checks.rs`, where the walk still finds the manifest); the account-realloc program's private-helper tests stayed in-crate because only the crate itself can reach those functions. The migrations program's exact runtime-CU snapshot moved to its own `tests/compute_units.rs` for the same reason, and the workspace harness now measures the four non-migration-aware programs. Every suite count is preserved: 18 migration-view tests, 13 counter, 22 profile, 11 realloc all run in their own packages.
+
+Source-including the `pina_bpf_program` also pulled its artifact-inspection tests (`sbf_build_produces_artifact`, `sbf_build_artifact_is_elf`) into the Surfpool harness, where the performance workflow sweeps them with `--ignored` and places ELFs through the compute-unit manifest instead of `target/deploy`. `pina_test::benchmark_artifact` now resolves a program's recorded artifact from `PINA_CU_MANIFEST` — the same manifest `ProgramTest::start` already reads — and the tests consult it before the `pina test` pin and the conventional `target/deploy` walk.
+
+The fuzz targets had the same dependency shape: `crates/pina_fuzz` depended on `counter_program`, `role_registry_program`, and `migrations_program` as rlibs, which cdylib-only programs no longer produce. Each program now carries a `fuzz/` re-export crate inside its own tree — the source include expands the migration-aware macros with the manifest found by the walk, and the rlib the wrapper produces carries the already-expanded codegen — and the fuzz targets depend on those (`migrations_program_fuzz` re-exports the program's `fuzzing` feature through its own, since an include resolves features against the including crate). The corpus and target set are unchanged; the smoke tier replays and fuzzes all three targets green.
+
+##### Measured the entrypoint account budget and recorded the lean-entrypoint strategy
+
+The framework-comparison fixtures never passed `nostd_entrypoint!` its second argument, so they carried pinocchio's unrolled 255-account deserializer for programs whose widest instruction uses three accounts. New `pina_lean` fixtures measure the bounded budget with the exact comparison profile and verifier: hello 4,680 → 2,736 bytes (−41.5%) at +6 CU, counter 12,720 → 11,680 (−8.2%) at +1/+4 CU. ADR 0010 (`docs/src/adrs/0010-lean-entrypoint-strategy.md`) records the full exploration — where the remaining bytes live (derive dispatch, the `RangeInclusive` envelope triplication, error conversion), what Quasar and Anchor v2 do differently (lazy per-arm account walking, 32-byte entrypoint stubs), and the phased decision: adopt the budget now, build the opt-in `lean_entrypoint!` dispatcher behind equivalence measurements, and keep pinocchio as a library. The program-size guide documents the budget lever with the measured table.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #544](https://github.com/pina-rs/pina/pull/544)
+
+#### Bind privacy pool initialization to a bootstrap authority
+
+_Packages:_ ⚪ _pina_
+
+The pool's accounts are all singleton PDAs over fixed seeds, so `Initialize` was a one-time, winner-takes-all instruction: the first funded signer to call it became the permanent `PoolConfig.authority`, with no transfer or renounce path. That key installs the Groth16 verifying keys, rotates the disclosure committee, and registers compelled-disclosure requesters, so a front-running attacker could prove spends against keys they generated (or brick the pool for honest users) and turn the "governed, logged disclosure" guarantee into attacker-controlled surveillance over every honest deposit.
+
+`Initialize` now requires the signer to be the committed `BOOTSTRAP_AUTHORITY`. The check is one 32-byte comparison against a constant before any CPI. A new adversarial Surfpool case proves it: against the unpatched program an unapproved first initializer succeeds and captures the config, and with the check it is refused with no state created. The example readme records the production guidance — generate the bootstrap authority off-circuit, commit only its public key, and initialize in the deployment ceremony.
+
+The measured cost is ratcheted into `scripts/compute-unit-policy.json`: privacy pool `initialize` 49,265 (+20) and `requestDisclosure` 11,605 (+7). Every other instruction is byte-identical, including `deposit`, `withdraw`, and `transfer`.
+
+#### Check the tier-1 disclosure deadline arithmetic
+
+`RequestDisclosure` computed `now + window` unchecked. A wrapped deadline lands in the past and silently collapses the challenge window tier 1 exists to provide. The addition now goes through a checked `challenge_deadline` helper with boundary unit tests covering the exact limit and the refusal one second past it.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #534](https://github.com/pina-rs/pina/pull/534) · _Related issues:_ [#506](https://github.com/pina-rs/pina/issues/506), [#530](https://github.com/pina-rs/pina/issues/530)
+
+#### Update the pinned toolchain and the classification gate
+
+_Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_macros_, ⚪ _pina_test_
+
+The devenv inputs moved to a newer `ifiokjr-nixpkgs` revision, which advances the pinned `monochange` to 0.14.0, `mdt` to 0.9.5, and the rest of the nix-provided toolchain. `monochange/actions` moves back to v0.9.4 in the same change, because the CLI and the action read the same report and must move together.
+
+`monochange 0.14.0` emits its change-classification report as `schema_version` `"0.2"` — a string — with `compatibility_impact`, the renamed `unmodeled` impact, `decision.release_impact`, and label-driven skipping. The v0.9.2 action pinned here earlier parses the integer `schemaVersion` that 0.13 emitted and rejects the new shape with "monochange did not return a supported change-classification report"; v0.9.4 is the first release that parses it. The two pins are a pair: bumping either alone breaks the `changeset-policy` job on the next pull request whose classification actually runs, which is why the earlier action-only bump was reverted in #546. `monochange check` passes against the existing `monochange.toml` unchanged; 0.14.0's new `[changesets.classification].skip_labels` default of `["release"]` means the release pull request is no longer classified, matching the existing `[changesets.affected].skip_labels` entry.
+
+#### Repair the Kani toolchain link
+
+`devenv.nix` linked Kani against `nightly-2025-11-21`, but the nixpkgs revision now ships Kani 0.68.0, whose release bundle was built against `nightly-2026-08-21` and resolves `librustc_driver` out of `$out/toolchain` at runtime. Every harness aborted before verification with `Library not loaded: librustc_driver-...dylib`. The link now uses 0.68.0's own toolchain, and the `kani (quick)` and `kani (compact layouts)` jobs pin 0.68.0 to match; `test:kani:quick` verifies 23 of 23 harnesses again.
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #548](https://github.com/pina-rs/pina/pull/548) · _Related issues:_ [#543](https://github.com/pina-rs/pina/issues/543), [#546](https://github.com/pina-rs/pina/issues/546), [#547](https://github.com/pina-rs/pina/issues/547)
+
 ## [0.21.0](https://github.com/pina-rs/pina/releases/tag/v0.21.0) (2026-09-25)
 
 Grouped release for `core`.

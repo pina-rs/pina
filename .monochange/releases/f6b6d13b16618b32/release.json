@@ -1,0 +1,1656 @@
+{
+	"schema_version": "0.7",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-09-29T05:26:49Z",
+	"command": "release",
+	"version": null,
+	"versions": {
+		"core": "0.22.0",
+		"pina_root": "0.0.12"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.22.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.22.0",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		},
+		{
+			"id": "pina_root",
+			"kind": "package",
+			"version": "0.0.12",
+			"version_format": "namespaced",
+			"tag": false,
+			"release": false,
+			"tag_name": "pina_root/v0.0.12",
+			"members": [
+				"pina_root"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_root",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.22.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/codama-toolchain-kit-8.md",
+		".changeset/cpi-exclusive-seed-bounds.md",
+		".changeset/idl-instruction-argument-docs.md",
+		".changeset/lto-example-builds.md",
+		".changeset/privacy-pool-bootstrap-authority.md",
+		".changeset/skill-migration-evals.md",
+		".changeset/toolchain-update-monochange-0-14.md",
+		".changeset/validation-comparisons.md",
+		".changeset/windows-cli-capture-timing-headroom.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/codama-toolchain-kit-8.md",
+			"summary": "Pin client generation to the Kit 8 toolchain",
+			"details": "`CodamaError` gains the `StaleKitScaffold` variant (now carrying an `ecosystem` label and a string `minimum`), which is a breaking change for downstream exhaustive matches over the error enum.\n\nThe Dart scaffolds move the Solana Kit Dart packages to `\">=0.10.0 <1.0.0\"` — a range rather than a caret pin, so pre-1.0 minor releases flow in without regeneration — and raise their SDK floor to Dart 3.13, which the Kit 0.10 line requires. The fail-closed scaffold guard covers both ecosystems: it rejects a `@solana/kit` range or a `solana_kit_*` pubspec range (inline or nested `version:`) that provably cannot resolve what the generated sources compile against, judging ranges by what they can resolve so bounded and union ranges that reach the floor still pass.\n\nThe `npx` and `pnpm dlx` fallbacks installed `codama@1.10.1` with `@codama/renderers-js@2.3.1` and `codama-renderers-dart@0.5.5`, so every freshly scaffolded TypeScript client pinned `@solana/kit` to the Kit 7 line even though the workspace itself targets Kit 8. The pinned install specs move to `codama@1.11.0`, `@codama/renderers-js@2.5.0`, and `codama-renderers-dart@0.5.6`, the workspace's local renderer floors match, and all committed clients are regenerated from the Kit 8 renderer with their scaffolded manifests consciously aligned to the current ranges.\n\nBecause scaffolded manifests are never rewritten by later runs, a manifest created by an older renderer keeps its stale Kit pin forever while the regenerated sources around it move forward. Generation now fails closed when an existing scaffold pins a Kit version older than the generated sources require — `@solana/kit` for TypeScript, the `solana_kit_*` packages for Dart — naming the manifest and the range to update instead of leaving a client that cannot compile. `overwrite` mode remains the explicit way to start a scaffold over on the current ranges.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_codama_renderer_cpi",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_codama_renderer_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "76ba879120c363fa91e8cfc33f0eac8216f889b4",
+						"short_sha": "76ba879",
+						"url": "https://github.com/pina-rs/pina/commit/76ba879120c363fa91e8cfc33f0eac8216f889b4",
+						"authored_at": "2026-09-26T18:26:47+01:00",
+						"committed_at": "2026-09-26T18:26:47+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#533",
+						"title": "fix(pina_cli): pin client generation to the Kit 8 Codama toolchain",
+						"url": "https://github.com/pina-rs/pina/pull/533",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "76ba879120c363fa91e8cfc33f0eac8216f889b4",
+						"short_sha": "76ba879",
+						"url": "https://github.com/pina-rs/pina/commit/76ba879120c363fa91e8cfc33f0eac8216f889b4",
+						"authored_at": "2026-09-26T18:26:47+01:00",
+						"committed_at": "2026-09-26T18:26:47+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#533",
+						"title": "fix(pina_cli): pin client generation to the Kit 8 Codama toolchain",
+						"url": "https://github.com/pina-rs/pina/pull/533",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/cpi-exclusive-seed-bounds.md",
+			"summary": "Slice PDA-creation seeds and signers with exclusive bounds",
+			"details": "The PDA-creation CPI spine assembled its derivation seeds, combined-seed signer, and signer list with inclusive ranges (`[a..=len]`). Every inclusive slice over a seed or signer array monomorphizes its own 216-byte `RangeInclusive<usize>::index` copy plus panic plumbing — three copies, roughly 1.3 KB of deployed text, in every program that creates a PDA through the checked or compact builders.\n\nThe spine now slices with exclusive bounds (`[a..len + 1]`, each guarded by the `len < MAX` check that already ran in the same function), which inline to a few instructions. Measured on the framework-comparison counter fixture with the exact comparison profile and proven by its verifier: the ELF shrinks 12,720 → 11,400 bytes (−10.4%) and `initialize` drops 3,295 → 3,203 compute units (−92) with byte-identical behavior; `increment` is unchanged. Behavior is identical because `[a..=len]` and `[a..len + 1]` denote the same half-open prefix; only the code shape changes.\n\nThe program-size guide documents the exclusive-bound shape for generated and user code, and the `pina_lean` comparison fixture — the measurement bed for ADR 0010's lean-entrypoint strategy — now combines this fix with a bounded entrypoint budget (`nostd_entrypoint!(process_instruction, 3)`) to measure the counter at 9,976 bytes (−21.6% from stock), 1,280 bytes from Anchor v2's 8,696 with the same account model and stricter validation.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "a473f4eb7eac6ae0f24251122179c49c82df233b",
+						"short_sha": "a473f4e",
+						"url": "https://github.com/pina-rs/pina/commit/a473f4eb7eac6ae0f24251122179c49c82df233b",
+						"authored_at": "2026-09-28T12:45:17+01:00",
+						"committed_at": "2026-09-28T12:45:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#547",
+						"title": "perf(pina): slice PDA-creation seeds and signers with exclusive bounds",
+						"url": "https://github.com/pina-rs/pina/pull/547",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "a473f4eb7eac6ae0f24251122179c49c82df233b",
+						"short_sha": "a473f4e",
+						"url": "https://github.com/pina-rs/pina/commit/a473f4eb7eac6ae0f24251122179c49c82df233b",
+						"authored_at": "2026-09-28T12:45:17+01:00",
+						"committed_at": "2026-09-28T12:45:17+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#547",
+						"title": "perf(pina): slice PDA-creation seeds and signers with exclusive bounds",
+						"url": "https://github.com/pina-rs/pina/pull/547",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#544",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/544",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/idl-instruction-argument-docs.md",
+			"summary": "Emit instruction argument doc comments in the generated IDL",
+			"details": "`pina idl` parsed the `///` doc comments on `#[instruction(...)]` struct fields but dropped them when lowering each field into a Codama `instructionArgumentNode`, so every instruction argument was published with no docs. The generator now copies those comments onto the argument node, matching how account and event fields already carry their docs.\n\nGenerated clients pick the docs up on the next `pina generate`: the Rust, CPI, and TypeScript instruction data types gain doc comments on their argument fields, and the generated Rust, TypeScript, and Dart CLIs show the doc text as each argument's `--help` description instead of the bare argument name. Regenerate your IDL and clients after upgrading to pick them up.\n\nBecause those docs are copied verbatim from the program source, an intra-doc link such as ``[`KIND_VAULT`]`` resolves in the program crate but not in the generated Rust CLI. The CLI renderer now allows `rustdoc::broken_intra_doc_links` in its generated files, as the CPI renderer already does, so documenting the CLI with `-D warnings` keeps passing.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_cli_renderer",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "92c2cb32fe9019d7d43916f197a72baf8ac5e708",
+						"short_sha": "92c2cb3",
+						"url": "https://github.com/pina-rs/pina/commit/92c2cb32fe9019d7d43916f197a72baf8ac5e708",
+						"authored_at": "2026-09-26T21:27:52+01:00",
+						"committed_at": "2026-09-26T21:27:52+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#536",
+						"title": "fix(pina_cli): emit instruction argument docs in the generated IDL",
+						"url": "https://github.com/pina-rs/pina/pull/536",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "92c2cb32fe9019d7d43916f197a72baf8ac5e708",
+						"short_sha": "92c2cb3",
+						"url": "https://github.com/pina-rs/pina/commit/92c2cb32fe9019d7d43916f197a72baf8ac5e708",
+						"authored_at": "2026-09-26T21:27:52+01:00",
+						"committed_at": "2026-09-26T21:27:52+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#536",
+						"title": "fix(pina_cli): emit instruction argument docs in the generated IDL",
+						"url": "https://github.com/pina-rs/pina/pull/536",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/lto-example-builds.md",
+			"summary": "Build every example program with fat link-time optimization",
+			"details": "Every example program was built for SBF without link-time optimization, even those whose `crate-type = [\"cdylib\"]` allows it: the `cargo build-<program>` aliases and `scripts/build-runtime-compute-units.ts` never passed `--lto`, so the PR size benchmark recorded ELFs 12-37% larger than what `pina build` (which applies its `Production` profile) produces for the same program.\n\nAll 27 example programs now ship `crate-type = [\"cdylib\"]` only. Their `tests/surfpool` crates include the real source with `#[path = \"../../../src/lib.rs\"]` instead of depending on an rlib, mirroring each program's `pina` features in the harness manifest so the included source compiles identically; the twelve `tests/*.rs` integration tests that imported the program crate use the same include (re-exporting the program module at the test crate root where the program's submodules use `crate::` paths). Every build alias and every CU-measurement build passes `--lto`, and the example inventory derives the flag from each manifest (`ltoEligible`), so the benchmark always measures the artifact users actually deploy.\n\nMeasured on the same commit, same toolchain, three deterministic Surfpool runs each:\n\n| Program         | Without LTO | With LTO | Δ size | Static CU Δ |\n| --------------- | ----------- | -------- | ------ | ----------- |\n| escrow          | 73,976      | 46,680   | −37%   | −34%        |\n| staking-rewards | 87,264      | 59,120   | −32%   | −29%        |\n| vesting         | 57,632      | 46,824   | −19%   | −14%        |\n| multisig        | 195,752     | 166,792  | −15%   | −10%        |\n| hello-solana    | 5,656       | 4,712    | −17%   | −18%        |\n\nRuntime compute units do not regress: fat LTO's single codegen unit lets inlining collapse cross-crate glue that the unoptimized link kept as call sequences, so escrow's Make drops 29,535 → 29,105 CU and Take 32,230 → 31,658 CU. Every entrypoint frame stays within the 4 KB stack limit (deepest: vesting at 3,992; multisig sits exactly at 4,096 with no offset beyond it — its manifest documents the re-check rule for any future instruction growth, and its 17 Surfpool plus 38 e2e tests pass against the LTO ELF).\n\n##### Share one allocation spine across creation builders\n\nThe compact and fixed-layout PDA creation builders duplicated their entire allocation sequence once per generic instantiation: seed marshalling, signer assembly, rent computation, and the system-program CPI — ~5 KB per copy, three copies in the multisig example alone. `CompactCreationTarget::allocate_zeroed` and `PdaCreationTarget::allocate` now carry that runtime-only spine as shared functions, leaving the generic half (patch commit, discriminator init) thin. Multisig's three `CreateCompactProgramAccountWithBump` instantiations dropped from 15,736 to 7,280 outlined bytes plus one 3,000-byte shared copy — 5,252 bytes gone. Each spine keeps the shape its users measured best with. The compact-creation spine (`allocate_zeroed`) stays a real outlined call — with no `inline` attribute, LLVM keeps it outside the generic instantiations, so multisig's three copies collapse into the single shared 3,000-byte function. The PDA-creation spine (`PdaCreationTarget::allocate`) carries `#[inline(always)]` instead, because a single-instantiation program has no duplicate to collapse and pays only the call boundary: outlining it measured +80 CU and +768 bytes on the counter fixture's `initialize`. After the split, the fixture measures exactly its previous 12,720 bytes and 3,295 CU, and the escrow Surfpool suite still passes 10/10 against the rebuilt artifact.\n\n##### `#[path]` harnesses can expand migration-aware discriminators again\n\n`verify_migration_contracts` resolved `migrations/manifest.json` from raw `CARGO_MANIFEST_DIR`, so a Surfpool harness that source-includes a cdylib-only program expanded the program's `#[discriminator]` with the harness's manifest directory and reported the program's declared migration ladder as missing — blocking the documented `#[path]` test pattern for every migration-aware program. It now uses `discover_program_dir()`, the same upward walk `#[account]` and the account ladder already use, so the manifest is found through the include just as it is through an rlib. The two unit tests and one trybuild fixture that asserted the old raw-path error now assert the unlocatable-manifest error the walk produces when no manifest exists anywhere above the expanding crate.\n\n##### Privacy pool prover module compiles in source-including harnesses\n\nThe host-only `prover` module is gated on the `prover` cargo feature, which a source-including harness cannot enable _on the program_ (features belong to a dependency, and a cdylib-only program is not a dependency). The Surfpool harness now declares `prover` as one of its **own** features — a `#[path]` include resolves `cfg(feature = ...)` against the including crate, so the harness's feature opens the module — while carrying the `ark-*` crates the module imports as plain dependencies. The program's gate itself is unchanged (`all(feature = \"prover\", not(target_os = \"solana\"))`): admitting every `cfg(test)` build would break the program's own lib-test target, which compiles under default features where the optional `ark-*` dependencies are absent. The SBF artifact is unaffected (`not(target_os = \"solana\")` still excludes the module from every on-chain build), and the `[[test]] required-features` on the program's own e2e suite is unchanged.\n\n##### Program self-tests moved beside the programs they pin\n\nConverting the programs to cdylib-only left the workspace compute-unit harness (`tests/compute_units.rs`) linking against programs that no longer produce rlibs, so it now source-includes them with `#[path]` like the Surfpool harnesses. That exposed a rule the embedded `#[cfg(test)]` modules had been silently exempt from: their assertions pin enveloped codegen (envelope geometry, version bytes), and migration-aware codegen only expands when `migrations/manifest.json` is discoverable by walking up from the expanding crate — true for any crate inside the program's tree, false for a workspace-root harness. The programs' self-tests moved to `tests/` beside each program (migration-aware assertions to `tests/generated_views.rs` / `tests/self_checks.rs`, where the walk still finds the manifest); the account-realloc program's private-helper tests stayed in-crate because only the crate itself can reach those functions. The migrations program's exact runtime-CU snapshot moved to its own `tests/compute_units.rs` for the same reason, and the workspace harness now measures the four non-migration-aware programs. Every suite count is preserved: 18 migration-view tests, 13 counter, 22 profile, 11 realloc all run in their own packages.\n\nSource-including the `pina_bpf_program` also pulled its artifact-inspection tests (`sbf_build_produces_artifact`, `sbf_build_artifact_is_elf`) into the Surfpool harness, where the performance workflow sweeps them with `--ignored` and places ELFs through the compute-unit manifest instead of `target/deploy`. `pina_test::benchmark_artifact` now resolves a program's recorded artifact from `PINA_CU_MANIFEST` — the same manifest `ProgramTest::start` already reads — and the tests consult it before the `pina test` pin and the conventional `target/deploy` walk.\n\nThe fuzz targets had the same dependency shape: `crates/pina_fuzz` depended on `counter_program`, `role_registry_program`, and `migrations_program` as rlibs, which cdylib-only programs no longer produce. Each program now carries a `fuzz/` re-export crate inside its own tree — the source include expands the migration-aware macros with the manifest found by the walk, and the rlib the wrapper produces carries the already-expanded codegen — and the fuzz targets depend on those (`migrations_program_fuzz` re-exports the program's `fuzzing` feature through its own, since an include resolves features against the including crate). The corpus and target set are unchanged; the smoke tier replays and fuzzes all three targets green.\n\n##### Measured the entrypoint account budget and recorded the lean-entrypoint strategy\n\nThe framework-comparison fixtures never passed `nostd_entrypoint!` its second argument, so they carried pinocchio's unrolled 255-account deserializer for programs whose widest instruction uses three accounts. New `pina_lean` fixtures measure the bounded budget with the exact comparison profile and verifier: hello 4,680 → 2,736 bytes (−41.5%) at +6 CU, counter 12,720 → 11,680 (−8.2%) at +1/+4 CU. ADR 0010 (`docs/src/adrs/0010-lean-entrypoint-strategy.md`) records the full exploration — where the remaining bytes live (derive dispatch, the `RangeInclusive` envelope triplication, error conversion), what Quasar and Anchor v2 do differently (lazy per-arm account walking, 32-byte entrypoint stubs), and the phased decision: adopt the budget now, build the opt-in `lean_entrypoint!` dispatcher behind equivalence measurements, and keep pinocchio as a library. The program-size guide documents the budget lever with the measured table.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "016f710848529bc9f86c3f5a195837bb2475d795",
+						"short_sha": "016f710",
+						"url": "https://github.com/pina-rs/pina/commit/016f710848529bc9f86c3f5a195837bb2475d795",
+						"authored_at": "2026-09-27T23:01:58+01:00",
+						"committed_at": "2026-09-27T23:01:58+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#544",
+						"title": "perf(examples): build every program with fat LTO and shared allocation spines",
+						"url": "https://github.com/pina-rs/pina/pull/544",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "016f710848529bc9f86c3f5a195837bb2475d795",
+						"short_sha": "016f710",
+						"url": "https://github.com/pina-rs/pina/commit/016f710848529bc9f86c3f5a195837bb2475d795",
+						"authored_at": "2026-09-27T23:01:58+01:00",
+						"committed_at": "2026-09-27T23:01:58+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#544",
+						"title": "perf(examples): build every program with fat LTO and shared allocation spines",
+						"url": "https://github.com/pina-rs/pina/pull/544",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/privacy-pool-bootstrap-authority.md",
+			"summary": "Bind privacy pool initialization to a bootstrap authority",
+			"details": "The pool's accounts are all singleton PDAs over fixed seeds, so `Initialize` was a one-time, winner-takes-all instruction: the first funded signer to call it became the permanent `PoolConfig.authority`, with no transfer or renounce path. That key installs the Groth16 verifying keys, rotates the disclosure committee, and registers compelled-disclosure requesters, so a front-running attacker could prove spends against keys they generated (or brick the pool for honest users) and turn the \"governed, logged disclosure\" guarantee into attacker-controlled surveillance over every honest deposit.\n\n`Initialize` now requires the signer to be the committed `BOOTSTRAP_AUTHORITY`. The check is one 32-byte comparison against a constant before any CPI. A new adversarial Surfpool case proves it: against the unpatched program an unapproved first initializer succeeds and captures the config, and with the check it is refused with no state created. The example readme records the production guidance — generate the bootstrap authority off-circuit, commit only its public key, and initialize in the deployment ceremony.\n\nThe measured cost is ratcheted into `scripts/compute-unit-policy.json`: privacy pool `initialize` 49,265 (+20) and `requestDisclosure` 11,605 (+7). Every other instruction is byte-identical, including `deposit`, `withdraw`, and `transfer`.\n\n#### Check the tier-1 disclosure deadline arithmetic\n\n`RequestDisclosure` computed `now + window` unchecked. A wrapped deadline lands in the past and silently collapses the challenge window tier 1 exists to provide. The addition now goes through a checked `challenge_deadline` helper with boundary unit tests covering the exact limit and the refusal one second past it.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "35174e39a2b9cb76aa045372178fe5b8085d7892",
+						"short_sha": "35174e3",
+						"url": "https://github.com/pina-rs/pina/commit/35174e39a2b9cb76aa045372178fe5b8085d7892",
+						"authored_at": "2026-09-26T12:53:31+01:00",
+						"committed_at": "2026-09-26T12:53:31+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#534",
+						"title": "fix(privacy_pool): bind initialization to a bootstrap authority",
+						"url": "https://github.com/pina-rs/pina/pull/534",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "35174e39a2b9cb76aa045372178fe5b8085d7892",
+						"short_sha": "35174e3",
+						"url": "https://github.com/pina-rs/pina/commit/35174e39a2b9cb76aa045372178fe5b8085d7892",
+						"authored_at": "2026-09-26T12:53:31+01:00",
+						"committed_at": "2026-09-26T12:53:31+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#534",
+						"title": "fix(privacy_pool): bind initialization to a bootstrap authority",
+						"url": "https://github.com/pina-rs/pina/pull/534",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#506",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/506",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#530",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/530",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/skill-migration-evals.md",
+			"summary": "Serve the agent skill from the CLI, fix migration docs",
+			"details": "##### `pina skill`\n\nThe agent skill now ships inside the `pina` binary, so an agent holding only the toolkit can reach the same guidance a skill installation would give it:\n\n```sh\npina skill                            # list the bundled topics\npina skill read pina                  # the entrypoint, raw Markdown on stdout\npina skill read migrations            # any reference, byte for byte\npina skill install --dir ~/.claude/skills/pina\n```\n\n`read` prints the document itself with no terminal rendering so agents can parse it; `install` writes the whole tree and refuses to replace an existing skill unless `--force` is passed. `pina --help` and `pina docs` advertise the command. The embedded documents are a committed copy of `packages/pina__skill` kept in step by `scripts/docs/sync-skill.mjs`; `verify:docs` fails when the copy drifts.\n\n##### Skill corrections\n\nThe manual-transition ABI is now written down instead of left to be inferred: a transition's `data` includes the discriminator and version envelope while the offsets printed in a generated stub's comment block are payload relative, so a `u64` shown at `32..40` is `data[34..42]`. Compact contracts get their own `target_size`/`working_size` shape, `--envelope-ack` is covered, growth budgets are sized against a whole stale ladder, and `tests/abi_layout.rs` is documented as a generated drift gate that `pina migrations check` enforces.\n\n`references/project-setup.md` no longer recommends `#![cfg_attr(not(test), no_std)]` — every program in this repository except the fuzzing-gated `migrations_program` writes plain `#![no_std]` and gates only a host `cdylib`'s `extern crate std` — and the retired integer manifest formats are replaced with the `abiVersion` string both documents carry.\n\nAn evaluation harness for the skill lives in `evals/pina-skill`; seventeen scenarios grade real changes to throwaway programs against the real CLI, and its `FINDINGS.md` records the measured result and its limits.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "afa50920684939fb65c598117754c1aef8213656",
+						"short_sha": "afa5092",
+						"url": "https://github.com/pina-rs/pina/commit/afa50920684939fb65c598117754c1aef8213656",
+						"authored_at": "2026-09-27T21:26:49+01:00",
+						"committed_at": "2026-09-27T21:26:49+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#538",
+						"title": "feat(pina_cli): serve the agent skill from the CLI, and measure it",
+						"url": "https://github.com/pina-rs/pina/pull/538",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "afa50920684939fb65c598117754c1aef8213656",
+						"short_sha": "afa5092",
+						"url": "https://github.com/pina-rs/pina/commit/afa50920684939fb65c598117754c1aef8213656",
+						"authored_at": "2026-09-27T21:26:49+01:00",
+						"committed_at": "2026-09-27T21:26:49+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#538",
+						"title": "feat(pina_cli): serve the agent skill from the CLI, and measure it",
+						"url": "https://github.com/pina-rs/pina/pull/538",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/toolchain-update-monochange-0-14.md",
+			"summary": "Update the pinned toolchain and the classification gate",
+			"details": "The devenv inputs moved to a newer `ifiokjr-nixpkgs` revision, which advances the pinned `monochange` to 0.14.0, `mdt` to 0.9.5, and the rest of the nix-provided toolchain. `monochange/actions` moves back to v0.9.4 in the same change, because the CLI and the action read the same report and must move together.\n\n`monochange 0.14.0` emits its change-classification report as `schema_version` `\"0.2\"` — a string — with `compatibility_impact`, the renamed `unmodeled` impact, `decision.release_impact`, and label-driven skipping. The v0.9.2 action pinned here earlier parses the integer `schemaVersion` that 0.13 emitted and rejects the new shape with \"monochange did not return a supported change-classification report\"; v0.9.4 is the first release that parses it. The two pins are a pair: bumping either alone breaks the `changeset-policy` job on the next pull request whose classification actually runs, which is why the earlier action-only bump was reverted in #546. `monochange check` passes against the existing `monochange.toml` unchanged; 0.14.0's new `[changesets.classification].skip_labels` default of `[\"release\"]` means the release pull request is no longer classified, matching the existing `[changesets.affected].skip_labels` entry.\n\n#### Repair the Kani toolchain link\n\n`devenv.nix` linked Kani against `nightly-2025-11-21`, but the nixpkgs revision now ships Kani 0.68.0, whose release bundle was built against `nightly-2026-08-21` and resolves `librustc_driver` out of `$out/toolchain` at runtime. Every harness aborted before verification with `Library not loaded: librustc_driver-...dylib`. The link now uses 0.68.0's own toolchain, and the `kani (quick)` and `kani (compact layouts)` jobs pin 0.68.0 to match; `test:kani:quick` verifies 23 of 23 harnesses again.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				},
+				{
+					"id": "pina_root",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "3b653ba59d54ce51bbe4b3bd4706b53783f6e328",
+						"short_sha": "3b653ba",
+						"url": "https://github.com/pina-rs/pina/commit/3b653ba59d54ce51bbe4b3bd4706b53783f6e328",
+						"authored_at": "2026-09-28T15:04:28+01:00",
+						"committed_at": "2026-09-28T15:04:28+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#548",
+						"title": "chore(deps): update the pinned toolchain and the classification gate",
+						"url": "https://github.com/pina-rs/pina/pull/548",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "3b653ba59d54ce51bbe4b3bd4706b53783f6e328",
+						"short_sha": "3b653ba",
+						"url": "https://github.com/pina-rs/pina/commit/3b653ba59d54ce51bbe4b3bd4706b53783f6e328",
+						"authored_at": "2026-09-28T15:04:28+01:00",
+						"committed_at": "2026-09-28T15:04:28+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#548",
+						"title": "chore(deps): update the pinned toolchain and the classification gate",
+						"url": "https://github.com/pina-rs/pina/pull/548",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#543",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/543",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#546",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/546",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#547",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/547",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/validation-comparisons.md",
+			"summary": "Spell value validation rules as comparisons",
+			"details": "A value rule is now a comparison over the field's `value` or its `len`, so the annotation reads as the check it generates:\n\n```rust\n#[account(discriminator = Kind::State)]\nstruct Counter {\n\t#[pina(validate(value >= 1 && value <= 10, len <= 64, value != 0))]\n\tpub amount: u64,\n}\n```\n\nThis replaces the `min`/`max`/`min_len`/`max_len`/`exact_len` parameter spellings, which made the annotation read like an assignment to a name nothing ever assigns and left inclusive-versus-exclusive to a naming convention. Comparisons carry the direction in the operator, chain bounds into one rule (`100 < value <= u64::MAX`), and can express what the named bounds could not — `value != 0` for a declarative non-zero check.\n\n##### The named bounds are deprecated, not removed\n\n`min`, `max`, `min_len`, `max_len`, and `exact_len` still parse and generate the identical checks, so nothing breaks. Each one warns at the parameter the author wrote and names its replacement:\n\n```text\nwarning: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `min` is deprecated;\nwrite the bound as a comparison, as in `value >= 1`\n --> src/lib.rs:8:22\n  |\n8 |     #[pina(validate(min = 1, max = 10))]\n  |                      ^^^\n```\n\n`error = ERROR` keeps its spelling: it names the failure to raise, not a comparison. The warning is the ordinary `deprecated` lint, so `#[allow(deprecated)]` silences it and `-D warnings` fails on it. The check compiles to an empty const block and costs no compute units.\n\n##### No compatibility effect\n\nThe IDL and migration manifests do not record value rules, and the checks the deprecated spellings generate are the same ones comparisons generate, so migrating an annotation changes nothing on the wire.",
+			"targets": [
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "33ef8c66e4be65ea2d9b0dba6b7fe541121a62dc",
+						"short_sha": "33ef8c6",
+						"url": "https://github.com/pina-rs/pina/commit/33ef8c66e4be65ea2d9b0dba6b7fe541121a62dc",
+						"authored_at": "2026-09-27T16:07:08+01:00",
+						"committed_at": "2026-09-27T16:07:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#537",
+						"title": "feat(pina_macros): spell value validation rules as comparisons",
+						"url": "https://github.com/pina-rs/pina/pull/537",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "33ef8c66e4be65ea2d9b0dba6b7fe541121a62dc",
+						"short_sha": "33ef8c6",
+						"url": "https://github.com/pina-rs/pina/commit/33ef8c66e4be65ea2d9b0dba6b7fe541121a62dc",
+						"authored_at": "2026-09-27T16:07:08+01:00",
+						"committed_at": "2026-09-27T16:07:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#537",
+						"title": "feat(pina_macros): spell value validation rules as comparisons",
+						"url": "https://github.com/pina-rs/pina/pull/537",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/windows-cli-capture-timing-headroom.md",
+			"summary": "Widen the headroom in the bounded-capture timing assertion",
+			"details": "`doctor::tests::command_capture_bounds_pipes_held_by_descendants` asserts that a capture returns before it would have waited out the descendant holding the inherited pipes. It proved the bound with a 100 ms deadline, a descendant sleeping 500 ms, and a ceiling of 400 ms on the whole call, which leaves 300 ms for the process spawn the capture also pays for. A Windows runner took longer than that to start the test binary, so the job failed on `main` while the identical tree passed the same job on the pull request.\n\nThe descendant now sleeps 2 s and the ceiling is 1 s, so the assertion still separates a bounded capture from one that waited the holder out — the 900 ms gap between them is what the check depends on — while leaving the spawn several hundred milliseconds of room. The deadline itself is unchanged at 100 ms, so nothing about the behavior under test is relaxed: mutating the capture to ignore its deadline still fails the assertion, which was verified by trying it.\n\nThe assertion message now reports the measured time, the ceiling, and the holder's sleep, so a future failure says which of the three moved.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "test"
+				},
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "f31e8f9391db54daa003110ec30c2f8caa53fd86",
+						"short_sha": "f31e8f9",
+						"url": "https://github.com/pina-rs/pina/commit/f31e8f9391db54daa003110ec30c2f8caa53fd86",
+						"authored_at": "2026-09-29T05:59:55+01:00",
+						"committed_at": "2026-09-29T05:59:55+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#550",
+						"title": "fix(pina_cli): widen the headroom in the bounded-capture timing test",
+						"url": "https://github.com/pina-rs/pina/pull/550",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": null,
+						"display_name": "Ifiok Jr.",
+						"url": null,
+						"source": "commit_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b32de0fe444ee7b1e48e762d244b903d8d850620",
+						"short_sha": "b32de0f",
+						"url": "https://github.com/pina-rs/pina/commit/b32de0fe444ee7b1e48e762d244b903d8d850620",
+						"authored_at": "2026-09-29T06:06:54+01:00",
+						"committed_at": "2026-09-29T06:06:54+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "ifiokotung@gmail.com"
+					},
+					"review_request": null
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#300",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/300",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#548",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/548",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.22.0](https://github.com/pina-rs/pina/releases/tag/v0.22.0) (2026-09-29)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Pin client generation to the Kit 8 toolchain\n\n_Packages:_ 🔴 _pina_cli_, 🟢 _pina_codama_nodes_, 🟢 _pina_codama_renderer_cpi_, 🟢 _pina_codama_renderer_cli_\n\n`CodamaError` gains the `StaleKitScaffold` variant (now carrying an `ecosystem` label and a string `minimum`), which is a breaking change for downstream exhaustive matches over the error enum.\n\nThe Dart scaffolds move the Solana Kit Dart packages to `\">=0.10.0 <1.0.0\"` — a range rather than a caret pin, so pre-1.0 minor releases flow in without regeneration — and raise their SDK floor to Dart 3.13, which the Kit 0.10 line requires. The fail-closed scaffold guard covers both ecosystems: it rejects a `@solana/kit` range or a `solana_kit_*` pubspec range (inline or nested `version:`) that provably cannot resolve what the generated sources compile against, judging ranges by what they can resolve so bounded and union ranges that reach the floor still pass.\n\nThe `npx` and `pnpm dlx` fallbacks installed `codama@1.10.1` with `@codama/renderers-js@2.3.1` and `codama-renderers-dart@0.5.5`, so every freshly scaffolded TypeScript client pinned `@solana/kit` to the Kit 7 line even though the workspace itself targets Kit 8. The pinned install specs move to `codama@1.11.0`, `@codama/renderers-js@2.5.0`, and `codama-renderers-dart@0.5.6`, the workspace's local renderer floors match, and all committed clients are regenerated from the Kit 8 renderer with their scaffolded manifests consciously aligned to the current ranges.\n\nBecause scaffolded manifests are never rewritten by later runs, a manifest created by an older renderer keeps its stale Kit pin forever while the regenerated sources around it move forward. Generation now fails closed when an existing scaffold pins a Kit version older than the generated sources require — `@solana/kit` for TypeScript, the `solana_kit_*` packages for Dart — naming the manifest and the range to update instead of leaving a client that cannot compile. `overwrite` mode remains the explicit way to start a scaffold over on the current ranges.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #533](https://github.com/pina-rs/pina/pull/533)"
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Spell value validation rules as comparisons\n\n_Packages:_ 🟠 _pina_, 🟠 _pina_cli_, 🟠 _pina_macros_, ⚪ _pina_skill_\n\nA value rule is now a comparison over the field's `value` or its `len`, so the annotation reads as the check it generates:\n\n```rust\n#[account(discriminator = Kind::State)]\nstruct Counter {\n\t#[pina(validate(value >= 1 && value <= 10, len <= 64, value != 0))]\n\tpub amount: u64,\n}\n```\n\nThis replaces the `min`/`max`/`min_len`/`max_len`/`exact_len` parameter spellings, which made the annotation read like an assignment to a name nothing ever assigns and left inclusive-versus-exclusive to a naming convention. Comparisons carry the direction in the operator, chain bounds into one rule (`100 < value <= u64::MAX`), and can express what the named bounds could not — `value != 0` for a declarative non-zero check.\n\n##### The named bounds are deprecated, not removed\n\n`min`, `max`, `min_len`, `max_len`, and `exact_len` still parse and generate the identical checks, so nothing breaks. Each one warns at the parameter the author wrote and names its replacement:\n\n```text\nwarning: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `min` is deprecated;\nwrite the bound as a comparison, as in `value >= 1`\n --> src/lib.rs:8:22\n  |\n8 |     #[pina(validate(min = 1, max = 10))]\n  |                      ^^^\n```\n\n`error = ERROR` keeps its spelling: it names the failure to raise, not a comparison. The warning is the ordinary `deprecated` lint, so `#[allow(deprecated)]` silences it and `-D warnings` fails on it. The check compiles to an empty const block and costs no compute units.\n\n##### No compatibility effect\n\nThe IDL and migration manifests do not record value rules, and the checks the deprecated spellings generate are the same ones comparisons generate, so migrating an annotation changes nothing on the wire.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #537](https://github.com/pina-rs/pina/pull/537)",
+							"#### Serve the agent skill from the CLI, fix migration docs\n\n_Packages:_ 🟠 _pina_cli_, 🟢 _pina_skill_\n\n##### `pina skill`\n\nThe agent skill now ships inside the `pina` binary, so an agent holding only the toolkit can reach the same guidance a skill installation would give it:\n\n```sh\npina skill                            # list the bundled topics\npina skill read pina                  # the entrypoint, raw Markdown on stdout\npina skill read migrations            # any reference, byte for byte\npina skill install --dir ~/.claude/skills/pina\n```\n\n`read` prints the document itself with no terminal rendering so agents can parse it; `install` writes the whole tree and refuses to replace an existing skill unless `--force` is passed. `pina --help` and `pina docs` advertise the command. The embedded documents are a committed copy of `packages/pina__skill` kept in step by `scripts/docs/sync-skill.mjs`; `verify:docs` fails when the copy drifts.\n\n##### Skill corrections\n\nThe manual-transition ABI is now written down instead of left to be inferred: a transition's `data` includes the discriminator and version envelope while the offsets printed in a generated stub's comment block are payload relative, so a `u64` shown at `32..40` is `data[34..42]`. Compact contracts get their own `target_size`/`working_size` shape, `--envelope-ack` is covered, growth budgets are sized against a whole stale ladder, and `tests/abi_layout.rs` is documented as a generated drift gate that `pina migrations check` enforces.\n\n`references/project-setup.md` no longer recommends `#![cfg_attr(not(test), no_std)]` — every program in this repository except the fuzzing-gated `migrations_program` writes plain `#![no_std]` and gates only a host `cdylib`'s `extern crate std` — and the retired integer manifest formats are replaced with the `abiVersion` string both documents carry.\n\nAn evaluation harness for the skill lives in `evals/pina-skill`; seventeen scenarios grade real changes to throwaway programs against the real CLI, and its `FINDINGS.md` records the measured result and its limits.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #538](https://github.com/pina-rs/pina/pull/538)"
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Slice PDA-creation seeds and signers with exclusive bounds\n\n_Packages:_ 🟢 _pina_\n\nThe PDA-creation CPI spine assembled its derivation seeds, combined-seed signer, and signer list with inclusive ranges (`[a..=len]`). Every inclusive slice over a seed or signer array monomorphizes its own 216-byte `RangeInclusive<usize>::index` copy plus panic plumbing — three copies, roughly 1.3 KB of deployed text, in every program that creates a PDA through the checked or compact builders.\n\nThe spine now slices with exclusive bounds (`[a..len + 1]`, each guarded by the `len < MAX` check that already ran in the same function), which inline to a few instructions. Measured on the framework-comparison counter fixture with the exact comparison profile and proven by its verifier: the ELF shrinks 12,720 → 11,400 bytes (−10.4%) and `initialize` drops 3,295 → 3,203 compute units (−92) with byte-identical behavior; `increment` is unchanged. Behavior is identical because `[a..=len]` and `[a..len + 1]` denote the same half-open prefix; only the code shape changes.\n\nThe program-size guide documents the exclusive-bound shape for generated and user code, and the `pina_lean` comparison fixture — the measurement bed for ADR 0010's lean-entrypoint strategy — now combines this fix with a bounded entrypoint budget (`nostd_entrypoint!(process_instruction, 3)`) to measure the counter at 9,976 bytes (−21.6% from stock), 1,280 bytes from Anchor v2's 8,696 with the same account model and stricter validation.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #547](https://github.com/pina-rs/pina/pull/547) · _Related issues:_ [#544](https://github.com/pina-rs/pina/issues/544)",
+							"#### Emit instruction argument doc comments in the generated IDL\n\n_Packages:_ 🟢 _pina_cli_, 🟢 _pina_cli_renderer_\n\n`pina idl` parsed the `///` doc comments on `#[instruction(...)]` struct fields but dropped them when lowering each field into a Codama `instructionArgumentNode`, so every instruction argument was published with no docs. The generator now copies those comments onto the argument node, matching how account and event fields already carry their docs.\n\nGenerated clients pick the docs up on the next `pina generate`: the Rust, CPI, and TypeScript instruction data types gain doc comments on their argument fields, and the generated Rust, TypeScript, and Dart CLIs show the doc text as each argument's `--help` description instead of the bare argument name. Regenerate your IDL and clients after upgrading to pick them up.\n\nBecause those docs are copied verbatim from the program source, an intra-doc link such as ``[`KIND_VAULT`]`` resolves in the program crate but not in the generated Rust CLI. The CLI renderer now allows `rustdoc::broken_intra_doc_links` in its generated files, as the CPI renderer already does, so documenting the CLI with `-D warnings` keeps passing.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #536](https://github.com/pina-rs/pina/pull/536)"
+						]
+					},
+					{
+						"title": "Testing",
+						"collapsed": false,
+						"entries": [
+							"#### Widen the headroom in the bounded-capture timing assertion\n\n_Packages:_ ⚪ _pina_, ⚪ _pina_cli_\n\n`doctor::tests::command_capture_bounds_pipes_held_by_descendants` asserts that a capture returns before it would have waited out the descendant holding the inherited pipes. It proved the bound with a 100 ms deadline, a descendant sleeping 500 ms, and a ceiling of 400 ms on the whole call, which leaves 300 ms for the process spawn the capture also pays for. A Windows runner took longer than that to start the test binary, so the job failed on `main` while the identical tree passed the same job on the pull request.\n\nThe descendant now sleeps 2 s and the ceiling is 1 s, so the assertion still separates a bounded capture from one that waited the holder out — the 900 ms gap between them is what the check depends on — while leaving the spawn several hundred milliseconds of room. The deadline itself is unchanged at 100 ms, so nothing about the behavior under test is relaxed: mutating the capture to ignore its deadline still fails the assertion, which was verified by trying it.\n\nThe assertion message now reports the measured time, the ceiling, and the holder's sleep, so a future failure says which of the three moved.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #550](https://github.com/pina-rs/pina/pull/550) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#548](https://github.com/pina-rs/pina/issues/548)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"#### Build every example program with fat link-time optimization\n\n_Packages:_ ⚪ _pina_, ⚪ _pina_macros_, ⚪ _pina_test_\n\nEvery example program was built for SBF without link-time optimization, even those whose `crate-type = [\"cdylib\"]` allows it: the `cargo build-<program>` aliases and `scripts/build-runtime-compute-units.ts` never passed `--lto`, so the PR size benchmark recorded ELFs 12-37% larger than what `pina build` (which applies its `Production` profile) produces for the same program.\n\nAll 27 example programs now ship `crate-type = [\"cdylib\"]` only. Their `tests/surfpool` crates include the real source with `#[path = \"../../../src/lib.rs\"]` instead of depending on an rlib, mirroring each program's `pina` features in the harness manifest so the included source compiles identically; the twelve `tests/*.rs` integration tests that imported the program crate use the same include (re-exporting the program module at the test crate root where the program's submodules use `crate::` paths). Every build alias and every CU-measurement build passes `--lto`, and the example inventory derives the flag from each manifest (`ltoEligible`), so the benchmark always measures the artifact users actually deploy.\n\nMeasured on the same commit, same toolchain, three deterministic Surfpool runs each:\n\n| Program         | Without LTO | With LTO | Δ size | Static CU Δ |\n| --------------- | ----------- | -------- | ------ | ----------- |\n| escrow          | 73,976      | 46,680   | −37%   | −34%        |\n| staking-rewards | 87,264      | 59,120   | −32%   | −29%        |\n| vesting         | 57,632      | 46,824   | −19%   | −14%        |\n| multisig        | 195,752     | 166,792  | −15%   | −10%        |\n| hello-solana    | 5,656       | 4,712    | −17%   | −18%        |\n\nRuntime compute units do not regress: fat LTO's single codegen unit lets inlining collapse cross-crate glue that the unoptimized link kept as call sequences, so escrow's Make drops 29,535 → 29,105 CU and Take 32,230 → 31,658 CU. Every entrypoint frame stays within the 4 KB stack limit (deepest: vesting at 3,992; multisig sits exactly at 4,096 with no offset beyond it — its manifest documents the re-check rule for any future instruction growth, and its 17 Surfpool plus 38 e2e tests pass against the LTO ELF).\n\n##### Share one allocation spine across creation builders\n\nThe compact and fixed-layout PDA creation builders duplicated their entire allocation sequence once per generic instantiation: seed marshalling, signer assembly, rent computation, and the system-program CPI — ~5 KB per copy, three copies in the multisig example alone. `CompactCreationTarget::allocate_zeroed` and `PdaCreationTarget::allocate` now carry that runtime-only spine as shared functions, leaving the generic half (patch commit, discriminator init) thin. Multisig's three `CreateCompactProgramAccountWithBump` instantiations dropped from 15,736 to 7,280 outlined bytes plus one 3,000-byte shared copy — 5,252 bytes gone. Each spine keeps the shape its users measured best with. The compact-creation spine (`allocate_zeroed`) stays a real outlined call — with no `inline` attribute, LLVM keeps it outside the generic instantiations, so multisig's three copies collapse into the single shared 3,000-byte function. The PDA-creation spine (`PdaCreationTarget::allocate`) carries `#[inline(always)]` instead, because a single-instantiation program has no duplicate to collapse and pays only the call boundary: outlining it measured +80 CU and +768 bytes on the counter fixture's `initialize`. After the split, the fixture measures exactly its previous 12,720 bytes and 3,295 CU, and the escrow Surfpool suite still passes 10/10 against the rebuilt artifact.\n\n##### `#[path]` harnesses can expand migration-aware discriminators again\n\n`verify_migration_contracts` resolved `migrations/manifest.json` from raw `CARGO_MANIFEST_DIR`, so a Surfpool harness that source-includes a cdylib-only program expanded the program's `#[discriminator]` with the harness's manifest directory and reported the program's declared migration ladder as missing — blocking the documented `#[path]` test pattern for every migration-aware program. It now uses `discover_program_dir()`, the same upward walk `#[account]` and the account ladder already use, so the manifest is found through the include just as it is through an rlib. The two unit tests and one trybuild fixture that asserted the old raw-path error now assert the unlocatable-manifest error the walk produces when no manifest exists anywhere above the expanding crate.\n\n##### Privacy pool prover module compiles in source-including harnesses\n\nThe host-only `prover` module is gated on the `prover` cargo feature, which a source-including harness cannot enable _on the program_ (features belong to a dependency, and a cdylib-only program is not a dependency). The Surfpool harness now declares `prover` as one of its **own** features — a `#[path]` include resolves `cfg(feature = ...)` against the including crate, so the harness's feature opens the module — while carrying the `ark-*` crates the module imports as plain dependencies. The program's gate itself is unchanged (`all(feature = \"prover\", not(target_os = \"solana\"))`): admitting every `cfg(test)` build would break the program's own lib-test target, which compiles under default features where the optional `ark-*` dependencies are absent. The SBF artifact is unaffected (`not(target_os = \"solana\")` still excludes the module from every on-chain build), and the `[[test]] required-features` on the program's own e2e suite is unchanged.\n\n##### Program self-tests moved beside the programs they pin\n\nConverting the programs to cdylib-only left the workspace compute-unit harness (`tests/compute_units.rs`) linking against programs that no longer produce rlibs, so it now source-includes them with `#[path]` like the Surfpool harnesses. That exposed a rule the embedded `#[cfg(test)]` modules had been silently exempt from: their assertions pin enveloped codegen (envelope geometry, version bytes), and migration-aware codegen only expands when `migrations/manifest.json` is discoverable by walking up from the expanding crate — true for any crate inside the program's tree, false for a workspace-root harness. The programs' self-tests moved to `tests/` beside each program (migration-aware assertions to `tests/generated_views.rs` / `tests/self_checks.rs`, where the walk still finds the manifest); the account-realloc program's private-helper tests stayed in-crate because only the crate itself can reach those functions. The migrations program's exact runtime-CU snapshot moved to its own `tests/compute_units.rs` for the same reason, and the workspace harness now measures the four non-migration-aware programs. Every suite count is preserved: 18 migration-view tests, 13 counter, 22 profile, 11 realloc all run in their own packages.\n\nSource-including the `pina_bpf_program` also pulled its artifact-inspection tests (`sbf_build_produces_artifact`, `sbf_build_artifact_is_elf`) into the Surfpool harness, where the performance workflow sweeps them with `--ignored` and places ELFs through the compute-unit manifest instead of `target/deploy`. `pina_test::benchmark_artifact` now resolves a program's recorded artifact from `PINA_CU_MANIFEST` — the same manifest `ProgramTest::start` already reads — and the tests consult it before the `pina test` pin and the conventional `target/deploy` walk.\n\nThe fuzz targets had the same dependency shape: `crates/pina_fuzz` depended on `counter_program`, `role_registry_program`, and `migrations_program` as rlibs, which cdylib-only programs no longer produce. Each program now carries a `fuzz/` re-export crate inside its own tree — the source include expands the migration-aware macros with the manifest found by the walk, and the rlib the wrapper produces carries the already-expanded codegen — and the fuzz targets depend on those (`migrations_program_fuzz` re-exports the program's `fuzzing` feature through its own, since an include resolves features against the including crate). The corpus and target set are unchanged; the smoke tier replays and fuzzes all three targets green.\n\n##### Measured the entrypoint account budget and recorded the lean-entrypoint strategy\n\nThe framework-comparison fixtures never passed `nostd_entrypoint!` its second argument, so they carried pinocchio's unrolled 255-account deserializer for programs whose widest instruction uses three accounts. New `pina_lean` fixtures measure the bounded budget with the exact comparison profile and verifier: hello 4,680 → 2,736 bytes (−41.5%) at +6 CU, counter 12,720 → 11,680 (−8.2%) at +1/+4 CU. ADR 0010 (`docs/src/adrs/0010-lean-entrypoint-strategy.md`) records the full exploration — where the remaining bytes live (derive dispatch, the `RangeInclusive` envelope triplication, error conversion), what Quasar and Anchor v2 do differently (lazy per-arm account walking, 32-byte entrypoint stubs), and the phased decision: adopt the budget now, build the opt-in `lean_entrypoint!` dispatcher behind equivalence measurements, and keep pinocchio as a library. The program-size guide documents the budget lever with the measured table.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #544](https://github.com/pina-rs/pina/pull/544)",
+							"#### Bind privacy pool initialization to a bootstrap authority\n\n_Packages:_ ⚪ _pina_\n\nThe pool's accounts are all singleton PDAs over fixed seeds, so `Initialize` was a one-time, winner-takes-all instruction: the first funded signer to call it became the permanent `PoolConfig.authority`, with no transfer or renounce path. That key installs the Groth16 verifying keys, rotates the disclosure committee, and registers compelled-disclosure requesters, so a front-running attacker could prove spends against keys they generated (or brick the pool for honest users) and turn the \"governed, logged disclosure\" guarantee into attacker-controlled surveillance over every honest deposit.\n\n`Initialize` now requires the signer to be the committed `BOOTSTRAP_AUTHORITY`. The check is one 32-byte comparison against a constant before any CPI. A new adversarial Surfpool case proves it: against the unpatched program an unapproved first initializer succeeds and captures the config, and with the check it is refused with no state created. The example readme records the production guidance — generate the bootstrap authority off-circuit, commit only its public key, and initialize in the deployment ceremony.\n\nThe measured cost is ratcheted into `scripts/compute-unit-policy.json`: privacy pool `initialize` 49,265 (+20) and `requestDisclosure` 11,605 (+7). Every other instruction is byte-identical, including `deposit`, `withdraw`, and `transfer`.\n\n#### Check the tier-1 disclosure deadline arithmetic\n\n`RequestDisclosure` computed `now + window` unchecked. A wrapped deadline lands in the past and silently collapses the challenge window tier 1 exists to provide. The addition now goes through a checked `challenge_deadline` helper with boundary unit tests covering the exact limit and the refusal one second past it.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #534](https://github.com/pina-rs/pina/pull/534) · _Related issues:_ [#506](https://github.com/pina-rs/pina/issues/506), [#530](https://github.com/pina-rs/pina/issues/530)",
+							"#### Update the pinned toolchain and the classification gate\n\n_Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_macros_, ⚪ _pina_test_\n\nThe devenv inputs moved to a newer `ifiokjr-nixpkgs` revision, which advances the pinned `monochange` to 0.14.0, `mdt` to 0.9.5, and the rest of the nix-provided toolchain. `monochange/actions` moves back to v0.9.4 in the same change, because the CLI and the action read the same report and must move together.\n\n`monochange 0.14.0` emits its change-classification report as `schema_version` `\"0.2\"` — a string — with `compatibility_impact`, the renamed `unmodeled` impact, `decision.release_impact`, and label-driven skipping. The v0.9.2 action pinned here earlier parses the integer `schemaVersion` that 0.13 emitted and rejects the new shape with \"monochange did not return a supported change-classification report\"; v0.9.4 is the first release that parses it. The two pins are a pair: bumping either alone breaks the `changeset-policy` job on the next pull request whose classification actually runs, which is why the earlier action-only bump was reverted in #546. `monochange check` passes against the existing `monochange.toml` unchanged; 0.14.0's new `[changesets.classification].skip_labels` default of `[\"release\"]` means the release pull request is no longer classified, matching the existing `[changesets.affected].skip_labels` entry.\n\n#### Repair the Kani toolchain link\n\n`devenv.nix` linked Kani against `nightly-2025-11-21`, but the nixpkgs revision now ships Kani 0.68.0, whose release bundle was built against `nightly-2026-08-21` and resolves `librustc_driver` out of `$out/toolchain` at runtime. Every harness aborted before verification with `Library not loaded: librustc_driver-...dylib`. The link now uses 0.68.0's own toolchain, and the `kani (quick)` and `kani (compact layouts)` jobs pin 0.68.0 to match; `test:kani:quick` verifies 23 of 23 harnesses again.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #548](https://github.com/pina-rs/pina/pull/548) · _Related issues:_ [#543](https://github.com/pina-rs/pina/issues/543), [#546](https://github.com/pina-rs/pina/issues/546), [#547](https://github.com/pina-rs/pina/issues/547)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.22.0](https://github.com/pina-rs/pina/releases/tag/v0.22.0) (2026-09-29)\n\nGrouped release for `core`.\n\n### Breaking Changes\n\n#### Pin client generation to the Kit 8 toolchain\n\n_Packages:_ 🔴 _pina_cli_, 🟢 _pina_codama_nodes_, 🟢 _pina_codama_renderer_cpi_, 🟢 _pina_codama_renderer_cli_\n\n`CodamaError` gains the `StaleKitScaffold` variant (now carrying an `ecosystem` label and a string `minimum`), which is a breaking change for downstream exhaustive matches over the error enum.\n\nThe Dart scaffolds move the Solana Kit Dart packages to `\">=0.10.0 <1.0.0\"` — a range rather than a caret pin, so pre-1.0 minor releases flow in without regeneration — and raise their SDK floor to Dart 3.13, which the Kit 0.10 line requires. The fail-closed scaffold guard covers both ecosystems: it rejects a `@solana/kit` range or a `solana_kit_*` pubspec range (inline or nested `version:`) that provably cannot resolve what the generated sources compile against, judging ranges by what they can resolve so bounded and union ranges that reach the floor still pass.\n\nThe `npx` and `pnpm dlx` fallbacks installed `codama@1.10.1` with `@codama/renderers-js@2.3.1` and `codama-renderers-dart@0.5.5`, so every freshly scaffolded TypeScript client pinned `@solana/kit` to the Kit 7 line even though the workspace itself targets Kit 8. The pinned install specs move to `codama@1.11.0`, `@codama/renderers-js@2.5.0`, and `codama-renderers-dart@0.5.6`, the workspace's local renderer floors match, and all committed clients are regenerated from the Kit 8 renderer with their scaffolded manifests consciously aligned to the current ranges.\n\nBecause scaffolded manifests are never rewritten by later runs, a manifest created by an older renderer keeps its stale Kit pin forever while the regenerated sources around it move forward. Generation now fails closed when an existing scaffold pins a Kit version older than the generated sources require — `@solana/kit` for TypeScript, the `solana_kit_*` packages for Dart — naming the manifest and the range to update instead of leaving a client that cannot compile. `overwrite` mode remains the explicit way to start a scaffold over on the current ranges.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #533](https://github.com/pina-rs/pina/pull/533)\n\n### Features\n\n#### Spell value validation rules as comparisons\n\n_Packages:_ 🟠 _pina_, 🟠 _pina_cli_, 🟠 _pina_macros_, ⚪ _pina_skill_\n\nA value rule is now a comparison over the field's `value` or its `len`, so the annotation reads as the check it generates:\n\n```rust\n#[account(discriminator = Kind::State)]\nstruct Counter {\n\t#[pina(validate(value >= 1 && value <= 10, len <= 64, value != 0))]\n\tpub amount: u64,\n}\n```\n\nThis replaces the `min`/`max`/`min_len`/`max_len`/`exact_len` parameter spellings, which made the annotation read like an assignment to a name nothing ever assigns and left inclusive-versus-exclusive to a naming convention. Comparisons carry the direction in the operator, chain bounds into one rule (`100 < value <= u64::MAX`), and can express what the named bounds could not — `value != 0` for a declarative non-zero check.\n\n##### The named bounds are deprecated, not removed\n\n`min`, `max`, `min_len`, `max_len`, and `exact_len` still parse and generate the identical checks, so nothing breaks. Each one warns at the parameter the author wrote and names its replacement:\n\n```text\nwarning: use of deprecated constant `_::PINA_DEPRECATED_VALIDATION_BOUND`: `min` is deprecated;\nwrite the bound as a comparison, as in `value >= 1`\n --> src/lib.rs:8:22\n  |\n8 |     #[pina(validate(min = 1, max = 10))]\n  |                      ^^^\n```\n\n`error = ERROR` keeps its spelling: it names the failure to raise, not a comparison. The warning is the ordinary `deprecated` lint, so `#[allow(deprecated)]` silences it and `-D warnings` fails on it. The check compiles to an empty const block and costs no compute units.\n\n##### No compatibility effect\n\nThe IDL and migration manifests do not record value rules, and the checks the deprecated spellings generate are the same ones comparisons generate, so migrating an annotation changes nothing on the wire.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #537](https://github.com/pina-rs/pina/pull/537)\n\n#### Serve the agent skill from the CLI, fix migration docs\n\n_Packages:_ 🟠 _pina_cli_, 🟢 _pina_skill_\n\n##### `pina skill`\n\nThe agent skill now ships inside the `pina` binary, so an agent holding only the toolkit can reach the same guidance a skill installation would give it:\n\n```sh\npina skill                            # list the bundled topics\npina skill read pina                  # the entrypoint, raw Markdown on stdout\npina skill read migrations            # any reference, byte for byte\npina skill install --dir ~/.claude/skills/pina\n```\n\n`read` prints the document itself with no terminal rendering so agents can parse it; `install` writes the whole tree and refuses to replace an existing skill unless `--force` is passed. `pina --help` and `pina docs` advertise the command. The embedded documents are a committed copy of `packages/pina__skill` kept in step by `scripts/docs/sync-skill.mjs`; `verify:docs` fails when the copy drifts.\n\n##### Skill corrections\n\nThe manual-transition ABI is now written down instead of left to be inferred: a transition's `data` includes the discriminator and version envelope while the offsets printed in a generated stub's comment block are payload relative, so a `u64` shown at `32..40` is `data[34..42]`. Compact contracts get their own `target_size`/`working_size` shape, `--envelope-ack` is covered, growth budgets are sized against a whole stale ladder, and `tests/abi_layout.rs` is documented as a generated drift gate that `pina migrations check` enforces.\n\n`references/project-setup.md` no longer recommends `#![cfg_attr(not(test), no_std)]` — every program in this repository except the fuzzing-gated `migrations_program` writes plain `#![no_std]` and gates only a host `cdylib`'s `extern crate std` — and the retired integer manifest formats are replaced with the `abiVersion` string both documents carry.\n\nAn evaluation harness for the skill lives in `evals/pina-skill`; seventeen scenarios grade real changes to throwaway programs against the real CLI, and its `FINDINGS.md` records the measured result and its limits.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #538](https://github.com/pina-rs/pina/pull/538)\n\n### Fixes\n\n#### Slice PDA-creation seeds and signers with exclusive bounds\n\n_Packages:_ 🟢 _pina_\n\nThe PDA-creation CPI spine assembled its derivation seeds, combined-seed signer, and signer list with inclusive ranges (`[a..=len]`). Every inclusive slice over a seed or signer array monomorphizes its own 216-byte `RangeInclusive<usize>::index` copy plus panic plumbing — three copies, roughly 1.3 KB of deployed text, in every program that creates a PDA through the checked or compact builders.\n\nThe spine now slices with exclusive bounds (`[a..len + 1]`, each guarded by the `len < MAX` check that already ran in the same function), which inline to a few instructions. Measured on the framework-comparison counter fixture with the exact comparison profile and proven by its verifier: the ELF shrinks 12,720 → 11,400 bytes (−10.4%) and `initialize` drops 3,295 → 3,203 compute units (−92) with byte-identical behavior; `increment` is unchanged. Behavior is identical because `[a..=len]` and `[a..len + 1]` denote the same half-open prefix; only the code shape changes.\n\nThe program-size guide documents the exclusive-bound shape for generated and user code, and the `pina_lean` comparison fixture — the measurement bed for ADR 0010's lean-entrypoint strategy — now combines this fix with a bounded entrypoint budget (`nostd_entrypoint!(process_instruction, 3)`) to measure the counter at 9,976 bytes (−21.6% from stock), 1,280 bytes from Anchor v2's 8,696 with the same account model and stricter validation.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #547](https://github.com/pina-rs/pina/pull/547) · _Related issues:_ [#544](https://github.com/pina-rs/pina/issues/544)\n\n#### Emit instruction argument doc comments in the generated IDL\n\n_Packages:_ 🟢 _pina_cli_, 🟢 _pina_cli_renderer_\n\n`pina idl` parsed the `///` doc comments on `#[instruction(...)]` struct fields but dropped them when lowering each field into a Codama `instructionArgumentNode`, so every instruction argument was published with no docs. The generator now copies those comments onto the argument node, matching how account and event fields already carry their docs.\n\nGenerated clients pick the docs up on the next `pina generate`: the Rust, CPI, and TypeScript instruction data types gain doc comments on their argument fields, and the generated Rust, TypeScript, and Dart CLIs show the doc text as each argument's `--help` description instead of the bare argument name. Regenerate your IDL and clients after upgrading to pick them up.\n\nBecause those docs are copied verbatim from the program source, an intra-doc link such as ``[`KIND_VAULT`]`` resolves in the program crate but not in the generated Rust CLI. The CLI renderer now allows `rustdoc::broken_intra_doc_links` in its generated files, as the CPI renderer already does, so documenting the CLI with `-D warnings` keeps passing.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #536](https://github.com/pina-rs/pina/pull/536)\n\n### Testing\n\n#### Widen the headroom in the bounded-capture timing assertion\n\n_Packages:_ ⚪ _pina_, ⚪ _pina_cli_\n\n`doctor::tests::command_capture_bounds_pipes_held_by_descendants` asserts that a capture returns before it would have waited out the descendant holding the inherited pipes. It proved the bound with a 100 ms deadline, a descendant sleeping 500 ms, and a ceiling of 400 ms on the whole call, which leaves 300 ms for the process spawn the capture also pays for. A Windows runner took longer than that to start the test binary, so the job failed on `main` while the identical tree passed the same job on the pull request.\n\nThe descendant now sleeps 2 s and the ceiling is 1 s, so the assertion still separates a bounded capture from one that waited the holder out — the 900 ms gap between them is what the check depends on — while leaving the spawn several hundred milliseconds of room. The deadline itself is unchanged at 100 ms, so nothing about the behavior under test is relaxed: mutating the capture to ignore its deadline still fails the assertion, which was verified by trying it.\n\nThe assertion message now reports the measured time, the ceiling, and the holder's sleep, so a future failure says which of the three moved.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #550](https://github.com/pina-rs/pina/pull/550) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#548](https://github.com/pina-rs/pina/issues/548)\n\n### Notes\n\n#### Build every example program with fat link-time optimization\n\n_Packages:_ ⚪ _pina_, ⚪ _pina_macros_, ⚪ _pina_test_\n\nEvery example program was built for SBF without link-time optimization, even those whose `crate-type = [\"cdylib\"]` allows it: the `cargo build-<program>` aliases and `scripts/build-runtime-compute-units.ts` never passed `--lto`, so the PR size benchmark recorded ELFs 12-37% larger than what `pina build` (which applies its `Production` profile) produces for the same program.\n\nAll 27 example programs now ship `crate-type = [\"cdylib\"]` only. Their `tests/surfpool` crates include the real source with `#[path = \"../../../src/lib.rs\"]` instead of depending on an rlib, mirroring each program's `pina` features in the harness manifest so the included source compiles identically; the twelve `tests/*.rs` integration tests that imported the program crate use the same include (re-exporting the program module at the test crate root where the program's submodules use `crate::` paths). Every build alias and every CU-measurement build passes `--lto`, and the example inventory derives the flag from each manifest (`ltoEligible`), so the benchmark always measures the artifact users actually deploy.\n\nMeasured on the same commit, same toolchain, three deterministic Surfpool runs each:\n\n| Program         | Without LTO | With LTO | Δ size | Static CU Δ |\n| --------------- | ----------- | -------- | ------ | ----------- |\n| escrow          | 73,976      | 46,680   | −37%   | −34%        |\n| staking-rewards | 87,264      | 59,120   | −32%   | −29%        |\n| vesting         | 57,632      | 46,824   | −19%   | −14%        |\n| multisig        | 195,752     | 166,792  | −15%   | −10%        |\n| hello-solana    | 5,656       | 4,712    | −17%   | −18%        |\n\nRuntime compute units do not regress: fat LTO's single codegen unit lets inlining collapse cross-crate glue that the unoptimized link kept as call sequences, so escrow's Make drops 29,535 → 29,105 CU and Take 32,230 → 31,658 CU. Every entrypoint frame stays within the 4 KB stack limit (deepest: vesting at 3,992; multisig sits exactly at 4,096 with no offset beyond it — its manifest documents the re-check rule for any future instruction growth, and its 17 Surfpool plus 38 e2e tests pass against the LTO ELF).\n\n##### Share one allocation spine across creation builders\n\nThe compact and fixed-layout PDA creation builders duplicated their entire allocation sequence once per generic instantiation: seed marshalling, signer assembly, rent computation, and the system-program CPI — ~5 KB per copy, three copies in the multisig example alone. `CompactCreationTarget::allocate_zeroed` and `PdaCreationTarget::allocate` now carry that runtime-only spine as shared functions, leaving the generic half (patch commit, discriminator init) thin. Multisig's three `CreateCompactProgramAccountWithBump` instantiations dropped from 15,736 to 7,280 outlined bytes plus one 3,000-byte shared copy — 5,252 bytes gone. Each spine keeps the shape its users measured best with. The compact-creation spine (`allocate_zeroed`) stays a real outlined call — with no `inline` attribute, LLVM keeps it outside the generic instantiations, so multisig's three copies collapse into the single shared 3,000-byte function. The PDA-creation spine (`PdaCreationTarget::allocate`) carries `#[inline(always)]` instead, because a single-instantiation program has no duplicate to collapse and pays only the call boundary: outlining it measured +80 CU and +768 bytes on the counter fixture's `initialize`. After the split, the fixture measures exactly its previous 12,720 bytes and 3,295 CU, and the escrow Surfpool suite still passes 10/10 against the rebuilt artifact.\n\n##### `#[path]` harnesses can expand migration-aware discriminators again\n\n`verify_migration_contracts` resolved `migrations/manifest.json` from raw `CARGO_MANIFEST_DIR`, so a Surfpool harness that source-includes a cdylib-only program expanded the program's `#[discriminator]` with the harness's manifest directory and reported the program's declared migration ladder as missing — blocking the documented `#[path]` test pattern for every migration-aware program. It now uses `discover_program_dir()`, the same upward walk `#[account]` and the account ladder already use, so the manifest is found through the include just as it is through an rlib. The two unit tests and one trybuild fixture that asserted the old raw-path error now assert the unlocatable-manifest error the walk produces when no manifest exists anywhere above the expanding crate.\n\n##### Privacy pool prover module compiles in source-including harnesses\n\nThe host-only `prover` module is gated on the `prover` cargo feature, which a source-including harness cannot enable _on the program_ (features belong to a dependency, and a cdylib-only program is not a dependency). The Surfpool harness now declares `prover` as one of its **own** features — a `#[path]` include resolves `cfg(feature = ...)` against the including crate, so the harness's feature opens the module — while carrying the `ark-*` crates the module imports as plain dependencies. The program's gate itself is unchanged (`all(feature = \"prover\", not(target_os = \"solana\"))`): admitting every `cfg(test)` build would break the program's own lib-test target, which compiles under default features where the optional `ark-*` dependencies are absent. The SBF artifact is unaffected (`not(target_os = \"solana\")` still excludes the module from every on-chain build), and the `[[test]] required-features` on the program's own e2e suite is unchanged.\n\n##### Program self-tests moved beside the programs they pin\n\nConverting the programs to cdylib-only left the workspace compute-unit harness (`tests/compute_units.rs`) linking against programs that no longer produce rlibs, so it now source-includes them with `#[path]` like the Surfpool harnesses. That exposed a rule the embedded `#[cfg(test)]` modules had been silently exempt from: their assertions pin enveloped codegen (envelope geometry, version bytes), and migration-aware codegen only expands when `migrations/manifest.json` is discoverable by walking up from the expanding crate — true for any crate inside the program's tree, false for a workspace-root harness. The programs' self-tests moved to `tests/` beside each program (migration-aware assertions to `tests/generated_views.rs` / `tests/self_checks.rs`, where the walk still finds the manifest); the account-realloc program's private-helper tests stayed in-crate because only the crate itself can reach those functions. The migrations program's exact runtime-CU snapshot moved to its own `tests/compute_units.rs` for the same reason, and the workspace harness now measures the four non-migration-aware programs. Every suite count is preserved: 18 migration-view tests, 13 counter, 22 profile, 11 realloc all run in their own packages.\n\nSource-including the `pina_bpf_program` also pulled its artifact-inspection tests (`sbf_build_produces_artifact`, `sbf_build_artifact_is_elf`) into the Surfpool harness, where the performance workflow sweeps them with `--ignored` and places ELFs through the compute-unit manifest instead of `target/deploy`. `pina_test::benchmark_artifact` now resolves a program's recorded artifact from `PINA_CU_MANIFEST` — the same manifest `ProgramTest::start` already reads — and the tests consult it before the `pina test` pin and the conventional `target/deploy` walk.\n\nThe fuzz targets had the same dependency shape: `crates/pina_fuzz` depended on `counter_program`, `role_registry_program`, and `migrations_program` as rlibs, which cdylib-only programs no longer produce. Each program now carries a `fuzz/` re-export crate inside its own tree — the source include expands the migration-aware macros with the manifest found by the walk, and the rlib the wrapper produces carries the already-expanded codegen — and the fuzz targets depend on those (`migrations_program_fuzz` re-exports the program's `fuzzing` feature through its own, since an include resolves features against the including crate). The corpus and target set are unchanged; the smoke tier replays and fuzzes all three targets green.\n\n##### Measured the entrypoint account budget and recorded the lean-entrypoint strategy\n\nThe framework-comparison fixtures never passed `nostd_entrypoint!` its second argument, so they carried pinocchio's unrolled 255-account deserializer for programs whose widest instruction uses three accounts. New `pina_lean` fixtures measure the bounded budget with the exact comparison profile and verifier: hello 4,680 → 2,736 bytes (−41.5%) at +6 CU, counter 12,720 → 11,680 (−8.2%) at +1/+4 CU. ADR 0010 (`docs/src/adrs/0010-lean-entrypoint-strategy.md`) records the full exploration — where the remaining bytes live (derive dispatch, the `RangeInclusive` envelope triplication, error conversion), what Quasar and Anchor v2 do differently (lazy per-arm account walking, 32-byte entrypoint stubs), and the phased decision: adopt the budget now, build the opt-in `lean_entrypoint!` dispatcher behind equivalence measurements, and keep pinocchio as a library. The program-size guide documents the budget lever with the measured table.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #544](https://github.com/pina-rs/pina/pull/544)\n\n#### Bind privacy pool initialization to a bootstrap authority\n\n_Packages:_ ⚪ _pina_\n\nThe pool's accounts are all singleton PDAs over fixed seeds, so `Initialize` was a one-time, winner-takes-all instruction: the first funded signer to call it became the permanent `PoolConfig.authority`, with no transfer or renounce path. That key installs the Groth16 verifying keys, rotates the disclosure committee, and registers compelled-disclosure requesters, so a front-running attacker could prove spends against keys they generated (or brick the pool for honest users) and turn the \"governed, logged disclosure\" guarantee into attacker-controlled surveillance over every honest deposit.\n\n`Initialize` now requires the signer to be the committed `BOOTSTRAP_AUTHORITY`. The check is one 32-byte comparison against a constant before any CPI. A new adversarial Surfpool case proves it: against the unpatched program an unapproved first initializer succeeds and captures the config, and with the check it is refused with no state created. The example readme records the production guidance — generate the bootstrap authority off-circuit, commit only its public key, and initialize in the deployment ceremony.\n\nThe measured cost is ratcheted into `scripts/compute-unit-policy.json`: privacy pool `initialize` 49,265 (+20) and `requestDisclosure` 11,605 (+7). Every other instruction is byte-identical, including `deposit`, `withdraw`, and `transfer`.\n\n#### Check the tier-1 disclosure deadline arithmetic\n\n`RequestDisclosure` computed `now + window` unchecked. A wrapped deadline lands in the past and silently collapses the challenge window tier 1 exists to provide. The addition now goes through a checked `challenge_deadline` helper with boundary unit tests covering the exact limit and the refusal one second past it.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #534](https://github.com/pina-rs/pina/pull/534) · _Related issues:_ [#506](https://github.com/pina-rs/pina/issues/506), [#530](https://github.com/pina-rs/pina/issues/530)\n\n#### Update the pinned toolchain and the classification gate\n\n_Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_macros_, ⚪ _pina_test_\n\nThe devenv inputs moved to a newer `ifiokjr-nixpkgs` revision, which advances the pinned `monochange` to 0.14.0, `mdt` to 0.9.5, and the rest of the nix-provided toolchain. `monochange/actions` moves back to v0.9.4 in the same change, because the CLI and the action read the same report and must move together.\n\n`monochange 0.14.0` emits its change-classification report as `schema_version` `\"0.2\"` — a string — with `compatibility_impact`, the renamed `unmodeled` impact, `decision.release_impact`, and label-driven skipping. The v0.9.2 action pinned here earlier parses the integer `schemaVersion` that 0.13 emitted and rejects the new shape with \"monochange did not return a supported change-classification report\"; v0.9.4 is the first release that parses it. The two pins are a pair: bumping either alone breaks the `changeset-policy` job on the next pull request whose classification actually runs, which is why the earlier action-only bump was reverted in #546. `monochange check` passes against the existing `monochange.toml` unchanged; 0.14.0's new `[changesets.classification].skip_labels` default of `[\"release\"]` means the release pull request is no longer classified, matching the existing `[changesets.affected].skip_labels` entry.\n\n#### Repair the Kani toolchain link\n\n`devenv.nix` linked Kani against `nightly-2025-11-21`, but the nixpkgs revision now ships Kani 0.68.0, whose release bundle was built against `nightly-2026-08-21` and resolves `librustc_driver` out of `$out/toolchain` at runtime. Every harness aborted before verification with `Library not loaded: librustc_driver-...dylib`. The link now uses 0.68.0's own toolchain, and the `kani (quick)` and `kani (compact layouts)` jobs pin 0.68.0 to match; `test:kani:quick` verifies 23 of 23 harnesses again.\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #548](https://github.com/pina-rs/pina/pull/548) · _Related issues:_ [#543](https://github.com/pina-rs/pina/issues/543), [#546](https://github.com/pina-rs/pina/issues/546), [#547](https://github.com/pina-rs/pina/issues/547)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
