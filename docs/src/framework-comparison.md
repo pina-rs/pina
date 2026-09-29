@@ -39,7 +39,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 | Framework                   | Size (bytes) | `hello` CU | vs Pinocchio size |
 | --------------------------- | -----------: | ---------: | ----------------: |
-| Pina                        |        2,088 |        146 |              −34% |
+| Pina                        |        1,984 |        146 |              −37% |
 | Pinocchio (hand-written)    |        3,160 |        111 |               +0% |
 | Quasar                      |        2,520 |        115 |              −20% |
 | Anchor v2 (`lang-v2`, rc.1) |        1,880 |        127 |              −41% |
@@ -48,7 +48,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 | Framework                   | Size (bytes) | `initialize` CU | `increment` CU | vs Pinocchio size |
 | --------------------------- | -----------: | --------------: | -------------: | ----------------: |
-| Pina                        |        9,304 |           3,080 |          1,755 |              +43% |
+| Pina                        |        8,712 |           3,080 |          1,738 |              +34% |
 | Pinocchio (hand-written)    |        6,512 |           1,490 |          1,721 |               +0% |
 | Quasar                      |        7,808 |           3,488 |            330 |              +20% |
 | Anchor v2 (`lang-v2`, rc.1) |        8,696 |           3,458 |          2,117 |              +34% |

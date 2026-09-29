@@ -53,6 +53,8 @@ Failure paths are the largest avoidable cost. `log!("address: {} …", addr)` an
 
 The default `logs` feature now logs a fixed message per failure and keeps the descriptive text. Formatted detail and `file:line:column` locations moved to the opt-in `verbose-logs` feature.
 
+A fixed message is only logged when it tells a client something the error code does not. Five validations fail with a code that names exactly one check — `MissingRequiredSignature`, `InvalidAccountOwner`, `AccountAlreadyInitialized`, `UninitializedAccount`, and pina's `InvalidAccountSize` — so their messages are logged only with `verbose-logs`, alongside the account's address. Each such site cost about 150 bytes, because a logging branch cannot be merged with the other failures that return the same code. Messages that tell apart the causes of a shared code, such as the several reasons for `InvalidAccountData` or an account discriminator versus an instruction discriminator, are still logged by default.
+
 ```toml
 [dependencies]
 pina = { version = "0.17", features = ["logs", "derive"] }

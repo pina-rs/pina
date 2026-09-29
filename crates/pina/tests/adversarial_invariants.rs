@@ -1064,6 +1064,38 @@ fn account_validation_accepts_matching_metadata() {
 	assert!(account.assert_owners(&[SYSVAR_OWNER]).is_ok());
 }
 
+/// The validations whose message only restates their error still fail with
+/// that error when the message is not logged.
+#[test]
+fn account_validation_rejects_empty_and_foreign_owned_accounts() {
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(31))
+			.owner(SYSVAR_OWNER),
+		AccountBuilder::new()
+			.address(fake_address(32))
+			.owner(SYSVAR_OWNER)
+			.data(&[1]),
+	];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let (empty, filled) = (&account_views[0], &account_views[1]);
+
+	assert_eq!(
+		empty.assert_not_empty().err(),
+		Some(ProgramError::UninitializedAccount)
+	);
+	assert_eq!(
+		filled.assert_empty().err(),
+		Some(ProgramError::AccountAlreadyInitialized)
+	);
+	assert_eq!(
+		empty.assert_owners(&[TEST_PROGRAM_ID]).err(),
+		Some(ProgramError::InvalidAccountOwner)
+	);
+}
+
 #[test]
 fn non_canonical_pda_requires_explicit_bump_verification() {
 	let (seed_bytes, _canonical_address, canonical_bump, non_canonical_address, non_canonical_bump) =

@@ -28,12 +28,31 @@ use crate::log_failure;
 
 const SYSVAR_ID: Address = crate::address!("Sysvar1111111111111111111111111111111111111");
 
+/// Logs a failure whose static message only restates the error the caller
+/// returns.
+///
+/// The error code already tells a client which check failed, so default builds
+/// log nothing: the message would cost deployed size in every program for no
+/// extra information. `verbose-logs` builds log the message and its detail,
+/// which names the account involved. Messages that disambiguate a shared error
+/// code, such as the several causes of `InvalidAccountData`, use
+/// [`log_failure!`] and are always logged.
+macro_rules! log_restated_failure {
+	($message:literal, $($arg:tt)*) => {{
+		if crate::VERBOSE_LOGS_ENABLED {
+			log_failure!($message, $($arg)*);
+		} else {
+			let _ = ($($arg)*);
+		}
+	}};
+}
+
 // `AccountView` is a pointer-sized `Copy` handle. Passing it by value through
 // these private validators copies only that handle, never the account data.
 #[track_caller]
 fn validate_signer(account: AccountView) -> ProgramResult {
 	if !account.is_signer() {
-		log_failure!(
+		log_restated_failure!(
 			"account is missing a required signature",
 			"address: {}",
 			account.address().as_ref()
@@ -97,7 +116,7 @@ fn validate_data_len(account: AccountView, len: usize) -> ProgramResult {
 #[track_caller]
 fn validate_fixed_account_size(account: AccountView, len: usize) -> ProgramResult {
 	if account.data_len() != len {
-		log_failure!(
+		log_restated_failure!(
 			"account has an invalid data length for the fixed account type",
 			"address: {}",
 			account.address().as_ref()
@@ -113,7 +132,7 @@ fn validate_fixed_account_size(account: AccountView, len: usize) -> ProgramResul
 #[track_caller]
 fn validate_empty(account: AccountView) -> ProgramResult {
 	if !account.is_data_empty() {
-		log_failure!(
+		log_restated_failure!(
 			"account is not empty",
 			"address: {}",
 			account.address().as_ref()
@@ -129,7 +148,7 @@ fn validate_empty(account: AccountView) -> ProgramResult {
 #[track_caller]
 fn validate_not_empty(account: AccountView) -> ProgramResult {
 	if account.is_data_empty() {
-		log_failure!(
+		log_restated_failure!(
 			"account is empty",
 			"address: {}",
 			account.address().as_ref()
@@ -224,7 +243,7 @@ fn validate_owner(account: AccountView, owner: &Address) -> ProgramResult {
 	let account_owner = account.owner();
 
 	if account_owner.ne(owner) {
-		log_failure!(
+		log_restated_failure!(
 			"account has an invalid owner",
 			"address: {} has invalid owner: {}, required: {}",
 			account.address().as_ref(),
@@ -247,7 +266,7 @@ fn validate_owners(account: AccountView, owners: &[Address]) -> ProgramResult {
 		return Ok(());
 	}
 
-	log_failure!(
+	log_restated_failure!(
 		"account has an invalid owner",
 		"address: {} has invalid owner: {}",
 		account.address().as_ref(),
