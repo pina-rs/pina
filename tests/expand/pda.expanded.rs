@@ -2473,6 +2473,7 @@ mod __pinapod_compact_CompactState {
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {
+        /// Validate `data` and return a read-only view over it.
         pub fn new(
             data: &'__pinapod_data [u8],
         ) -> Result<Self, pina::pinapod::PinaPodError> {
@@ -2481,9 +2482,11 @@ mod __pinapod_compact_CompactState {
             value.encoded_len = value.current_encoded_len();
             Ok(value)
         }
+        #[inline(always)]
         fn header(&self) -> &'__pinapod_data CompactStateHeader {
             unsafe { &*(self.data.as_ptr() as *const CompactStateHeader) }
         }
+        #[inline]
         fn current_encoded_len(&self) -> usize {
             let __hdr = self.header();
             let mut __offset = core::mem::size_of::<CompactStateHeader>();
@@ -2493,15 +2496,22 @@ mod __pinapod_compact_CompactState {
                     * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
             __offset
         }
+        /// The encoded length of the active value, excluding spare capacity.
+        #[inline(always)]
         pub fn encoded_len(&self) -> usize {
             self.encoded_len
         }
+        /// The physical allocation length the view was built from.
+        #[inline(always)]
         pub fn storage_len(&self) -> usize {
             self.data.len()
         }
+        /// The bytes a compact update may still claim without a resize.
         pub fn spare_capacity(&self) -> usize {
             self.data.len() - self.encoded_len
         }
+        /// The active elements of this tail field.
+        #[inline]
         pub fn values(&self) -> &'__pinapod_data [<u64 as pina::pinapod::ZcField>::Pod] {
             let __hdr = self.header();
             let __count = u16::from_le_bytes(__hdr.__values_len) as usize;
@@ -2543,6 +2553,7 @@ mod __pinapod_compact_CompactState {
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {
+        /// Validate `data` and return a staged writer over it.
         pub fn new(
             data: &'__pinapod_data mut [u8],
         ) -> Result<Self, pina::pinapod::PinaPodError> {
@@ -2574,19 +2585,26 @@ mod __pinapod_compact_CompactState {
         fn header_mut(&mut self) -> &mut CompactStateHeader {
             unsafe { &mut *(self.data.as_mut_ptr() as *mut CompactStateHeader) }
         }
+        /// Mutably borrow this inline field's stored value.
+        #[inline]
         pub fn discriminator_mut(
             &mut self,
         ) -> &mut [<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES] {
             &mut self.header_mut().discriminator
         }
+        /// Mutably borrow this inline field's stored value.
+        #[inline]
         pub fn authority_mut(
             &mut self,
         ) -> &mut <Address as pina::pinapod::ZcField>::Pod {
             &mut self.header_mut().authority
         }
+        /// Mutably borrow this inline field's stored value.
+        #[inline]
         pub fn bump_mut(&mut self) -> &mut <u8 as pina::pinapod::ZcField>::Pod {
             &mut self.header_mut().bump
         }
+        #[inline]
         pub fn set_values(
             &mut self,
             value: &'__pinapod_data [<u64 as pina::pinapod::ZcField>::Pod],
@@ -2594,11 +2612,9 @@ mod __pinapod_compact_CompactState {
             if value.len() > 4 || __pinapod_check_prefix(value.len(), 2usize).is_err() {
                 return Err(pina::pinapod::PinaPodError::Overflow);
             }
-            for __item in value {
-                <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
-                    __item,
-                )?;
-            }
+            <<u64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_slice(
+                value,
+            )?;
             self.__values_edit = Some((value.as_ptr() as *const u8, value.len()));
             Ok(())
         }
@@ -2631,6 +2647,8 @@ mod __pinapod_compact_CompactState {
             }
             Ok(__total)
         }
+        /// The allocation size the staged edits need, saturating instead of
+        /// reporting an error.
         pub fn projected_size(&self) -> usize {
             self.try_projected_size().unwrap_or(usize::MAX)
         }
@@ -2741,6 +2759,7 @@ mod __pinapod_compact_CompactState {
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {
+        /// An empty patch; every field stays at its stored value.
         pub fn new() -> Self {
             Self {
                 authority: None,
@@ -2795,6 +2814,8 @@ mod __pinapod_compact_CompactState {
             }
             Ok(())
         }
+        /// The allocation size applying this patch would produce, without
+        /// changing `data`.
         pub fn updated_len(
             &self,
             data: &[u8],
@@ -2831,6 +2852,7 @@ mod __pinapod_compact_CompactState {
             }
             Ok(initialized_len)
         }
+        /// Apply the patch in place and return the new encoded length.
         pub fn update(
             &self,
             data: &mut [u8],
@@ -2891,6 +2913,9 @@ mod __pinapod_compact_CompactState {
             }
             Ok(encoded_len)
         }
+        /// Write the patch into a fresh or zeroed allocation and return the
+        /// encoded length. A failure leaves the destination zeroed rather
+        /// than partially patched.
         pub fn initialize(
             &self,
             data: &mut [u8],
