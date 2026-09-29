@@ -2,7 +2,7 @@
 pina_cli: fix
 ---
 
-# Make a fresh `pina init` project work end to end, and tighten `pina deploy`
+# Make fresh `pina init` projects and `pina deploy` work
 
 - `pina init` scaffolded a nightly no Pina release ships lint drivers for, so `pina lint` could never succeed on a new project. The scaffold now pins the workspace toolchain (with `clippy`), and a test keeps the two in step.
 - TypeScript and Dart generation failed in any project without a local `codama` install, because the stdin render script could not resolve `npx -p` packages. It now loads the pinned packages from the `npx`/`pnpm dlx` install.

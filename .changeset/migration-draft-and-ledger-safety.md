@@ -2,7 +2,7 @@
 pina_cli: feat
 ---
 
-# Close migration gaps that let drafts and published history drift silently
+# Stop migration drafts and published history drifting
 
 - A finished manual transition body survived later changes to its draft's layout and kept compiling, silently misplacing bytes. When a draft's destination schema changes, `pina migrations create` now moves the finished body to `vN_to_vM.rs.stale`, writes a fresh stub for the new offsets, and says so; the stub's marker blocks the build until the body is ported.
 - `--manual <field>` was ignored for a draft already recorded as automatic. It now converts the draft to a manual stub.

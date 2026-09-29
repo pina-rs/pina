@@ -493,6 +493,7 @@ fn doctor_json_reports_missing_required_tools_as_failures() {
 	);
 }
 
+#[cfg(not(windows))]
 #[test]
 fn keys_point_at_the_migration_rebind_when_history_records_another_program() {
 	let temp = project("11111111111111111111111111111111");

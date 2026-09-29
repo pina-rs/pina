@@ -979,12 +979,16 @@ mod tests {
 			Some("11111111111111111111111111111111")
 		);
 
-		let generated = generate_keys(temp.path(), Some(&keypair_path), true)
-			.unwrap_or_else(|error| panic!("generation failed: {error}"));
-		assert_eq!(
-			generated.migration_history_program_id.as_deref(),
-			Some("11111111111111111111111111111111")
-		);
+		// Keypair generation refuses platforms without private file modes.
+		#[cfg(unix)]
+		{
+			let generated = generate_keys(temp.path(), Some(&keypair_path), true)
+				.unwrap_or_else(|error| panic!("generation failed: {error}"));
+			assert_eq!(
+				generated.migration_history_program_id.as_deref(),
+				Some("11111111111111111111111111111111")
+			);
+		}
 	}
 
 	#[test]

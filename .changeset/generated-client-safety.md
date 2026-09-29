@@ -4,7 +4,7 @@ pina_codama_renderer: fix
 pina_codama_renderer_cli: fix
 ---
 
-# Harden generated clients against spoofed events, broken `Migrate` calls, and injected docs
+# Harden generated clients against spoofing and injection
 
 - **Event attribution.** The TypeScript and Dart `parse<Program>EventsFromLogs` helpers decoded every `Program data:` line in a transaction, so any program — including one the caller invokes through CPI — could forge an event with the right discriminator, and one foreign future-version line made the whole parse throw. The parsers now follow the runtime's `Program <address> invoke [n]` / `success` / `failed` frames and decode a line only while the program (or an explicit `programAddress`) is the innermost invocation.
 - **`Migrate` system program.** The TypeScript, Dart, and Rust `Migrate` composers filled an omitted `systemProgram` with the program-address placeholder, which the on-chain `MigrateContext` rejects, so the documented `getMigrateInstruction({ state, payer })` call always failed. Slot 1 now defaults to the system program, and the payer and system program slots are always sent.

@@ -4607,7 +4607,10 @@ fn a_manual_answer_on_an_added_field_survives_a_draft_refresh() {
 	);
 
 	let stale = path.with_extension("rs.stale");
-	assert_eq!(output.stale_manual_transitions, [stale.clone()]);
+	assert_eq!(
+		canonical_paths(&output.stale_manual_transitions),
+		canonical_paths(&[stale.clone()])
+	);
 	let preserved =
 		std::fs::read_to_string(&stale).unwrap_or_else(|error| panic!("read stale: {error}"));
 	assert_eq!(preserved, body, "the developer's conversion must be kept");
@@ -4636,6 +4639,18 @@ fn a_manual_answer_on_an_added_field_survives_a_draft_refresh() {
 	);
 }
 
+/// Canonicalize reported paths so a comparison holds whichever spelling of the
+/// fixture root (Windows verbatim or not) the command reports.
+fn canonical_paths(paths: &[std::path::PathBuf]) -> Vec<std::path::PathBuf> {
+	paths
+		.iter()
+		.map(|path| {
+			std::fs::canonicalize(path)
+				.unwrap_or_else(|error| panic!("canonicalize {}: {error}", path.display()))
+		})
+		.collect()
+}
+
 /// `--manual` on a field an automatic draft already moves must convert that
 /// draft instead of being ignored.
 #[test]
@@ -4657,7 +4672,10 @@ fn a_manual_answer_converts_an_unchanged_automatic_draft() {
 		.unwrap_or_else(|error| panic!("answers: {error}"));
 	let output = create_migrations_with_answers(&fixture.root, &answers)
 		.unwrap_or_else(|error| panic!("convert to manual: {error:?}"));
-	assert_eq!(output.manual_transitions, [path.clone()]);
+	assert_eq!(
+		canonical_paths(&output.manual_transitions),
+		canonical_paths(&[path.clone()])
+	);
 	assert!(
 		output.stale_manual_transitions.is_empty(),
 		"an automatic body is regenerated, not kept"
