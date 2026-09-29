@@ -617,31 +617,47 @@ impl CommandRunner for SystemCommandRunner {
 		{
 			use std::os::windows::process::CommandExt as _;
 
-			let status = Command::new(program)
+			let mut child = Command::new(program)
 				.raw_arg(args[0].clone())
 				.raw_arg(command.clone())
 				.envs(env.iter().map(|(key, value)| (key, value)))
 				.current_dir(current_dir)
 				.stdin(Stdio::null())
-				.status()?;
+				.spawn()?;
+			let status = wait_for_child(&mut child)?;
 			return Ok(CommandStatus {
 				success: status.success(),
 				code: status.code(),
 			});
 		}
 
-		let status = Command::new(program)
+		let mut child = Command::new(program)
 			.args(args)
 			.envs(env.iter().map(|(key, value)| (key, value)))
 			.current_dir(current_dir)
 			.stdin(Stdio::null())
-			.status()?;
+			.spawn()?;
+		let status = wait_for_child(&mut child)?;
 
 		Ok(CommandStatus {
 			success: status.success(),
 			code: status.code(),
 		})
 	}
+}
+
+/// Marks an I/O error raised while waiting for a child that already started.
+///
+/// The child may have run to completion, so a caller must not treat the
+/// failure as proof that nothing was sent.
+#[derive(Debug, Error)]
+#[error("waiting for the started process failed: {0}")]
+pub(crate) struct ChildWaitError(#[source] pub(crate) io::Error);
+
+fn wait_for_child(child: &mut std::process::Child) -> io::Result<std::process::ExitStatus> {
+	child
+		.wait()
+		.map_err(|error| io::Error::other(ChildWaitError(error)))
 }
 
 /// Deployment planning or execution failure.
@@ -708,6 +724,15 @@ pub enum DeployError {
 	/// A child process could not be started.
 	#[error("failed to start {program:?}: {source}")]
 	CommandStart {
+		program: String,
+		#[source]
+		source: io::Error,
+	},
+
+	/// A child process started but its exit could not be observed, so it may
+	/// have written to the cluster.
+	#[error("lost track of {program:?} after it started: {source}")]
+	CommandInterrupted {
 		program: String,
 		#[source]
 		source: io::Error,
@@ -985,11 +1010,14 @@ impl DeployError {
 	/// Whether the deployment provably never reached the network.
 	///
 	/// Every error [`ApprovedDeployment::execute`] can return is raised before
-	/// the deploy program runs, except a program that started and then failed.
-	/// That one may have written to the cluster, so its pending publication must
-	/// be reconciled rather than discarded.
+	/// the deploy program runs, except a program that started and then failed
+	/// or whose exit was lost. Those may have written to the cluster, so their
+	/// pending publication must be reconciled rather than discarded.
 	pub fn is_unsent(&self) -> bool {
-		!matches!(self, Self::CommandFailed { .. })
+		!matches!(
+			self,
+			Self::CommandFailed { .. } | Self::CommandInterrupted { .. }
+		)
 	}
 }
 
@@ -1018,9 +1046,17 @@ fn run_command(
 			current_dir,
 		)
 		.map_err(|source| {
-			DeployError::CommandStart {
-				program: command.program.clone(),
-				source,
+			let started = matches!(source.get_ref(), Some(inner) if inner.is::<ChildWaitError>());
+			if started {
+				DeployError::CommandInterrupted {
+					program: command.program.clone(),
+					source,
+				}
+			} else {
+				DeployError::CommandStart {
+					program: command.program.clone(),
+					source,
+				}
 			}
 		})?;
 
@@ -2361,6 +2397,21 @@ mod tests {
 			"a started program may have reached the cluster"
 		);
 		assert_eq!(child_failure.calls.len(), 1);
+
+		let mut lost_child = FakeRunner {
+			calls: Vec::new(),
+			results: VecDeque::from([Err(io::Error::other(ChildWaitError(io::Error::new(
+				io::ErrorKind::Interrupted,
+				"wait failed",
+			))))]),
+		};
+		let error =
+			execute_deployment(&plan, false, false, &mut lost_child, &mut confirmer).unwrap_err();
+		assert!(matches!(error, DeployError::CommandInterrupted { .. }));
+		assert!(
+			!error.is_unsent(),
+			"a program whose exit was lost may have reached the cluster"
+		);
 
 		let mut signaled_child = FakeRunner {
 			calls: Vec::new(),

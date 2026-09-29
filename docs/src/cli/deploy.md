@@ -59,11 +59,11 @@ Pina validates and redacts the explicit target before project discovery or any b
 
 After confirmation, Pina copies the artifact and every keypair into a private, owner-only temporary directory (`pina-deploy-*`, mode `0700`, keypairs `0600`), revalidates the copies against the declared program ID and the SHA-256 fingerprints taken at planning time, and hands the child those copies rather than the original paths. A file replaced after the plan was displayed is therefore detected, and one replaced after the final check cannot reach the child. The displayed plan shows the paths you passed; the child's argument vector names the snapshot copies.
 
-Deployment requires the external `solana` executable from Agave on `PATH`. Pina runs every modeled command from the resolved project root, passes an argument vector directly rather than a shell command string, and closes the child's standard input after Pina handles confirmation. The npm-distributed Pina binary supports platforms on which Agave may not be available, so verify the local Agave installation before depending on deployment automation.
+Without `--remote-command`, deployment requires the external `solana` executable from Agave on `PATH`; a custom deploy command does not. Pina runs every modeled command from the resolved project root, passes an argument vector directly rather than a shell command string, and closes the child's standard input after Pina handles confirmation. The npm-distributed Pina binary supports platforms on which Agave may not be available, so verify the local Agave installation before depending on deployment automation.
 
 ## Custom deploy commands
 
-`--remote-command <COMMAND>` replaces `solana program deploy` with `sh -c <COMMAND>`, for platforms that deploy through their own tooling. Every other safeguard still applies: target policy, confirmation, snapshot validation, and publication receipts. The deployment facts reach the command only as environment variables, never interpolated into the command string:
+`--remote-command <COMMAND>` replaces `solana program deploy` with `sh -c <COMMAND>` (`cmd /C <COMMAND>` on Windows), for platforms that deploy through their own tooling. Every other safeguard still applies: target policy, confirmation, snapshot validation, and publication receipts. The deployment facts reach the command only as environment variables, never interpolated into the command string:
 
 | Variable                        | Value                                      |
 | ------------------------------- | ------------------------------------------ |

@@ -642,6 +642,8 @@ fn a_deploy_program_that_never_starts_discards_its_fresh_pending_publication() {
 		.command()
 		.args(["--cluster", "devnet", "--yes"])
 		.env("PATH", &empty_bin)
+		// Project discovery still needs Cargo, so name it by absolute path.
+		.env("CARGO", env!("CARGO"))
 		.output()
 		.unwrap_or_else(|error| panic!("run unstartable deployment: {error}"));
 	let stderr = String::from_utf8_lossy(&output.stderr);

@@ -1,5 +1,5 @@
 ---
-pina_cli: feat
+pina_cli: breaking
 ---
 
 # Stop migration drafts and published history drifting
@@ -10,3 +10,4 @@ pina_cli: feat
 - An unpublished history now rebinds to a changed `declare_id!` on the next `create` (the normal path after `pina keys new`), and `pina keys new`/`sync` point at that step. A published history still refuses a different program ID.
 - `pina idl` and `pina generate` refuse to run for a program whose `pina.toml` enables `auto` before `pina migrations create` records a baseline, instead of emitting an IDL without the version byte.
 - The generated `tests/abi_layout.rs` reports a compact contract's `MAX_SIZE` including the envelope header, like its `MIN_SIZE`.
+- Library API: `CreateMigrationsOutput`, `KeySync`, and `KeyGeneration` gain public fields, and `MigrationError::UnpinnedPublication`, `KeysError::MissingKeypair`, `CodamaError::ClientManifest`, and `DeployError::CommandInterrupted` are new variants, so exhaustive struct literals and matches over them must be updated.
