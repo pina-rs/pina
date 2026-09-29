@@ -269,10 +269,10 @@ owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
 pina_test = { path = "crates/pina_test", version = "0.22.0" }
-# Pinapod defines the account wire format and its derive, and 0.4.4 is the
-# first release re-exporting `fixed` (`pina::fixed` forwards it), so
-# downstream fixed-point schemas depend on `pina` alone.
-pinapod = { version = "0.4.4", default-features = false, features = ["solana-address", "solana-program-error"] }
+# Pinapod defines the account wire format and its derive, and 0.4.5 is the
+# first release rejecting array-nested dynamic prefixes at compile time, so
+# a schema cannot declare one wire layout and compile another.
+pinapod = { version = "0.4.5", default-features = false, features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
