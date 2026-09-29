@@ -36,8 +36,9 @@ pub(crate) const CLIENT_DEPENDENCY_REQUIREMENTS: &[(&str, &str, &[&str])] = &[
 	("thiserror", "^2", &[]),
 ];
 
-/// Whether a client crate at `crate_dir` can inherit `pina` from an enclosing
-/// workspace's `[workspace.dependencies]`.
+/// Whether a client crate at `crate_dir` can inherit its dependencies from an
+/// enclosing workspace: the workspace must declare `pina` and every
+/// dependency the client's manifest inherits with `workspace = true`.
 pub(crate) fn inherits_workspace_dependencies(crate_dir: &Path) -> bool {
 	let Some(start) = crate_dir
 		.ancestors()
@@ -54,11 +55,23 @@ pub(crate) fn inherits_workspace_dependencies(crate_dir: &Path) -> bool {
 			manifest.get("workspace").cloned()
 		})
 		.is_some_and(|workspace| {
-			workspace
-				.get("dependencies")
-				.and_then(Value::as_table)
-				.is_some_and(|dependencies| dependencies.contains_key("pina"))
+			let declared = workspace.get("dependencies").and_then(Value::as_table);
+			let declared = declared.cloned().unwrap_or_default();
+			declared.contains_key("pina")
+				&& inherited_dependencies(crate_dir).all(|name| declared.contains_key(&name))
 		})
+}
+
+/// The `[dependencies]` a client manifest inherits with `workspace = true`.
+fn inherited_dependencies(crate_dir: &Path) -> impl Iterator<Item = String> {
+	let contents = std::fs::read_to_string(crate_dir.join("Cargo.toml")).unwrap_or_default();
+	let manifest = contents.parse::<Table>().unwrap_or_default();
+	let dependencies = manifest.get("dependencies").and_then(Value::as_table);
+	let dependencies = dependencies.cloned().unwrap_or_default();
+	dependencies
+		.into_iter()
+		.filter(|(_, value)| value.get("workspace").and_then(Value::as_bool) == Some(true))
+		.map(|(name, _)| name)
 }
 
 /// Rewrite the scaffolded manifest in `crate_dir` to name concrete
@@ -269,8 +282,18 @@ serde = "1"
 		std::fs::write(&root, declared).unwrap_or_else(|error| panic!("write: {error}"));
 		assert!(inherits_workspace_dependencies(&client));
 
-		let missing = temp.path().join("missing");
+		// A workspace that lacks any dependency the client inherits cannot
+		// resolve it, so the client must become standalone.
+		let inherited =
+			"[dependencies]\npina = { workspace = true }\nbs58 = { workspace = true }\n";
 		let package = client.join("Cargo.toml");
+		std::fs::write(&package, inherited).unwrap_or_else(|e| panic!("write: {e}"));
+		assert!(!inherits_workspace_dependencies(&client));
+		let declared = "[workspace]\n[workspace.dependencies]\npina = \"0.22\"\nbs58 = \"0.5\"\n";
+		std::fs::write(&root, declared).unwrap_or_else(|error| panic!("write: {error}"));
+		assert!(inherits_workspace_dependencies(&client));
+
+		let missing = temp.path().join("missing");
 		std::fs::write(&package, "[package]\nname = \"demo\"\n").unwrap_or_else(|e| panic!("{e}"));
 		assert!(make_manifest_standalone(&missing).is_err());
 		make_manifest_standalone(&client).unwrap_or_else(|error| panic!("rewrite: {error}"));

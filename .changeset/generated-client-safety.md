@@ -1,7 +1,7 @@
 ---
 pina_cli: fix
 pina_codama_renderer: fix
-pina_codama_renderer_cli: fix
+pina_codama_renderer_cli: minor
 ---
 
 # Harden generated clients against spoofing and injection
