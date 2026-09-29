@@ -1103,16 +1103,16 @@ mod tests {
 	fn lint_driver_toolchain_matches_the_workspace_toolchain() {
 		let workspace_toolchain =
 			Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rust-toolchain.toml");
-		let Ok(contents) = std::fs::read_to_string(&workspace_toolchain) else {
-			// A packaged crate has no workspace to compare against.
-			return;
-		};
+		// A packaged crate has no workspace toolchain to compare against.
+		let contents = std::fs::read_to_string(&workspace_toolchain).unwrap_or_default();
 		let channel = contents
 			.lines()
 			.find_map(|line| line.trim().strip_prefix("channel = "))
-			.map(|value| value.trim_matches('"'))
-			.unwrap_or_else(|| panic!("rust-toolchain.toml must pin a channel"));
-		assert_eq!(LINT_DRIVER_TOOLCHAIN, channel);
+			.map(|value| value.trim_matches('"'));
+		assert!(
+			contents.is_empty() || channel == Some(LINT_DRIVER_TOOLCHAIN),
+			"rust-toolchain.toml pins {channel:?}, lint drivers ship for {LINT_DRIVER_TOOLCHAIN}"
+		);
 	}
 
 	#[test]

@@ -655,9 +655,12 @@ impl CommandRunner for SystemCommandRunner {
 pub(crate) struct ChildWaitError(#[source] pub(crate) io::Error);
 
 fn wait_for_child(child: &mut std::process::Child) -> io::Result<std::process::ExitStatus> {
-	child
-		.wait()
-		.map_err(|error| io::Error::other(ChildWaitError(error)))
+	child.wait().map_err(child_wait_error)
+}
+
+/// Wrap a wait failure so [`run_command`] can tell it from a spawn failure.
+fn child_wait_error(error: io::Error) -> io::Error {
+	io::Error::other(ChildWaitError(error))
 }
 
 /// Deployment planning or execution failure.
@@ -2330,8 +2333,7 @@ mod tests {
 	fn deployment_warnings_flag_self_authority_and_non_elf_artifacts() {
 		let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
 		let elf = temp.path().join("program.so");
-		fs::write(&elf, b"\x7fELF\x02\x01\x01")
-			.unwrap_or_else(|error| panic!("write elf: {error}"));
+		fs::write(&elf, b"\x7fELF\x02\x01\x01").unwrap_or_else(|error| panic!("write: {error}"));
 		let mut authority = vec![7_u8; 32];
 		authority.extend([9_u8; 32]);
 		let program_id = bs58::encode([3_u8; 32]).into_string();
@@ -2352,13 +2354,11 @@ mod tests {
 	fn deployment_snapshot_directory_is_owner_only() {
 		use std::os::unix::fs::PermissionsExt;
 
-		let directory = snapshot_directory_builder()
-			.tempdir()
-			.unwrap_or_else(|error| panic!("create snapshot directory: {error}"));
-		let mode = fs::metadata(directory.path())
-			.unwrap_or_else(|error| panic!("inspect snapshot directory: {error}"))
-			.permissions()
-			.mode();
+		let directory = snapshot_directory_builder().tempdir();
+		let directory = directory.unwrap_or_else(|error| panic!("create directory: {error}"));
+		let metadata = fs::metadata(directory.path());
+		let metadata = metadata.unwrap_or_else(|error| panic!("inspect directory: {error}"));
+		let mode = metadata.permissions().mode();
 		assert_eq!(mode & 0o777, 0o700);
 	}
 
@@ -2400,10 +2400,10 @@ mod tests {
 
 		let mut lost_child = FakeRunner {
 			calls: Vec::new(),
-			results: VecDeque::from([Err(io::Error::other(ChildWaitError(io::Error::new(
+			results: VecDeque::from([Err(child_wait_error(io::Error::new(
 				io::ErrorKind::Interrupted,
 				"wait failed",
-			))))]),
+			)))]),
 		};
 		let error =
 			execute_deployment(&plan, false, false, &mut lost_child, &mut confirmer).unwrap_err();

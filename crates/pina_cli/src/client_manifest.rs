@@ -204,11 +204,10 @@ solana-pubkey = { workspace = true, default-features = true, features = ["curve2
 demo = { path = "../demo" }
 serde = "1"
 "#,
-		)
-		.unwrap_or_else(|error| panic!("rewrite manifest: {error}"));
-		let parsed = manifest
-			.parse::<Table>()
-			.unwrap_or_else(|error| panic!("reparse manifest: {error}"));
+		);
+		let manifest = manifest.unwrap_or_else(|error| panic!("rewrite manifest: {error}"));
+		let parsed = manifest.parse::<Table>();
+		let parsed = parsed.unwrap_or_else(|error| panic!("reparse manifest: {error}"));
 		let dependencies = parsed["dependencies"].as_table().expect("dependencies");
 
 		let pina = dependencies["pina"].as_table().expect("pina");
@@ -223,8 +222,8 @@ serde = "1"
 
 		assert_eq!(dependencies["demo"]["path"].as_str(), Some("../demo"));
 		assert_eq!(dependencies["serde"].as_str(), Some("1"));
-		let clap = standalone_manifest("[dependencies]\nclap = { workspace = true }\n")
-			.unwrap_or_else(|error| panic!("rewrite clap: {error}"));
+		let clap = standalone_manifest("[dependencies]\nclap = { workspace = true }\n");
+		let clap = clap.unwrap_or_else(|error| panic!("rewrite clap: {error}"));
 		assert!(clap.contains(r#"features = ["derive", "std"]"#), "{clap}");
 		assert!(parsed["workspace"].as_table().is_some_and(Table::is_empty));
 	}
@@ -234,8 +233,8 @@ serde = "1"
 		let manifest = standalone_manifest(
 			"[dependencies]\nthiserror = { workspace = true, optional = true }\nlong = { version = \
 			 \"1\", features = [\n\t\"a\",\n] }\n\n[workspace]\nmembers = []\n",
-		)
-		.unwrap_or_else(|error| panic!("rewrite manifest: {error}"));
+		);
+		let manifest = manifest.unwrap_or_else(|error| panic!("rewrite manifest: {error}"));
 		assert!(
 			manifest.contains(
 				r#"thiserror = { version = "^2", default-features = false, optional = true }"#
@@ -262,24 +261,20 @@ serde = "1"
 		assert!(!inherits_workspace_dependencies(&client));
 		assert!(!inherits_workspace_dependencies(Path::new("")));
 
-		std::fs::write(temp.path().join("Cargo.toml"), "[workspace]\n")
-			.unwrap_or_else(|error| panic!("write root: {error}"));
+		let root = temp.path().join("Cargo.toml");
+		std::fs::write(&root, "[workspace]\n").unwrap_or_else(|error| panic!("write: {error}"));
 		assert!(!inherits_workspace_dependencies(&client));
 
-		std::fs::write(
-			temp.path().join("Cargo.toml"),
-			"[workspace]\n[workspace.dependencies]\npina = \"0.22\"\n",
-		)
-		.unwrap_or_else(|error| panic!("write root: {error}"));
+		let declared = "[workspace]\n[workspace.dependencies]\npina = \"0.22\"\n";
+		std::fs::write(&root, declared).unwrap_or_else(|error| panic!("write: {error}"));
 		assert!(inherits_workspace_dependencies(&client));
 
 		let missing = temp.path().join("missing");
-		std::fs::write(client.join("Cargo.toml"), "[package]\nname = \"demo\"\n")
-			.unwrap_or_else(|error| panic!("write client: {error}"));
+		let package = client.join("Cargo.toml");
+		std::fs::write(&package, "[package]\nname = \"demo\"\n").unwrap_or_else(|e| panic!("{e}"));
 		assert!(make_manifest_standalone(&missing).is_err());
 		make_manifest_standalone(&client).unwrap_or_else(|error| panic!("rewrite: {error}"));
-		let rewritten = std::fs::read_to_string(client.join("Cargo.toml"))
-			.unwrap_or_else(|error| panic!("read client: {error}"));
+		let rewritten = std::fs::read_to_string(&package).unwrap_or_else(|e| panic!("read: {e}"));
 		assert!(rewritten.contains("[workspace]"));
 	}
 
@@ -288,13 +283,12 @@ serde = "1"
 	#[test]
 	fn requirements_admit_the_repository_lockfile() {
 		let lockfile = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.lock");
-		let Ok(contents) = std::fs::read_to_string(lockfile) else {
-			return;
-		};
-		let lock = contents
-			.parse::<Table>()
-			.unwrap_or_else(|error| panic!("parse lockfile: {error}"));
-		let packages = lock["package"].as_array().expect("locked packages");
+		// A packaged crate has no lockfile, so there is nothing to compare.
+		let contents = std::fs::read_to_string(lockfile).unwrap_or_default();
+		let lock = contents.parse::<Table>();
+		let lock = lock.unwrap_or_else(|error| panic!("parse lockfile: {error}"));
+		let packages = lock.get("package").and_then(Value::as_array);
+		let packages = packages.map(Vec::as_slice).unwrap_or_default();
 		let parse = |version: &str| {
 			version
 				.split('.')
@@ -302,11 +296,11 @@ serde = "1"
 				.collect::<Vec<_>>()
 		};
 		for (name, requirement, _) in CLIENT_DEPENDENCY_REQUIREMENTS {
-			let minimum = parse(
-				requirement
-					.strip_prefix('^')
-					.unwrap_or_else(|| panic!("{name} must use a caret requirement")),
+			assert!(
+				requirement.starts_with('^'),
+				"{name} must use a caret requirement"
 			);
+			let minimum = parse(requirement.trim_start_matches('^'));
 			let admitted = packages.iter().any(|package| {
 				package["name"].as_str() == Some(*name)
 					&& package["version"].as_str().is_some_and(|version| {
@@ -314,7 +308,10 @@ serde = "1"
 						locked.first() == minimum.first() && locked >= minimum
 					})
 			});
-			assert!(admitted, "{name} {requirement} must admit a locked version");
+			assert!(
+				packages.is_empty() || admitted,
+				"{name} {requirement} must admit a locked version"
+			);
 		}
 	}
 }

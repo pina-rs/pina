@@ -953,25 +953,23 @@ mod tests {
 		let temp = project("11111111111111111111111111111111");
 		let keypair_path = temp.path().join("program-keypair.json");
 		let expected = keypair(&keypair_path, [9u8; 32]);
-		let sync = sync_keys(temp.path(), Some(&keypair_path))
-			.unwrap_or_else(|error| panic!("sync without history failed: {error}"));
+		let sync = sync_keys(temp.path(), Some(&keypair_path));
+		let sync = sync.unwrap_or_else(|error| panic!("sync without history failed: {error}"));
 		assert_eq!(sync.migration_history_program_id, None);
 
-		fs::create_dir_all(temp.path().join("migrations"))
-			.unwrap_or_else(|error| panic!("create migrations failed: {error}"));
+		let migrations = temp.path().join("migrations");
+		fs::create_dir_all(&migrations).unwrap_or_else(|error| panic!("create: {error}"));
 		let manifest = pina_abi::MigrationManifest::new(
 			"11111111111111111111111111111111".to_owned(),
 			pina_abi::MigrationVersionType::U8,
 		);
-		fs::write(
-			temp.path().join(pina_abi::MANIFEST_PATH),
-			serde_json::to_vec_pretty(&manifest)
-				.unwrap_or_else(|error| panic!("serialize manifest failed: {error}")),
-		)
-		.unwrap_or_else(|error| panic!("write manifest failed: {error}"));
+		let json = serde_json::to_vec_pretty(&manifest);
+		let json = json.unwrap_or_else(|error| panic!("serialize manifest: {error}"));
+		let path = temp.path().join(pina_abi::MANIFEST_PATH);
+		fs::write(&path, json).unwrap_or_else(|error| panic!("write manifest: {error}"));
 
-		let sync = sync_keys(temp.path(), Some(&keypair_path))
-			.unwrap_or_else(|error| panic!("matching sync failed: {error}"));
+		let sync = sync_keys(temp.path(), Some(&keypair_path));
+		let sync = sync.unwrap_or_else(|error| panic!("matching sync failed: {error}"));
 		assert!(!sync.changed);
 		assert_eq!(sync.program_id, expected);
 		assert_eq!(
@@ -982,8 +980,8 @@ mod tests {
 		// Keypair generation refuses platforms without private file modes.
 		#[cfg(unix)]
 		{
-			let generated = generate_keys(temp.path(), Some(&keypair_path), true)
-				.unwrap_or_else(|error| panic!("generation failed: {error}"));
+			let generated = generate_keys(temp.path(), Some(&keypair_path), true);
+			let generated = generated.unwrap_or_else(|error| panic!("generation: {error}"));
 			assert_eq!(
 				generated.migration_history_program_id.as_deref(),
 				Some("11111111111111111111111111111111")

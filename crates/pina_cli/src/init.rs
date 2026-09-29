@@ -918,24 +918,21 @@ mod tests {
 		fs::create_dir_all(&dir.path).unwrap_or_else(|err| panic!("create root: {err}"));
 		assert_eq!(enclosing_workspace(&nested), None);
 
-		fs::write(
-			dir.path.join("Cargo.toml"),
-			"[workspace]\nmembers = [\"programs/*\"]\n",
-		)
-		.unwrap_or_else(|err| panic!("write workspace: {err}"));
+		let outer = dir.path.join("Cargo.toml");
+		let workspace = "[workspace]\nmembers = [\"programs/*\"]\n";
+		fs::write(&outer, workspace).unwrap_or_else(|err| panic!("write workspace: {err}"));
 		let found = enclosing_workspace(&nested).unwrap_or_else(|| panic!("workspace expected"));
 		assert!(found.ends_with("Cargo.toml"));
 		print_next_steps(&nested, "counter");
 
 		// A package without a workspace table does not enclose anything.
-		fs::write(dir.path.join("Cargo.toml"), "[package]\nname = \"outer\"\n")
-			.unwrap_or_else(|err| panic!("write package: {err}"));
+		let package = "[package]\nname = \"outer\"\n";
+		fs::write(&outer, package).unwrap_or_else(|err| panic!("write package: {err}"));
 		assert_eq!(enclosing_workspace(&nested), None);
 
-		init_project(&nested, "counter", false)
-			.unwrap_or_else(|err| panic!("expected nested init to succeed: {err}"));
-		let cargo = fs::read_to_string(nested.join("Cargo.toml"))
-			.unwrap_or_else(|err| panic!("read nested manifest: {err}"));
+		init_project(&nested, "counter", false).unwrap_or_else(|err| panic!("init: {err}"));
+		let cargo = fs::read_to_string(nested.join("Cargo.toml"));
+		let cargo = cargo.unwrap_or_else(|err| panic!("read nested manifest: {err}"));
 		assert!(
 			!cargo.contains("[workspace"),
 			"a scaffold never declares its own workspace"

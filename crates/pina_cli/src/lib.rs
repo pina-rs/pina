@@ -74,10 +74,9 @@ fn reject_unsnapshotted_auto_policy(
 	if !recorded.is_empty() || program_path.join(pina_abi::MANIFEST_PATH).exists() {
 		return Ok(());
 	}
-	let configured_auto = project::Project::discover(program_path).map_or_else(
-		|_| pina_abi::MigrationAuto::none(),
-		|project| project.migration_auto,
-	);
+	let configured_auto = project::Project::discover(program_path)
+		.map(|project| project.migration_auto)
+		.unwrap_or_default();
 	if configured_auto.is_empty() {
 		return Ok(());
 	}

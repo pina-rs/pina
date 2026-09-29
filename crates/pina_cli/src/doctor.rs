@@ -1526,22 +1526,24 @@ mod tests {
 				.contains(&"run `pina keys sync` after reviewing the selected keypair".to_owned())
 		);
 
-		fs::write(
-			source_dir.join("lib.rs"),
-			format!(
-				"declare_id!(\"{}\");\n",
-				crate::init::PLACEHOLDER_PROGRAM_ID
-			),
-		)
-		.unwrap_or_else(|error| panic!("placeholder write failed: {error}"));
+		let source = format!(
+			"declare_id!(\"{}\");\n",
+			crate::init::PLACEHOLDER_PROGRAM_ID
+		);
+		let lib = source_dir.join("lib.rs");
+		fs::write(&lib, source).unwrap_or_else(|error| panic!("placeholder write: {error}"));
 		let placeholder = diagnose(&root);
-		let check = placeholder
-			.checks
-			.iter()
-			.find(|check| check.id == "project.program-id")
-			.unwrap_or_else(|| panic!("program-id check expected"));
-		assert_eq!(check.status, CheckStatus::Warn);
-		assert!(check.message.contains("pina keys new"), "{}", check.message);
+		let checks = placeholder.checks.iter();
+		let check = checks
+			.filter(|check| check.id == "project.program-id")
+			.collect::<Vec<_>>();
+		assert_eq!(check.len(), 1, "program-id check expected");
+		assert_eq!(check[0].status, CheckStatus::Warn);
+		assert!(
+			check[0].message.contains("pina keys new"),
+			"{}",
+			check[0].message
+		);
 	}
 
 	#[test]
