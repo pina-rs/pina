@@ -6,7 +6,7 @@
   ...
 }:
 let
-  currentDir = builtins.dirOf __curPos.file;
+  currentDir = dirOf __curPos.file;
   llvm = pkgs.llvmPackages_21;
   custom = inputs.ifiokjr-nixpkgs.packages.${pkgs.stdenv.hostPlatform.system};
   # Must match the toolchain the Kani release bundle was built against: the

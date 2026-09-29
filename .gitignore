@@ -14,6 +14,7 @@
 # its crate directory, so a full coverage run would otherwise litter the
 # worktree.
 *.profraw
+**/*.profraw
 
 # Devenv
 .devenv*

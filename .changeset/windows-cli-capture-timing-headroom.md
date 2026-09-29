@@ -1,8 +1,6 @@
 ---
-pina_cli: fix
+pina_cli: test
 pina: none
-# `pina_root` propagates from every core-group change; unpublished, so no bump.
-pina_root: none
 ---
 
 # Widen the headroom in the bounded-capture timing assertion
