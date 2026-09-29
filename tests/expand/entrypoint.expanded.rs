@@ -1,10 +1,12 @@
 use pina::*;
 /// Program entrypoint.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-    ::pinocchio::entrypoint::process_entrypoint::<
-        { ::pina::pinocchio::MAX_TX_ACCOUNTS },
-    >(input, process_instruction)
+    unsafe {
+        ::pina::__process_entrypoint::<
+            { ::pina::pinocchio::MAX_TX_ACCOUNTS },
+        >(input, process_instruction)
+    }
 }
 /// Allocates memory for the given type `T` at the specified offset in the heap
 /// reserved address space.

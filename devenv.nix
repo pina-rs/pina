@@ -547,8 +547,12 @@ in
           cargo +"$TOOLCHAIN" miri test --locked -p pina --test miri_loader_guards --all-features
         MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
           cargo +"$TOOLCHAIN" miri test --locked -p pina --test schema_boundary --all-features
+        # The entrypoint deserializes the loader's raw input through `unsafe`;
+        # its tests build that input byte for byte.
+        MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
+          cargo +"$TOOLCHAIN" miri test --locked -p pina --lib --all-features entry::
       '';
-      description = "Run Miri regressions for loader guards and macro-generated schema storage.";
+      description = "Run Miri regressions for loader guards, macro-generated schema storage, and the program entrypoint.";
       binary = "bash";
     };
     "test:kani:quick" = {
