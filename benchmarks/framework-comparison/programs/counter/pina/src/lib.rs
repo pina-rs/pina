@@ -6,7 +6,7 @@ use pina::*;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
-#[discriminator]
+#[discriminator(entrypoint)]
 pub enum CounterInstruction {
 	Initialize = 0,
 	Increment = 1,
@@ -96,22 +96,10 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 	}
 }
 
-nostd_entrypoint!(process_instruction);
-
-#[inline(always)]
-pub fn process_instruction(
-	program_id: &Address,
-	accounts: &mut [AccountView],
-	data: &[u8],
-) -> ProgramResult {
-	let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;
-
-	match instruction {
-		CounterInstruction::Initialize => {
-			InitializeAccounts::try_from((program_id, accounts))?.process(data)
-		}
-		CounterInstruction::Increment => {
-			IncrementAccounts::try_from((program_id, accounts))?.process(data)
-		}
-	}
-}
+// The generated router, with the account array its routes need: the widest
+// instruction plus one spare slot, so an extra trailing account is still
+// rejected by `finish_exact`.
+nostd_entrypoint!(
+	CounterInstruction::process_instruction,
+	CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+);
