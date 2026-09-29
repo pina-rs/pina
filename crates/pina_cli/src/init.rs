@@ -6,12 +6,16 @@ use heck::ToUpperCamelCase;
 
 // A non-system placeholder keeps the generated Surfpool deployment executable.
 // Users must still replace it before sharing or deploying the project.
-const PLACEHOLDER_PROGRAM_ID: &str = "Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7";
+pub(crate) const PLACEHOLDER_PROGRAM_ID: &str = "Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7";
 
 /// Errors produced during project initialization.
 #[derive(Debug, thiserror::Error)]
 pub enum InitError {
-	#[error("invalid package name `{name}`")]
+	#[error(
+		"invalid package name `{name}`: use 1-64 ASCII letters, digits, `_`, or `-`, start with a \
+		 letter or `_`, and avoid Rust keywords, because the name becomes the crate name of the \
+		 program and of every generated client"
+	)]
 	InvalidPackageName { name: String },
 
 	#[error("refusing to overwrite existing file: {path}")]
@@ -104,7 +108,11 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!("  Next steps:");
 	println!();
 	println!("    cd {}", project_dir.display());
-	println!("    # 1. Set your program address in src/lib.rs, then snapshot the ABI:");
+	println!("    # 1. Give the program its own identity, then snapshot the ABI:");
+	println!(
+		"    pina keys new                  # write target/deploy/<name>-keypair.json and \
+		 declare_id!"
+	);
 	println!("    pina migrations create         # record the version-0 baseline");
 	println!();
 	println!("    pina lint                      # run Pina's security lints");
@@ -118,6 +126,18 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 		"  Run `pina migrations create` only after the declared program address is final: the \
 		 recorded history is bound to that address."
 	);
+	println!(
+		"  The program keypair lives under the git-ignored `target/deploy/`, so `cargo clean` \
+		 deletes it. Back it up before deploying; it is the program's upgrade identity."
+	);
+	if let Some(workspace) = enclosing_workspace(project_dir) {
+		println!(
+			"  This program is inside the workspace at {}. Add it to that workspace's `members`, \
+			 and add the dependencies generated Rust clients inherit to its \
+			 `[workspace.dependencies]`.",
+			workspace.display()
+		);
+	}
 	println!();
 }
 
@@ -164,21 +184,55 @@ fn build_script_template() -> String {
 		.to_owned()
 }
 
+/// Rust keywords that cannot name a crate, so they cannot name a program whose
+/// generated clients declare modules and crates after it.
+const RUST_KEYWORDS: &[&str] = &[
+	"abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "crate",
+	"do", "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "gen", "if", "impl",
+	"in", "let", "loop", "macro", "match", "mod", "move", "mut", "override", "priv", "pub", "ref",
+	"return", "self", "static", "struct", "super", "trait", "true", "try", "type", "typeof",
+	"unsafe", "unsized", "use", "virtual", "where", "while", "yield",
+];
+
+/// Longest accepted package name, well inside Cargo's and file systems' limits.
+const MAX_PACKAGE_NAME_LEN: usize = 64;
+
 fn is_valid_package_name(name: &str) -> bool {
-	if name.is_empty() {
+	let Some(first) = name.chars().next() else {
+		return false;
+	};
+	if name.len() > MAX_PACKAGE_NAME_LEN || !(first.is_ascii_alphabetic() || first == '_') {
 		return false;
 	}
-
-	if name == "." || name == ".." {
-		return false;
-	}
-
-	if name.contains('/') || name.contains('\\') || name.chars().any(char::is_whitespace) {
-		return false;
-	}
-
-	name.chars()
+	if !name
+		.chars()
 		.all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+	{
+		return false;
+	}
+
+	let identifier = name.replace('-', "_").to_ascii_lowercase();
+	identifier != "_" && !RUST_KEYWORDS.contains(&identifier.as_str())
+}
+
+/// The manifest of the Cargo workspace enclosing `project_dir`, if any.
+///
+/// A program scaffolded inside a workspace must be listed in that workspace's
+/// members before Cargo will build it, so `pina init` points at it.
+fn enclosing_workspace(project_dir: &Path) -> Option<PathBuf> {
+	// The destination may not exist yet; its nearest existing ancestor can
+	// then be the workspace root itself, so only an existing destination skips
+	// its own manifest.
+	let start = project_dir
+		.ancestors()
+		.find_map(|candidate| fs::canonicalize(candidate).ok())?;
+	let own = usize::from(project_dir.exists());
+	start.ancestors().skip(own).find_map(|directory| {
+		let manifest = directory.join("Cargo.toml");
+		let contents = fs::read_to_string(&manifest).ok()?;
+		let table = contents.parse::<toml::Table>().ok()?;
+		table.contains_key("workspace").then_some(manifest)
+	})
 }
 
 fn write_file(path: &Path, contents: &str) -> Result<(), InitError> {
@@ -193,6 +247,9 @@ fn write_file(path: &Path, contents: &str) -> Result<(), InitError> {
 fn cargo_toml_template(package_name: &str) -> String {
 	let pina_version = env!("CARGO_PKG_VERSION");
 
+	// Package metadata rather than `[workspace.metadata]`: any `[workspace]`
+	// table makes the program a workspace root, which breaks an enclosing
+	// workspace that lists it as a member ("multiple workspace roots").
 	format!(
 		r#"[package]
 name = "{package_name}"
@@ -200,7 +257,7 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
-[workspace.metadata.cli]
+[package.metadata.cli]
 solana = "3.0.0"
 
 [lib]
@@ -293,12 +350,17 @@ pina idl --path .
 }
 
 fn rust_toolchain_template() -> String {
-	r#"[toolchain]
-channel = "nightly-2026-02-20"
-components = ["rust-src"]
+	// Scaffold the nightly Pina's released lint drivers are built for, so
+	// `pina lint` finds a prebuilt driver in a fresh project. `clippy` backs the
+	// `cargo clippy` step the testing guidance runs.
+	format!(
+		r#"[toolchain]
+channel = "{}"
+components = ["rust-src", "clippy"]
 profile = "minimal"
-"#
-	.to_owned()
+"#,
+		crate::lint_driver::LINT_DRIVER_TOOLCHAIN
+	)
 }
 
 fn gitignore_template() -> String {
@@ -510,18 +572,18 @@ use program::InitializeInstruction;
 /// native/Mollusk loop.
 #[test]
 #[ignore = "run with `pina test`"]
-fn initialize_runs_on_surfpool() {{
-	pina_test::run(async {{
+fn initialize_runs_on_surfpool() {
+	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
 			.await
 			.expect("start isolated program test");
 		let authority = program.payer();
 		let mut data = [0u8; InitializeInstruction::SIZE];
-		InitializeInstruction::initialize(&mut data, |args| {{
+		InitializeInstruction::initialize(&mut data, |args| {
 			args.value = 42;
 			Ok(())
-		}})
+		})
 		.expect("initialize instruction storage");
 		let instruction = program.instruction(
 			&data,
@@ -532,8 +594,8 @@ fn initialize_runs_on_surfpool() {{
 			.expect("execute Initialize instruction");
 
 		program.stop().expect("stop isolated program test");
-	}});
-}}
+	});
+}
 "#
 	.to_owned()
 }
@@ -593,7 +655,8 @@ mod tests {
 		// The scaffolded program serves migrations, and the reserved `Migrate`
 		// route that `#[discriminator(entrypoint)]` generates resizes accounts.
 		assert!(cargo.contains("features = [\"account-resize\", \"logs\", \"derive\"]"));
-		assert!(cargo.contains("[workspace.metadata.cli]"));
+		assert!(cargo.contains("[package.metadata.cli]"));
+		assert!(!cargo.contains("[workspace"));
 		assert!(cargo.contains("solana = \"3.0.0\""));
 		assert!(!cargo.contains("[workspace.metadata.bin]"));
 		assert!(!cargo.contains("dylint"));
@@ -684,8 +747,9 @@ mod tests {
 
 		let toolchain = fs::read_to_string(dir.path.join("rust-toolchain.toml"))
 			.unwrap_or_else(|err| panic!("expected rust-toolchain.toml to be readable: {err}"));
-		assert!(toolchain.contains("nightly-2026-02-20"));
+		assert!(toolchain.contains(crate::lint_driver::LINT_DRIVER_TOOLCHAIN));
 		assert!(toolchain.contains("rust-src"));
+		assert!(toolchain.contains("clippy"));
 		let readme = fs::read_to_string(dir.path.join("README.md"))
 			.unwrap_or_else(|err| panic!("expected README.md to be readable: {err}"));
 		assert!(readme.contains("cargo-build-sbf"));
@@ -800,6 +864,83 @@ mod tests {
 		let dir = TempDir::new("invalid_name");
 		let result = init_project(&dir.path, "not valid", false);
 		assert!(matches!(result, Err(InitError::InvalidPackageName { .. })));
+	}
+
+	#[test]
+	fn package_names_follow_cargo_and_rust_identifier_rules() {
+		for valid in [
+			"counter",
+			"my-program",
+			"my_program",
+			"_private",
+			"a1",
+			"std",
+			"pina",
+		] {
+			assert!(is_valid_package_name(valid), "{valid} should be accepted");
+		}
+		let too_long = "a".repeat(MAX_PACKAGE_NAME_LEN + 1);
+		for invalid in [
+			"",
+			"1escrow",
+			"-",
+			"--",
+			"-program",
+			"_",
+			"self",
+			"Self",
+			"crate",
+			"super",
+			"type",
+			"my program",
+			"a/b",
+			"caf\u{e9}",
+			too_long.as_str(),
+		] {
+			assert!(
+				!is_valid_package_name(invalid),
+				"{invalid:?} should be rejected"
+			);
+		}
+		assert!(is_valid_package_name(&"a".repeat(MAX_PACKAGE_NAME_LEN)));
+
+		let message = InitError::InvalidPackageName {
+			name: "1escrow".to_owned(),
+		}
+		.to_string();
+		assert!(message.contains("start with a letter"), "{message}");
+	}
+
+	#[test]
+	fn enclosing_workspaces_are_detected_from_missing_destinations() {
+		let dir = TempDir::new("workspace");
+		let nested = dir.path.join("programs/counter");
+		fs::create_dir_all(&dir.path).unwrap_or_else(|err| panic!("create root: {err}"));
+		assert_eq!(enclosing_workspace(&nested), None);
+
+		fs::write(
+			dir.path.join("Cargo.toml"),
+			"[workspace]\nmembers = [\"programs/*\"]\n",
+		)
+		.unwrap_or_else(|err| panic!("write workspace: {err}"));
+		let found = enclosing_workspace(&nested).unwrap_or_else(|| panic!("workspace expected"));
+		assert!(found.ends_with("Cargo.toml"));
+		print_next_steps(&nested, "counter");
+
+		// A package without a workspace table does not enclose anything.
+		fs::write(dir.path.join("Cargo.toml"), "[package]\nname = \"outer\"\n")
+			.unwrap_or_else(|err| panic!("write package: {err}"));
+		assert_eq!(enclosing_workspace(&nested), None);
+
+		init_project(&nested, "counter", false)
+			.unwrap_or_else(|err| panic!("expected nested init to succeed: {err}"));
+		let cargo = fs::read_to_string(nested.join("Cargo.toml"))
+			.unwrap_or_else(|err| panic!("read nested manifest: {err}"));
+		assert!(
+			!cargo.contains("[workspace"),
+			"a scaffold never declares its own workspace"
+		);
+		print_next_steps(&nested, "counter");
 	}
 
 	#[test]

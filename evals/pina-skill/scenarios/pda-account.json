@@ -2,7 +2,7 @@
 	"id": "pda-account",
 	"title": "Add a PDA-backed account with a create instruction",
 	"fixture": "base-counter-published",
-	"prompt": "This counter program needs per-authority journals: each authority gets exactly one journal account at a PDA derived from their address. Add a `Journal` account (a `u32` revision and a `Vec<u64, 8>` of entries) plus an `Initialize` instruction that creates the caller's journal and funds it from their wallet. Follow the toolkit's own patterns for PDA creation — I don't want hand-rolled address derivation sprinkled around. Keep everything building.",
+	"prompt": "This counter program needs per-authority journals: each authority gets exactly one journal account at a PDA derived from their address. Add a `Journal` account (a `u32` revision and a `Vec<u64, 8>` of entries) plus an `Initialize` instruction that creates the caller's journal and funds it from their wallet. Follow the toolkit's own patterns for PDA creation \u2014 I don't want hand-rolled address derivation sprinkled around. Keep everything building.",
 	"expectation": "The agent declares the journal with `#[pda(seeds = [...])]` in a type-specific seed namespace and creates it through the toolkit's `CreateProgramAccount` builder, which derives and validates the canonical bump itself. Storing the bump on the account (`bump = bump`, then `invoke_with_bump`) is a valid design but not a requirement, so the checks grade that creation goes through the builder without hand-rolled `find_program_address` duplication.",
 	"checks": [
 		{
@@ -23,8 +23,8 @@
 			"id": "uses-create-builder",
 			"kind": "file",
 			"path": "src/lib.rs",
-			"match": "CreateProgramAccount",
-			"why": "Account creation goes through the documented builder values, not raw system CPI."
+			"match": "Create(Compact)?ProgramAccount",
+			"why": "Account creation goes through the documented builder values (`CreateProgramAccount*`, or `CreateCompactProgramAccount*` for a compact account), not raw system CPI."
 		},
 		{
 			"id": "no-hand-rolled-derivation",
@@ -41,7 +41,7 @@
 			"expectOutput": [
 				"creation op"
 			],
-			"why": "Creation must go through the toolkit's builder with the invocation chained to the same construction — a builder name elsewhere in the file does not prove the PDA creation path. Whether the account stores the bump (and therefore needs `invoke_with_bump`) is the author's design choice, so the check does not demand one variant."
+			"why": "Creation must go through the toolkit's builder with the invocation chained to the same construction \u2014 a builder name elsewhere in the file does not prove the PDA creation path. Whether the account stores the bump (and therefore needs `invoke_with_bump`) is the author's design choice, so the check does not demand one variant."
 		},
 		{
 			"id": "history-consistent",

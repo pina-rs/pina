@@ -183,6 +183,9 @@ pub enum CodamaError {
 	#[error("Dart client IDL validation failed at {path}: {message}")]
 	DartClientValidation { path: PathBuf, message: String },
 
+	#[error("Failed to make the generated client manifest {path} standalone: {message}")]
+	ClientManifest { path: PathBuf, message: String },
+
 	#[error("Failed to run `{cmd}`: {source}")]
 	RunCommand { cmd: String, source: std::io::Error },
 

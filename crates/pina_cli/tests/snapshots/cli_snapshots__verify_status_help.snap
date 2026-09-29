@@ -23,7 +23,6 @@ Options:
 Example:
   pina verify status --program-id <ADDRESS>
 
-This command is \
-		              read-only and always queries the official mainnet remote verifier.
+This command is read-only and always queries the official mainnet remote verifier.
 
 ----- stderr -----

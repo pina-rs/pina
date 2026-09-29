@@ -33,12 +33,14 @@ This guidance also travels inside the toolkit itself: `pina skill read <topic>` 
 - After changing a migration-aware account, instruction payload, or event, run `pina migrations create` and resolve every generated `TODO(pina-manual-migration)` transition before building. An unfinished transition or a drifted schema blocks the build.
 - Finish every migration-aware change with `pina migrations check` and report its result. It is the only command that catches the drift gates a build does not, including a stale generated `tests/abi_layout.rs`. Never describe migration work as complete on the strength of a passing build alone.
 - Never strip a version envelope the manifest records (including via `migrations = false` on a recorded contract) and never hand-edit `migrations/manifest.json`, `migrations/publications.json`, `tests/abi_layout.rs`, or generated transition files. Regenerate clients after `create` so the manifest and the generated clients stay in sync.
+- Treat these as stop signs, not obstacles to clear: a `vN_to_vM.rs.stale` file (a hand-written body for an older draft layout, to be ported by hand, never copied back), `UnpinnedPublication` (verify the manifest against version control before `pina migrations reconcile --pin-legacy`), and `ProgramIdentityChanged` on a published history (restore the original `declare_id!`). Never delete `migrations/` or blank receipt history to make a check pass.
+- Generated clients decode bytes; they do not prove where the bytes came from. Code built on them must check account owners, attribute events through `parse<Program>EventsFromLogs` over complete transaction logs, and validate values it relies on. See [references/cli-and-codegen.md](references/cli-and-codegen.md#using-generated-clients-safely).
 
 Read [references/program-authoring.md](references/program-authoring.md) before changing macros, account layouts, validation chains, PDAs, CPIs, or close/reallocation logic.
 
 ## Workflow
 
-1. Inspect the smallest relevant surface and state the compatibility boundary: wire format, account layout, program ID, generated IDL, or CLI output.
+1. Inspect the smallest relevant surface and state the compatibility boundary: wire format, account layout, program ID, generated IDL, or CLI output. On a fresh `pina init` project, run `pina keys new` and then `pina migrations create` before building or generating anything.
 2. Make the narrowest idiomatic change. Reuse Pina validation and loader APIs instead of duplicating parsing or ownership checks.
 3. Add or update a regression test at the layer where the behavior is observable.
 4. Run focused tests first, then the repository's documented format, lint, build, and test commands. For a standalone project without task aliases, use Cargo commands from [references/testing.md](references/testing.md).

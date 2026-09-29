@@ -38,7 +38,7 @@ final class CreateCommand extends Command<void> {
       programAddress: context.programAddress,
       account: account,
       authority: authority,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       dataF32: dataF32Value,
       dataF64: dataF64Value,
     );

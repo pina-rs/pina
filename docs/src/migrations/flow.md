@@ -279,12 +279,14 @@ Generated clients turn that flow into a one-call routine. Next to each migratabl
 - the generic `needsMigration` envelope check is that per-account helper (`stateNeedsMigration` for a `State` account, and so on);
 - `<account>NeedsMigration(bytes)` — a cheap envelope check that returns true only when the bytes name this account's discriminator and a version older than the client's schema. Future versions and foreign discriminators return false; the decoder explains those when the account is decoded.
 
-The clients also emit a `Migrate` instruction composer (TypeScript `getMigrateInstruction`, Dart `getMigrateInstruction`, Rust `Migrate::new().instruction()`). Migratable **events** get the same envelope treatment on the read path: transaction logs are immutable, so instead of migrating them each client emits a log entry point (`parse<Program>EventsFromLogs` in TypeScript and Dart, `project_from_bytes` in Rust) that enforces the version envelope and, when the checked-in migration manifest proves the transition is automatic, projects historical bytes into the current shape. The decoded record reports `sourceVersion` and `wasMigrated`, mirroring the runtime's `CurrentEventData::source_version`. Manual transitions are the documented limit: generated clients cannot represent them, so those log versions fail closed with a message naming the transition. Every migratable slot is optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs. The intended catch → migrate → retry loop:
+The clients also emit a `Migrate` instruction composer (TypeScript `getMigrateInstruction`, Dart `getMigrateInstruction`, Rust `Migrate::new().instruction()`). Migratable **events** get the same envelope treatment on the read path: transaction logs are immutable, so instead of migrating them each client emits a log entry point (`parse<Program>EventsFromLogs` in TypeScript and Dart, `project_from_bytes` in Rust) that enforces the version envelope and, when the checked-in migration manifest proves the transition is automatic, projects historical bytes into the current shape. The decoded record reports `sourceVersion` and `wasMigrated`, mirroring the runtime's `CurrentEventData::source_version`. Manual transitions are the documented limit: generated clients cannot represent them, so those log versions fail closed with a message naming the transition. The event parser also attributes each line to the program that emitted it by following the transaction's `invoke`/`success` frames, so pass it a transaction's complete, ordered logs. In the `Migrate` composer, the payer and system program slots are always sent, and `systemProgram` defaults to the system program because the program rejects anything else in slot 1. Every migratable slot is optional: omitted slots become program-address placeholders and trailing omitted migratable slots are truncated, so a client sends only the accounts it needs. The intended catch → migrate → retry loop:
 
 ```ts
-const { data } = await fetchEncodedAccount(rpc, address);
-if (stateNeedsMigration(data)) {
-	await send(getMigrateInstruction({ state: address, payer }).make());
+const account = await fetchEncodedAccount(rpc, address);
+if (account.exists && stateNeedsMigration(account.data)) {
+	// `getMigrateInstruction` returns a complete instruction; add it to a
+	// transaction message like any other.
+	await send(getMigrateInstruction({ state: address, payer }));
 }
 // now decode `state` and send the real instruction
 ```

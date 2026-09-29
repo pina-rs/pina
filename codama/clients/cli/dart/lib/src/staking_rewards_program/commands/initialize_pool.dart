@@ -85,9 +85,9 @@ final class InitializePoolCommand extends Command<void> {
       stakeVault: stakeVault,
       rewardVault: rewardVault,
       associatedTokenProgram: Address(
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
       ),
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       tokenProgram: tokenProgram,
       bump: bumpValue,
     );

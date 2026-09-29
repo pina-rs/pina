@@ -218,10 +218,10 @@ export const COUNTER_STATE_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (counterStateNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && counterStateNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ counterState: address, payer }).make());
+ * 	await send(getMigrateInstruction({ counterState: address, payer }));
  * }
  * ```
  */

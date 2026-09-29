@@ -64,7 +64,7 @@ final class ConfigAuthorityExecuteCommand extends Command<void> {
       multisig: multisig,
       authority: authority,
       rentPayer: rentPayer,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       clock: clock,
       rentCollector: rentCollector,
       spendingLimitAccounts: spendingLimitAccounts,

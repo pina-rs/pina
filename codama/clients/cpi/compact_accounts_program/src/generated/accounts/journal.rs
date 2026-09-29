@@ -37,10 +37,7 @@ impl<'data> Journal<'data> {
 	/// Largest encoded size of this account's data.
 	pub const MAX_LEN: usize = 18446744073709551615;
 	/// Why this account has no generated parser.
-	pub const PARSER_UNSUPPORTED: &'static str =
-		"unsupported type `accountNode` at `account `Journal` field `featured_entry``: a field of \
-		 type `Option<u64>` needs a value decoder this renderer does not emit; only integers, \
-		 booleans, addresses, fixed byte arrays, and generated structs have one";
+	pub const PARSER_UNSUPPORTED: &'static str = "unsupported type `accountNode` at `account `Journal` field `featured_entry``: a field of type `Option<u64>` needs a value decoder this renderer does not emit; only integers, booleans, addresses, fixed byte arrays, and generated structs have one";
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]

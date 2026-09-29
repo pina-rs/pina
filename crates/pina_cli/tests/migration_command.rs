@@ -898,3 +898,167 @@ fn abi_schema_prints_each_document_and_rejects_unknown_requests() {
 		"stderr: {stderr}"
 	);
 }
+
+#[test]
+fn reconcile_pins_legacy_receipts_only_on_request() {
+	let fixture = MigrationFixture::new(true);
+	run(&mut fixture.command("create"));
+	fixture.publish(true);
+
+	let already = run(fixture.command("reconcile").arg("--pin-legacy"));
+	assert!(
+		already.contains("already pins its history"),
+		"stdout: {already}"
+	);
+
+	// Strip the pins, as a ledger written before pinning has them.
+	let path = fixture.root.join("migrations/publications.json");
+	let mut ledger = pina_abi::decode_publication_ledger(
+		&fs::read(&path).unwrap_or_else(|error| panic!("read ledger: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("decode ledger: {error}"));
+	for receipt in &mut ledger.receipts {
+		for published in receipt.versions.values_mut() {
+			published.history.clear();
+		}
+	}
+	fs::write(
+		&path,
+		pina_abi::encode_publication_ledger(&ledger)
+			.unwrap_or_else(|error| panic!("encode ledger: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("write ledger: {error}"));
+
+	let (_, stderr) = run_failure(&mut fixture.command("check"));
+	assert!(stderr.contains("--pin-legacy"), "stderr: {stderr}");
+
+	let pinned = run(fixture.command("reconcile").arg("--pin-legacy"));
+	assert!(
+		pinned.contains("Pinned 1 published contract"),
+		"stdout: {pinned}"
+	);
+	run(&mut fixture.command("check"));
+	let repeated = run(fixture
+		.command("reconcile")
+		.arg("--pin-legacy")
+		.arg("--json"));
+	let report: serde_json::Value =
+		serde_json::from_str(&repeated).unwrap_or_else(|error| panic!("parse pin JSON: {error}"));
+	assert_eq!(report["pinned"], 0);
+
+	let (_, conflict) = run_failure(
+		fixture
+			.command("reconcile")
+			.arg("--pin-legacy")
+			.arg("--abandon"),
+	);
+	assert!(
+		conflict.contains("cannot be used with"),
+		"stderr: {conflict}"
+	);
+}
+
+#[test]
+fn create_reports_stale_manual_bodies_and_identity_rebinds() {
+	let fixture = MigrationFixture::new(true);
+	run(&mut fixture.command("create"));
+	fixture.publish(true);
+
+	// A type change needs a hand-written body.
+	fixture.write_fields("value: u32");
+	let created = run(&mut fixture.command("create"));
+	assert!(
+		created.contains("Manual migration required"),
+		"stdout: {created}"
+	);
+	let transition = fixture
+		.root
+		.join("migrations/transitions/account_1_01/v0_to_v1.rs");
+	fs::write(
+		&transition,
+		"pub(crate) const SOURCE_SIZE: usize = 10;\npub(crate) const DESTINATION_SIZE: usize = \
+		 6;\npub(crate) const WORKING_SIZE: usize = 10;\npub(crate) fn migrate(data: &mut [u8]) \
+		 {\n\tlet _ = data;\n}\n",
+	)
+	.unwrap_or_else(|error| panic!("write body: {error}"));
+
+	// Changing the draft's layout again moves that body aside.
+	fixture.write_fields("value: u32, extra: u8");
+	let refreshed = run(&mut fixture.command("create"));
+	assert!(
+		refreshed.contains("hand-written body was moved to"),
+		"stdout: {refreshed}"
+	);
+	assert!(transition.with_extension("rs.stale").exists());
+
+	// An unpublished history follows a new program ID.
+	let draft = MigrationFixture::new(true);
+	run(&mut draft.command("create"));
+	let source = fs::read_to_string(draft.root.join("src/lib.rs"))
+		.unwrap_or_else(|error| panic!("read source: {error}"));
+	draft.write_source(&source.replace(PROGRAM_ID, "Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7"));
+	let rebound = run(&mut draft.command("create"));
+	assert!(
+		rebound.contains("Rebound unpublished migration history"),
+		"stdout: {rebound}"
+	);
+	assert!(
+		rebound.contains("`pina init` placeholder program ID"),
+		"stdout: {rebound}"
+	);
+}
+
+#[test]
+fn a_process_only_change_keeps_a_finished_manual_body() {
+	let fixture = MigrationFixture::new(true);
+	fixture.write_source(&migratable_program_source("value: u64", "amount: u64"));
+	run(&mut fixture.command("create"));
+	fixture.publish(true);
+
+	// A narrowed payload field needs a hand-written instruction conversion.
+	fixture.write_source(&migratable_program_source("value: u64", "amount: u32"));
+	let created = run(&mut fixture.command("create"));
+	assert!(
+		created.contains("Manual migration required"),
+		"stdout: {created}"
+	);
+	let transition = fs::read_dir(fixture.root.join("migrations/transitions"))
+		.unwrap_or_else(|error| panic!("list transitions: {error}"))
+		.filter_map(Result::ok)
+		.find(|entry| {
+			entry
+				.file_name()
+				.to_string_lossy()
+				.starts_with("instruction")
+		})
+		.map(|entry| entry.path().join("v0_to_v1.rs"))
+		.unwrap_or_else(|| panic!("instruction transition expected"));
+	let finished = fs::read_to_string(&transition)
+		.unwrap_or_else(|error| panic!("read stub: {error}"))
+		.replace("TODO(pina-manual-migration)", "reviewed conversion");
+	fs::write(&transition, &finished).unwrap_or_else(|error| panic!("finish body: {error}"));
+	run(&mut fixture.command("create"));
+
+	// Appending an optional account slot changes only the process contract,
+	// so the body still converts between the same two payload layouts.
+	fixture.write_source(
+		&migratable_program_source("value: u64", "amount: u32").replace(
+			"\tsystem_program: Option<&'a AccountView>,\n}",
+			"\tsystem_program: Option<&'a AccountView>,\n\taudit: Option<&'a AccountView>,\n}",
+		),
+	);
+	let refreshed = run(&mut fixture.command("create"));
+	assert!(
+		refreshed.contains("Updated draft instruction"),
+		"the slot change must reach the draft: {refreshed}"
+	);
+	assert!(
+		!refreshed.contains("hand-written body was moved"),
+		"stdout: {refreshed}"
+	);
+	assert_eq!(
+		fs::read_to_string(&transition).unwrap_or_else(|error| panic!("read body: {error}")),
+		finished
+	);
+	assert!(!transition.with_extension("rs.stale").exists());
+}

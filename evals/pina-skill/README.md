@@ -52,7 +52,7 @@ Useful flags: `--model`, `--timeout`, `--repeats`, `--instruction-variant`, `--s
    devenv shell -- cargo build -p pina_cli
    ```
 
-2. The agent runtime must be authenticated. Runs use `--setting-sources project` and `--strict-mcp-config`, so the operator's personal hooks, plugins, and MCP servers stay out of the measurement.
+2. The agent runtime must be authenticated. Runs use `--setting-sources project` and `--strict-mcp-config`, so the operator's personal hooks, plugins, and MCP servers stay out of the measurement. They also use `--permission-mode bypassPermissions`, which the runtime refuses as root; inside a disposable container that runs as root, set `IS_SANDBOX=1` to acknowledge it. A runtime that exits before producing a transcript aborts the whole run rather than being graded as a failed attempt.
 
 ## How isolation works
 

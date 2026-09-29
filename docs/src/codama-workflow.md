@@ -77,7 +77,9 @@ const codama = await createFromFile("./idls/my_program.json");
 await codama.accept(renderJsVisitor("./clients/js/my_program"));
 ```
 
-Generated clients are an untrusted boundary. The checked-in contract suite requires encoders to reject fixed and compact capacity overflow. Decoders enforce discriminators, declared capacities, canonical boolean and option tags, exact top-level lengths, and strict UTF-8. A renderer version that cannot satisfy those contracts is rejected instead of producing a client with a different wire format.
+Generated clients are an untrusted boundary. The checked-in contract suite requires encoders to reject fixed and compact capacity overflow. Decoders enforce discriminators, declared capacities, canonical boolean and option tags, and strict UTF-8. They do not enforce exact top-level lengths everywhere: TypeScript account and instruction decoders accept trailing bytes, and Dart account decoders do too, while the on-chain `try_from_bytes` requires an exact length. A renderer version that cannot satisfy those contracts is rejected instead of producing a client with a different wire format.
+
+Decoding is not attribution. No generated decoder checks which program owns an account, so compare the fetched account's owner with the program address before trusting decoded state, or fetch a PDA through its generated `fetch…FromSeeds` helper. Program-level event parsers (`parse<Program>EventsFromLogs` in TypeScript and Dart) take a transaction's complete, ordered logs and decode a `Program data:` line only while the program is the innermost invocation, because any other program, including one it calls through CPI, can log bytes that start with the same discriminator. The per-event `parse<Event>FromLog` helpers decode a single line without that attribution.
 
 ### 3. Generate Dart clients with Codama
 

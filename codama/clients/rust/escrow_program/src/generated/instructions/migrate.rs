@@ -37,6 +37,8 @@ impl Migrate {
 	///
 	/// Omitted accounts become program-address placeholders, which the
 	/// program treats as absent: send only the accounts that are stale.
+	/// `system_program` defaults to the system program, the only account the
+	/// program accepts in that slot.
 	/// The payer must sign and be writable when any migration needs funding.
 	pub fn instruction(&self) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(&[])
@@ -55,17 +57,11 @@ impl Migrate {
 				false,
 			));
 		}
-		if let Some(system_program) = self.system_program {
-			accounts.push(solana_instruction::AccountMeta::new_readonly(
-				system_program,
-				false,
-			));
-		} else {
-			accounts.push(solana_instruction::AccountMeta::new_readonly(
-				crate::ESCROW_PROGRAM_ID,
-				false,
-			));
-		}
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program
+				.unwrap_or(solana_pubkey::Pubkey::new_from_array([0; 32])),
+			false,
+		));
 		if let Some(escrow_state) = self.escrow_state {
 			accounts.push(solana_instruction::AccountMeta::new(escrow_state, false));
 		} else {

@@ -78,7 +78,7 @@ pub const PINA_LINT_DRIVER_BASE_URL: &str = "PINA_LINT_DRIVER_BASE_URL";
 /// scaffolds into new projects. It is no longer required for a lint run — a
 /// driver is negotiated for whatever toolchain is active — but `pina doctor`
 /// reports it as the release the shipped lint set is verified against.
-pub const LINT_DRIVER_TOOLCHAIN: &str = "nightly-2026-02-20";
+pub const LINT_DRIVER_TOOLCHAIN: &str = "nightly-2026-09-15";
 
 /// The Pina release drivers are published with.
 const DEFAULT_DRIVER_REPO: &str = "pina-rs/pina";
@@ -222,10 +222,13 @@ pub enum DriverError {
 
 	#[error(
 		"Could not build the lint driver for {toolchain}: cargo exited with status {status}. The \
-		 driver compiles Pina's lints against the compiler's internals, so building it needs the \
-		 `rustc-dev` and `rust-src` components of the active toolchain. Install them with `rustup \
-		 component add rustc-dev rust-src --toolchain {toolchain}`, or set \
-		 `{PINA_LINT_DRIVER_PATH}` to a driver you built."
+		 driver compiles Pina's lints against the compiler's internals, so there are two usual \
+		 causes. Either the active toolchain lacks the `rustc-dev` and `rust-src` components \
+		 (install them by running `rustup component add rustc-dev rust-src` from the project \
+		 directory, so `rust-toolchain.toml` selects the toolchain), or the lint source does not \
+		 compile against this nightly's compiler internals, which change between nightlies (pin \
+		 `{LINT_DRIVER_TOOLCHAIN}`, the nightly this Pina release builds its drivers with). You \
+		 can also set `{PINA_LINT_DRIVER_PATH}` to a driver you built."
 	)]
 	BuildFailed { toolchain: String, status: String },
 
@@ -1093,6 +1096,25 @@ pub fn format_diagnostics(stderr: &[u8]) -> String {
 mod tests {
 	use super::*;
 
+	/// Released drivers are built with the workspace toolchain, and `pina init`
+	/// scaffolds this constant, so the two must never drift apart: a stale pin
+	/// makes `pina lint` ask for a driver no release ships.
+	#[test]
+	fn lint_driver_toolchain_matches_the_workspace_toolchain() {
+		let workspace_toolchain =
+			Path::new(env!("CARGO_MANIFEST_DIR")).join("../../rust-toolchain.toml");
+		let Ok(contents) = std::fs::read_to_string(&workspace_toolchain) else {
+			// A packaged crate has no workspace to compare against.
+			return;
+		};
+		let channel = contents
+			.lines()
+			.find_map(|line| line.trim().strip_prefix("channel = "))
+			.map(|value| value.trim_matches('"'))
+			.unwrap_or_else(|| panic!("rust-toolchain.toml must pin a channel"));
+		assert_eq!(LINT_DRIVER_TOOLCHAIN, channel);
+	}
+
 	#[test]
 	fn parses_sysroot_output_and_rejects_blank_reports() {
 		assert_eq!(
@@ -1677,6 +1699,11 @@ mod tests {
 			message.contains("rustc-dev") && message.contains("rust-src"),
 			"{message}"
 		);
+		assert!(
+			!message.contains("--toolchain 1.95.0-nightly"),
+			"a version string is not a valid rustup toolchain name: {message}"
+		);
+		assert!(message.contains(LINT_DRIVER_TOOLCHAIN), "{message}");
 	}
 
 	#[test]

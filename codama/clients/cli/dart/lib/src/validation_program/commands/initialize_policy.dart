@@ -55,7 +55,7 @@ final class InitializePolicyCommand extends Command<void> {
       programAddress: context.programAddress,
       authority: authority,
       policy: policy,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
       minimum: minimumValue,
       maximum: maximumValue,

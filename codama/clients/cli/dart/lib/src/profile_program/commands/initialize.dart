@@ -52,7 +52,7 @@ final class InitializeCommand extends Command<void> {
       programAddress: context.programAddress,
       authority: authority,
       profile: profile,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
       name: nameValue,
       bio: bioValue,

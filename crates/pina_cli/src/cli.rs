@@ -1313,6 +1313,12 @@ pub(crate) enum MigrationCommands {
 		/// versions stay frozen because the deployment may still have gone live.
 		#[arg(long)]
 		abandon: bool,
+		/// Pin receipts that record published versions without their schema
+		/// hashes to what migrations/manifest.json records now. Run it only after
+		/// confirming with version control that the manifest still describes what
+		/// those receipts made live.
+		#[arg(long, conflicts_with = "abandon")]
+		pin_legacy: bool,
 		/// Emit a machine-readable result.
 		#[arg(long)]
 		json: bool,
@@ -1440,10 +1446,9 @@ Safety:
 	/// Submit an existing on-chain verification record to the mainnet remote verifier.
 	#[command(
 		after_help = "Example:\n  pina verify submit --program-id <ADDRESS> --uploader \
-		              <ADDRESS>\n\n\\
-		              This command always targets the official mainnet remote verifier. UPLOADER is the \
-		              \\
-		              public address that created the on-chain verification record; it is not a keypair."
+		              <ADDRESS>\n\nThis command always targets the official mainnet remote \
+		              verifier. UPLOADER is the public address that created the on-chain \
+		              verification record; it is not a keypair."
 	)]
 	Submit {
 		/// Program address whose recorded build should be verified.
@@ -1457,7 +1462,7 @@ Safety:
 
 	/// Read the mainnet remote-verifier status for a program.
 	#[command(
-		after_help = "Example:\n  pina verify status --program-id <ADDRESS>\n\nThis command is \\
+		after_help = "Example:\n  pina verify status --program-id <ADDRESS>\n\nThis command is \
 		              read-only and always queries the official mainnet remote verifier."
 	)]
 	Status {

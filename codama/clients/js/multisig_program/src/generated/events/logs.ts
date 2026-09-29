@@ -171,18 +171,51 @@ function projectProposalStatusEventEvent(
 /** Every event this program can emit, as decoded from a log line. */
 export type DecodedMultisigProgramEvent = DecodedProposalStatusEventEvent;
 
+/** The program whose invocation frames emit the events decoded here. */
+export const MULTISIG_PROGRAM_EVENT_SOURCE_ADDRESS =
+	"5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc";
+
+const PROGRAM_INVOKE_LOG = /^Program (\S+) invoke \[\d+\]$/;
+const PROGRAM_EXIT_LOG = /^Program (\S+) (?:success|failed: .*)$/;
+
 /**
- * Decode every `Program data:` line that names one of this program's events.
+ * Decode every `Program data:` line this program emitted in a transaction's
+ * logs.
  *
- * Unrelated lines and programs are skipped. A log that names an event but
- * carries an unknown, future, or non-projectable version throws instead of
- * being silently dropped.
+ * `logs` must be the complete, ordered log messages of one transaction. The
+ * parser follows the runtime's `Program <address> invoke [n]` and
+ * `Program <address> success` / `failed` frames and decodes a data line only
+ * while `programAddress` is the innermost invoked program. Any program can
+ * write a `Program data:` line with this program's discriminator, so data
+ * lines from other programs (including ones this program invokes through CPI)
+ * and lines outside any frame are skipped rather than trusted.
+ *
+ * Unrelated lines are skipped. A line this program emitted that names an event
+ * but carries an unknown, future, or non-projectable version throws instead of
+ * being silently dropped. The per-event `parse*FromLog` helpers decode one line
+ * without this attribution and are only safe for data already known to come
+ * from this program.
  */
 export function parseMultisigProgramEventsFromLogs(
 	logs: readonly string[],
+	programAddress: string = MULTISIG_PROGRAM_EVENT_SOURCE_ADDRESS,
 ): DecodedMultisigProgramEvent[] {
 	const discovered: DecodedMultisigProgramEvent[] = [];
+	const frames: string[] = [];
 	for (const log of logs) {
+		const invoke = PROGRAM_INVOKE_LOG.exec(log);
+		if (invoke !== null) {
+			frames.push(invoke[1] ?? "");
+			continue;
+		}
+		const exit = PROGRAM_EXIT_LOG.exec(log);
+		if (exit !== null) {
+			frames.pop();
+			continue;
+		}
+		if (frames.length === 0 || frames[frames.length - 1] !== programAddress) {
+			continue;
+		}
 		const proposalStatusEvent = parseProposalStatusEventEventFromLog(log);
 		if (proposalStatusEvent !== null) {
 			discovered.push(proposalStatusEvent);

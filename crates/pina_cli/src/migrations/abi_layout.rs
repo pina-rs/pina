@@ -213,10 +213,19 @@ fn render_contract(
 			tail_alignment,
 			..
 		} => {
-			let _ = writeln!(output, "\t/// Compact header size in bytes.");
+			let _ = writeln!(
+				output,
+				"\t/// Compact header size in bytes, excluding the envelope header."
+			);
 			let _ = writeln!(output, "\tpub const HEADER_SIZE: usize = {header_size};");
-			let _ = writeln!(output, "\t/// Maximum encoded size in bytes.");
-			let _ = writeln!(output, "\tpub const MAX_SIZE: usize = {maximum_size};");
+			let _ = writeln!(
+				output,
+				"\t/// Largest valid encoded size, including the envelope header."
+			);
+			let _ = writeln!(
+				output,
+				"\tpub const MAX_SIZE: usize = MIGRATION_HEADER_SIZE + {maximum_size};"
+			);
 			let _ = writeln!(output, "\t/// Byte granularity of valid allocations.");
 			let _ = writeln!(
 				output,

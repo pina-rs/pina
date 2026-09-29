@@ -148,7 +148,9 @@ Answers that contradict each other fail closed rather than picking a winner, whi
 
 ## Resolve a manual transition
 
-Pina generates automatic transitions only for direction-safe fixed-layout changes. A type change, compact layout, an ambiguous field move, or a `--manual` answer creates a manual Rust file with `TODO(pina-manual-migration)`.
+Pina generates automatic transitions only for direction-safe fixed-layout changes: copies, insertions and removals that shift later fields, and zero-filled additions. A type change (including a widening such as `u64` to `u128`), a reorder of existing fields, a compact layout, an ambiguous field move, or a `--manual` answer creates a manual Rust file with `TODO(pina-manual-migration)`. `--manual <field>` also converts a draft that `create` already recorded as automatic.
+
+A finished body belongs to the two layouts it was written for. While the draft's destination schema is unchanged, `create` keeps it. If you change the draft's layout again, `create` moves the finished body to `vN_to_vM.rs.stale`, writes a new stub whose header prints the new offsets, and says so. The new stub's marker blocks the build until you port the old body; delete the `.stale` file once you have. This keeps an old body from compiling against a layout it was not written for and silently misplacing bytes.
 
 Every generated transition reads its byte offsets from the **stored** schema. A removed field keeps occupying its bytes, so a transition that drops a field in the middle of a layout still reads the fields after it from their original offsets — and its `SOURCE_SIZE` counts the bytes that are actually on the account.
 
@@ -165,7 +167,7 @@ pina test --compatibility
 
 `check` rejects a remaining marker. Once publication is pending or complete, it also rejects any change to the transition file or either schema hash. Fix frozen transition code with another migration version.
 
-IDL generation runs the same check. The current IDL keeps each migration-aware account or instruction's `migrationVersion` field in place with `defaultValueStrategy: "omitted"` and its default value: generated client inputs omit it, encoders stamp the current value into the envelope automatically, and decoders reject any other version. Historical schemas and transition code remain exclusively in `migrations/manifest.json`. Historical schemas and transition code remain exclusively in `migrations/manifest.json`.
+IDL generation runs the same check. The current IDL keeps each migration-aware account or instruction's `migrationVersion` field in place with `defaultValueStrategy: "omitted"` and its default value: generated client inputs omit it, encoders stamp the current value into the envelope automatically, and decoders reject any other version. Historical schemas and transition code remain exclusively in `migrations/manifest.json`. When `pina.toml` enables `auto` but no manifest exists yet, `pina idl` and `pina generate` refuse to run, because the IDL would omit the version byte the program gains once the baseline is recorded.
 
 ## Change an instruction process
 
@@ -190,11 +192,17 @@ Events are immutable, so Pina projects rather than rewrites them. A migratable e
 
 Use `pina deploy` for a persistent cluster. Before the remote command starts, Pina atomically records the exact program ID, RPC target, executable digest, manifest digest, and current contract versions as pending. Receipts and pending records also pin the schema hash and transition-implementation hash of every published version, so rewriting published history — even with consistently recomputed hashes — fails every later check. A pending version is frozen because it may already be live. After deployment succeeds, Pina rechecks the planned files and converts that record into a hash-chained receipt.
 
-Local deployments do not publish versions. A published version is immutable even if a later deployment replaces it.
+Local deployments do not publish versions unless you pass `--record-publication`. A published version is immutable even if a later deployment replaces it.
+
+If the deploy program cannot even start, for example because `solana` is not on `PATH`, nothing can have reached the cluster, so Pina discards the pending record it just wrote and your drafts stay editable. A pending record that an earlier attempt left behind is never discarded this way.
 
 If deployment or receipt recording fails, stop the release. The pending record remains, and `pina migrations status` reports `publication pending`. Restore the exact planned inputs and rerun the same deployment to reconcile it; Pina rejects a different deployment while the outcome is ambiguous. The current ledger does not prove the deployed program-data hash, genesis hash, slot, or transaction signature.
 
 When the exact planned inputs cannot be reproduced (for example a cleaned build directory), inspect the pending deployment with `pina migrations reconcile`. It prints the cluster, RPC endpoint, program, and executable digest that must be resumed. Once you are certain the deployment never went live, `pina migrations reconcile --abandon` converts the pending record into an abandoned receipt that still freezes its pinned versions and unblocks the next deployment. Losing `migrations/publications.json` entirely fails every later check while the manifest still records advanced versions, because published history must stay pinned; restore the ledger from version control instead of regenerating it.
+
+A receipt must pin the schema hash of every version it made live. Ledgers written before pinning existed name only the highest version, and every command refuses them with `UnpinnedPublication`, because such a receipt cannot tell a rewritten published schema from the one that shipped. After confirming from version control that `migrations/manifest.json` still records exactly what those receipts shipped, run `pina migrations reconcile --pin-legacy` once and commit the ledger.
+
+The manifest records the program ID its history belongs to. Before anything is published, `pina migrations create` rebinds the history to a changed `declare_id!` (for example after `pina keys new`) and says so. After publication, a different `declare_id!` fails every command until the original is restored.
 
 ## ABI document upgrades
 
@@ -217,10 +225,14 @@ An ABI document upgrade does not consume an on-chain migration version.
 
 ## Commands
 
-| Command                  | Result                                                         |
-| ------------------------ | -------------------------------------------------------------- |
-| `pina migrations create` | Capture source changes and create or refresh one draft         |
-| `pina migrations check`  | Fail on source, schema, process, transition, or version drift  |
-| `pina migrations status` | Show each current version, its publication state, and the cost |
+| Command                                  | Result                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| `pina migrations create`                 | Capture source changes and create or refresh one draft                   |
+| `pina migrations check`                  | Fail on source, schema, process, transition, or version drift            |
+| `pina migrations status`                 | Show each current version, its publication state, and the cost           |
+| `pina migrations sync`                   | Run `create`, `pina build`, and `pina generate` for unambiguous changes  |
+| `pina migrations inspect <ADDRESS>`      | Compare one on-chain account's envelope with the manifest                |
+| `pina migrations reconcile [--abandon]`  | Explain or abandon an ambiguous pending deployment                       |
+| `pina migrations reconcile --pin-legacy` | Pin receipts written before schema pinning, after verifying the manifest |
 
 Add `--json` for machine-readable output. Add `--project <DIR>` to select a program from another directory.

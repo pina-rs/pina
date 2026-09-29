@@ -233,10 +233,10 @@ export const NOTE_COMMITMENT_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (noteCommitmentNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && noteCommitmentNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ noteCommitment: address, payer }).make());
+ * 	await send(getMigrateInstruction({ noteCommitment: address, payer }));
  * }
  * ```
  */

@@ -220,6 +220,15 @@ export async function runAgent(
 	writeFileSync(join(options.transcriptDir, "transcript.jsonl"), stdout);
 	writeFileSync(join(options.transcriptDir, "stderr.txt"), stderr);
 
+	// A runtime that refuses to start (no credentials, or bypassed permissions
+	// under root) produces no transcript at all. Grading that as an ordinary
+	// failed run would report the skill as broken when no agent ever ran.
+	if (!timedOut && exit !== 0 && stdout.trim() === "") {
+		throw new Error(
+			`the agent runtime exited with status ${exit} before producing a transcript: ${stderr.trim()}`,
+		);
+	}
+
 	const transcriptParts: string[] = [];
 	const finalParts: string[] = [];
 	const usage: RunUsage = {

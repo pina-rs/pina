@@ -15,17 +15,17 @@ This tutorial walks through building a minimal Solana program from scratch using
 
 <br>
 
-Create a new crate inside the workspace (or standalone):
+The quickest start is `pina init hello_solana_program`, which writes everything below plus tests, a pinned toolchain, and client configuration. To see each piece, create the crate by hand instead:
 
 ```toml
 # Cargo.toml
 [package]
-name = "hello_solana"
+name = "hello_solana_program"
 version = "0.0.0"
 edition = "2024"
 
 [lib]
-crate-type = ["cdylib", "lib"]
+crate-type = ["cdylib"]
 
 [features]
 bpf-entrypoint = []
@@ -34,7 +34,7 @@ bpf-entrypoint = []
 pina = { version = "...", features = ["logs", "derive"] }
 ```
 
-The `cdylib` crate type is required for building a shared library that the Solana runtime can load. The `lib` type lets tests and other crates consume the program as a regular Rust library.
+The `cdylib` crate type is required for building a shared library that the Solana runtime can load. Keep it the only crate type: adding `lib` makes rustc reject link-time optimization for the program, which costs 20-35% of the deployed size. Tests reach the source through a `#[path = "../src/lib.rs"]` module instead of linking the crate.
 
 The `bpf-entrypoint` feature gates the on-chain entrypoint so that test builds do not pull in BPF-specific machinery.
 
@@ -165,7 +165,7 @@ pub mod entrypoint {
 
 <br>
 
-Putting it all together (this matches `examples/hello_solana/src/lib.rs` in the repository):
+Putting it all together (this matches `examples/hello_solana_program/src/lib.rs` in the repository):
 
 ```rust
 #![allow(clippy::inline_always)]
@@ -233,13 +233,15 @@ pub mod entrypoint {
 
 <br>
 
-To compile the program for the Solana BPF target:
+Compile the program for the Solana SBF target with the Agave CLI's `cargo-build-sbf`, which provides the SBF toolchain and linker:
 
 ```bash
-cargo build --release --target bpfel-unknown-none -p hello_solana -Z build-std -F bpf-entrypoint
+pina build
+# or, without the IDL refresh:
+cargo build-sbf --sbf-out-dir target/deploy -F bpf-entrypoint
 ```
 
-The workspace `.cargo/config.toml` already sets the required linker flags for `bpfel-unknown-none`. The `-Z build-std` flag rebuilds `core` and `alloc` for the BPF target.
+`pina build` also enables fat LTO for a `cdylib`-only crate and writes the program's IDL next to the artifact.
 
 ## Writing tests
 

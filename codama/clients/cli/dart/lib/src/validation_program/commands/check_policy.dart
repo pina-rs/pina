@@ -57,7 +57,7 @@ final class CheckPolicyCommand extends Command<void> {
       authority: authority,
       policy: policy,
       audit: audit,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       amount: amountValue,
       memo: memoValue,
       approvals: approvalsValue,

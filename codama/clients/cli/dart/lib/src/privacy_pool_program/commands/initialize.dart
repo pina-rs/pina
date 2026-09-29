@@ -147,7 +147,7 @@ final class InitializeCommand extends Command<void> {
       custodianRegistry: custodianRegistry,
       requesterRegistry: requesterRegistry,
       disclosureLog: disclosureLog,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       configBump: configBumpValue,
       vaultBump: vaultBumpValue,
       treeBump: treeBumpValue,

@@ -41,9 +41,7 @@ impl<'data> Multisig<'data> {
 	/// Largest encoded size of this account's data.
 	pub const MAX_LEN: usize = 65918;
 	/// Why this account has no generated parser.
-	pub const PARSER_UNSUPPORTED: &'static str =
-		"unsupported type `accountNode` at `account `Multisig` field `member_roster``: this \
-		 field's width is not fixed, so a read-only parser cannot locate the field that follows it";
+	pub const PARSER_UNSUPPORTED: &'static str = "unsupported type `accountNode` at `account `Multisig` field `member_roster``: this field's width is not fixed, so a read-only parser cannot locate the field that follows it";
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]

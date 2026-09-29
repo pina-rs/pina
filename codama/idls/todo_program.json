@@ -131,7 +131,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "owner",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
 						"isOptional": false
 					},

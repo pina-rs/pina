@@ -87,10 +87,10 @@ final class ClaimCommand extends Command<void> {
       userRewardAta: userRewardAta,
       rewardVault: rewardVault,
       associatedTokenProgram: Address(
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
       ),
       tokenProgram: tokenProgram,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
     );
     await context.send([instruction]);
   }

@@ -443,6 +443,14 @@ void main() {
         compactState: systemAddress,
       );
       expect(omitted.accounts!.length, 5);
+      // Slot 1 must be the system program, so it never takes the placeholder.
+      expect(omitted.accounts![1].address, systemAddress);
+      expect(omitted.accounts![2].address, program);
+
+      final bare = migrations_program.getMigrateInstruction(
+        programAddress: program,
+      );
+      expect(bare.accounts!.length, 2);
       expect(
         omitted.accounts!.take(4).map((meta) => meta.role),
         everyElement(AccountRole.readonly),
@@ -556,16 +564,59 @@ void main() {
         isNull,
       );
 
+      final program = migrations_program.migrationsProgramProgramAddress.value;
       final discovered = migrations_program.parseMigrationsProgramEventsFromLogs(
         [
+          'Program $program invoke [1]',
           'Program log: Instruction: Update',
           'Program data: '
               '${base64.encode(_valueChangedEventBytes(1, BigInt.from(5), 3))}',
           'Program data: ${base64.encode(const [9, 1, 0])}',
+          'Program $program success',
         ],
       );
       expect(discovered, hasLength(1));
       expect(discovered.first.name, 'valueChangedEvent');
+    });
+
+    test('attribute log lines to the program that emitted them', () {
+      final program = migrations_program.migrationsProgramProgramAddress.value;
+      const other = '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin';
+      String data(int version, int value) =>
+          'Program data: '
+          '${base64.encode(_valueChangedEventBytes(version, BigInt.from(value), 1))}';
+
+      final discovered = migrations_program
+          .parseMigrationsProgramEventsFromLogs([
+            data(1, 99),
+            'Program $program invoke [1]',
+            data(1, 5),
+            'Program $other invoke [2]',
+            data(1, 99),
+            data(9, 1),
+            'Program $other failed: custom program error: 0x1',
+            data(1, 6),
+            'Program $program success',
+            'Program $other invoke [1]',
+            data(1, 99),
+            'Program $other success',
+          ]);
+      expect(
+        discovered.map(
+          (event) =>
+              (event as migrations_program.NormalizedValueChangedEventEvent)
+                  .data
+                  .value,
+        ),
+        [BigInt.from(5), BigInt.from(6)],
+      );
+
+      final forked = migrations_program.parseMigrationsProgramEventsFromLogs([
+        'Program $other invoke [1]',
+        data(1, 99),
+        'Program $other success',
+      ], programAddress: other);
+      expect(forked, hasLength(1));
     });
 
     test('decode events at the current version envelope', () {
@@ -583,10 +634,16 @@ void main() {
       final parsed = events_program.parseMyEventEventFromLog(log);
       expect(parsed, isNotNull);
       expect(parsed!.name, 'myEvent');
+      final program = events_program.eventsProgramProgramAddress.value;
       expect(
-        events_program.parseEventsProgramEventsFromLogs([log]),
+        events_program.parseEventsProgramEventsFromLogs([
+          'Program $program invoke [1]',
+          log,
+          'Program $program success',
+        ]),
         hasLength(1),
       );
+      expect(events_program.parseEventsProgramEventsFromLogs([log]), isEmpty);
     });
   });
 }

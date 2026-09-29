@@ -57,7 +57,7 @@ final class AddRoleCommand extends Command<void> {
       grantee: grantee,
       registryConfig: registryConfig,
       roleEntry: roleEntry,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       roleId: roleIdValue,
       permissions: permissionsValue,
       bump: bumpValue,

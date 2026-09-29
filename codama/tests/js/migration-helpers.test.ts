@@ -93,7 +93,7 @@ test("migrate fills omitted slots with the program address and truncates the tai
 	const gapped = getMigrateInstruction({ compactState: COMPACT });
 	assert.deepEqual(
 		gapped.accounts.map((meta) => meta.address),
-		[PROGRAM, PROGRAM, PROGRAM, PROGRAM, COMPACT],
+		[PROGRAM, SYSTEM, PROGRAM, PROGRAM, COMPACT],
 	);
 	assert.deepEqual(
 		gapped.accounts.map((meta) => meta.role),
@@ -113,9 +113,19 @@ test("migrate fills omitted slots with the program address and truncates the tai
 
 test("migrate without a payer marks the payer slot as the program placeholder", () => {
 	const instruction = getMigrateInstruction({ state: STATE });
+	// Slot 1 must be the system program: the program rejects anything else
+	// there, so it defaults to that address rather than the placeholder.
 	assert.deepEqual(
 		instruction.accounts.map((meta) => meta.address),
-		[PROGRAM, PROGRAM, STATE],
+		[PROGRAM, SYSTEM, STATE],
+	);
+
+	// The payer and system program are always sent, even with nothing to
+	// migrate, because the program requires both slots.
+	const bare = getMigrateInstruction({});
+	assert.deepEqual(
+		bare.accounts.map((meta) => meta.address),
+		[PROGRAM, SYSTEM],
 	);
 });
 
@@ -228,12 +238,52 @@ test("Program data log lines decode through the event entry point", () => {
 
 test("the program log parser skips unrelated lines and keeps matching ones", () => {
 	const events = parseMigrationsProgramEventsFromLogs([
+		`Program ${PROGRAM} invoke [1]`,
 		"Program log: Instruction: Update",
 		programDataLog(valueChangedEventBytes(1, 5n, 3)),
 		programDataLog(new Uint8Array([9, 1, 0])),
+		`Program ${PROGRAM} success`,
 	]);
 	assert.equal(events.length, 1);
 	assert.equal(events[0]?.name, "valueChangedEvent");
 	assert.equal(events[0]?.data.memo, 3);
 	assert.deepEqual(parseMigrationsProgramEventsFromLogs([]), []);
+});
+
+test("the program log parser only trusts lines this program emitted", () => {
+	const spoofed = programDataLog(valueChangedEventBytes(1, 999n, 9));
+	// A foreign program's future-version line would throw if it were decoded.
+	const foreignFuture = programDataLog(valueChangedEventBytes(9, 1n, 1));
+	const events = parseMigrationsProgramEventsFromLogs([
+		// A data line outside any invocation frame is not attributable.
+		spoofed,
+		`Program ${PROGRAM} invoke [1]`,
+		programDataLog(valueChangedEventBytes(1, 5n, 3)),
+		// This program invokes another one, which forges this program's event.
+		`Program ${FORK} invoke [2]`,
+		spoofed,
+		foreignFuture,
+		`Program ${FORK} failed: custom program error: 0x1`,
+		// Back in this program's frame after the inner call returns.
+		programDataLog(valueChangedEventBytes(1, 6n, 4)),
+		`Program ${PROGRAM} success`,
+		// A later top-level instruction of another program.
+		`Program ${FORK} invoke [1]`,
+		spoofed,
+		`Program ${FORK} success`,
+	]);
+	assert.deepEqual(
+		events.map((event) => event.data.value),
+		[5n, 6n],
+	);
+
+	// A caller that deployed the same program elsewhere names its address.
+	const forked = parseMigrationsProgramEventsFromLogs(
+		[`Program ${FORK} invoke [1]`, spoofed, `Program ${FORK} success`],
+		FORK,
+	);
+	assert.deepEqual(
+		forked.map((event) => event.data.value),
+		[999n],
+	);
 });

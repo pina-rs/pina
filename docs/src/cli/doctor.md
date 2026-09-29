@@ -14,12 +14,12 @@ pina doctor --json
 
 The report checks:
 
-- nearest Cargo program package, source entrypoint, and declared program ID;
+- nearest Cargo program package, source entrypoint, and declared program ID, warning when it is still the shared `pina init` placeholder;
 - lint-driver resolution: the active toolchain, the release the shipped lints are verified against, the resolved driver with its own toolchain and how it was obtained, both search paths, and the remedy when nothing matched;
 - canonical SBF artifact and program-keypair paths;
 - source/keypair identity agreement;
-- required Rust/SBF tools (`cargo`, `rustc`, `rust-src`, nightly `-Z` support, and `sbpf-linker`);
-- optional Solana and Surfpool tools;
+- required Rust/SBF tools (`cargo`, `rustc`, and the Agave `cargo-build-sbf` driver);
+- optional `solana` and `surfpool` tools;
 - Node.js plus an `npx` or pnpm renderer when configured clients require JavaScript tooling.
 
 Human output is stable, color-free text. It includes typed check IDs such as `project.discovery`, `project.program-id`, `project.artifact`, `lint.driver`, and `tool.surfpool` so the same vocabulary appears in logs and agent output.

@@ -85,9 +85,9 @@ final class TakeCommand extends Command<void> {
       vault: vault,
       tokenProgram: tokenProgram,
       associatedTokenProgram: Address(
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
       ),
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
     );
     await context.send([instruction]);
   }

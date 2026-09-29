@@ -215,10 +215,10 @@ export const CUSTODIAN_REGISTRY_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (custodianRegistryNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && custodianRegistryNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ custodianRegistry: address, payer }).make());
+ * 	await send(getMigrateInstruction({ custodianRegistry: address, payer }));
  * }
  * ```
  */

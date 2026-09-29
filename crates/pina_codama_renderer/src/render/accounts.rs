@@ -522,8 +522,8 @@ pub(crate) fn render_needs_migration(envelope: &MigrationEnvelope) -> String {
 		 account's discriminator and carries a version older than\n/// [`{constant}`]. Current or \
 		 foreign bytes return false; decoding explains the difference.\npub fn \
 		 {module}_needs_migration(data: &[u8]) -> bool {{\n\tdata.len() >= {header}\n\t\t\t&& \
-		 {conditions}\n\t\t\t&& {{\n\t\t\t\tlet mut version = [0_u8; \
-		 8];\n\t\t\t\tversion[..{vb}]\n\t\t\t\t\t.copy_from_slice(&data[{vo}..{ve}]);\n\t\t\t\t		 \
+		 {conditions}\n\t\t\t&& {{\n\t\t\t\tlet mut version = [0_u8; 8];\n\t\t\t\t\
+		 version[..{vb}]\n\t\t\t\t\t.copy_from_slice(&data[{vo}..{ve}]);\n\t\t\t\t\
 		 u64::from_le_bytes(version) < {version}\n\t\t\t}}\n}}\n",
 		constant = constant,
 		module = module,

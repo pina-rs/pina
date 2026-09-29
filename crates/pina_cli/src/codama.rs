@@ -43,7 +43,6 @@ const RENDERERS_DART_PACKAGE: &str = "codama-renderers-dart@0.5.6";
 const MINIMUM_GENERATED_KIT_MAJOR: u16 = 8;
 
 const CLIENT_RENDER_SCRIPT: &str = r#"
-import { createFromJson, visit } from "codama";
 import {
 	copyFileSync,
 	cpSync,
@@ -57,7 +56,67 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { basename, delimiter, dirname, join, relative, sep } from "node:path";
+import { pathToFileURL } from "node:url";
+
+// This script arrives on stdin, so bare imports resolve from the working
+// directory. `npx -p` and `pnpm dlx` install the pinned packages into a cache
+// whose `node_modules/.bin` they prepend to PATH instead, which is where a
+// project without a local Codama install finds them.
+async function loadPackage(name) {
+	try {
+		return await import(name);
+	} catch (error) {
+		if (error?.code !== "ERR_MODULE_NOT_FOUND") {
+			throw error;
+		}
+	}
+	for (const binDir of (process.env.PATH ?? "").split(delimiter)) {
+		if (basename(binDir) !== ".bin" || basename(dirname(binDir)) !== "node_modules") {
+			continue;
+		}
+		const packageDir = join(dirname(binDir), ...name.split("/"));
+		const manifestPath = join(packageDir, "package.json");
+		if (!existsSync(manifestPath)) {
+			continue;
+		}
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+		const entry = exportTarget(manifest.exports?.["."] ?? manifest.exports)
+			?? manifest.module
+			?? manifest.main
+			?? "index.js";
+		return await import(pathToFileURL(join(packageDir, entry)).href);
+	}
+	throw new Error(`cannot resolve the pinned package ${name}; run through npx or pnpm dlx, or install it locally`);
+}
+
+function exportTarget(target) {
+	if (typeof target === "string") {
+		return target;
+	}
+	if (Array.isArray(target)) {
+		for (const candidate of target) {
+			const resolved = exportTarget(candidate);
+			if (resolved) {
+				return resolved;
+			}
+		}
+		return null;
+	}
+	if (target && typeof target === "object") {
+		for (const condition of ["node", "import", "default"]) {
+			if (condition in target) {
+				const resolved = exportTarget(target[condition]);
+				if (resolved) {
+					return resolved;
+				}
+			}
+		}
+	}
+	return null;
+}
+
+const { createFromJson, visit } = await loadPackage("codama");
 
 const [renderer, outputRoot, clientRoot, requestedMode, scaffoldValue, ...idlPaths] = process.argv.slice(2);
 
@@ -72,11 +131,11 @@ const stagingRoot = mkdtempSync(join(tmpdir(), "pina-clients-"));
 try {
 	for (const idlPath of idlPaths.sort()) {
 		const name = basename(idlPath, ".json");
-		const json = readFileSync(idlPath, "utf8");
+		const json = sanitizeDocs(readFileSync(idlPath, "utf8"));
 		const codama = createFromJson(json);
 
 		if (renderer === "typescript") {
-			const { renderVisitor } = await import("@codama/renderers-js");
+			const { renderVisitor } = await loadPackage("@codama/renderers-js");
 			await codama.accept(renderVisitor(join(stagingRoot, name), {
 				formatCode: false,
 				deleteFolderBeforeRendering: true,
@@ -85,7 +144,7 @@ try {
 		}
 
 		if (renderer === "dart") {
-			const { renderVisitor } = await import("codama-renderers-dart");
+			const { renderVisitor } = await loadPackage("codama-renderers-dart");
 			visit(codama.getRoot(), renderVisitor(join(stagingRoot, "lib", "src", "generated", name), {
 				formatCode: false,
 				deleteFolderBeforeRendering: true,
@@ -94,7 +153,7 @@ try {
 		}
 
 		if (renderer === "cli-ts") {
-			const { renderVisitor } = await import("@pina-rs/codama-renderer-cli");
+			const { renderVisitor } = await loadPackage("@pina-rs/codama-renderer-cli");
 			const appDir = join(stagingRoot, name);
 			const clientDir = join(clientRoot, name);
 			const clientImportPath = `../../../../js/${name}/src/generated/index`;
@@ -103,7 +162,7 @@ try {
 		}
 
 		if (renderer === "cli-dart") {
-			const { renderVisitor } = await import("@pina-rs/codama-renderer-cli");
+			const { renderVisitor } = await loadPackage("@pina-rs/codama-renderer-cli");
 			const clientPackage = dartPackageName(clientRoot);
 			await codama.accept(
 				renderVisitor(stagingRoot, {
@@ -135,6 +194,23 @@ try {
 	}
 } finally {
 	rmSync(stagingRoot, { force: true, recursive: true });
+}
+
+// Docs reach generated sources as comment text, which the upstream renderers
+// do not escape. A `*/` would close a JSDoc block and a line terminator would
+// end a `///` comment, turning the rest of the doc into live code, so every
+// doc line is split on line terminators and has its comment closers defused.
+function sanitizeDocs(json) {
+	return JSON.stringify(JSON.parse(json), (key, value) => {
+		if (key !== "docs" || !Array.isArray(value)) {
+			return value;
+		}
+		return value.flatMap((line) =>
+			typeof line === "string"
+				? line.split(/\r\n|[\r\n\u2028\u2029]/u).map((part) => part.replaceAll("*/", "*\\/"))
+				: [line]
+		);
+	});
 }
 
 function publishTypescript(name) {
@@ -441,6 +517,21 @@ pub fn generate_project_clients(
 /// Relative path from one directory to another, using only `..` and the
 /// target's remaining components. Both inputs must be absolute or both
 /// relative; the caller passes generation outputs, which share a root.
+/// Whether rendering `crate_dir` will scaffold a new `Cargo.toml`.
+fn scaffolds_manifest(crate_dir: &Path, scaffold: bool) -> bool {
+	scaffold && !crate_dir.join("Cargo.toml").exists()
+}
+
+/// Make a freshly scaffolded client manifest buildable outside a workspace
+/// that declares its inherited dependencies. Existing manifests are the
+/// user's and stay untouched.
+fn finish_client_manifest(crate_dir: &Path, scaffolded: bool) -> Result<(), CodamaError> {
+	if !scaffolded || crate::client_manifest::inherits_workspace_dependencies(crate_dir) {
+		return Ok(());
+	}
+	crate::client_manifest::make_manifest_standalone(crate_dir)
+}
+
 fn relative_dependency_path(from_dir: &Path, to_dir: &Path) -> String {
 	let mut from = from_dir.components().peekable();
 	let mut to = to_dir.components().peekable();
@@ -563,7 +654,9 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 					.unwrap_or_default(),
 				..RenderConfig::default()
 			};
+			let scaffolds_manifest = scaffolds_manifest(&crate_dir, settings.scaffold);
 			render_rust_client(idl_path, &crate_dir, &render_config)?;
+			finish_client_manifest(&crate_dir, scaffolds_manifest)?;
 		}
 	}
 
@@ -584,7 +677,9 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 				scaffold_dependency: CpiScaffoldDependency::Workspace,
 				..CpiRenderConfig::default()
 			};
+			let scaffolds_manifest = scaffolds_manifest(&crate_dir, settings.scaffold);
 			render_cpi_client(idl_path, &crate_dir, &render_config)?;
+			finish_client_manifest(&crate_dir, scaffolds_manifest)?;
 		}
 	}
 
@@ -635,12 +730,14 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 				client_package,
 				client_path,
 			};
+			let scaffolds_manifest = scaffolds_manifest(&crate_dir, settings.scaffold);
 			render_cli_idl_file(idl_path, &crate_dir, &render_config).map_err(|source| {
 				CodamaError::RenderCli {
 					path: crate_dir.clone(),
 					source,
 				}
 			})?;
+			finish_client_manifest(&crate_dir, scaffolds_manifest)?;
 		}
 	}
 

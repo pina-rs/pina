@@ -29,6 +29,15 @@ pina keys new --force
 
 Program deployments are identified by their address. Treat `keys new --force` as a destructive identity rotation: review downstream clients, deployment records, and funded accounts first.
 
+The conventional keypair lives below the Cargo target directory, which `pina init` git-ignores, so `cargo clean` deletes it. Back it up outside the repository before the first deployment: it is the program's address, and losing it after deployment means upgrades can no longer name the program by its keypair.
+
+## Identity and migration history
+
+`migrations/manifest.json` records the program ID the history belongs to. When `new` or `sync` writes a different ID than the manifest records, the command prints the recorded ID and points at the next step:
+
+- If nothing was ever deployed (no publication receipt and no pending deployment), run `pina migrations create`. It rebinds the unpublished history to the new `declare_id!` and says so. This is the normal path after `pina init`, whose scaffold starts with a shared placeholder address.
+- If a receipt exists, the history belongs to the deployed program. Every migrations and deploy command fails with `Migration history belongs to program …` until the original `declare_id!` is restored; a new identity is a new program.
+
 ## Output and failures
 
 Human output identifies source, keypair path, public program IDs, and match status. `--json` emits only JSON on stdout. Failures are written to stderr and exit unsuccessfully.

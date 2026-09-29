@@ -2,8 +2,8 @@
 	"id": "close-counter",
 	"title": "Close an account without leaving readable stale bytes",
 	"fixture": "base-counter-published",
-	"prompt": "Add a `CloseCounter` instruction that closes a counter account and returns its lamports to the counter's recorded authority. Compliance requires that nothing readable is left in the account data after closing — a later rent payer must not be able to inspect old counter bytes. Only the authority recorded in the counter may close it. Keep everything building.",
-	"expectation": "The erasure requirement selects `CloseAccountZeroed` over `CloseAccount`. The agent validates the counter's authority (signer plus stored-authority match) before closing, routes lamports to that authority, and does not hand-roll lamport transfer plus data truncation — the close builders own that sequence, including the zero-before-transfer ordering.",
+	"prompt": "Add a `CloseCounter` instruction that closes a counter account and returns its lamports to the counter's recorded authority. Compliance requires that nothing readable is left in the account data after closing \u2014 a later rent payer must not be able to inspect old counter bytes. Only the authority recorded in the counter may close it. Keep everything building.",
+	"expectation": "The erasure requirement selects `CloseAccountZeroed` over `CloseAccount`. The agent validates the counter's authority (signer plus stored-authority match) before closing, routes lamports to that authority, and does not hand-roll lamport transfer plus data truncation \u2014 the close builders own that sequence, including the zero-before-transfer ordering.",
 	"checks": [
 		{
 			"id": "uses-zeroed-close",
@@ -23,14 +23,14 @@
 			"id": "authority-checked-before-close",
 			"kind": "file",
 			"path": "src/lib.rs",
-			"match": "CloseCounter[\\s\\S]{0,600}?assert_signer",
-			"why": "Only the recorded authority may close; the signer check must sit inside the `CloseCounter` handler and precede the close. File-wide matching would let the `Increment` and `Reset` handlers satisfy it on a `CloseCounter` that skips the check."
+			"match": "ProcessAccountInfos<[^>]*>\\s+for\\s+Close\\w*<[^>]*>\\s*\\{[\\s\\S]{0,600}?assert_signer",
+			"why": "Only the recorded authority may close; the signer check must sit inside the close handler (whatever the agent names it, `CloseCounter` or `Close`) and precede the close. File-wide matching would let the `Increment` and `Reset` handlers satisfy it on a close handler that skips the check."
 		},
 		{
 			"id": "stored-authority-bound",
 			"kind": "file",
 			"path": "src/lib.rs",
-			"match": "CloseCounter[\\s\\S]{0,600}?(authority != |authority == |assert_owner|InvalidAccountData)",
+			"match": "ProcessAccountInfos<[^>]*>\\s+for\\s+Close\\w*<[^>]*>\\s*\\{[\\s\\S]{0,600}?(authority != |authority == |assert_owner|InvalidAccountData)",
 			"why": "A signer check alone proves nothing about which counter; the stored authority must bind inside the same handler before lamports move."
 		},
 		{

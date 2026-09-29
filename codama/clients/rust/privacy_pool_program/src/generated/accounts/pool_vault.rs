@@ -111,16 +111,13 @@ impl core::fmt::Display for PoolVaultVersionError {
 			Self::Stale { stored } => {
 				write!(
 					f,
-					"migration version mismatch: expected 0, received {stored} (the data predates \
-					 this client; migrate it by sending a transaction to the program, or decode \
-					 it with a client generated from an older IDL)"
+					"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
 				)
 			}
 			Self::Future { stored } => {
 				write!(
 					f,
-					"migration version mismatch: expected 0, received {stored} (the data was \
-					 written by a newer program; upgrade this client)"
+					"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
 				)
 			}
 		}
@@ -163,8 +160,7 @@ mod pool_vault_version_error_tests {
 		assert_eq!(error, PoolVaultVersionError::Future { stored: 1 });
 		assert_eq!(
 			PoolVaultVersionError::Future { stored: 1 }.to_string(),
-			"migration version mismatch: expected 0, received 1 (the data was written by a newer \
-			 program; upgrade this client)"
+			"migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)"
 		);
 		assert!(
 			PoolVault::try_from_bytes(&envelope(0 as u8)).is_ok(),

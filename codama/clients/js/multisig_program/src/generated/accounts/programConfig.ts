@@ -199,10 +199,10 @@ export const PROGRAM_CONFIG_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (programConfigNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && programConfigNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ programConfig: address, payer }).make());
+ * 	await send(getMigrateInstruction({ programConfig: address, payer }));
  * }
  * ```
  */

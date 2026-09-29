@@ -121,7 +121,7 @@ Instruction getCreateInstruction({
     programAddress: programAddress,
     accounts: [
       AccountMeta(address: account, role: AccountRole.writable),
-      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+      AccountMeta(address: authority, role: AccountRole.writableSigner),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getCreateInstructionDataEncoder().encode(instructionData),

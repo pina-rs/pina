@@ -230,10 +230,10 @@ export const COMPACT_STATE_MIGRATION_VERSION = 1;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (compactStateNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && compactStateNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ compactState: address, payer }).make());
+ * 	await send(getMigrateInstruction({ compactState: address, payer }));
  * }
  * ```
  */

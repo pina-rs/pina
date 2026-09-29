@@ -67,10 +67,10 @@ pub mod account_1_02 {
 	pub const VERSION_BYTES: usize = 1;
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
-	/// Compact header size in bytes.
+	/// Compact header size in bytes, excluding the envelope header.
 	pub const HEADER_SIZE: usize = 126;
-	/// Maximum encoded size in bytes.
-	pub const MAX_SIZE: usize = 654;
+	/// Largest valid encoded size, including the envelope header.
+	pub const MAX_SIZE: usize = MIGRATION_HEADER_SIZE + 654;
 	/// Byte granularity of valid allocations.
 	pub const TAIL_ALIGNMENT: usize = 1;
 	/// Smallest valid encoded size, including the envelope header.
@@ -95,10 +95,10 @@ pub mod account_1_03 {
 	pub const VERSION_BYTES: usize = 1;
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
-	/// Compact header size in bytes.
+	/// Compact header size in bytes, excluding the envelope header.
 	pub const HEADER_SIZE: usize = 106;
-	/// Maximum encoded size in bytes.
-	pub const MAX_SIZE: usize = 878;
+	/// Largest valid encoded size, including the envelope header.
+	pub const MAX_SIZE: usize = MIGRATION_HEADER_SIZE + 878;
 	/// Byte granularity of valid allocations.
 	pub const TAIL_ALIGNMENT: usize = 1;
 	/// Smallest valid encoded size, including the envelope header.
@@ -123,10 +123,10 @@ pub mod account_1_04 {
 	pub const VERSION_BYTES: usize = 1;
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
-	/// Compact header size in bytes.
+	/// Compact header size in bytes, excluding the envelope header.
 	pub const HEADER_SIZE: usize = 128;
-	/// Maximum encoded size in bytes.
-	pub const MAX_SIZE: usize = 896;
+	/// Largest valid encoded size, including the envelope header.
+	pub const MAX_SIZE: usize = MIGRATION_HEADER_SIZE + 896;
 	/// Byte granularity of valid allocations.
 	pub const TAIL_ALIGNMENT: usize = 1;
 	/// Smallest valid encoded size, including the envelope header.

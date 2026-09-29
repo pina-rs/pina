@@ -120,7 +120,7 @@
 					{
 						"kind": "instructionAccountNode",
 						"name": "authority",
-						"isWritable": false,
+						"isWritable": true,
 						"isSigner": true,
 						"isOptional": false
 					},

@@ -28,5 +28,5 @@ pina generate
 <br>
 
 ```bash
-cargo build --release --target bpfel-unknown-none -p hello_solana -Z build-std -F bpf-entrypoint
+cargo build --release --target bpfel-unknown-none -p hello_solana_program -Z build-std -F bpf-entrypoint
 ```

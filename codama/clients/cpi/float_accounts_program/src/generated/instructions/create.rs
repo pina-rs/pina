@@ -26,7 +26,7 @@ pub struct Create<'account> {
 	pub account: &'account AccountView,
 
 	/// CPI account `authority`.
-	/// Required privileges: read-only and signer.
+	/// Required privileges: writable and signer.
 	pub authority: &'account AccountView,
 
 	/// CPI account `systemProgram`.
@@ -79,7 +79,7 @@ impl<'account> Create<'account> {
 	) -> ProgramResult {
 		let accounts: [CpiHandle<'_>; 3] = [
 			CpiHandle::writable(self.account)?,
-			CpiHandle::readonly_signer(self.authority),
+			CpiHandle::writable_signer(self.authority)?,
 			CpiHandle::readonly(self.system_program),
 		];
 		let data = self.ix.to_bytes()?;

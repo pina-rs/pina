@@ -859,6 +859,79 @@ fn internal_contract_helpers_fail_closed_on_collisions_and_missing_values() {
 }
 
 #[test]
+fn an_auto_policy_without_a_snapshot_refuses_to_generate_an_envelope_free_idl() {
+	let fixture = migration_fixture();
+	let plain = |extra: &str| {
+		std::fs::write(
+			fixture.root.join("src/lib.rs"),
+			format!(
+				"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1 \
+				 }}\n#[account(discriminator = Kind::State)]\nstruct State {{ value: u64 \
+				 }}\n{extra}",
+				fixture.program_id
+			),
+		)
+		.unwrap_or_else(|error| panic!("write source: {error}"));
+	};
+	let configure = |auto: &str| {
+		std::fs::write(
+			fixture.root.join("pina.toml"),
+			format!("[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\n{auto}"),
+		)
+		.unwrap_or_else(|error| panic!("write config: {error}"));
+	};
+	plain("");
+
+	configure("auto = true\n");
+	let error = crate::generate_idl(&fixture.root, None)
+		.expect_err("an unsnapshotted auto policy must not produce an IDL");
+	assert!(error.to_string().contains("account `State`"), "{error}");
+	assert!(
+		error.to_string().contains("pina migrations create"),
+		"{error}"
+	);
+
+	configure("auto = [\"instructions\"]\n");
+	plain(
+		"#[discriminator]\nenum Ix { Go = 0 }\n#[instruction(discriminator = Ix::Go)]\nstruct \
+		 GoInstruction { value: u8 }\n#[derive(Accounts)]\npub struct GoAccounts<'a> { pub payer: \
+		 &'a AccountView }\nimpl<'a> ProcessAccountInfos<'a> for GoAccounts<'a> { fn process(self, \
+		 _data: &[u8]) -> ProgramResult { Ok(()) } }\npub fn process_instruction(program_id: \
+		 &Address, accounts: &mut [AccountView], data: &[u8]) -> ProgramResult { let instruction: \
+		 Ix = parse_instruction(program_id, &ID, data)?; match instruction { Ix::Go => \
+		 GoAccounts::try_from((program_id, accounts))?.process(data) } }\n",
+	);
+	let error = crate::generate_idl(&fixture.root, None).expect_err("instructions are covered too");
+	assert!(
+		error.to_string().contains("instruction `")
+			&& error.to_string().contains("no checked-in snapshot"),
+		"{error}"
+	);
+
+	configure("auto = [\"events\"]\n");
+	plain(
+		"#[discriminator]\nenum Ev { Done = 0 }\n#[event(discriminator = Ev::Done)]\nstruct \
+		 DoneEvent { value: u8 }\n",
+	);
+	let error = crate::generate_idl(&fixture.root, None).expect_err("events are covered too");
+	assert!(
+		error.to_string().contains("event `")
+			&& error.to_string().contains("no checked-in snapshot"),
+		"{error}"
+	);
+
+	// A policy that covers nothing in the program leaves the IDL alone.
+	configure("auto = [\"instructions\"]\n");
+	plain("");
+	crate::generate_idl(&fixture.root, None)
+		.unwrap_or_else(|error| panic!("nothing to envelope: {error}"));
+
+	// No policy at all is the ordinary non-migrating program.
+	configure("");
+	crate::generate_idl(&fixture.root, None).unwrap_or_else(|error| panic!("no policy: {error}"));
+}
+
+#[test]
 fn non_migratable_projects_have_no_idl_migration_metadata() {
 	let fixture = migration_fixture();
 	std::fs::write(
@@ -873,6 +946,118 @@ fn non_migratable_projects_have_no_idl_migration_metadata() {
 			.unwrap_or_else(|error| panic!("read ordinary metadata: {error}"))
 			.is_none()
 	);
+}
+
+#[test]
+fn create_rebinds_only_an_unpublished_history_to_a_new_program_id() {
+	const NEW_PROGRAM_ID: &str = "11111111111111111111111111111111";
+	let rewrite = |fixture: &PublicationFixture| {
+		let source = std::fs::read_to_string(fixture.root.join("src/lib.rs"))
+			.unwrap_or_else(|error| panic!("read source: {error}"));
+		std::fs::write(
+			fixture.root.join("src/lib.rs"),
+			source.replace(fixture.program_id, NEW_PROGRAM_ID),
+		)
+		.unwrap_or_else(|error| panic!("rewrite program id: {error}"));
+	};
+
+	let draft = publication_fixture();
+	assert_eq!(
+		recorded_program_id(&draft.root).as_deref(),
+		Some(draft.program_id)
+	);
+	rewrite(&draft);
+	assert!(matches!(
+		check_migrations(&draft.root),
+		Err(MigrationError::ProgramIdentityChanged { .. })
+	));
+	let output = create_migrations(&draft.root)
+		.unwrap_or_else(|error| panic!("rebind unpublished history: {error}"));
+	assert_eq!(
+		output.rebound_from_program_id.as_deref(),
+		Some(draft.program_id)
+	);
+	assert_eq!(
+		recorded_program_id(&draft.root).as_deref(),
+		Some(NEW_PROGRAM_ID)
+	);
+	check_migrations(&draft.root).unwrap_or_else(|error| panic!("check rebound history: {error}"));
+	let repeated = create_migrations(&draft.root)
+		.unwrap_or_else(|error| panic!("repeat rebound create: {error}"));
+	assert_eq!(repeated.rebound_from_program_id, None);
+
+	let published = publication_fixture();
+	let digest: [u8; 32] = Sha256::digest(b"artifact").into();
+	begin_publication(
+		&published.root,
+		"devnet",
+		"https://api.devnet.solana.com",
+		published.program_id,
+		&published.artifact,
+		digest,
+	)
+	.unwrap_or_else(|error| panic!("begin publication: {error}"));
+	rewrite(&published);
+	let error = create_migrations(&published.root)
+		.expect_err("a pending deployment pins the program identity");
+	assert!(matches!(
+		error,
+		MigrationError::ProgramIdentityChanged { .. }
+	));
+	assert!(
+		error
+			.to_string()
+			.contains("restore the original `declare_id!`")
+	);
+	assert!(recorded_program_id(&published.root.join("missing")).is_none());
+}
+
+#[test]
+fn unsent_publication_is_discarded_only_when_fresh_and_exact() {
+	let fixture = publication_fixture();
+	let digest: [u8; 32] = Sha256::digest(b"artifact").into();
+	let begin = || {
+		begin_publication_attempt(
+			&fixture.root,
+			"devnet",
+			"https://api.devnet.solana.com",
+			fixture.program_id,
+			&fixture.artifact,
+			digest,
+		)
+		.unwrap_or_else(|error| panic!("begin publication: {error}"))
+		.expect("migration-aware fixture has a pending publication")
+	};
+	let fresh = begin();
+	assert!(fresh.fresh);
+	let resumed = begin();
+	assert!(!resumed.fresh, "a retained record must never read as fresh");
+	assert_eq!(resumed.pending, fresh.pending);
+
+	let mut other = fresh.pending.clone();
+	other.cluster = "testnet".to_owned();
+	assert!(
+		!discard_unsent_publication(&fixture.root, &other)
+			.unwrap_or_else(|error| panic!("discard mismatched record: {error}")),
+		"a different pending record must be left in place"
+	);
+	assert!(
+		load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+			.unwrap_or_else(|error| panic!("reload ledger: {error}"))
+			.pending
+			.is_some()
+	);
+
+	assert!(
+		discard_unsent_publication(&fixture.root, &fresh.pending)
+			.unwrap_or_else(|error| panic!("discard exact record: {error}"))
+	);
+	let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
+		.unwrap_or_else(|error| panic!("reload discarded ledger: {error}"));
+	assert!(ledger.pending.is_none());
+	assert!(ledger.receipts.is_empty());
+	assert!(!ledger.version_is_frozen("account:1:01", 0));
+	assert!(begin().fresh, "a discarded record leaves nothing to resume");
 }
 
 #[test]
@@ -1236,6 +1421,83 @@ fn reconcile_reports_and_abandons_pending_deployments() {
 }
 
 #[test]
+fn legacy_receipts_are_pinned_only_on_request_and_keep_their_chain() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	write_state_source(&fixture, "value: u64, extra: u16");
+	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("advance: {error:?}"));
+	publish_current(&fixture);
+	write_state_source(&fixture, "value: u64, extra: u16, more: u8");
+	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("advance again: {error:?}"));
+	let digest: [u8; 32] = Sha256::digest(
+		std::fs::read(&fixture.artifact).unwrap_or_else(|error| panic!("read artifact: {error}")),
+	)
+	.into();
+	begin_publication(
+		&fixture.root,
+		"devnet",
+		"https://api.devnet.solana.com",
+		fixture.program_id,
+		&fixture.artifact,
+		digest,
+	)
+	.unwrap_or_else(|error| panic!("pending publication: {error}"));
+
+	let path = fixture.root.join(PUBLICATIONS_PATH);
+	let pinned = load_publication_ledger(&path).unwrap_or_else(|error| panic!("load: {error:?}"));
+	assert_eq!(pinned.receipts.len(), 2);
+	assert_eq!(
+		pin_legacy_publications(&fixture.root)
+			.unwrap_or_else(|error| panic!("noop pin: {error:?}")),
+		0,
+		"a fully pinned ledger is left alone"
+	);
+
+	// Strip every pin and rebuild a coherent chain, as an older ledger has it.
+	let mut legacy = pinned.clone();
+	let mut previous = None;
+	for receipt in &mut legacy.receipts {
+		receipt.previous_receipt_sha256 = previous;
+		for published in receipt.versions.values_mut() {
+			published.history.clear();
+		}
+		previous = Some(receipt.sha256());
+	}
+	if let Some(pending) = &mut legacy.pending {
+		pending.previous_receipt_sha256 = previous;
+	}
+	std::fs::write(
+		&path,
+		pina_abi::encode_publication_ledger(&legacy)
+			.unwrap_or_else(|error| panic!("encode legacy: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("write legacy: {error}"));
+	assert!(matches!(
+		check_migrations(&fixture.root),
+		Err(MigrationError::UnpinnedPublication { sequence: 0, .. })
+	));
+
+	assert_eq!(
+		pin_legacy_publications(&fixture.root).unwrap_or_else(|error| panic!("pin: {error:?}")),
+		2
+	);
+	let repinned =
+		load_publication_ledger(&path).unwrap_or_else(|error| panic!("reload: {error:?}"));
+	assert_eq!(
+		repinned, pinned,
+		"pinning an untampered manifest reproduces the original receipts"
+	);
+	check_migrations(&fixture.root).unwrap_or_else(|error| panic!("check pinned: {error:?}"));
+
+	std::fs::remove_file(fixture.root.join(MANIFEST_PATH))
+		.unwrap_or_else(|error| panic!("remove manifest: {error}"));
+	assert!(matches!(
+		pin_legacy_publications(&fixture.root),
+		Err(MigrationError::InvalidHistory(_))
+	));
+}
+
+#[test]
 fn receipts_pin_published_schema_hashes() {
 	let fixture = publication_fixture();
 	publish_current(&fixture);
@@ -1265,8 +1527,8 @@ fn receipts_pin_published_schema_hashes() {
 		.validate()
 		.unwrap_or_else(|error| panic!("coherent tamper must pass manifest validation: {error}"));
 
-	// A legacy receipt upgraded from an older ledger format carries no
-	// pins and still accepts the rewrite.
+	// A receipt without pins cannot tell a rewrite from the shipped schema,
+	// so it is refused outright until the operator pins it deliberately.
 	let mut legacy = ledger.clone();
 	for receipt in &mut legacy.receipts {
 		for published in receipt.versions.values_mut() {
@@ -1274,8 +1536,11 @@ fn receipts_pin_published_schema_hashes() {
 		}
 	}
 	assert!(
-		validate_ledger_for_manifest(&legacy, &tampered).is_ok(),
-		"legacy receipts cannot verify rewritten published schemas"
+		matches!(
+			validate_ledger_for_manifest(&legacy, &tampered),
+			Err(MigrationError::UnpinnedPublication { sequence: 0, .. })
+		),
+		"unpinned receipts must not accept rewritten published schemas"
 	);
 
 	// The pinned receipt records the schema that actually shipped and
@@ -4302,8 +4567,9 @@ fn persisted_and_flag_manual_answers_fail_closed_on_contradiction() {
 
 /// A `--manual` answer on a brand-new field has no rename to record it, so the
 /// recorded mode is the only durable marker. A later schema change re-derives
-/// the draft, and the developer's body must survive that refresh instead of
-/// being replaced by a generated transition.
+/// the draft: it must stay manual rather than become a generated transition,
+/// and the developer's body, written for the old layout, must move aside
+/// instead of compiling against the new one and misplacing bytes.
 #[test]
 fn a_manual_answer_on_an_added_field_survives_a_draft_refresh() {
 	let fixture = publication_fixture();
@@ -4340,8 +4606,67 @@ fn a_manual_answer_on_an_added_field_survives_a_draft_refresh() {
 		"the transition stays manual across the refresh: {output:?}"
 	);
 
+	let stale = path.with_extension("rs.stale");
+	assert_eq!(output.stale_manual_transitions, [stale.clone()]);
+	let preserved =
+		std::fs::read_to_string(&stale).unwrap_or_else(|error| panic!("read stale: {error}"));
+	assert_eq!(preserved, body, "the developer's conversion must be kept");
 	let after = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("read: {error}"));
-	assert_eq!(after, body, "the developer's conversion must survive");
+	assert!(
+		after.contains("TODO(pina-manual-migration)") && after.contains("20 bytes"),
+		"the regenerated stub describes the new layout and blocks the build: {after}"
+	);
+	assert!(
+		matches!(
+			check_migrations(&fixture.root),
+			Err(MigrationError::ManualTransitionIncomplete { .. })
+		),
+		"an unported body must fail the gate"
+	);
+
+	// A process-only change leaves the byte layouts alone, so a finished
+	// body for the current layout is kept as written.
+	std::fs::write(&path, body).unwrap_or_else(|error| panic!("rewrite body: {error}"));
+	let refreshed = create_migrations_with_answers(&fixture.root, &MigrationAnswers::default())
+		.unwrap_or_else(|error| panic!("unchanged refresh: {error:?}"));
+	assert!(refreshed.stale_manual_transitions.is_empty());
+	assert_eq!(
+		std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("read: {error}")),
+		body
+	);
+}
+
+/// `--manual` on a field an automatic draft already moves must convert that
+/// draft instead of being ignored.
+#[test]
+fn a_manual_answer_converts_an_unchanged_automatic_draft() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+	write_state_source(&fixture, "value: u64, derived: u64");
+	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("automatic draft: {error:?}"));
+	let path = fixture
+		.root
+		.join("migrations/transitions/account_1_01/v0_to_v1.rs");
+	assert!(
+		std::fs::read_to_string(&path)
+			.unwrap_or_else(|error| panic!("read: {error}"))
+			.contains("do not edit an automatic transition")
+	);
+
+	let answers = MigrationAnswers::from_flags_with_manual(&[], &[], &["derived".to_owned()], true)
+		.unwrap_or_else(|error| panic!("answers: {error}"));
+	let output = create_migrations_with_answers(&fixture.root, &answers)
+		.unwrap_or_else(|error| panic!("convert to manual: {error:?}"));
+	assert_eq!(output.manual_transitions, [path.clone()]);
+	assert!(
+		output.stale_manual_transitions.is_empty(),
+		"an automatic body is regenerated, not kept"
+	);
+	assert!(
+		std::fs::read_to_string(&path)
+			.unwrap_or_else(|error| panic!("read: {error}"))
+			.contains("TODO(pina-manual-migration)")
+	);
 }
 
 /// A manual transition Pina could not prove — an in-place type change — is

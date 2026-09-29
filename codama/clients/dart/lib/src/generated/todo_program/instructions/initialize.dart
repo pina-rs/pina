@@ -117,7 +117,7 @@ Instruction getInitializeInstruction({
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: owner, role: AccountRole.readonlySigner),
+      AccountMeta(address: owner, role: AccountRole.writableSigner),
       AccountMeta(address: todo, role: AccountRole.writable),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],

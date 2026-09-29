@@ -99,7 +99,7 @@ final class WithdrawCommand extends Command<void> {
       nullifierSet: nullifierSet,
       verifyingKeyAccount: verifyingKeyAccount,
       recipient: recipient,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       nullifier: nullifierValue,
       root: rootValue,
       proofA: proofAValue,

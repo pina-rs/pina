@@ -569,8 +569,9 @@ fn render_instruction_account_default_value(
 ///
 /// Slots: a writable-signer payer (the program-address placeholder marks an
 /// absent payer), the system program, then every declared migratable account
-/// in wire order. Omitted accounts become program-address placeholders; the
-/// program treats those exactly like absent accounts.
+/// in wire order. Omitted migratable accounts and an omitted payer become
+/// program-address placeholders, which the program treats exactly like absent
+/// accounts; an omitted system program defaults to the system program.
 pub fn render_migrate_instruction_page(
 	program: &ProgramNode,
 	primary_program_const: &str,
@@ -638,6 +639,10 @@ pub fn render_migrate_instruction_page(
 		"\t/// program treats as absent: send only the accounts that are stale.",
 	));
 	lines.push(String::from(
+		"\t/// `system_program` defaults to the system program, the only account the",
+	));
+	lines.push(String::from("\t/// program accepts in that slot."));
+	lines.push(String::from(
 		"\t/// The payer must sign and be writable when any migration needs funding.",
 	));
 	lines.push(String::from(
@@ -672,13 +677,17 @@ pub fn render_migrate_instruction_page(
 				"\t\t\taccounts.push(solana_instruction::AccountMeta::new({name}, false));"
 			));
 		} else {
-			lines.push(format!("\t\tif let Some({name}) = self.{name} {{"));
+			// Slot 1 must be the system program (the all-zero address), so an
+			// omitted value defaults to it instead of the program placeholder.
 			lines.push(String::from(
-				"\t\t\taccounts.push(solana_instruction::AccountMeta::new_readonly(",
+				"\t\taccounts.push(solana_instruction::AccountMeta::new_readonly(",
 			));
-			lines.push(format!("\t\t\t\t{name},"));
-			lines.push(String::from("\t\t\t\tfalse,"));
-			lines.push(String::from("\t\t\t));"));
+			lines.push(format!(
+				"\t\t\tself.{name}.unwrap_or(solana_pubkey::Pubkey::new_from_array([0; 32])),"
+			));
+			lines.push(String::from("\t\t\tfalse,"));
+			lines.push(String::from("\t\t));"));
+			continue;
 		}
 		lines.push(String::from("\t\t} else {"));
 		lines.push(String::from(

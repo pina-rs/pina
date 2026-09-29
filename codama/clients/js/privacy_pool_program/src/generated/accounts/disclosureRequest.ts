@@ -278,10 +278,10 @@ export const DISCLOSURE_REQUEST_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (disclosureRequestNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && disclosureRequestNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ disclosureRequest: address, payer }).make());
+ * 	await send(getMigrateInstruction({ disclosureRequest: address, payer }));
  * }
  * ```
  */

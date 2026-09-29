@@ -1787,10 +1787,10 @@ export const {shouting}_MIGRATION_VERSION = {version};
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const {{ data }} = await fetchEncodedAccount(rpc, address);
- * if ({camel}NeedsMigration(data)) {{
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && {camel}NeedsMigration(account.data)) {{
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({{ {camel}: address, payer }}).make());
+ * 	await send(getMigrateInstruction({{ {camel}: address, payer }}));
  * }}
  * ```
  */
@@ -1829,6 +1829,11 @@ fn js_le_read(offset: usize, width: usize) -> String {
 	}
 	terms.join(" + ")
 }
+
+/// Address of the system program, the only account `Migrate` accepts in slot 1.
+const SYSTEM_PROGRAM_ADDRESS: &str = "11111111111111111111111111111111";
+/// [`SYSTEM_PROGRAM_ADDRESS`] as a TypeScript string literal.
+const SYSTEM_PROGRAM_LITERAL: &str = "\"11111111111111111111111111111111\"";
 
 /// The generated `instructions/migrate.ts` module for one program.
 ///
@@ -1931,7 +1936,17 @@ fn js_migrate_instruction_module(program: &str, plan: &MigrationPlan) -> String 
 		.iter()
 		.map(|(camel, role)| {
 			let writable = role.as_str() != "ReadonlyAccount";
-			format!("\t\t{camel}: {{ value: input.{camel} ?? null, isWritable: {writable} }},")
+			// The program rejects any slot-1 account other than the system
+			// program, so it defaults to that address rather than to the
+			// program-address placeholder the other slots use.
+			let fallback = if camel == "systemProgram" {
+				format!("({SYSTEM_PROGRAM_LITERAL} as Address<\"{SYSTEM_PROGRAM_ADDRESS}\">)")
+			} else {
+				"null".to_owned()
+			};
+			format!(
+				"\t\t{camel}: {{ value: input.{camel} ?? {fallback}, isWritable: {writable} }},"
+			)
 		})
 		.collect::<Vec<_>>()
 		.join("\n");
@@ -1940,9 +1955,12 @@ fn js_migrate_instruction_module(program: &str, plan: &MigrationPlan) -> String 
 		.map(|(camel, _)| format!("\t\tgetAccountMeta(\"{camel}\", accounts.{camel}),"))
 		.collect::<Vec<_>>()
 		.join("\n");
-	let provided = slots
+	// Only migratable slots are truncated: the payer and system program always
+	// occupy slots 0 and 1, because the program requires both to be present.
+	let provided = plan
+		.accounts
 		.iter()
-		.map(|(camel, _)| format!("input.{camel}"))
+		.map(|account| format!("input.{}", account.camel))
 		.collect::<Vec<_>>()
 		.join(", ");
 	let function_type_parameters = slots
@@ -2037,8 +2055,9 @@ export type MigrateInput<
  * program-address placeholder and trailing omitted slots are dropped, so a
  * client sends only the accounts it needs to migrate. The `payer` funds rent
  * deficits and must be a writable signer; omit it when no migration needs
- * funding. The program caps the whole instruction's rent transfers at a
- * program-chosen lamport budget.
+ * funding. `systemProgram` defaults to the system program, the only account
+ * the program accepts in that slot. The program caps the whole
+ * instruction's rent transfers at a program-chosen lamport budget.
  */
 export function getMigrateInstruction<
 {function_type_parameters}
@@ -2065,10 +2084,10 @@ export function getMigrateInstruction<
 	>;
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 
-	// Slots after the last provided account may be truncated: the program
-	// treats a missing trailing slot exactly like the program-address
-	// placeholder.
-	const provided = [{provided}];
+	// Migratable slots after the last provided account may be truncated: the
+	// program treats a missing trailing slot exactly like the program-address
+	// placeholder. The payer and system program slots are always sent.
+	const provided: readonly unknown[] = [{provided}];
 	let lastProvided = -1;
 	for (let index = 0; index < provided.length; index += 1) {{
 		if (provided[index] != null) {{
@@ -2079,7 +2098,7 @@ export function getMigrateInstruction<
 	return Object.freeze({{
 		accounts: [
 {metas}
-		].slice(0, lastProvided + 1),
+		].slice(0, 2 + lastProvided + 1),
 		data: getMigrateDiscriminatorBytes(),
 		programAddress,
 	}} as MigrateInstruction<

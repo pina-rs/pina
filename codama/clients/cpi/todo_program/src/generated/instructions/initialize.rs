@@ -22,7 +22,7 @@ use crate::ProgramAccount;
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 pub struct Initialize<'account> {
 	/// CPI account `owner`.
-	/// Required privileges: read-only and signer.
+	/// Required privileges: writable and signer.
 	pub owner: &'account AccountView,
 
 	/// CPI account `todo`.
@@ -78,7 +78,7 @@ impl<'account> Initialize<'account> {
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
 		let accounts: [CpiHandle<'_>; 3] = [
-			CpiHandle::readonly_signer(self.owner),
+			CpiHandle::writable_signer(self.owner)?,
 			CpiHandle::writable(self.todo)?,
 			CpiHandle::readonly(self.system_program),
 		];

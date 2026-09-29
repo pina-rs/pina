@@ -298,10 +298,10 @@ export const PROFILE_STATE_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (profileStateNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && profileStateNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ profileState: address, payer }).make());
+ * 	await send(getMigrateInstruction({ profileState: address, payer }));
  * }
  * ```
  */

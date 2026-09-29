@@ -629,6 +629,20 @@ fn diagnose_project(
 	append_inspection_error(&artifact_metadata, findings);
 	append_inspection_error(&keypair_metadata, findings);
 	let program_id = match inspect_program_id(&project.library_source) {
+		Ok(declaration) if declaration.program_id == crate::init::PLACEHOLDER_PROGRAM_ID => {
+			// Every scaffold starts with this address and nobody holds its
+			// keypair, so it can be neither deployed nor safely snapshotted.
+			checks.push(DoctorCheck {
+				id: "project.program-id".to_owned(),
+				status: CheckStatus::Warn,
+				message: format!(
+					"declared as the `pina init` placeholder {}; run `pina keys new` to give the \
+					 program its own identity",
+					declaration.program_id
+				),
+			});
+			Some(declaration.program_id)
+		}
 		Ok(declaration) => {
 			checks.push(DoctorCheck {
 				id: "project.program-id".to_owned(),
@@ -1511,6 +1525,23 @@ mod tests {
 				.findings
 				.contains(&"run `pina keys sync` after reviewing the selected keypair".to_owned())
 		);
+
+		fs::write(
+			source_dir.join("lib.rs"),
+			format!(
+				"declare_id!(\"{}\");\n",
+				crate::init::PLACEHOLDER_PROGRAM_ID
+			),
+		)
+		.unwrap_or_else(|error| panic!("placeholder write failed: {error}"));
+		let placeholder = diagnose(&root);
+		let check = placeholder
+			.checks
+			.iter()
+			.find(|check| check.id == "project.program-id")
+			.unwrap_or_else(|| panic!("program-id check expected"));
+		assert_eq!(check.status, CheckStatus::Warn);
+		assert!(check.message.contains("pina keys new"), "{}", check.message);
 	}
 
 	#[test]

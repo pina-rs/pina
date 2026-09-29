@@ -107,7 +107,7 @@ final class DepositCommand extends Command<void> {
       poolVault: poolVault,
       merkleTree: merkleTree,
       noteCommitment: noteCommitment,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
       commitment: commitmentValue,
       viewPubkey: viewPubkeyValue,

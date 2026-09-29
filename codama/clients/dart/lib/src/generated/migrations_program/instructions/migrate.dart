@@ -23,7 +23,9 @@ Uint8List getMigrateDiscriminatorBytes() => Uint8List.fromList(const [255]);
 /// Every migratable account is optional: omitted slots become program-address
 /// placeholders and trailing omitted slots are truncated, so a client sends
 /// only the accounts it needs to migrate. The `payer` funds rent deficits and
-/// must sign; omit it when no migration needs funding.
+/// must sign; omit it when no migration needs funding. `systemProgram`
+/// defaults to the system program, the only account the program accepts in
+/// that slot.
 Instruction getMigrateInstruction({
   Address? programAddress,
   Address? payer,
@@ -39,7 +41,8 @@ Instruction getMigrateInstruction({
       role: payer == null ? AccountRole.readonly : AccountRole.writableSigner,
     ),
     AccountMeta(
-      address: systemProgram ?? resolvedProgram,
+      address:
+          systemProgram ?? const Address('11111111111111111111111111111111'),
       role: AccountRole.readonly,
     ),
     AccountMeta(
@@ -55,7 +58,7 @@ Instruction getMigrateInstruction({
       role: compactState == null ? AccountRole.readonly : AccountRole.writable,
     ),
   ];
-  final provided = [payer, systemProgram, state, manualState, compactState];
+  final provided = <Address?>[state, manualState, compactState];
   var last = -1;
   for (var index = 0; index < provided.length; index++) {
     if (provided[index] != null) {
@@ -64,7 +67,7 @@ Instruction getMigrateInstruction({
   }
   return Instruction(
     programAddress: resolvedProgram,
-    accounts: metas.sublist(0, last + 1),
+    accounts: metas.sublist(0, 2 + last + 1),
     data: getMigrateDiscriminatorBytes(),
   );
 }

@@ -1184,6 +1184,29 @@ mod tests {
 	/// A decoder already carrying the direction-aware check must be reported as
 	/// hardened, not re-processed.
 	#[test]
+	fn dart_migrate_module_always_sends_the_payer_and_system_program() {
+		let plan = MigrationPlan {
+			accounts: vec![crate::client_migrations::MigratableAccount {
+				camel: "profileState".to_owned(),
+				shouting: "PROFILE_STATE".to_owned(),
+				discriminator: vec![1],
+				version: 0,
+				version_bytes: 1,
+			}],
+			reserved_discriminator: vec![255],
+		};
+		let module = dart_migrate_instruction_module("profile_program", &plan);
+
+		assert!(
+			module.contains("systemProgram ?? const Address('11111111111111111111111111111111')"),
+			"{module}"
+		);
+		assert!(module.contains("final provided = <Address?>[profileState];"));
+		assert!(module.contains("accounts: metas.sublist(0, 2 + last + 1),"));
+		assert!(module.contains("AccountRole.writableSigner"));
+	}
+
+	#[test]
 	fn dart_version_hardening_reports_already_hardened() {
 		let account = migratable_account();
 		let source = "final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + \
@@ -1871,17 +1894,23 @@ fn dart_migrate_instruction_module(program: &str, plan: &MigrationPlan) -> Strin
 					 {camel} == null ? AccountRole.readonly : AccountRole.writable,\n    ),"
 				)
 			} else {
+				// Slot 1 must be the system program, so it defaults to that
+				// address rather than the program-address placeholder.
 				format!(
-					"    AccountMeta(address: {camel} ?? resolvedProgram, role: \
-					 AccountRole.readonly),"
+					"    AccountMeta(\n      address: {camel} ?? const \
+					 Address('11111111111111111111111111111111'),\n      role: \
+					 AccountRole.readonly,\n    ),"
 				)
 			}
 		})
 		.collect::<Vec<_>>()
 		.join("\n");
-	let provided = slots
+	// Only migratable slots are truncated: the payer and system program always
+	// occupy slots 0 and 1, because the program requires both to be present.
+	let provided = plan
+		.accounts
 		.iter()
-		.map(|(camel, _)| camel.clone())
+		.map(|account| account.camel.clone())
 		.collect::<Vec<_>>()
 		.join(", ");
 	let discriminator_bytes = plan
@@ -1922,7 +1951,9 @@ Uint8List getMigrateDiscriminatorBytes() =>
 /// Every migratable account is optional: omitted slots become program-address
 /// placeholders and trailing omitted slots are truncated, so a client sends
 /// only the accounts it needs to migrate. The `payer` funds rent deficits and
-/// must sign; omit it when no migration needs funding.
+/// must sign; omit it when no migration needs funding. `systemProgram`
+/// defaults to the system program, the only account the program accepts in
+/// that slot.
 Instruction getMigrateInstruction({{
   Address? programAddress,
 {parameters}
@@ -1931,7 +1962,7 @@ Instruction getMigrateInstruction({{
   final metas = <AccountMeta>[
 {metas}
   ];
-  final provided = [{provided}];
+  final provided = <Address?>[{provided}];
   var last = -1;
   for (var index = 0; index < provided.length; index++) {{
     if (provided[index] != null) {{
@@ -1940,7 +1971,7 @@ Instruction getMigrateInstruction({{
   }}
   return Instruction(
     programAddress: resolvedProgram,
-    accounts: metas.sublist(0, last + 1),
+    accounts: metas.sublist(0, 2 + last + 1),
     data: getMigrateDiscriminatorBytes(),
   );
 }}

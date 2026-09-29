@@ -38,8 +38,7 @@ use super::transition::RENT_EXEMPT_LAMPORTS_PER_BYTE;
 pub(crate) const MAX_INLINE_STEPS: u32 = 8;
 
 /// Human-readable description of the ladder a preview quotes.
-pub(crate) const LADDER_MODEL: &str =
-	"the oldest version within MAX_INLINE_STEPS (8) of the current version, climbing one adjacent \
+pub(crate) const LADDER_MODEL: &str = "the oldest version within MAX_INLINE_STEPS (8) of the current version, climbing one adjacent \
 	 transition per step; a version-0 (day-one) account is only reachable inline when the history \
 	 has at most MAX_INLINE_STEPS transitions";
 
