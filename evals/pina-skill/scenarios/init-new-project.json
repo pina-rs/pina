@@ -45,7 +45,18 @@
 			"kind": "command",
 			"why": "History binds to the declared program address. The agent may establish a fresh identity with `pina keys new` and snapshot immediately, but a manifest still holding the placeholder address (or a mismatch) means the baseline is wrong.",
 			"command": "python3 -c \"import json,re,os; root='escrow_program' if os.path.exists('escrow_program/migrations/manifest.json') else '.'; m=json.load(open(root+'/migrations/manifest.json')); src=open(root+'/src/lib.rs').read(); declared=re.search(r'declare_id!\\(\\\"([^\\\"]+)\\\"\\)', src).group(1); print('declared', declared, 'manifest', m['programId']); raise SystemExit(0 if m['programId']==declared else 1)\"",
-			"expectOutput": ["declared"]
+			"expectOutput": [
+				"declared"
+			]
+		},
+		{
+			"id": "identity-is-not-the-placeholder",
+			"kind": "command",
+			"command": "if [ -d escrow_program ]; then cd escrow_program; fi && ! grep -q Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7 src/lib.rs && echo identity-replaced",
+			"expectOutput": [
+				"identity-replaced"
+			],
+			"why": "Every scaffold shares the placeholder address, which nobody can deploy; `pina keys new` must replace it before the baseline is recorded."
 		},
 		{
 			"id": "build-script-scaffolded",

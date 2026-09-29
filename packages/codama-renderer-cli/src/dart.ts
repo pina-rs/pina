@@ -14,6 +14,18 @@
 
 import type { ArgKind, CliModel, InstructionModel } from "./model.ts";
 
+/**
+ * Quote `value` as a Dart string literal.
+ *
+ * JSON string escapes (`\"`, `\\`, `\n`, `\uXXXX`) mean the same thing in
+ * Dart, but Dart also interpolates `$`, so IDL text such as a doc containing
+ * `${...}` would otherwise become an evaluated expression in the generated
+ * command.
+ */
+export function dartString(value: string): string {
+	return JSON.stringify(value).replaceAll("$", "\\$");
+}
+
 export interface DartOptions {
 	/** Name of the Dart package these sources belong to. */
 	packageName: string;
@@ -478,7 +490,9 @@ function factoryParams(instruction: InstructionModel): string {
 	for (const account of instruction.accounts) {
 		if (account.resolution.resolution === "constant") {
 			params.push(
-				`      ${account.camel}: Address('${account.resolution.address}'),`,
+				`      ${account.camel}: Address(${
+					dartString(account.resolution.address)
+				}),`,
 			);
 		} else {
 			params.push(`      ${account.camel}: ${account.camel},`);
@@ -508,14 +522,14 @@ function optionAdders(instruction: InstructionModel): string {
 		if (arg.type.kind === "bool") {
 			adders.push(
 				`      ..addFlag('${arg.snake}', help: ${
-					JSON.stringify(arg.docs[0]?.split("\n")[0] ?? arg.camel)
+					dartString(arg.docs[0]?.split("\n")[0] ?? arg.camel)
 				})`,
 			);
 			continue;
 		}
 		adders.push(
 			`      ..addOption('${arg.snake}', mandatory: true, help: ${
-				JSON.stringify(arg.docs[0]?.split("\n")[0] ?? arg.camel)
+				dartString(arg.docs[0]?.split("\n")[0] ?? arg.camel)
 			})`,
 		);
 	}
@@ -540,7 +554,7 @@ function optionAdders(instruction: InstructionModel): string {
 		adders.push(
 			`      ..addOption('${account.snake}', mandatory: ${
 				mandatory ? "true" : "false"
-			}, help: ${JSON.stringify(`${help}${hint}`)})`,
+			}, help: ${dartString(`${help}${hint}`)})`,
 		);
 	}
 	return adders.join("\n");
@@ -564,7 +578,7 @@ ${optionAdders(instruction)};
 
   @override
   String get description => ${
-		JSON.stringify(
+		dartString(
 			instruction.docs.join(" ").split("\n")[0] || instruction.snake,
 		)
 	};
@@ -611,7 +625,7 @@ function renderFetchCommand(model: CliModel, clientBarrel: string): string {
 				"      ..addOption('address', help: 'Account address; overrides PDA derivation.')",
 				...variableSeeds.map((seed) =>
 					`      ..addOption('${seed.snake}', mandatory: true, help: ${
-						JSON.stringify(`PDA seed \`${seed.snake}\`.`)
+						dartString(`PDA seed \`${seed.snake}\`.`)
 					})`
 				),
 			].join("\n");
@@ -674,7 +688,7 @@ ${adders};
 
   @override
   String get description => ${
-				JSON.stringify(account.docs[0]?.split("\n")[0] ?? account.snake)
+				dartString(account.docs[0]?.split("\n")[0] ?? account.snake)
 			};
 
   @override
@@ -751,7 +765,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
     '${model.programKebab}-cli',
-    ${JSON.stringify(model.about)},
+    ${dartString(model.about)},
   )
     ..argParser.addOption(
         'url',
@@ -800,7 +814,7 @@ export function renderDart(
 
 	files.set(
 		`lib/src/${stem}/context.dart`,
-		CONTEXT.replace("PROGRAM_ADDRESS", JSON.stringify(model.programAddress)),
+		CONTEXT.replace("PROGRAM_ADDRESS", () => dartString(model.programAddress)),
 	);
 
 	for (const instruction of model.instructions) {

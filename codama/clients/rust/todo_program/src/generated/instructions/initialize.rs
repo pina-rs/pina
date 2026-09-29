@@ -43,9 +43,7 @@ impl Initialize {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.owner, true,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.owner, true));
 		accounts.push(solana_instruction::AccountMeta::new(self.todo, false));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.system_program,

@@ -76,7 +76,7 @@ final class WithdrawCommand extends Command<void> {
       userStakeAta: userStakeAta,
       stakeVault: stakeVault,
       tokenProgram: tokenProgram,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       amount: amountValue,
     );
     await context.send([instruction]);

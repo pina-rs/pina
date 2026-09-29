@@ -95,3 +95,71 @@ The lesson matches round one: grader defects are the dominant risk, and every on
 - **An assignment prefix does not survive `&&`.** `PATH=… pina a && pina b` shadows `pina` for `a` only; `b` silently resolved to a stale release. The grader now injects `PATH` through the child environment instead of the command string.
 
 - **Soft goals need deterministic homes.** "The agent should find the guidance through the CLI" sounded like a scenario check, but a model that already knows the answer will not go looking — grading its transcript fails correct work. Reachability is now a property test of the CLI; the agent scenario grades only the work.
+
+## Round four: the end-to-end flows and the generated clients
+
+Rounds one to three graded the skill against migration tasks. Round four asked a different question: when an agent follows the skill, the docs, and the CLI literally through the whole lifecycle (`pina init`, day-to-day usage, the migration flow, deployment, and the generated clients an application is built on), does each step produce the outcome the documentation promises, and is that outcome safe?
+
+### Method
+
+Four independent evaluations ran in parallel against the workspace CLI, each in throwaway projects, each told to reproduce every finding before reporting it:
+
+- **init and general usage:** a fresh `pina init` project taken through every documented command, plus hostile inputs (names, destinations, existing workspaces);
+- **migrations:** every schema-change class on the three fixtures, drift and tamper attempts on the manifest and ledger, and a native harness that ran generated and hand-written transition bodies on real account bytes;
+- **deployment:** 35 `--cluster` spellings, malformed and mis-permissioned keypairs, shell-injection paths, `--remote-command`, and the publication ledger around failed deploys;
+- **generated clients:** the TypeScript, Dart, Rust, and CPI output of every example, scrutinized against the program's validation, plus crafted malicious IDLs.
+
+Every defect below was fixed in this round and is pinned by a unit, integration, or contract test. The ones an agent is most likely to hit are also pinned by the deterministic `migration-safety-gates` scenario. The whole agent suite was then re-run on both skill variants.
+
+### Defects that produced wrong outcomes
+
+- **A fresh project could not complete the documented loop.**
+  - `pina lint` asked for a driver built for a nightly no release ships, because the scaffold pinned an old toolchain.
+  - TypeScript, Dart, `cli-ts`, and `cli-dart` generation failed outside this repository. The stdin render script could not resolve `npx -p` packages, and the published `@pina-rs/codama-renderer-cli` tarball had no `dist/`.
+  - Every generated Rust, CPI, and `cli-rust` client inherited dependencies from a workspace the scaffold does not have.
+  - The skill's own setup sequence omitted `pina keys new` and `pina migrations create`, so `pina build` failed on its first run.
+- **A finished manual transition corrupted accounts silently.** A body written for one draft layout survived a later change to that draft, compiled, and passed `check`. In the native harness it moved `count` into the new `revision` field and shifted `authority`. `create` now moves a stale body to `vN_to_vM.rs.stale` behind a build-blocking stub.
+- **Published history could be rewritten.** A receipt with an empty `history` skipped the published-schema check, so blanking it let a published `u64` become a `u32` while `check` reported "consistent". Unpinned receipts are now refused until `reconcile --pin-legacy` pins them, and the committed fixtures and `examples/migrations_program` were pinned. Pinning an untampered ledger reproduces the original receipts byte for byte.
+- **Generated clients encoded the wrong wire format.** Before a baseline existed, `pina idl` and `pina generate` emitted an IDL without the version byte, so clients were one byte short of the program the next `create` produces. Both now refuse.
+- **The generated `Migrate` call always failed on chain.** The TypeScript, Dart, and Rust composers put the program address in the system-program slot the program asserts, and a test asserted that broken layout.
+- **Payers were read-only in the IDL.** A payer passed as `&AccountView` to a creation builder was emitted read-only in `counter_program`, `todo_program`, and `float_accounts_program`, so any transaction with a separate fee payer, and any CPI, failed with a privilege escalation.
+- **Event parsers trusted any program.** The TypeScript and Dart log parsers decoded every `Program data:` line, so a program invoked through CPI could forge events with the right discriminator, and one foreign future-version line made the whole parse throw. They now attribute each line through the transaction's invocation frames.
+- **Generated code could be injected.** A `*/` in a Rust doc comment became live TypeScript, a multi-line `#[doc]` value could end a `///` comment, and `$` in IDL text became an evaluated expression in the Dart CLI.
+- **`--manual` was silently ignored** on a draft already recorded as automatic.
+- **Changing the program ID stranded the history.** `pina keys new` left every migrations and deploy command failing with no recovery short of deleting `migrations/`. An unpublished history now rebinds on the next `create`.
+- **A deploy that never started froze drafts.** With `solana` missing, the pending record could only be abandoned, which freezes the versions forever. A record written by an attempt that provably never started is now discarded.
+
+### Defects that only misled
+
+These made no outcome wrong, but each cost an agent a turn or pointed it at the wrong fix: help text with literal tabs and backslashes (the repository's `format_strings = true` rustfmt setting splits long string literals in the middle of escape sequences, which also turned one test's source rewrite into a silent no-op; the setting is now off); an invalid `rustup --toolchain` remedy; a URL-parser error for a mistyped cluster name; a Surfpool test template with doubled braces; compact `MAX_SIZE` in `tests/abi_layout.rs` that excluded the envelope `MIN_SIZE` included; an envelope-acknowledgement message that claimed bytes shift for brand-new contracts; `pina init` accepting names Cargo rejects; and a placeholder program ID that `pina doctor` reported as a pass.
+
+The docs and the skill carried the same kind of error. They claimed `create` persists answers to `pina.toml` (it only reads them), that reordering is automatic (it is manual), that a missing manifest always fails the build (an `auto` policy builds envelope-free), that decoders enforce exact lengths (TypeScript accepts trailing bytes), that `pina deploy` never runs a shell string (`--remote-command` does), and that the scaffold ships Mollusk and an SBF linker configuration (it ships neither). The flow page showed a `pina deploy --program-id` flag that does not exist, and the migration flow showed a `.make()` call on an object that has no such method. Each claim was corrected against the CLI's actual behavior.
+
+### Agent-suite results
+
+After the fixes, both variants were run through every scenario with one agent run per cell:
+
+| Variant    | Pass rate | Notes                                                    |
+| ---------- | --------- | -------------------------------------------------------- |
+| `improved` | 18/18     | after regrading `close-counter` with the corrected check |
+| `baseline` | 18/18     | after regrading `pda-account` with the corrected check   |
+
+The suite still does not separate the variants, which matches the earlier rounds: a strong model completes these tasks with either skill. This round's value is the CLI and documentation fixes above and the gates that now pin them, not a pass-rate delta. Do not quote the table as evidence that the updated skill is better.
+
+### Grader and harness defects
+
+- `close-counter` anchored its security checks on the literal `CloseCounter`. The improved run named the instruction `Close`, and its handler checked the signer and the stored authority before `CloseAccountZeroed` exactly as required. The checks now anchor on the close handler's `ProcessAccountInfos` impl, and a mutation that removes its signer check still fails them.
+- `pda-account` required `CreateProgramAccount`, so the baseline run failed for choosing `CreateCompactProgramAccount`, the correct builder for its compact account. The check now accepts either family.
+- The harness graded 18 runs as ordinary failures when the agent runtime refused to start at all (bypassed permissions under root), with zero tokens used. That report looked like a skill regression. The harness now aborts when the runtime exits without a transcript, and the README documents `IS_SANDBOX=1` for disposable root containers.
+
+Both grader defects repeat round three's lesson: they pinned one correct answer, and both failed correct work.
+
+### Not fixed in this round
+
+These were reproduced and are documented in the skill or the docs, but need design work of their own:
+
+- CPI crates have no owner-checked account entry point, and they report `LEN`/`MAX_LEN` that are wrong when fields are dropped or capacities ignored.
+- `pina migrations inspect` checks neither the account owner nor its length, and the cost preview can name an instruction that cannot fund growth as the most expensive one.
+- A loopback deploy URL may be a tunnel to a live cluster; the documented remedy is to use the real URL until the CLI checks the genesis hash.
+- `tests/abi_layout.rs` contains constants but no `#[test]` functions.
+- Retiring a never-published contract still requires deleting `migrations/`, and TypeScript decoders still accept trailing bytes (upstream Codama behavior).

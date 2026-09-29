@@ -39,7 +39,7 @@ final class CreatePdaCommand extends Command<void> {
       programAddress: context.programAddress,
       payer: payer,
       state: state,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
     );
     await context.send([instruction]);

@@ -14,6 +14,7 @@ use codama_nodes::DiscriminatorNode;
 use codama_nodes::EventNode;
 use codama_nodes::Number;
 use codama_nodes::NumberFormat;
+use codama_nodes::ProgramNode;
 use codama_nodes::RootNode;
 use codama_nodes::TypeNode;
 use codama_nodes::ValueNode;
@@ -39,7 +40,7 @@ pub(crate) fn emit_js_event_log_module(
 	if root.program.events.is_empty() {
 		return Ok(());
 	}
-	let Some(module) = event_log_module(program, &root.program.events, histories) else {
+	let Some(module) = event_log_module(program, &root.program, histories) else {
 		return Ok(());
 	};
 
@@ -95,9 +96,10 @@ pub(crate) fn emit_js_event_log_module(
 
 fn event_log_module(
 	program: &str,
-	events: &[EventNode],
+	program_node: &ProgramNode,
 	histories: &EventClientHistoryIndex,
 ) -> Option<String> {
+	let events = &program_node.events;
 	let mut imports = Vec::new();
 	let mut body = Vec::new();
 	let mut decoders = Vec::new();
@@ -127,6 +129,9 @@ fn event_log_module(
 	}
 
 	let program_pascal = pascal_case(&snake_to_camel(program));
+	// The address is a base58 literal from the IDL; JSON quoting keeps any
+	// unexpected character inside the string rather than in generated code.
+	let program_address = serde_json::Value::String(program_node.public_key.clone()).to_string();
 	let union = decoders
 		.iter()
 		.map(|(_, pascal, _)| format!("\t| Decoded{pascal}Event"))
@@ -165,23 +170,56 @@ import {{ getBase64Encoder, type ReadonlyUint8Array }} from "@solana/kit";
 export type Decoded{program_pascal}Event =
 {union};
 
+/** The program whose invocation frames emit the events decoded here. */
+export const {program_shouting}_EVENT_SOURCE_ADDRESS = {program_address};
+
+const PROGRAM_INVOKE_LOG = /^Program (\S+) invoke \[\d+\]$/;
+const PROGRAM_EXIT_LOG = /^Program (\S+) (?:success|failed: .*)$/;
+
 /**
- * Decode every `Program data:` line that names one of this program's events.
+ * Decode every `Program data:` line this program emitted in a transaction's
+ * logs.
  *
- * Unrelated lines and programs are skipped. A log that names an event but
- * carries an unknown, future, or non-projectable version throws instead of
- * being silently dropped.
+ * `logs` must be the complete, ordered log messages of one transaction. The
+ * parser follows the runtime's `Program <address> invoke [n]` and
+ * `Program <address> success` / `failed` frames and decodes a data line only
+ * while `programAddress` is the innermost invoked program. Any program can
+ * write a `Program data:` line with this program's discriminator, so data
+ * lines from other programs (including ones this program invokes through CPI)
+ * and lines outside any frame are skipped rather than trusted.
+ *
+ * Unrelated lines are skipped. A line this program emitted that names an event
+ * but carries an unknown, future, or non-projectable version throws instead of
+ * being silently dropped. The per-event `parse*FromLog` helpers decode one line
+ * without this attribution and are only safe for data already known to come
+ * from this program.
  */
 export function parse{program_pascal}EventsFromLogs(
 	logs: readonly string[],
+	programAddress: string = {program_shouting}_EVENT_SOURCE_ADDRESS,
 ): Decoded{program_pascal}Event[] {{
 	const discovered: Decoded{program_pascal}Event[] = [];
+	const frames: string[] = [];
 	for (const log of logs) {{
+		const invoke = PROGRAM_INVOKE_LOG.exec(log);
+		if (invoke !== null) {{
+			frames.push(invoke[1] ?? "");
+			continue;
+		}}
+		const exit = PROGRAM_EXIT_LOG.exec(log);
+		if (exit !== null) {{
+			frames.pop();
+			continue;
+		}}
+		if (frames.length === 0 || frames[frames.length - 1] !== programAddress) {{
+			continue;
+		}}
 {dispatches}
 	}}
 	return discovered;
 }}
 "#,
+		program_shouting = shouting_snake(program),
 		imports = imports.join("\n"),
 		body = body.join("\n"),
 	))
@@ -887,7 +925,7 @@ mod tests {
 
 		let module = event_log_module(
 			"events_program",
-			&root.program.events,
+			&root.program,
 			&EventClientHistoryIndex::default(),
 		)
 		.unwrap_or_else(|| panic!("one renderable event keeps the module"));
@@ -900,7 +938,7 @@ mod tests {
 		let root = read_idl("migrations_program.json");
 		let module = event_log_module(
 			"migrations_program",
-			&root.program.events,
+			&root.program,
 			&EventClientHistoryIndex::default(),
 		)
 		.unwrap_or_else(|| panic!("the migration event must emit a log module"));
@@ -1108,7 +1146,7 @@ mod tests {
 		let history = migrations_history();
 		histories.insert_for_test(history);
 
-		let module = event_log_module("migrations_program", &root.program.events, &histories)
+		let module = event_log_module("migrations_program", &root.program, &histories)
 			.unwrap_or_else(|| panic!("the migration event must emit a log module"));
 
 		assert!(module.contains("export function parseMigrationsProgramEventsFromLogs("));
@@ -1131,7 +1169,7 @@ mod tests {
 		let root = read_idl("events_program.json");
 		let module = event_log_module(
 			"events_program",
-			&root.program.events,
+			&root.program,
 			&EventClientHistoryIndex::default(),
 		)
 		.unwrap_or_else(|| panic!("events must emit a log module"));
@@ -1155,7 +1193,7 @@ mod tests {
 		assert!(
 			event_log_module(
 				"counter_program",
-				&root.program.events,
+				&root.program,
 				&EventClientHistoryIndex::default(),
 			)
 			.is_none()

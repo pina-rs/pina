@@ -55,7 +55,7 @@ final class RenameCommand extends Command<void> {
       programAddress: context.programAddress,
       authority: authority,
       journal: journal,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       titleLen: titleLenValue,
       title: titleValue,
     );

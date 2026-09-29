@@ -47,7 +47,7 @@ final class RelayCommand extends Command<void> {
       referrer: referrer,
       state: state,
       migrationPayer: migrationPayer,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       migrationProgram: migrationProgram,
       value: valueValue,
     );

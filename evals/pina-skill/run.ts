@@ -16,7 +16,11 @@ import {
 import { basename, join } from "node:path";
 import process from "node:process";
 
-import { runAgent, runWorkdir } from "./lib/agent.ts";
+import {
+	AgentRuntimeUnavailableError,
+	runAgent,
+	runWorkdir,
+} from "./lib/agent.ts";
 import { allPassed, gradeAll } from "./lib/grade.ts";
 import {
 	copyFixture,
@@ -357,6 +361,11 @@ async function main(): Promise<void> {
 							: undefined,
 					});
 				} catch (error) {
+					// A runtime that never started invalidates every run, so abort
+					// instead of grading it as a skill failure.
+					if (error instanceof AgentRuntimeUnavailableError) {
+						throw error;
+					}
 					console.error(`  harness error: ${String(error)}`);
 					runs.push({
 						scenario: scenario.id,

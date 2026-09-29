@@ -205,7 +205,7 @@ pub(crate) fn emit_dart_event_modules(
 	}
 
 	let barrel_path = events_dir.join("events.dart");
-	let barrel = events_barrel(&program_pascal, &events, &exports);
+	let barrel = events_barrel(&program_pascal, &root.program.public_key, &events, &exports);
 	std::fs::write(&barrel_path, barrel).map_err(|source| {
 		CodamaError::DartClient {
 			path: barrel_path.clone(),
@@ -321,8 +321,38 @@ Uint8List writeLittleEndian(int value, int width) {
 	module
 }
 
+/// Quote `value` as a single-quoted Dart string literal.
+///
+/// Dart interpolates `$` inside ordinary literals, so it is escaped along with
+/// the quote, the backslash, and every control character.
+fn dart_string_literal(value: &str) -> String {
+	let mut literal = String::with_capacity(value.len() + 2);
+	literal.push('\'');
+	for character in value.chars() {
+		match character {
+			'\\' => literal.push_str("\\\\"),
+			'\'' => literal.push_str("\\'"),
+			'$' => literal.push_str("\\$"),
+			'\n' => literal.push_str("\\n"),
+			'\r' => literal.push_str("\\r"),
+			'\t' => literal.push_str("\\t"),
+			character if character.is_control() => {
+				let _ = write!(literal, "\\u{{{:x}}}", u32::from(character));
+			}
+			character => literal.push(character),
+		}
+	}
+	literal.push('\'');
+	literal
+}
+
 /// The `events.dart` barrel with the program-level log parser.
-fn events_barrel(program_pascal: &str, events: &[EventFacts<'_>], exports: &[String]) -> String {
+fn events_barrel(
+	program_pascal: &str,
+	program_address: &str,
+	events: &[EventFacts<'_>],
+	exports: &[String],
+) -> String {
 	let mut lines = vec![
 		"// Auto-generated. Do not edit.".to_owned(),
 		"// ignore_for_file: type=lint".to_owned(),
@@ -336,23 +366,62 @@ fn events_barrel(program_pascal: &str, events: &[EventFacts<'_>], exports: &[Str
 	for export in exports.iter().skip(1) {
 		lines.push(format!("import '{export}';"));
 	}
+	let source_address = format!("{}EventSourceAddress", lower_camel(program_pascal));
+	lines.push(String::new());
+	lines.push("/// The program whose invocation frames emit the events decoded here.".to_owned());
+	lines.push(format!(
+		"const {source_address} = {};",
+		dart_string_literal(program_address)
+	));
 	lines.push(String::new());
 	lines.push(
-		"/// Decode every `Program data:` line that names one of this program's events.".to_owned(),
-	);
-	lines.push("///".to_owned());
-	lines.push(
-		"/// Unrelated lines and programs are skipped. A log that names an event but".to_owned(),
+		"final _programInvokeLog = RegExp(r'^Program (\\S+) invoke \\[\\d+\\]$');".to_owned(),
 	);
 	lines.push(
-		"/// carries an unknown, future, or non-projectable version throws instead of".to_owned(),
+		"final _programExitLog = RegExp(r'^Program (\\S+) (?:success|failed: .*)$');".to_owned(),
 	);
-	lines.push("/// being silently dropped.".to_owned());
+	lines.push(String::new());
+	for doc in [
+		"/// Decode every `Program data:` line this program emitted in a transaction's",
+		"/// logs.",
+		"///",
+		"/// [logs] must be the complete, ordered log messages of one transaction. The",
+		"/// parser follows the runtime's `Program <address> invoke [n]` and",
+		"/// `Program <address> success` / `failed` frames and decodes a data line only",
+		"/// while [programAddress] is the innermost invoked program. Any program can",
+		"/// write a `Program data:` line with this program's discriminator, so data",
+		"/// lines from other programs (including ones this program invokes through CPI)",
+		"/// and lines outside any frame are skipped rather than trusted.",
+		"///",
+		"/// Unrelated lines are skipped. A line this program emitted that names an event",
+		"/// but carries an unknown, future, or non-projectable version throws instead of",
+		"/// being silently dropped. The per-event `parse*FromLog` helpers decode one line",
+		"/// without this attribution and are only safe for data already known to come",
+		"/// from this program.",
+	] {
+		lines.push(doc.to_owned());
+	}
 	lines.push(format!(
-		"List<{program_pascal}Event> parse{program_pascal}EventsFromLogs(List<String> logs) {{"
+		"List<{program_pascal}Event> parse{program_pascal}EventsFromLogs(\n  List<String> logs, \
+		 {{\n  String programAddress = {source_address},\n}}) {{"
 	));
 	lines.push(format!("  final discovered = <{program_pascal}Event>[];"));
+	lines.push("  final frames = <String>[];".to_owned());
 	lines.push("  for (final log in logs) {".to_owned());
+	lines.push("    final invoke = _programInvokeLog.firstMatch(log);".to_owned());
+	lines.push("    if (invoke != null) {".to_owned());
+	lines.push("      frames.add(invoke.group(1)!);".to_owned());
+	lines.push("      continue;".to_owned());
+	lines.push("    }".to_owned());
+	lines.push("    if (_programExitLog.hasMatch(log)) {".to_owned());
+	lines.push("      if (frames.isNotEmpty) {".to_owned());
+	lines.push("        frames.removeLast();".to_owned());
+	lines.push("      }".to_owned());
+	lines.push("      continue;".to_owned());
+	lines.push("    }".to_owned());
+	lines.push("    if (frames.isEmpty || frames.last != programAddress) {".to_owned());
+	lines.push("      continue;".to_owned());
+	lines.push("    }".to_owned());
 	for facts in events {
 		let binding = lower_camel(&facts.pascal);
 		lines.push(format!(
@@ -1925,6 +1994,15 @@ mod tests {
 	}
 
 	#[test]
+	fn dart_string_literals_escape_interpolation_quotes_and_controls() {
+		assert_eq!(dart_string_literal("plain"), "'plain'");
+		assert_eq!(
+			dart_string_literal("it's $x \\ ${y}\n\r\t\u{7}"),
+			"'it\\'s \\$x \\\\ \\${y}\\n\\r\\t\\u{7}'"
+		);
+	}
+
+	#[test]
 	fn barrel_dispatches_every_event() {
 		let root = read_idl("events_program.json");
 		let program = pascal_case(&snake_to_camel("events_program"));
@@ -1944,11 +2022,17 @@ mod tests {
 			"my_event.dart".to_owned(),
 			"my_other_event.dart".to_owned(),
 		];
-		let barrel = events_barrel(&program, &events, &exports);
+		let barrel = events_barrel(&program, &root.program.public_key, &events, &exports);
 
 		assert!(barrel.contains(
-			"List<EventsProgramEvent> parseEventsProgramEventsFromLogs(List<String> logs) {"
+			"List<EventsProgramEvent> parseEventsProgramEventsFromLogs(\n  List<String> logs, \
+				 {\n  String programAddress = eventsProgramEventSourceAddress,\n}) {"
 		));
+		assert!(barrel.contains(&format!(
+			"const eventsProgramEventSourceAddress = '{}';",
+			root.program.public_key
+		)));
+		assert!(barrel.contains("if (frames.isEmpty || frames.last != programAddress) {"));
 		assert!(barrel.contains("final myEvent = parseMyEventEventFromLog(log);"));
 		assert!(barrel.contains("final myOtherEvent = parseMyOtherEventEventFromLog(log);"));
 		assert!(barrel.contains("export 'my_event.dart';"));

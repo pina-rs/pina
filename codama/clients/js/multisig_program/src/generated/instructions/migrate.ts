@@ -96,8 +96,9 @@ export type MigrateInput<
  * program-address placeholder and trailing omitted slots are dropped, so a
  * client sends only the accounts it needs to migrate. The `payer` funds rent
  * deficits and must be a writable signer; omit it when no migration needs
- * funding. The program caps the whole instruction's rent transfers at a
- * program-chosen lamport budget.
+ * funding. `systemProgram` defaults to the system program, the only account
+ * the program accepts in that slot. The program caps the whole
+ * instruction's rent transfers at a program-chosen lamport budget.
  */
 export function getMigrateInstruction<
 	TAccountPayer extends string = string,
@@ -133,7 +134,13 @@ export function getMigrateInstruction<
 	// Original accounts.
 	const originalAccounts = {
 		payer: { value: input.payer ?? null, isWritable: true },
-		systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+		systemProgram: {
+			value: input.systemProgram ??
+				("11111111111111111111111111111111" as Address<
+					"11111111111111111111111111111111"
+				>),
+			isWritable: false,
+		},
 		programConfig: { value: input.programConfig ?? null, isWritable: true },
 		multisig: { value: input.multisig ?? null, isWritable: true },
 		proposal: { value: input.proposal ?? null, isWritable: true },
@@ -145,12 +152,10 @@ export function getMigrateInstruction<
 	>;
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
 
-	// Slots after the last provided account may be truncated: the program
-	// treats a missing trailing slot exactly like the program-address
-	// placeholder.
-	const provided = [
-		input.payer,
-		input.systemProgram,
+	// Migratable slots after the last provided account may be truncated: the
+	// program treats a missing trailing slot exactly like the program-address
+	// placeholder. The payer and system program slots are always sent.
+	const provided: readonly unknown[] = [
 		input.programConfig,
 		input.multisig,
 		input.proposal,
@@ -171,7 +176,7 @@ export function getMigrateInstruction<
 			getAccountMeta("multisig", accounts.multisig),
 			getAccountMeta("proposal", accounts.proposal),
 			getAccountMeta("spendingLimit", accounts.spendingLimit),
-		].slice(0, lastProvided + 1),
+		].slice(0, 2 + lastProvided + 1),
 		data: getMigrateDiscriminatorBytes(),
 		programAddress,
 	} as MigrateInstruction<

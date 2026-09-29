@@ -113,7 +113,7 @@ final class MultisigImportCommand extends Command<void> {
       createKey: createKey,
       multisig: multisig,
       rentPayer: rentPayer,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       treasury: treasury,
       bump: bumpValue,
       legacyProgram: legacyProgramValue,

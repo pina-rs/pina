@@ -62,10 +62,14 @@ Generate the clients selected in `pina.toml`, or override them for one invocatio
 pina generate
 pina generate --client rust --client typescript
 pina generate --client cpi
+pina generate --client rust --client cli-rust
+pina generate --project ./programs/counter --output ./generated
 pina generate --mode update --no-scaffold
 ```
 
-CPI-only and Rust-only generation do not require Node.js.
+`pina generate` refreshes the project's IDL first, so a program whose `pina.toml` enables migrations needs its `pina migrations create` baseline before the first run. CPI-only and Rust-only generation do not require Node.js. A freshly scaffolded Rust, CPI, or `cli-rust` crate outside a workspace that declares `pina` in `[workspace.dependencies]` names concrete dependency versions and its own `[workspace]`, so it builds standalone.
+
+Generation keeps Codama's ergonomic JavaScript string and array types, then adds Pina-specific runtime validation at the generated client's wire boundary. Over-capacity values fail instead of being truncated; discriminators, booleans, and UTF-8 are checked during decoding. Decoders do not check which program owns an account, so verify the owner before trusting decoded state. The TypeScript and Dart `parse<Program>EventsFromLogs` helpers attribute each event to the program that emitted it by following the transaction's invocation frames. Generating a whole repository means running the command once per project; `scripts/generate-pina-clients.sh` does that for this repository's examples.
 
 Generation defaults to `auto`: initialize an empty client and later update only renderer-owned source directories, preserving customized manifests and entrypoints. Configure `mode` and `scaffold` globally or per client in `pina.toml`, or use `--mode create|update|overwrite` and `--no-scaffold` for a one-off override.
 
@@ -202,20 +206,6 @@ pina deploy --project ./programs/my_program --cluster devnet \
 ```
 
 Every remote write requires confirmation or `--yes`; named mainnet and custom remote endpoints also require `--allow-mainnet`. Query-bearing RPC URLs are rejected because the external Agave `solana` executable receives its endpoint through process arguments. Keypair reads are size-bounded and, on Unix, require owner-private permissions. The program keypair is validated against `declare_id!` before planning and revalidated immediately before deployment.
-
-### `pina generate`
-
-<br>
-
-Refresh a project's IDL and generate its configured client ecosystems.
-
-```bash
-pina generate
-pina generate --client rust --client cli-rust
-pina generate --project ./programs/counter --output ./generated
-```
-
-Generation keeps Codama's ergonomic JavaScript string and array types, then adds Pina-specific runtime validation at the generated client's wire boundary. Over-capacity values fail instead of being truncated; discriminators, booleans, and UTF-8 are checked during decoding. Generating a whole repository means running the command once per project; `scripts/generate-pina-clients.sh` does that for this repository's examples.
 
 ## Library API
 

@@ -28,7 +28,7 @@ pub struct Initialize<'account> {
 	/// CPI account `authority`.
 	/// The wallet creating the counter. Pays for account creation and becomes
 	/// the authority whose address seeds the PDA.
-	/// Required privileges: read-only and signer.
+	/// Required privileges: writable and signer.
 	pub authority: &'account AccountView,
 
 	/// CPI account `counter`.
@@ -83,7 +83,7 @@ impl<'account> Initialize<'account> {
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
 		let accounts: [CpiHandle<'_>; 3] = [
-			CpiHandle::readonly_signer(self.authority),
+			CpiHandle::writable_signer(self.authority)?,
 			CpiHandle::writable(self.counter)?,
 			CpiHandle::readonly(self.system_program),
 		];

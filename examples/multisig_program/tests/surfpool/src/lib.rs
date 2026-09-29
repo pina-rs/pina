@@ -3115,7 +3115,7 @@ fn audit_sec_20_config_execution_refunds_closed_rent_to_the_configured_collector
 				// fails and proves SEC-20.
 				assert!(
 					collector_after > collector_before,
-					"the close refund must reach the multisig's configured rent collector, not 					 the executor"
+					"the close refund must reach the multisig's configured rent collector, not the executor"
 				);
 				assert!(
 					executor_final <= executor_before,

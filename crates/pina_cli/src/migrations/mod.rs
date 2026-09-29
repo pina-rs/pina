@@ -37,10 +37,14 @@ pub use cost::MostExpensiveTransaction;
 pub use cost::StaticCuEstimate;
 use diff::SourceIntent;
 use diff::resolve_field_changes;
+pub use ledger::PublicationAttempt;
 pub use ledger::ReconcileOutput;
 pub use ledger::begin_publication;
+pub use ledger::begin_publication_attempt;
+pub use ledger::discard_unsent_publication;
 use ledger::load_manifest;
 use ledger::load_publication_ledger_for_manifest;
+pub use ledger::pin_legacy_publications;
 pub use ledger::reconcile_publication;
 pub use ledger::record_publication;
 use ledger::validate_ledger_for_manifest;
@@ -93,6 +97,17 @@ pub struct CreateMigrationsOutput {
 	/// Build-script action taken for the recorded auto policy.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub build_script: Option<BuildScriptStatus>,
+	/// Program ID the unpublished history was bound to before this run moved
+	/// it to the current `declare_id!`.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub rebound_from_program_id: Option<String>,
+	/// Hand-written transition bodies that no longer match their draft's
+	/// layouts, moved aside so the regenerated stub can replace them.
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub stale_manual_transitions: Vec<PathBuf>,
+	/// The history is bound to the shared `pina init` placeholder address.
+	#[serde(skip_serializing_if = "std::ops::Not::not")]
+	pub placeholder_program_id: bool,
 }
 
 /// Current status of one migration-aware wire contract.
@@ -183,14 +198,21 @@ pub enum MigrationError {
 	AbiLayoutTestMissing { path: PathBuf },
 
 	#[error(
-		"Opting these already-published contracts into the migration version envelope changes \
-		 their wire format: {contracts}. Every byte after the discriminator shifts, so regenerate \
-		 clients, update fixtures and hand-written decoders, and commit the regenerated layout \
-		 test. Re-run with `--envelope-ack` to record the change."
+		"These contracts would enter the migration version envelope while their contract kind is \
+		 already published: {contracts}. For a contract that was itself published, every byte \
+		 after the discriminator shifts, so regenerate clients, update fixtures and hand-written \
+		 decoders, and commit the regenerated layout test. For a new contract, or one whose \
+		 discriminator changed, nothing live shifts, but existing decoders of that kind must \
+		 expect the envelope. Re-run with `--envelope-ack` to record the change."
 	)]
 	EnvelopeAcknowledgementRequired { contracts: String },
 
-	#[error("Migration history belongs to program {found}, but current source declares {expected}")]
+	#[error(
+		"Migration history belongs to program {found}, but current source declares {expected}. If \
+		 this history was never deployed, run `pina migrations create` to rebind it to the \
+		 declared program; published history cannot move to a new program ID, so restore the \
+		 original `declare_id!` instead"
+	)]
 	ProgramIdentityChanged { expected: String, found: String },
 
 	#[error("Migration version encoding is frozen as {found}, but pina.toml configures {expected}")]
@@ -316,6 +338,14 @@ pub enum MigrationError {
 	#[error("Deployment program ID {deployed} does not match migration history {manifest}")]
 	PublicationProgramMismatch { deployed: String, manifest: String },
 
+	#[error(
+		"Publication receipt {sequence} does not pin the published history of `{contract}`, so \
+		 nothing proves its published schemas are unchanged. Confirm with version control that \
+		 migrations/manifest.json still records exactly what was deployed, then run `pina \
+		 migrations reconcile --pin-legacy` to pin it."
+	)]
+	UnpinnedPublication { sequence: u64, contract: String },
+
 	#[error("Deployed artifact changed before its migration publication was recorded: {path}")]
 	PublicationArtifactChanged { path: PathBuf },
 
@@ -375,6 +405,38 @@ fn recorded_intent(transition: Option<&Transition>) -> SourceIntent {
 	}
 }
 
+/// Program ID recorded by the project's migration manifest, when one exists
+/// and can be decoded.
+pub(crate) fn recorded_program_id(program_dir: &Path) -> Option<String> {
+	load_manifest(&program_dir.join(MANIFEST_PATH))
+		.ok()
+		.flatten()
+		.map(|manifest| manifest.program_id)
+}
+
+/// Move a never-published history to the program ID the source now declares.
+///
+/// Returns the previous program ID when the manifest was rebound.
+fn rebind_unpublished_history(
+	manifest: &mut MigrationManifest,
+	ledger: &PublicationLedger,
+	current: &scan::CurrentProgram,
+) -> Option<String> {
+	let unpublished = ledger.receipts.is_empty()
+		&& ledger.pending.is_none()
+		&& manifest
+			.contracts
+			.values()
+			.all(|history| history.versions.len() <= 1);
+	if !unpublished || manifest.program_id == current.program_id {
+		return None;
+	}
+	Some(std::mem::replace(
+		&mut manifest.program_id,
+		current.program_id.clone(),
+	))
+}
+
 pub fn create_migrations(start: &Path) -> Result<CreateMigrationsOutput, MigrationError> {
 	create_migrations_with_answers(start, &MigrationAnswers::default())
 }
@@ -406,11 +468,18 @@ pub fn create_migrations_with_answers(
 	});
 	reject_opt_outs(&manifest, &current.opt_outs)?;
 	let ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
+	// A history nothing was ever deployed from belongs to no program yet, so a
+	// new identity (for example from `pina keys new`) simply rebinds it. Once a
+	// receipt or pending deployment exists the identity is part of the
+	// published record and the mismatch below stays a hard error.
+	let rebound_from_program_id = rebind_unpublished_history(&mut manifest, &ledger, &current);
 	validate_program_configuration(&project, &current.program_id, &manifest)?;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
 
 	let mut output = CreateMigrationsOutput {
 		manifest: manifest_path.clone(),
+		rebound_from_program_id,
+		placeholder_program_id: current.program_id == crate::init::PLACEHOLDER_PROGRAM_ID,
 		..CreateMigrationsOutput::default()
 	};
 	let mut seen = BTreeMap::new();
@@ -456,7 +525,23 @@ pub fn create_migrations_with_answers(
 				let latest = history
 					.current()
 					.expect("decoded migration histories always contain a current version");
-				if latest.schema == source.schema && latest.process == source.process {
+				// `--manual <field>` must turn an unchanged automatic draft into a
+				// hand-written one; otherwise the answer would be silently dropped.
+				let converts_to_manual = !answers.manual.is_empty()
+					&& latest
+						.transition
+						.as_ref()
+						.is_some_and(|transition| transition.mode == TransitionMode::Automatic)
+					&& !ledger.version_is_frozen(&key, history.current_version().unwrap_or(0))
+					&& source
+						.schema
+						.fields
+						.iter()
+						.any(|field| answers.manual.contains(&field.name));
+				if latest.schema == source.schema
+					&& latest.process == source.process
+					&& !converts_to_manual
+				{
 					refresh_draft_transition_hash(&project, &ledger, &key, history, &mut output)?;
 					output.unchanged_contracts.push(key);
 					continue;
@@ -542,7 +627,12 @@ pub fn create_migrations_with_answers(
 								destination_version: latest_version,
 								destination: &source.schema,
 								destination_process: source.process.as_ref(),
-								preserve_manual: true,
+								// A hand-written body is only valid for the byte
+								// layouts it was written against. A process-only
+								// change keeps it; any change to the destination
+								// schema or to the recorded intent regenerates it.
+								preserve_manual: latest.schema == source.schema
+									&& !converts_to_manual,
 							},
 							&mut output,
 						)?;

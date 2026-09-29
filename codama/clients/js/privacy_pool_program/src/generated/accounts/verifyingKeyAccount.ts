@@ -270,10 +270,10 @@ export const VERIFYING_KEY_ACCOUNT_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (verifyingKeyAccountNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && verifyingKeyAccountNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ verifyingKeyAccount: address, payer }).make());
+ * 	await send(getMigrateInstruction({ verifyingKeyAccount: address, payer }));
  * }
  * ```
  */

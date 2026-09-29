@@ -51,11 +51,37 @@ Custom endpoints reject URL user information, query parameters, and fragments. T
 
 Local endpoints execute after displaying the plan. Every remote endpoint prompts the operator to type `deploy`. Non-interactive remote deployment fails before starting a child process unless `--yes` is supplied. Named mainnet and every custom remote endpoint additionally require `--allow-mainnet`, because Pina cannot prove which Solana cluster an arbitrary URL serves. The flag is rejected for localnet, devnet, testnet, and custom loopback endpoints.
 
+Local means the parsed host is a loopback address (`localhost`, `127.0.0.0/8`, or `[::1]`), so spellings such as `localhost.example.com`, `127.0.0.1.nip.io`, or `http://127.0.0.1@example.com` are classified as remote or rejected. A loopback port is still not proof of a local cluster: an SSH tunnel or proxy that forwards `127.0.0.1:8899` to a live cluster would skip confirmation and record no publication receipt. Deploy to a forwarded cluster through its real URL instead.
+
 ## Build and external requirements
 
-Pina validates and redacts the explicit target before project discovery or any build begins. `--build` then invokes the same in-process project build workflow as `pina build` before Pina resolves and displays the final deployment plan. It does not search `PATH` for another Pina executable. A failed build stops immediately. After confirmation, Pina revalidates the declared program ID, every keypair, and streamed SHA-256 fingerprints of the artifact and keypair files immediately before starting Solana. Changes detected by that final validation require the operator to review a new plan. As with any path-based external CLI handoff, a privileged local process could still replace a file between Pina's final validation and Solana opening it; keep deployment directories and keypairs writable only by the deploying user.
+Pina validates and redacts the explicit target before project discovery or any build begins. `--build` then invokes the same in-process project build workflow as `pina build` before Pina resolves and displays the final deployment plan. It does not search `PATH` for another Pina executable. A failed build stops immediately.
 
-Deployment requires the external `solana` executable from Agave on `PATH`. Pina runs every modeled command from the resolved project root, passes an argument vector directly—never a shell command string—and closes the child's standard input after Pina handles confirmation. The npm-distributed Pina binary supports platforms on which Agave may not be available, so verify the local Agave installation before depending on deployment automation.
+After confirmation, Pina copies the artifact and every keypair into a private, owner-only temporary directory (`pina-deploy-*`, mode `0700`, keypairs `0600`), revalidates the copies against the declared program ID and the SHA-256 fingerprints taken at planning time, and hands the child those copies rather than the original paths. A file replaced after the plan was displayed is therefore detected, and one replaced after the final check cannot reach the child. The displayed plan shows the paths you passed; the child's argument vector names the snapshot copies.
+
+Without `--remote-command`, deployment requires the external `solana` executable from Agave on `PATH`; a custom deploy command does not. Pina runs every modeled command from the resolved project root, passes an argument vector directly rather than a shell command string, and closes the child's standard input after Pina handles confirmation. The npm-distributed Pina binary supports platforms on which Agave may not be available, so verify the local Agave installation before depending on deployment automation.
+
+## Custom deploy commands
+
+`--remote-command <COMMAND>` replaces `solana program deploy` with `sh -c <COMMAND>` (`cmd /C <COMMAND>` on Windows), for platforms that deploy through their own tooling. Every other safeguard still applies: target policy, confirmation, snapshot validation, and publication receipts. The deployment facts reach the command only as environment variables, never interpolated into the command string:
+
+| Variable                        | Value                                      |
+| ------------------------------- | ------------------------------------------ |
+| `PINA_DEPLOY_RPC_URL`           | the normalized RPC URL                     |
+| `PINA_DEPLOY_CLUSTER`           | the named cluster or `custom`              |
+| `PINA_DEPLOY_PROGRAM`           | the snapshot copy of the SBF artifact      |
+| `PINA_DEPLOY_PROGRAM_ID`        | the declared program ID                    |
+| `PINA_DEPLOY_PROGRAM_KEYPAIR`   | the snapshot copy of the program keypair   |
+| `PINA_DEPLOY_UPGRADE_AUTHORITY` | the snapshot copy of the upgrade authority |
+| `PINA_DEPLOY_PAYER`             | the snapshot copy of the fee payer         |
+
+Quote the variables inside the command (`"$PINA_DEPLOY_PAYER"`), and treat an exit status of zero as the command's claim that the deployment succeeded: Pina records the publication receipt on that claim alone.
+
+## Migration publication receipts
+
+For a program with checked-in migrations, a deployment to any non-loopback target freezes the ABI versions it ships. Before starting the deploy program, Pina writes a pending record to `migrations/publications.json`; after the program succeeds, it converts that record into a hash-chained receipt. From then on `pina migrations create` advances those contracts to a new version instead of rewriting them. `--record-publication` opts a loopback deployment into the same lifecycle, which is how a Surfpool run exercises it.
+
+If the deploy program starts and then fails, the pending record stays, because the program may already be live. Rerunning the exact same deployment reconciles it, and `pina migrations reconcile` explains the state. If the deploy program never started, for example because `solana` is not installed, Pina discards the pending record it just wrote and says so, because nothing can have reached the cluster. A pending record left by an earlier attempt is never discarded this way.
 
 ## Output contract
 

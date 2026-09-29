@@ -161,10 +161,10 @@ export const ORACLE_STATE_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (oracleStateNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && oracleStateNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ oracleState: address, payer }).make());
+ * 	await send(getMigrateInstruction({ oracleState: address, payer }));
  * }
  * ```
  */

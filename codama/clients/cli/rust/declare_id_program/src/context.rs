@@ -37,14 +37,12 @@ const LOCALNET_ENDPOINT: &str = "http://localhost:8899";
 #[derive(Debug, Error)]
 pub enum CliError {
 	#[error(
-		"`{value}` is not a valid RPC endpoint; expected mainnet, devnet, testnet, localhost, or \
-		 an http(s) URL"
+		"`{value}` is not a valid RPC endpoint; expected mainnet, devnet, testnet, localhost, or an http(s) URL"
 	)]
 	InvalidEndpoint { value: String },
 
 	#[error(
-		"plaintext `http://` endpoints are only allowed on localhost; use https for remote \
-		 clusters"
+		"plaintext `http://` endpoints are only allowed on localhost; use https for remote clusters"
 	)]
 	InsecureEndpoint { value: String },
 

@@ -30,7 +30,7 @@ final class InitializeCommand extends Command<void> {
       programAddress: context.programAddress,
       payer: payer,
       oracle: oracle,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
     );
     await context.send([instruction]);
   }

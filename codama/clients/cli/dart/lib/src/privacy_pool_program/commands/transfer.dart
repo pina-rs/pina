@@ -123,7 +123,7 @@ final class TransferCommand extends Command<void> {
       nullifierSet: nullifierSet,
       verifyingKeyAccount: verifyingKeyAccount,
       noteCommitment: noteCommitment,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
       nullifier: nullifierValue,
       root: rootValue,

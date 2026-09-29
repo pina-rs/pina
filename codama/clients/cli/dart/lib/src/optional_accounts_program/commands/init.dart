@@ -47,7 +47,7 @@ final class InitCommand extends Command<void> {
       programAddress: context.programAddress,
       authority: authority,
       store: store,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
     );
     await context.send([instruction]);

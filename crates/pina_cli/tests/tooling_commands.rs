@@ -492,3 +492,47 @@ fn doctor_json_reports_missing_required_tools_as_failures() {
 			.any(|check| { check["id"] == "tool.cargo" && check["status"] == "fail" })
 	);
 }
+
+#[cfg(not(windows))]
+#[test]
+fn keys_point_at_the_migration_rebind_when_history_records_another_program() {
+	let temp = project("11111111111111111111111111111111");
+	let root = fs::canonicalize(temp.path())
+		.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+	fs::create_dir_all(root.join("migrations"))
+		.unwrap_or_else(|error| panic!("create migrations failed: {error}"));
+	let manifest = pina_abi::MigrationManifest::new(
+		"11111111111111111111111111111111".to_owned(),
+		pina_abi::MigrationVersionType::U8,
+	);
+	fs::write(
+		root.join(pina_abi::MANIFEST_PATH),
+		serde_json::to_vec_pretty(&manifest)
+			.unwrap_or_else(|error| panic!("serialize manifest failed: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("write manifest failed: {error}"));
+	let keypair = root.join("rebind-keypair.json");
+
+	let generated = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(&root)
+		.args(["keys", "new", "--keypair"])
+		.arg(&keypair)
+		.output()
+		.unwrap_or_else(|error| panic!("keys new failed to launch: {error}"));
+	assert!(generated.status.success());
+	let stdout = String::from_utf8_lossy(&generated.stdout);
+	assert!(stdout.contains("still records program"), "stdout: {stdout}");
+	assert!(
+		stdout.contains("pina migrations create"),
+		"stdout: {stdout}"
+	);
+
+	let synced = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(&root)
+		.args(["keys", "sync", "--keypair"])
+		.arg(&keypair)
+		.output()
+		.unwrap_or_else(|error| panic!("keys sync failed to launch: {error}"));
+	assert!(synced.status.success());
+	assert!(String::from_utf8_lossy(&synced.stdout).contains("still records program"));
+}

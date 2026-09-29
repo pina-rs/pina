@@ -1914,15 +1914,15 @@ fn generate_refreshes_the_idl_when_the_program_source_changes() {
 		.replace(
 			"impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {\n\tfn process(self, \
 			 data: &[u8]) -> ProgramResult {\n\t\tlet _args = \
-			 InitializeInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\\
-			 tOk(())\n\t}\n}\n",
+			 InitializeInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\tOk(\
+			 ())\n\t}\n}\n",
 			"impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {\n\tfn process(self, \
 			 data: &[u8]) -> ProgramResult {\n\t\tlet _args = \
-			 InitializeInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\\
-			 tOk(())\n\t}\n}\n\nimpl<'a> ProcessAccountInfos<'a> for ResetAccounts<'a> {\n\tfn \
+			 InitializeInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\tOk(\
+			 ())\n\t}\n}\n\nimpl<'a> ProcessAccountInfos<'a> for ResetAccounts<'a> {\n\tfn \
 			 process(self, data: &[u8]) -> ProgramResult {\n\t\tlet _args = \
-			 ResetInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\\
-			 tOk(())\n\t}\n}\n",
+			 ResetInstruction::try_from_bytes(data)?;\n\t\tself.payer.assert_signer()?;\n\t\tOk(\
+			 ())\n\t}\n}\n",
 		)
 		.replace(
 			"\t\tCustomInstruction::Initialize => \
@@ -1935,6 +1935,10 @@ fn generate_refreshes_the_idl_when_the_program_source_changes() {
 	assert_ne!(
 		source, extended,
 		"the fixture should contain the marker enum"
+	);
+	assert!(
+		extended.contains("ProcessAccountInfos<'a> for ResetAccounts<'a>"),
+		"every source rewrite should match the fixture, including the processor"
 	);
 	fs::write(project.join("src/lib.rs"), extended)
 		.unwrap_or_else(|error| panic!("failed to extend program source: {error}"));

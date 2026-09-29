@@ -26,12 +26,12 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
-	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
 	transformEncoder,
 	type WritableAccount,
+	type WritableSignerAccount,
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
@@ -75,7 +75,7 @@ export type InitializeInstruction<
 	& InstructionWithAccounts<
 		[
 			TAccountOwner extends string ?
-					& ReadonlySignerAccount<TAccountOwner>
+					& WritableSignerAccount<TAccountOwner>
 					& AccountSignerMeta<TAccountOwner>
 				: TAccountOwner,
 			TAccountTodo extends string ? WritableAccount<TAccountTodo>
@@ -187,7 +187,7 @@ export async function getInitializeInstructionAsync<
 
 	// Original accounts.
 	const originalAccounts = {
-		owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
+		owner: { value: input.owner ?? null, isSigner: true, isWritable: true },
 		todo: { value: input.todo ?? null, isSigner: false, isWritable: true },
 		systemProgram: {
 			value: input.systemProgram ?? null,
@@ -290,7 +290,7 @@ export function getInitializeInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
-		owner: { value: input.owner ?? null, isSigner: true, isWritable: false },
+		owner: { value: input.owner ?? null, isSigner: true, isWritable: true },
 		todo: { value: input.todo ?? null, isSigner: false, isWritable: true },
 		systemProgram: {
 			value: input.systemProgram ?? null,

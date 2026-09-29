@@ -58,6 +58,10 @@ pub struct KeySync {
 	pub program_id: String,
 	/// Whether the source file changed.
 	pub changed: bool,
+	/// Program ID recorded by `migrations/manifest.json` when it differs from
+	/// the synchronized identity, so the caller can point at the rebind step.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub migration_history_program_id: Option<String>,
 }
 
 /// Result of generating a local program identity.
@@ -70,6 +74,10 @@ pub struct KeyGeneration {
 	pub program_id: String,
 	/// Source synchronization result.
 	pub source: PathBuf,
+	/// Program ID recorded by `migrations/manifest.json` when it differs from
+	/// the generated identity.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub migration_history_program_id: Option<String>,
 }
 
 /// Program-key inspection and synchronization failures.
@@ -78,6 +86,13 @@ pub enum KeysError {
 	/// Project discovery failed.
 	#[error("project discovery failed: {0:?}")]
 	Project(#[from] ProjectError),
+
+	/// The keypair to synchronize does not exist.
+	#[error(
+		"no keypair at {path:?}; run `pina keys new` to create one, or pass `--keypair` to \
+		 synchronize an existing file"
+	)]
+	MissingKeypair { path: PathBuf },
 
 	/// A source or keypair file could not be read.
 	#[error("failed to read {path:?}: {source}")]
@@ -186,6 +201,11 @@ pub fn sync_keys(start: &Path, keypair: Option<&Path>) -> Result<KeySync, KeysEr
 	let project = Project::discover(start)?;
 	let default_keypair = project.keypair();
 	let keypair = keypair.unwrap_or(&default_keypair);
+	if optional_metadata(keypair, fs::symlink_metadata(keypair))?.is_none() {
+		return Err(KeysError::MissingKeypair {
+			path: keypair.to_path_buf(),
+		});
+	}
 	let program_id = read_keypair_program_id(keypair)?;
 	let snapshot = read_project_source(&project)?;
 
@@ -209,6 +229,7 @@ fn sync_source(
 
 		return Ok(KeySync {
 			source: project.library_source.clone(),
+			migration_history_program_id: diverging_history_program_id(project, &program_id),
 			previous_program_id,
 			program_id,
 			changed: false,
@@ -230,10 +251,17 @@ fn sync_source(
 
 	Ok(KeySync {
 		source: project.library_source.clone(),
+		migration_history_program_id: diverging_history_program_id(project, &program_id),
 		previous_program_id,
 		program_id,
 		changed: true,
 	})
+}
+
+/// Program ID of an existing migration history that disagrees with `program_id`.
+fn diverging_history_program_id(project: &Project, program_id: &str) -> Option<String> {
+	crate::migrations::recorded_program_id(&project.program_dir)
+		.filter(|recorded| recorded != program_id)
 }
 
 /// Generate a fresh keypair and synchronize the source declaration.
@@ -298,15 +326,19 @@ fn finish_generated_keypair(
 		Some((keypair, generated_handle)),
 	);
 
-	if let Err(operation) = sync {
-		let rollback = rollback_keypair(keypair, generated_handle, generated_file, previous);
-		return finish_rollback(operation, rollback);
-	}
+	let sync = match sync {
+		Ok(sync) => sync,
+		Err(operation) => {
+			let rollback = rollback_keypair(keypair, generated_handle, generated_file, previous);
+			return finish_rollback(operation, rollback);
+		}
+	};
 
 	Ok(KeyGeneration {
 		keypair: keypair.to_path_buf(),
 		program_id,
 		source: project.library_source,
+		migration_history_program_id: sync.migration_history_program_id,
 	})
 }
 
@@ -904,6 +936,57 @@ mod tests {
 		assert_eq!(sync.program_id, expected);
 		assert!(source.starts_with("// keep me\nuse pina::*;\n\n"));
 		assert!(source.contains(&format!("declare_id!(\"{}\")", sync.program_id)));
+	}
+
+	#[test]
+	fn sync_names_the_generation_command_for_a_missing_keypair() {
+		let temp = project("11111111111111111111111111111111");
+		let missing = temp.path().join("missing-keypair.json");
+		let error = sync_keys(temp.path(), Some(&missing))
+			.expect_err("a missing keypair cannot be synchronized");
+		assert!(matches!(error, KeysError::MissingKeypair { .. }));
+		assert!(error.to_string().contains("pina keys new"), "{error}");
+	}
+
+	#[test]
+	fn sync_and_generation_report_a_diverging_migration_history() {
+		let temp = project("11111111111111111111111111111111");
+		let keypair_path = temp.path().join("program-keypair.json");
+		let expected = keypair(&keypair_path, [9u8; 32]);
+		let sync = sync_keys(temp.path(), Some(&keypair_path));
+		let sync = sync.unwrap_or_else(|error| panic!("sync without history failed: {error}"));
+		assert_eq!(sync.migration_history_program_id, None);
+
+		let migrations = temp.path().join("migrations");
+		fs::create_dir_all(&migrations).unwrap_or_else(|error| panic!("create: {error}"));
+		let manifest = pina_abi::MigrationManifest::new(
+			"11111111111111111111111111111111".to_owned(),
+			pina_abi::MigrationVersionType::U8,
+		);
+		let json = serde_json::to_vec_pretty(&manifest);
+		let json = json.unwrap_or_else(|error| panic!("serialize manifest: {error}"));
+		let path = temp.path().join(pina_abi::MANIFEST_PATH);
+		fs::write(&path, json).unwrap_or_else(|error| panic!("write manifest: {error}"));
+
+		let sync = sync_keys(temp.path(), Some(&keypair_path));
+		let sync = sync.unwrap_or_else(|error| panic!("matching sync failed: {error}"));
+		assert!(!sync.changed);
+		assert_eq!(sync.program_id, expected);
+		assert_eq!(
+			sync.migration_history_program_id.as_deref(),
+			Some("11111111111111111111111111111111")
+		);
+
+		// Keypair generation refuses platforms without private file modes.
+		#[cfg(unix)]
+		{
+			let generated = generate_keys(temp.path(), Some(&keypair_path), true);
+			let generated = generated.unwrap_or_else(|error| panic!("generation: {error}"));
+			assert_eq!(
+				generated.migration_history_program_id.as_deref(),
+				Some("11111111111111111111111111111111")
+			);
+		}
 	}
 
 	#[test]

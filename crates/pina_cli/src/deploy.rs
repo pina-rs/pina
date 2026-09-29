@@ -146,6 +146,7 @@ pub struct DeploymentPlan {
 	target: ResolvedTarget,
 	remote_command: Option<String>,
 	input_fingerprint: InputFingerprint,
+	warnings: Vec<String>,
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -164,12 +165,27 @@ struct DeploymentInputSnapshot {
 	payer: String,
 }
 
+/// Builder for the private directory that holds the deployment input copies.
+///
+/// Keypair copies are already `0600`, but an owner-only directory also keeps
+/// other local users from listing or racing the snapshot's file names.
+fn snapshot_directory_builder() -> tempfile::Builder<'static, 'static> {
+	let mut builder = tempfile::Builder::new();
+	builder.prefix("pina-deploy-");
+	#[cfg(unix)]
+	{
+		use std::os::unix::fs::PermissionsExt;
+		builder.permissions(fs::Permissions::from_mode(0o700));
+	}
+	builder
+}
+
 impl DeploymentInputSnapshot {
 	fn capture(plan: &DeploymentPlan) -> Result<Self, DeployError> {
 		plan.revalidate()?;
 		let directory = deployment_snapshot_directory(
 			plan.project_root(),
-			tempfile::Builder::new().prefix("pina-deploy-").tempdir(),
+			snapshot_directory_builder().tempdir(),
 		)?;
 		let program_path = snapshot_input(
 			Path::new(plan.program()),
@@ -269,6 +285,8 @@ struct SerializableDeploymentPlan<'a> {
 	is_local: bool,
 	requires_mainnet_acknowledgement: bool,
 	commands: Vec<CommandPlan>,
+	#[serde(skip_serializing_if = "<[String]>::is_empty")]
+	warnings: &'a [String],
 }
 
 impl Serialize for DeploymentPlan {
@@ -418,6 +436,7 @@ impl DeploymentPlan {
 			is_local: self.is_local(),
 			requires_mainnet_acknowledgement: self.requires_mainnet_acknowledgement(),
 			commands: self.commands(),
+			warnings: &self.warnings,
 		}
 	}
 
@@ -522,6 +541,10 @@ impl DeploymentPlan {
 			output.push('\n');
 		}
 
+		for warning in &self.warnings {
+			let _ = writeln!(output, "  Warning: {}", diagnostic_quote(warning));
+		}
+
 		output
 	}
 }
@@ -594,31 +617,50 @@ impl CommandRunner for SystemCommandRunner {
 		{
 			use std::os::windows::process::CommandExt as _;
 
-			let status = Command::new(program)
+			let mut child = Command::new(program)
 				.raw_arg(args[0].clone())
 				.raw_arg(command.clone())
 				.envs(env.iter().map(|(key, value)| (key, value)))
 				.current_dir(current_dir)
 				.stdin(Stdio::null())
-				.status()?;
+				.spawn()?;
+			let status = wait_for_child(&mut child)?;
 			return Ok(CommandStatus {
 				success: status.success(),
 				code: status.code(),
 			});
 		}
 
-		let status = Command::new(program)
+		let mut child = Command::new(program)
 			.args(args)
 			.envs(env.iter().map(|(key, value)| (key, value)))
 			.current_dir(current_dir)
 			.stdin(Stdio::null())
-			.status()?;
+			.spawn()?;
+		let status = wait_for_child(&mut child)?;
 
 		Ok(CommandStatus {
 			success: status.success(),
 			code: status.code(),
 		})
 	}
+}
+
+/// Marks an I/O error raised while waiting for a child that already started.
+///
+/// The child may have run to completion, so a caller must not treat the
+/// failure as proof that nothing was sent.
+#[derive(Debug, Error)]
+#[error("waiting for the started process failed: {0}")]
+pub(crate) struct ChildWaitError(#[source] pub(crate) io::Error);
+
+fn wait_for_child(child: &mut std::process::Child) -> io::Result<std::process::ExitStatus> {
+	child.wait().map_err(child_wait_error)
+}
+
+/// Wrap a wait failure so [`run_command`] can tell it from a spawn failure.
+fn child_wait_error(error: io::Error) -> io::Error {
+	io::Error::other(ChildWaitError(error))
 }
 
 /// Deployment planning or execution failure.
@@ -690,6 +732,15 @@ pub enum DeployError {
 		source: io::Error,
 	},
 
+	/// A child process started but its exit could not be observed, so it may
+	/// have written to the cluster.
+	#[error("lost track of {program:?} after it started: {source}")]
+	CommandInterrupted {
+		program: String,
+		#[source]
+		source: io::Error,
+	},
+
 	/// A child process exited unsuccessfully.
 	#[error("{program:?} exited unsuccessfully with status {status}")]
 	CommandFailed { program: String, status: String },
@@ -739,7 +790,7 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 			.map_err(|error| {
 				DeployError::Project {
 					path: project.root.clone(),
-					reason: format!("could not resolve the declared program ID: {error}"),
+					reason: format!("could not read the program's declared ID and IDL: {error}"),
 				}
 			})?
 			.program
@@ -767,6 +818,11 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 		upgrade_authority: file_digest(&upgrade_authority_path, "upgrade authority")?,
 		payer: file_digest(&payer_path, "fee payer")?,
 	};
+	let warnings = deployment_warnings(
+		&program_path,
+		&read_keypair(&upgrade_authority_path, "upgrade authority")?,
+		&keypair_program_id,
+	);
 
 	Ok(DeploymentPlan {
 		remote_command: request.remote_command.clone(),
@@ -780,7 +836,32 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 		program_id: declared_program_id,
 		target,
 		input_fingerprint,
+		warnings,
 	})
+}
+
+/// Plan-time findings that are legal but almost always a mistake.
+fn deployment_warnings(program: &Path, upgrade_authority: &[u8], program_id: &str) -> Vec<String> {
+	let mut warnings = Vec::new();
+	if bs58::encode(&upgrade_authority[32..]).into_string() == program_id {
+		warnings.push(
+			"the program keypair is also the upgrade authority, so anyone holding the program \
+			 keypair can upgrade the program; use a separate authority"
+				.to_owned(),
+		);
+	}
+	let mut magic = [0_u8; 4];
+	let is_elf = fs::File::open(program)
+		.and_then(|mut file| file.read_exact(&mut magic))
+		.is_ok_and(|()| magic == *b"\x7fELF");
+	if !is_elf {
+		warnings.push(format!(
+			"{} is not an ELF shared object; check that it is the SBF artifact `pina build` \
+			 produced",
+			program.display()
+		));
+	}
+	warnings
 }
 
 /// Validate an explicit deployment target before project discovery, building, or execution.
@@ -928,6 +1009,21 @@ pub fn approve_deployment<'plan>(
 	Ok(ApprovedDeployment { plan })
 }
 
+impl DeployError {
+	/// Whether the deployment provably never reached the network.
+	///
+	/// Every error [`ApprovedDeployment::execute`] can return is raised before
+	/// the deploy program runs, except a program that started and then failed
+	/// or whose exit was lost. Those may have written to the cluster, so their
+	/// pending publication must be reconciled rather than discarded.
+	pub fn is_unsent(&self) -> bool {
+		!matches!(
+			self,
+			Self::CommandFailed { .. } | Self::CommandInterrupted { .. }
+		)
+	}
+}
+
 /// Approve and execute an already-reviewed deployment plan.
 pub fn execute_deployment(
 	plan: &DeploymentPlan,
@@ -953,9 +1049,17 @@ fn run_command(
 			current_dir,
 		)
 		.map_err(|source| {
-			DeployError::CommandStart {
-				program: command.program.clone(),
-				source,
+			let started = matches!(source.get_ref(), Some(inner) if inner.is::<ChildWaitError>());
+			if started {
+				DeployError::CommandInterrupted {
+					program: command.program.clone(),
+					source,
+				}
+			} else {
+				DeployError::CommandStart {
+					program: command.program.clone(),
+					source,
+				}
 			}
 		})?;
 
@@ -1010,6 +1114,16 @@ impl ResolvedTarget {
 			return Err(DeployError::InvalidRpcUrl {
 				url: diagnostic_url,
 				reason: "control characters are not accepted".to_owned(),
+			});
+		}
+
+		if !value.contains("://") {
+			// A bare word is a mistyped cluster name far more often than a URL.
+			return Err(DeployError::InvalidRpcUrl {
+				url: diagnostic_url,
+				reason: "expected a named cluster (`localnet`, `devnet`, `testnet`, or \
+				         `mainnet-beta`) or an http(s) URL"
+					.to_owned(),
 			});
 		}
 
@@ -2216,6 +2330,39 @@ mod tests {
 	}
 
 	#[test]
+	fn deployment_warnings_flag_self_authority_and_non_elf_artifacts() {
+		let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+		let elf = temp.path().join("program.so");
+		fs::write(&elf, b"\x7fELF\x02\x01\x01").unwrap_or_else(|error| panic!("write: {error}"));
+		let mut authority = vec![7_u8; 32];
+		authority.extend([9_u8; 32]);
+		let program_id = bs58::encode([3_u8; 32]).into_string();
+		assert!(deployment_warnings(&elf, &authority, &program_id).is_empty());
+
+		let self_owned = bs58::encode([9_u8; 32]).into_string();
+		let warnings = deployment_warnings(&elf, &authority, &self_owned);
+		assert_eq!(warnings.len(), 1);
+		assert!(warnings[0].contains("also the upgrade authority"));
+
+		let missing = temp.path().join("missing.so");
+		let warnings = deployment_warnings(&missing, &authority, &program_id);
+		assert!(warnings[0].contains("not an ELF shared object"));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn deployment_snapshot_directory_is_owner_only() {
+		use std::os::unix::fs::PermissionsExt;
+
+		let directory = snapshot_directory_builder().tempdir();
+		let directory = directory.unwrap_or_else(|error| panic!("create directory: {error}"));
+		let metadata = fs::metadata(directory.path());
+		let metadata = metadata.unwrap_or_else(|error| panic!("inspect directory: {error}"));
+		let mode = metadata.permissions().mode();
+		assert_eq!(mode & 0o777, 0o700);
+	}
+
+	#[test]
 	fn child_start_and_failure_stop_the_plan() {
 		let fixture = Fixture::new();
 		let request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
@@ -2229,6 +2376,10 @@ mod tests {
 		let error = execute_deployment(&plan, false, false, &mut start_failure, &mut confirmer)
 			.unwrap_err();
 		assert!(matches!(error, DeployError::CommandStart { .. }));
+		assert!(
+			error.is_unsent(),
+			"a program that never started sent nothing"
+		);
 		assert_eq!(start_failure.calls.len(), 1);
 
 		let mut child_failure = FakeRunner {
@@ -2241,7 +2392,26 @@ mod tests {
 		let error = execute_deployment(&plan, false, false, &mut child_failure, &mut confirmer)
 			.unwrap_err();
 		assert!(matches!(error, DeployError::CommandFailed { .. }));
+		assert!(
+			!error.is_unsent(),
+			"a started program may have reached the cluster"
+		);
 		assert_eq!(child_failure.calls.len(), 1);
+
+		let mut lost_child = FakeRunner {
+			calls: Vec::new(),
+			results: VecDeque::from([Err(child_wait_error(io::Error::new(
+				io::ErrorKind::Interrupted,
+				"wait failed",
+			)))]),
+		};
+		let error =
+			execute_deployment(&plan, false, false, &mut lost_child, &mut confirmer).unwrap_err();
+		assert!(matches!(error, DeployError::CommandInterrupted { .. }));
+		assert!(
+			!error.is_unsent(),
+			"a program whose exit was lost may have reached the cluster"
+		);
 
 		let mut signaled_child = FakeRunner {
 			calls: Vec::new(),

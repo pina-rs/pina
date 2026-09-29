@@ -68,9 +68,9 @@ final class ClaimCommand extends Command<void> {
       beneficiaryAta: beneficiaryAta,
       vault: vault,
       associatedTokenProgram: Address(
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
       ),
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       tokenProgram: tokenProgram,
       clock: clock,
       amount: amountValue,

@@ -23,15 +23,15 @@
 			"id": "authority-checked-before-close",
 			"kind": "file",
 			"path": "src/lib.rs",
-			"match": "CloseCounter[\\s\\S]{0,600}?assert_signer",
-			"why": "Only the recorded authority may close; the signer check must sit inside the `CloseCounter` handler and precede the close. File-wide matching would let the `Increment` and `Reset` handlers satisfy it on a `CloseCounter` that skips the check."
+			"match": "ProcessAccountInfos<[^>]*>\\s+for\\s+Close\\w*<[^>]*>\\s*\\{[\\s\\S]{0,600}?assert_signer",
+			"why": "Only the recorded authority may close; the signer check must sit inside the close handler (whatever the agent names it, `CloseCounter` or `Close`) and precede the close. File-wide matching would let the `Increment` and `Reset` handlers satisfy it on a close handler that skips the check."
 		},
 		{
 			"id": "stored-authority-bound",
 			"kind": "file",
 			"path": "src/lib.rs",
-			"match": "CloseCounter[\\s\\S]{0,600}?(authority != |authority == |assert_owner|InvalidAccountData)",
-			"why": "A signer check alone proves nothing about which counter; the stored authority must bind inside the same handler before lamports move."
+			"match": "ProcessAccountInfos<[^>]*>\\s+for\\s+Close\\w*<[^>]*>\\s*\\{[\\s\\S]{0,800}?(authority\\s*[!=]=|[!=]=\\s*[^;{]*authority)[\\s\\S]*?CloseAccountZeroed",
+			"why": "A signer check alone proves nothing about which counter; the close handler must compare the signer with the counter's stored authority before `CloseAccountZeroed` moves lamports. A bare `InvalidAccountData` or owner check does not bind the authority."
 		},
 		{
 			"id": "no-hand-rolled-close",

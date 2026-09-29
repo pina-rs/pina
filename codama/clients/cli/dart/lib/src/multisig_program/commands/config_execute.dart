@@ -57,7 +57,7 @@ final class ConfigExecuteCommand extends Command<void> {
       proposal: proposal,
       member: member,
       rentPayer: rentPayer,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       clock: clock,
       rentCollector: rentCollector,
       spendingLimitAccounts: spendingLimitAccounts,

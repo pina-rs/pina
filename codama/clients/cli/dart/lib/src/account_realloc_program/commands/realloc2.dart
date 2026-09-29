@@ -37,7 +37,7 @@ final class Realloc2Command extends Command<void> {
       authority: authority,
       sample1: sample1,
       sample2: sample2,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       len: lenValue,
     );
     await context.send([instruction]);

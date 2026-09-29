@@ -466,6 +466,10 @@ jobs:
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm run build:codama-nodes
           pnpm run build:codama-renderer-cpi
+          # `pina generate` resolves this package from npm for the TypeScript
+          # and Dart CLI clients, so a tarball without `dist/` breaks every
+          # project outside this repository.
+          pnpm run build:codama-renderer-cli
           pnpm run check:npm-packages
           pnpm run test:npm-packages
 
@@ -501,6 +505,17 @@ jobs:
               'any(.[0].files[]; .path == $path)' \
               "$cpi_pack_report" >/dev/null || {
                 echo "::error::@pina-rs/codama-renderer-cpi is missing $required_file" >&2
+                exit 1
+              }
+          done
+
+          cli_renderer_pack_report="$RUNNER_TEMP/pina-codama-renderer-cli-pack.json"
+          npm pack ./packages/codama-renderer-cli --dry-run --json > "$cli_renderer_pack_report"
+          for required_file in dist/index.js dist/types/index.d.ts README.md; do
+            jq -e --arg path "$required_file" \
+              'any(.[0].files[]; .path == $path)' \
+              "$cli_renderer_pack_report" >/dev/null || {
+                echo "::error::@pina-rs/codama-renderer-cli is missing $required_file" >&2
                 exit 1
               }
           done

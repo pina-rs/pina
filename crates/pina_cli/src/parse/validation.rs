@@ -559,8 +559,62 @@ fn collect_assertions_from_expr(
 			collect_assertions_from_expr(&unary.expr, props, bindings);
 		}
 
+		Expr::Struct(builder) => {
+			for field_name in lamport_moving_fields(builder, bindings) {
+				props.entry(field_name).or_default().is_writable = true;
+			}
+			for field in &builder.fields {
+				collect_assertions_from_expr(&field.expr, props, bindings);
+			}
+		}
+
 		_ => {}
 	}
+}
+
+/// Builders whose named fields debit or credit lamports, so the runtime
+/// requires those accounts to be writable even when the Rust field is a
+/// shared reference.
+const LAMPORT_MOVING_BUILDERS: &[(&str, &[&str])] = &[
+	("CreateAccount", &["from", "to"]),
+	("CreateProgramAccount", &["payer"]),
+	("CreateProgramAccountWithBump", &["payer"]),
+	("CreateProgramAccountWithUncheckedBump", &["payer"]),
+	("CreateCompactProgramAccount", &["payer"]),
+	("CreateCompactProgramAccountWithBump", &["payer"]),
+	("AllocateAccount", &["payer"]),
+	("AllocateAccountWithNonCanonicalBump", &["payer"]),
+	("Transfer", &["from", "to"]),
+];
+
+/// Account fields a lamport-moving builder literal writes to.
+///
+/// A payer passed as `&AccountView` still has its lamports debited by the
+/// system program, and an IDL that marks it read-only produces clients whose
+/// transactions fail with a privilege escalation whenever the payer is not
+/// also the fee payer.
+fn lamport_moving_fields(
+	builder: &syn::ExprStruct,
+	bindings: &HashMap<String, String>,
+) -> Vec<String> {
+	let name = builder
+		.path
+		.segments
+		.last()
+		.map(|segment| segment.ident.to_string())
+		.unwrap_or_default();
+	let Some((_, fields)) = LAMPORT_MOVING_BUILDERS
+		.iter()
+		.find(|(builder_name, _)| *builder_name == name)
+	else {
+		return Vec::new();
+	};
+	builder
+		.fields
+		.iter()
+		.filter(|field| fields.contains(&member_to_string(&field.member).as_str()))
+		.filter_map(|field| resolve_self_field(&field.expr, bindings))
+		.collect()
 }
 
 /// Return the account field passed to a canonical PDA creation builder.
@@ -993,6 +1047,50 @@ mod tests {
 				"{builder} must identify its target as writable"
 			);
 		}
+	}
+
+	#[test]
+	fn lamport_moving_builders_mark_payers_and_recipients_writable() {
+		let source = r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let funder = self.funder;
+					CreateProgramAccountWithUncheckedBump {
+						account: self.counter,
+						payer: self.authority,
+						owner: &ID,
+						seeds: &seeds,
+						bump: 1,
+					}
+					.invoke::<CounterState>()?;
+					system::instructions::Transfer {
+						from: funder,
+						to: self.recipient,
+						lamports: 1,
+					}
+					.invoke()?;
+					Unrelated { from: self.bystander }.invoke()?;
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let all = extract_validation_properties(&file);
+		let props = &all["MyAccounts"];
+
+		assert!(
+			props["authority"].is_writable,
+			"a creation payer is debited"
+		);
+		assert!(props["funder"].is_writable, "a transfer source is debited");
+		assert!(
+			props["recipient"].is_writable,
+			"a transfer target is credited"
+		);
+		assert!(
+			!props.contains_key("bystander"),
+			"unrelated builders must not change writability"
+		);
 	}
 
 	#[test]

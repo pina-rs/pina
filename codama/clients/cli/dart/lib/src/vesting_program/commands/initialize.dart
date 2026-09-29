@@ -97,9 +97,9 @@ final class InitializeCommand extends Command<void> {
       vault: vault,
       adminAta: adminAta,
       associatedTokenProgram: Address(
-        'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
       ),
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       tokenProgram: tokenProgram,
       totalAmount: totalAmountValue,
       startTs: startTsValue,

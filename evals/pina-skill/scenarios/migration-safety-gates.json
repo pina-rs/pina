@@ -1,0 +1,68 @@
+{
+	"id": "migration-safety-gates",
+	"title": "The migration and generation gates the round-four evaluation hardened (no agent)",
+	"fixture": "base-counter-published",
+	"agent": false,
+	"prompt": "",
+	"expectation": "Each check reproduces a failure an agent hit, or could hit, in the round-four evaluation, and asserts the CLI now fails closed or recovers deterministically. Every check works on a private copy of the fixture, so the checks are independent of each other.",
+	"checks": [
+		{
+			"id": "unpinned-receipts-are-refused",
+			"kind": "command",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && python3 -c \"import json; p='migrations/publications.json'; d=json.load(open(p)); [v.__setitem__('history', []) for r in d['receipts'] for v in r['versions'].values()]; json.dump(d, open(p, 'w'), indent=1)\" && pina migrations check",
+			"expectExit": 1,
+			"expectOutput": [
+				"--pin-legacy"
+			],
+			"why": "A receipt without schema pins cannot tell a rewritten published schema from the shipped one, so blanking pins must never make a check pass."
+		},
+		{
+			"id": "pin-legacy-reproduces-the-original-receipts",
+			"kind": "command",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && cp migrations/publications.json /tmp/pinned-original.json && python3 -c \"import json; p='migrations/publications.json'; d=json.load(open(p)); [v.__setitem__('history', []) for r in d['receipts'] for v in r['versions'].values()]; json.dump(d, open(p, 'w'), indent=1)\" && pina migrations reconcile --pin-legacy && cmp migrations/publications.json /tmp/pinned-original.json && pina migrations check",
+			"expectOutput": [
+				"Migration history is consistent"
+			],
+			"why": "Pinning an untampered manifest must reproduce the receipts byte for byte and leave a consistent history."
+		},
+		{
+			"id": "a-stale-manual-body-is-moved-aside",
+			"kind": "command",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && python3 -c \"import re; p='src/lib.rs'; s=open(p).read(); s=s.replace('\\tpub authority: Address,\\n\\t/// The current count.\\n\\tpub count: u64,', '\\tpub count: u64,\\n\\t/// Placeholder doc.\\n\\tpub authority: Address,'); open(p, 'w').write(s)\" && pina migrations create >/dev/null && printf 'pub(crate) const SOURCE_SIZE: usize = 42;\\npub(crate) const DESTINATION_SIZE: usize = 42;\\npub(crate) const WORKING_SIZE: usize = 42;\\npub(crate) fn migrate(data: &mut [u8]) {\\n\\tlet _ = data;\\n}\\n' > migrations/transitions/account_1_01/v0_to_v1.rs && pina migrations create >/dev/null && python3 -c \"p='src/lib.rs'; s=open(p).read(); s=s.replace('\\tpub count: u64,', '\\tpub count: u64,\\n\\t/// Revision.\\n\\tpub revision: u32,', 1); open(p, 'w').write(s)\" && pina migrations create && test -f migrations/transitions/account_1_01/v0_to_v1.rs.stale && ! pina migrations check",
+			"expectOutput": [
+				"hand-written body was moved to"
+			],
+			"why": "A body written for one draft layout compiled silently against the next one and corrupted accounts; it must now move aside behind a build-blocking stub."
+		},
+		{
+			"id": "manual-answer-converts-an-automatic-draft",
+			"kind": "command",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && python3 -c \"p='src/lib.rs'; s=open(p).read(); s=s.replace('\\tpub count: u64,', '\\tpub count: u64,\\n\\t/// Revision.\\n\\tpub revision: u32,', 1); open(p, 'w').write(s)\" && pina migrations create >/dev/null && pina migrations create --manual revision --no-interactive && grep -q TODO\\(pina-manual-migration\\) migrations/transitions/account_1_01/v0_to_v1.rs && grep -q '\"mode\": \"manual\"' migrations/manifest.json",
+			"expectOutput": [
+				"Manual migration required"
+			],
+			"why": "`--manual` on an unchanged automatic draft used to be ignored without a word."
+		},
+		{
+			"id": "idl-refuses-without-a-snapshot",
+			"kind": "command",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && rm -rf migrations && pina idl",
+			"expectExit": 1,
+			"expectOutput": [
+				"has no checked-in snapshot"
+			],
+			"why": "Without a manifest an auto policy compiles envelope-free; an IDL generated then would give every client the wrong wire format."
+		},
+		{
+			"id": "skill-names-the-new-stop-signs",
+			"kind": "command",
+			"command": "pina skill read pina && pina skill read migrations && pina skill read cli-and-codegen",
+			"expectOutput": [
+				".rs.stale",
+				"--pin-legacy",
+				"Using generated clients safely"
+			],
+			"why": "The skill must tell an agent what these states mean before it meets them."
+		}
+	]
+}

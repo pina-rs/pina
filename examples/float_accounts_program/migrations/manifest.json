@@ -74,7 +74,7 @@
 							},
 							{
 								"name": "authority",
-								"writable": false,
+								"writable": true,
 								"signer": true,
 								"optional": false,
 								"defaultValue": null,

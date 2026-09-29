@@ -43,7 +43,7 @@ final class OpenPositionCommand extends Command<void> {
       user: user,
       poolState: poolState,
       positionState: positionState,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
     );
     await context.send([instruction]);

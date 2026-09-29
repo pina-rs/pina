@@ -45,9 +45,7 @@ impl ProfileState {
 	/// Encoded size of this account's data.
 	pub const LEN: usize = 3;
 	/// Why this account has no generated parser.
-	pub const PARSER_UNSUPPORTED: &'static str =
-		"unsupported type `fixedSizeTypeNode` at `account `ProfileState` field `name``: a 33-byte \
-		 window cannot hold a payload of at most 256 bytes";
+	pub const PARSER_UNSUPPORTED: &'static str = "unsupported type `fixedSizeTypeNode` at `account `ProfileState` field `name``: a 33-byte window cannot hold a payload of at most 256 bytes";
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]

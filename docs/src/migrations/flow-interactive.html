@@ -377,12 +377,16 @@ stderr: error: ambiguous field changes need an explicit answer
 		<div class="step-caret">▶</div>
 	</button>
 	<div class="step-body">
-		<p>Some changes have no safe automatic answer, like changing a field's type or moving an account from fixed to compact layout. The CLI still records the migration, but generates the transition with a failing <code class="inline">todo!()</code> body so the build will not let you forget it:</p>
-		<div class="cmd"><span class="comment">// TODO: convert the stored representation (runs on-chain, must be infallible)
-fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
-    // read v1 field → convert → write v2 field
+		<p>Some changes have no safe automatic answer, like changing a field's type, reordering fields, or moving an account from fixed to compact layout. The CLI still records the migration, but generates a stub marked <code class="inline">TODO(pina-manual-migration)</code> that blocks the build until you write the body. Its header prints every field's stored and destination offsets, relative to the version envelope:</p>
+		<div class="cmd"><span class="comment">// TODO(pina-manual-migration): the source shape is preflighted; this conversion must be total and fully initialize destination.
+pub(crate) const SOURCE_SIZE: usize = 42;
+pub(crate) const DESTINATION_SIZE: usize = 38;
+pub(crate) const WORKING_SIZE: usize = 42;
+
+pub(crate) fn migrate(data: &amp;mut [u8]) {
+    // data includes the discriminator and version: read v1 bytes → convert → write v2 bytes
 }</span></div>
-		<p><code class="inline">pina migrations check</code> fails while any TODO remains, so CI can enforce completion. Everything around your body stays framework-owned: validating the old bytes, validating the result, the version bump, the rent math.</p>
+		<p><code class="inline">pina migrations check</code> fails while any TODO remains, so CI can enforce completion. Everything around your body stays framework-owned: validating the old bytes, validating the result, the version bump, the rent math. If you change the draft's layout again after writing the body, the next <code class="inline">create</code> moves your body to <code class="inline">v0_to_v1.rs.stale</code> and writes a fresh stub for the new offsets, so an old body can never compile against a layout it was not written for.</p>
 	</div>
 </div>
 
@@ -391,13 +395,13 @@ fn migrate(source: &amp;[u8], destination: &amp;mut [u8]) {
 		<div class="step-num">6</div>
 		<div>
 			<div class="step-title">Ship it, and freeze history</div>
-			<div class="step-what"><code class="inline">pina deploy --record-publication</code> publishes the program and pins every version you just shipped.</div>
+			<div class="step-what"><code class="inline">pina deploy</code> to any non-loopback cluster publishes the program and pins every version you just shipped. Add <code class="inline">--record-publication</code> only to exercise the same lifecycle against a local Surfpool or validator.</div>
 		</div>
 		<div class="step-caret">▶</div>
 	</button>
 	<div class="step-body">
 		<div class="cmd"><span class="prompt">$ </span>pina build
-<span class="prompt">$ </span>pina deploy <span class="flag">--record-publication</span> --program-id &lt;ID&gt; ...</div>
+<span class="prompt">$ </span>pina deploy <span class="flag">--cluster</span> devnet --payer &lt;KEYPAIR&gt; --upgrade-authority &lt;KEYPAIR&gt;</div>
 		<details class="under">
 			<summary>What happens under the hood</summary>
 			<div class="under-body">
@@ -668,7 +672,7 @@ if let Some(state) = state {
 	<tr><td><code>pina migrations status</code></td><td>Curiosity, support</td><td>Reports each contract's local version and publication state. <code>--json</code> for tooling.</td></tr>
 	<tr><td><code>pina migrations reconcile</code></td><td>A deploy died halfway</td><td>Inspects the pending publication receipt, then completes it or abandons it with <code>--abandon</code>.</td></tr>
 	<tr><td><code>pina build</code></td><td>Always</td><td>The drift gate. Fails until every schema change is recorded and every TODO transition is filled.</td></tr>
-	<tr><td><code>pina deploy --record-publication</code></td><td>Shipping</td><td>Deploys and appends a hash-chained receipt, freezing the shipped versions.</td></tr>
+	<tr><td><code>pina deploy --cluster &lt;CLUSTER&gt;</code></td><td>Shipping</td><td>Deploys and appends a hash-chained receipt, freezing the shipped versions. Loopback targets record one only with <code>--record-publication</code>.</td></tr>
 	<tr><td><code>pina generate</code></td><td>After <code>make</code></td><td>Regenerates the TypeScript, Dart, Rust, and CPI clients with the new shape and current version constants.</td></tr>
 </table>
 
@@ -688,10 +692,10 @@ if is_migrate_instruction(data) {
 <p>That is the client flow the sweep section above describes, now with a framework-owned entry point: prepend <code class="inline">[Migrate { payer }, …real instructions]</code> and the payer authorizes exactly the migration cost.</p>
 
 <h3 style="font-size:18px; margin-top: 28px;">Generated client helpers</h3>
-<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs.</p> Migratable <strong>events</strong> use the same envelope on the read path: each client emits a log entry point (<code class="inline">parse&lt;Program&gt;EventsFromLogs</code> in TypeScript and Dart, <code class="inline">project_from_bytes</code> in Rust) that enforces the version and projects historical bytes into the current shape when the checked-in manifest proves the transition is automatic, reporting <code class="inline">sourceVersion</code> and <code class="inline">wasMigrated</code>. Manual transitions fail closed with a message naming the transition.
-<div class="code"><span class="k">const</span> { data } = <span class="k">await</span> fetchEncodedAccount(rpc, address);
-<span class="k">if</span> (stateNeedsMigration(data)) {
-	<span class="k">await</span> send(getMigrateInstruction({ state: address, payer }).make());
+<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer that always sends the payer and system program slots (the system program is the default for slot 1) and whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs. Migratable <strong>events</strong> use the same envelope on the read path: each client emits a log entry point (<code class="inline">parse&lt;Program&gt;EventsFromLogs</code> in TypeScript and Dart, <code class="inline">project_from_bytes</code> in Rust) that enforces the version and projects historical bytes into the current shape when the checked-in manifest proves the transition is automatic, reporting <code class="inline">sourceVersion</code> and <code class="inline">wasMigrated</code>. The program-level parser decodes a line only while this program is the innermost invocation in the transaction's logs, so another program cannot forge its events. Manual transitions fail closed with a message naming the transition.</p>
+<div class="code"><span class="k">const</span> account = <span class="k">await</span> fetchEncodedAccount(rpc, address);
+<span class="k">if</span> (account.exists &amp;&amp; stateNeedsMigration(account.data)) {
+	<span class="k">await</span> send(getMigrateInstruction({ state: address, payer }));
 }
 <span class="comment">// now decode `state` and send the real instruction</span></div>
 

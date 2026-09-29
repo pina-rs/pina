@@ -42,7 +42,7 @@ final class CpiTransferCommand extends Command<void> {
       programAddress: context.programAddress,
       sender: sender,
       recipient: recipient,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       amount: amountValue,
     );
     await context.send([instruction]);

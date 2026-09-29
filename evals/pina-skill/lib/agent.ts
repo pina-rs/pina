@@ -26,6 +26,14 @@ import process from "node:process";
 import { SKILL_VARIANT_DIR, WORK_DIR } from "./paths.ts";
 import type { RunUsage } from "./types.ts";
 
+/**
+ * The agent runtime never started, so no run can be graded. The evaluation
+ * loop rethrows this instead of recording a failed attempt.
+ */
+export class AgentRuntimeUnavailableError extends Error {
+	override name = "AgentRuntimeUnavailableError";
+}
+
 export interface AgentRunOptions {
 	/// Directory the agent works in. It is the project root the agent sees.
 	workdir: string;
@@ -219,6 +227,15 @@ export async function runAgent(
 
 	writeFileSync(join(options.transcriptDir, "transcript.jsonl"), stdout);
 	writeFileSync(join(options.transcriptDir, "stderr.txt"), stderr);
+
+	// A runtime that refuses to start (no credentials, or bypassed permissions
+	// under root) produces no transcript at all. Grading that as an ordinary
+	// failed run would report the skill as broken when no agent ever ran.
+	if (!timedOut && exit !== 0 && stdout.trim() === "") {
+		throw new AgentRuntimeUnavailableError(
+			`the agent runtime exited with status ${exit} before producing a transcript: ${stderr.trim()}`,
+		);
+	}
 
 	const transcriptParts: string[] = [];
 	const finalParts: string[] = [];

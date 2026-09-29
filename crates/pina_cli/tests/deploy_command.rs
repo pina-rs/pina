@@ -155,6 +155,35 @@ fn dry_run_json_is_machine_readable_and_starts_no_child() {
 	assert_eq!(plan["program"], canonical(&fixture.program));
 	assert_eq!(plan["program_keypair"], canonical(&fixture.program_keypair));
 	assert!(text.contains("https://rpc.example.com/solana"));
+	// The synthetic artifact is not an ELF file, which the plan points out.
+	let warnings = plan["warnings"].as_array().expect("plan warnings");
+	assert_eq!(warnings.len(), 1, "{warnings:?}");
+	assert!(
+		warnings[0]
+			.as_str()
+			.is_some_and(|warning| warning.contains("not an ELF"))
+	);
+
+	// Naming the program keypair as its own upgrade authority is legal but
+	// hands upgrade rights to whoever holds the program keypair.
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("deploy")
+		.arg("--project")
+		.arg(&fixture.root)
+		.arg("--upgrade-authority")
+		.arg(&fixture.program_keypair)
+		.arg("--payer")
+		.arg(&fixture.payer)
+		.args(["--cluster", "localnet", "--dry-run"])
+		.output()
+		.unwrap_or_else(|error| panic!("run self-authority dry deployment: {error}"));
+	assert!(output.status.success());
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	assert!(stdout.contains("Warning:"), "stdout: {stdout}");
+	assert!(
+		stdout.contains("also the upgrade authority"),
+		"stdout: {stdout}"
+	);
 }
 
 #[test]
@@ -224,6 +253,29 @@ fn invalid_rpc_targets_fail_before_the_build_boundary() {
 			"invalid target crossed the build boundary"
 		);
 		assert!(!String::from_utf8_lossy(&output.stderr).contains("sentinel-secret"));
+	}
+
+	// A mistyped cluster name names the accepted spellings instead of a URL
+	// parser error.
+	for cluster in ["mainnet", "Localnet", "localhost"] {
+		let output = fixture
+			.command()
+			.args(["--cluster", cluster, "--build"])
+			.env("PATH", &joined_path)
+			.env("PINA_DEPLOY_BUILD_MARKER", &marker)
+			.output()
+			.unwrap_or_else(|error| panic!("run mistyped cluster deployment: {error}"));
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		assert!(!output.status.success());
+		assert!(
+			!marker.exists(),
+			"a mistyped cluster crossed the build boundary"
+		);
+		assert!(
+			stderr.contains("expected a named cluster"),
+			"stderr: {stderr}"
+		);
+		assert!(stderr.contains("mainnet-beta"), "stderr: {stderr}");
 	}
 }
 
@@ -575,6 +627,39 @@ fn remote_deployments_record_and_retain_crash_safe_migration_state() {
 	)
 	.unwrap_or_else(|error| panic!("decode retained publication: {error}"));
 	assert!(ledger.pending.is_some());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_deploy_program_that_never_starts_discards_its_fresh_pending_publication() {
+	let fixture = ProjectFixture::new();
+	fixture.enable_migrations();
+	// An empty PATH guarantees `solana` cannot be spawned, so nothing can have
+	// reached the cluster and the draft versions must stay editable.
+	let empty_bin = fixture.root.join("empty-bin");
+	fs::create_dir_all(&empty_bin).unwrap_or_else(|error| panic!("create empty bin: {error}"));
+	let output = fixture
+		.command()
+		.args(["--cluster", "devnet", "--yes"])
+		.env("PATH", &empty_bin)
+		// Project discovery still needs Cargo, so name it by absolute path.
+		.env("CARGO", env!("CARGO"))
+		.output()
+		.unwrap_or_else(|error| panic!("run unstartable deployment: {error}"));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success());
+	assert!(stderr.contains("failed to start"), "stderr: {stderr}");
+	assert!(
+		stderr.contains("pending migration publication was discarded"),
+		"stderr: {stderr}"
+	);
+	let ledger = pina_abi::decode_publication_ledger(
+		&fs::read(fixture.root.join("migrations/publications.json"))
+			.unwrap_or_else(|error| panic!("read discarded publication: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("decode discarded publication: {error}"));
+	assert!(ledger.pending.is_none());
+	assert!(ledger.receipts.is_empty());
 }
 
 #[cfg(unix)]

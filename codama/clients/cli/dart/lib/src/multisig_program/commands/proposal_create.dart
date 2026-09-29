@@ -107,7 +107,7 @@ final class ProposalCreateCommand extends Command<void> {
       proposal: proposal,
       creator: creator,
       rentPayer: rentPayer,
-      systemProgram: Address('11111111111111111111111111111111'),
+      systemProgram: Address("11111111111111111111111111111111"),
       clock: clock,
       bump: bumpValue,
       kind: kindValue,

@@ -170,10 +170,10 @@ export const POOL_VAULT_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (poolVaultNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && poolVaultNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ poolVault: address, payer }).make());
+ * 	await send(getMigrateInstruction({ poolVault: address, payer }));
  * }
  * ```
  */

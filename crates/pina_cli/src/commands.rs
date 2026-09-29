@@ -384,6 +384,14 @@ fn run_migrations(command: MigrationCommands) {
 			for path in &output.manual_transitions {
 				println!("Manual migration required: {}", escaped_path(path));
 			}
+			for path in &output.stale_manual_transitions {
+				println!(
+					"{} The draft's layout changed, so its hand-written body was moved to {}; \
+					 port it into the regenerated stub",
+					"⚠".yellow().bold(),
+					escaped_path(path)
+				);
+			}
 			for warning in &output.data_warnings {
 				println!("{} {warning}", "⚠".yellow().bold());
 			}
@@ -422,8 +430,30 @@ fn run_migrations(command: MigrationCommands) {
 		}
 		MigrationCommands::Reconcile {
 			project,
+			pin_legacy: true,
+			json,
+			..
+		} => {
+			let pinned = unwrap_or_exit(pina_cli::migrations::pin_legacy_publications(&project));
+			if json {
+				print_json(&serde_json::json!({ "pinned": pinned }));
+				return;
+			}
+			if pinned == 0 {
+				println!("Every publication receipt already pins its history.");
+			} else {
+				println!(
+					"{} Pinned {pinned} published contract histories to the current manifest. \
+					 Commit migrations/publications.json.",
+					"✔".green()
+				);
+			}
+		}
+		MigrationCommands::Reconcile {
+			project,
 			abandon,
 			json,
+			..
 		} => {
 			let output = unwrap_or_exit(pina_cli::migrations::reconcile_publication(
 				&project, abandon,
@@ -534,7 +564,12 @@ fn run_keys(path: &Path, keypair: Option<&Path>, json: bool, command: Option<&Ke
 					println!("Keypair program ID: {program_id}");
 					println!("Status: mismatch; review and run `pina keys sync`");
 				}
-				_ => println!("Status: keypair not found; source was not changed"),
+				_ => {
+					println!(
+						"Status: keypair not found; run `pina keys new` to create one (source was \
+						 not changed)"
+					);
+				}
 			}
 		}
 		Some(KeysCommands::Sync) => {
@@ -552,6 +587,7 @@ fn run_keys(path: &Path, keypair: Option<&Path>, json: bool, command: Option<&Ke
 			} else {
 				println!("Program ID already matches {}", sync.program_id);
 			}
+			print_migration_history_rebind(sync.migration_history_program_id.as_deref());
 		}
 		Some(KeysCommands::New { force }) => {
 			let generation = unwrap_or_exit(pina_cli::keys::generate_keys(path, keypair, *force));
@@ -568,8 +604,22 @@ fn run_keys(path: &Path, keypair: Option<&Path>, json: bool, command: Option<&Ke
 			);
 			println!("Updated: {}", escaped_path(&generation.source));
 			println!("Program ID: {}", generation.program_id);
+			print_migration_history_rebind(generation.migration_history_program_id.as_deref());
 		}
 	}
+}
+
+/// Explain the follow-up a program-ID change needs when migrations are tracked.
+fn print_migration_history_rebind(recorded: Option<&str>) {
+	let Some(recorded) = recorded else {
+		return;
+	};
+	println!(
+		"{} migrations/manifest.json still records program {recorded}. Run `pina migrations \
+		 create` to rebind an unpublished history; published history cannot move to a new program \
+		 ID.",
+		"⚠".yellow().bold()
+	);
 }
 
 fn run_doctor(path: &Path, json: bool) {
@@ -590,6 +640,19 @@ fn run_doctor(path: &Path, json: bool) {
 fn print_migration_notices(output: &pina_cli::migrations::CreateMigrationsOutput) {
 	use pina_cli::migrations::BuildScriptStatus;
 
+	if output.placeholder_program_id {
+		println!(
+			"{} The history is bound to the `pina init` placeholder program ID. Run `pina keys \
+			 new`, then `pina migrations create` again to rebind it before the first deployment.",
+			"⚠".yellow().bold()
+		);
+	}
+	if let Some(previous) = &output.rebound_from_program_id {
+		println!(
+			"{} Rebound unpublished migration history from {previous} to the declared program ID",
+			"✔".green(),
+		);
+	}
 	if !output.auto.is_empty() {
 		println!("Auto policy: {}", output.auto.join(", "));
 	}
@@ -1168,7 +1231,7 @@ fn run_deploy(
 	let pending_publication = if plan.is_local() && !record_publication {
 		None
 	} else {
-		match pina_cli::migrations::begin_publication(
+		match pina_cli::migrations::begin_publication_attempt(
 			Path::new(plan.project_root()),
 			plan.cluster(),
 			plan.rpc_url(),
@@ -1189,7 +1252,23 @@ fn run_deploy(
 	};
 
 	if let Err(error) = approved.execute(&mut runner) {
-		if pending_publication.is_some() {
+		let discarded = match &pending_publication {
+			Some(attempt) if attempt.fresh && error.is_unsent() => {
+				pina_cli::migrations::discard_unsent_publication(
+					Path::new(plan.project_root()),
+					&attempt.pending,
+				)
+				.unwrap_or(false)
+			}
+			_ => false,
+		};
+		if discarded {
+			eprintln!(
+				"{} The deployment never started, so the pending migration publication was \
+				 discarded and draft versions stay editable.",
+				"Note".cyan().bold()
+			);
+		} else if pending_publication.is_some() {
 			eprintln!(
 				"{} The recoverable pending publication was retained; rerun this exact deployment \
 				 to reconcile whether it became live.",

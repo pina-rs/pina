@@ -173,10 +173,10 @@ export const MANUAL_STATE_MIGRATION_VERSION = 2;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (manualStateNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && manualStateNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ manualState: address, payer }).make());
+ * 	await send(getMigrateInstruction({ manualState: address, payer }));
  * }
  * ```
  */

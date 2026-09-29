@@ -209,10 +209,10 @@ export const POSITION_STATE_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (positionStateNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && positionStateNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ positionState: address, payer }).make());
+ * 	await send(getMigrateInstruction({ positionState: address, payer }));
  * }
  * ```
  */

@@ -62,16 +62,13 @@ impl core::fmt::Display for PolicyCheckedVersionError {
 			Self::Stale { stored } => {
 				write!(
 					f,
-					"event migration version mismatch: expected 0, received {stored} (the log \
-					 predates this client; project it with the checked-in event history or decode \
-					 it with a client generated from the schema that wrote it)"
+					"event migration version mismatch: expected 0, received {stored} (the log predates this client; project it with the checked-in event history or decode it with a client generated from the schema that wrote it)"
 				)
 			}
 			Self::Future { stored } => {
 				write!(
 					f,
-					"event migration version mismatch: expected 0, received {stored} (the log was \
-					 written by a newer program; upgrade this client)"
+					"event migration version mismatch: expected 0, received {stored} (the log was written by a newer program; upgrade this client)"
 				)
 			}
 		}
@@ -117,23 +114,19 @@ impl core::fmt::Display for PolicyCheckedProjectionError {
 			Self::InvalidLength { stored } => {
 				write!(
 					f,
-					"event migration version mismatch: expected 0, received {stored} (the log \
-					 length does not match the v{stored} schema)"
+					"event migration version mismatch: expected 0, received {stored} (the log length does not match the v{stored} schema)"
 				)
 			}
 			Self::Manual { from, to } => {
 				write!(
 					f,
-					"event migration version mismatch: expected 0, received {from} (the v{from} \
-					 to v{to} transition is manual, so only an on-chain projection or a client \
-					 generated from that schema can represent it)"
+					"event migration version mismatch: expected 0, received {from} (the v{from} to v{to} transition is manual, so only an on-chain projection or a client generated from that schema can represent it)"
 				)
 			}
 			Self::Unknown { stored } => {
 				write!(
 					f,
-					"event migration version mismatch: expected 0, received {stored} (this client \
-					 has no checked-in projection for it)"
+					"event migration version mismatch: expected 0, received {stored} (this client has no checked-in projection for it)"
 				)
 			}
 		}

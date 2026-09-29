@@ -324,10 +324,10 @@ fn fetch_url(url: &str) -> Result<Vec<u8>, ImportError> {
 	if !matches!(parsed.scheme(), "http" | "https") {
 		return Err(ImportError::Fetch {
 			reason: format!(
-					"`{redacted_for_errors}` uses the unsupported scheme `{}`; only http and \
-					 https 				 are accepted",
-					parsed.scheme()
-				),
+				"`{redacted_for_errors}` uses the unsupported scheme `{}`; only http and https \
+				 are accepted",
+				parsed.scheme()
+			),
 		});
 	}
 
@@ -340,9 +340,9 @@ fn fetch_url(url: &str) -> Result<Vec<u8>, ImportError> {
 	if parsed.scheme() == "http" && !loopback {
 		return Err(ImportError::Fetch {
 			reason: format!(
-					"`{redacted_for_errors}` uses plain HTTP; only HTTPS may fetch IDLs from \
-					 remote 				 hosts (use `https`, or `http` against localhost for development)"
-				),
+				"`{redacted_for_errors}` uses plain HTTP; only HTTPS may fetch IDLs from remote \
+				 hosts (use `https`, or `http` against localhost for development)"
+			),
 		});
 	}
 

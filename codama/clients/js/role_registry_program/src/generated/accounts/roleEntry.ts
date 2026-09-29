@@ -198,10 +198,10 @@ export const ROLE_ENTRY_MIGRATION_VERSION = 0;
  * reported by the decoder when the account is decoded.
  *
  * ```ts
- * const { data } = await fetchEncodedAccount(rpc, address);
- * if (roleEntryNeedsMigration(data)) {
+ * const account = await fetchEncodedAccount(rpc, address);
+ * if (account.exists && roleEntryNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ roleEntry: address, payer }).make());
+ * 	await send(getMigrateInstruction({ roleEntry: address, payer }));
  * }
  * ```
  */
