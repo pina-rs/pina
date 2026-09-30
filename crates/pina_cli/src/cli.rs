@@ -1282,6 +1282,16 @@ pub(crate) enum MigrationCommands {
 		/// its wire format.
 		#[arg(long = "envelope-ack")]
 		envelope_ack: bool,
+		/// Record which contract kinds are tracked without a per-item
+		/// `migrations` token: `true`, `false`, or a comma-separated list of
+		/// `accounts`, `events`, and `instructions`. The policy lives in
+		/// migrations/manifest.json; omit the flag to keep the recorded one.
+		#[arg(long, value_name = "POLICY")]
+		auto: Option<pina_abi::MigrationAuto>,
+		/// Record the version envelope width: `u8` (the default), `u16`, or
+		/// `u32`. It can change only while nothing is published.
+		#[arg(long = "version-type", value_name = "WIDTH")]
+		version_type: Option<pina_abi::MigrationVersionType>,
 		/// Emit a machine-readable result.
 		#[arg(long)]
 		json: bool,
@@ -1313,10 +1323,10 @@ pub(crate) enum MigrationCommands {
 		/// versions stay frozen because the deployment may still have gone live.
 		#[arg(long)]
 		abandon: bool,
-		/// Pin receipts that record published versions without their schema
-		/// hashes to what migrations/manifest.json records now. Run it only after
-		/// confirming with version control that the manifest still describes what
-		/// those receipts made live.
+		/// Pin receipts a 0.20 ledger records without their schema hashes to
+		/// what migrations/manifest.json records now. Run it only after
+		/// confirming with version control that the manifest still describes
+		/// what those receipts made live.
 		#[arg(long, conflicts_with = "abandon")]
 		pin_legacy: bool,
 		/// Emit a machine-readable result.

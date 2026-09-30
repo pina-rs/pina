@@ -59,14 +59,14 @@ pub struct ApproveDisclosureIx {
 
 impl ApproveDisclosureIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 3;
+	pub const LEN: usize = 2;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 3], ProgramError> {
-		let mut data = [0u8; 3];
-		data[..2].copy_from_slice(&APPROVE_DISCLOSURE_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.reserved.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 2], ProgramError> {
+		let mut data = [0u8; 2];
+		data[..1].copy_from_slice(&APPROVE_DISCLOSURE_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.reserved.to_le_bytes());
 
 		Ok(data)
 	}
@@ -101,4 +101,4 @@ impl<'account> ApproveDisclosure<'account> {
 	}
 }
 
-const APPROVE_DISCLOSURE_DISCRIMINATOR: [u8; 2] = [11, 0];
+const APPROVE_DISCLOSURE_DISCRIMINATOR: [u8; 1] = [11];

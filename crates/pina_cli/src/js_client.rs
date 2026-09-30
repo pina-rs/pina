@@ -4,7 +4,6 @@ use std::path::Path;
 use codama_nodes::RootNode;
 use walkdir::WalkDir;
 
-use crate::client_events::EventClientHistoryIndex;
 use crate::client_migrations::MigratableAccount;
 use crate::client_migrations::MigrationPlan;
 use crate::compact_capacity::CompactCapacity;
@@ -263,7 +262,6 @@ pub fn harden_generated_clients(
 	output_root: &Path,
 	programs: &[String],
 	idl_paths: &[impl AsRef<Path>],
-	histories: &[EventClientHistoryIndex],
 ) -> Result<(), CodamaError> {
 	if programs.len() != idl_paths.len() {
 		return Err(js_validation_error(
@@ -276,9 +274,7 @@ pub fn harden_generated_clients(
 		));
 	}
 
-	let no_histories = EventClientHistoryIndex::default();
-
-	for (index, (program, idl_path)) in programs.iter().zip(idl_paths).enumerate() {
+	for (program, idl_path) in programs.iter().zip(idl_paths) {
 		let idl_path = idl_path.as_ref();
 		let idl_source = std::fs::read_to_string(idl_path).map_err(|source| {
 			CodamaError::HardenJavaScript {
@@ -336,12 +332,7 @@ pub fn harden_generated_clients(
 		}
 
 		harden_js_event_decoders(&generated, &root)?;
-		emit_js_event_log_module(
-			&generated,
-			program,
-			histories.get(index).unwrap_or(&no_histories),
-			&root,
-		)?;
+		emit_js_event_log_module(&generated, program, &root)?;
 
 		let helper_path = generated.join("pinaPodCodecs.ts");
 		std::fs::write(&helper_path, HELPER_MODULE).map_err(|source| {
@@ -1140,13 +1131,9 @@ mod tests {
 		// Blocking the events path makes the generated log module unwritable.
 		std::fs::write(generated.join("events"), b"file").expect("blocked events path");
 
-		let error = harden_generated_clients(
-			temporary.path(),
-			&["events_program".to_owned()],
-			&[idl],
-			&[],
-		)
-		.expect_err("an unwritable events module must fail");
+		let error =
+			harden_generated_clients(temporary.path(), &["events_program".to_owned()], &[idl])
+				.expect_err("an unwritable events module must fail");
 		assert!(matches!(error, CodamaError::HardenJavaScript { .. }));
 	}
 
@@ -1425,7 +1412,6 @@ const decoder = getStructDecoder([
 			temporary.path(),
 			&["compact_accounts_program".to_owned()],
 			&[idl],
-			&[],
 		)
 		.expect("generated tree should harden");
 		let hardened = std::fs::read_to_string(output).expect("hardened fixture should read");

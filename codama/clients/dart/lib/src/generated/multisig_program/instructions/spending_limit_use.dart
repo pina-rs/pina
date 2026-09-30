@@ -16,11 +16,9 @@ class SpendingLimitUseInstructionData {
   const SpendingLimitUseInstructionData({
     required this.amount,
     required this.decimals,
-  }) : discriminator = 13,
-       migrationVersion = 0;
+  }) : discriminator = 13;
 
   final int discriminator;
-  final int migrationVersion;
   final BigInt amount;
   final int decimals;
 }
@@ -29,7 +27,6 @@ Encoder<SpendingLimitUseInstructionData>
 getSpendingLimitUseInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('amount', getU64Encoder()),
     ('decimals', getU8Encoder()),
   ]);
@@ -38,7 +35,6 @@ getSpendingLimitUseInstructionDataEncoder() {
     structEncoder,
     (SpendingLimitUseInstructionData value) => <String, Object?>{
       'discriminator': 13,
-      'migrationVersion': 0,
       'amount': value.amount,
       'decimals': value.decimals,
     },
@@ -49,7 +45,6 @@ Decoder<SpendingLimitUseInstructionData>
 getSpendingLimitUseInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('amount', getU64Decoder()),
     ('decimals', getU8Decoder()),
   ]);
@@ -67,7 +62,6 @@ getSpendingLimitUseInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(13)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

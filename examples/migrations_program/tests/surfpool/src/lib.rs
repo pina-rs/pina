@@ -357,7 +357,7 @@ fn generated_current_update_writes_the_current_version() {
 		.expect("encode current Update data");
 		let instruction = generated_client::instructions::Update::new(authority).instruction(data);
 
-		assert_eq!(&instruction.data[0..2], &[UPDATE_DISCRIMINATOR, 2]);
+		assert_eq!(&instruction.data[0..2], &[UPDATE_DISCRIMINATOR, 1]);
 		program
 			.send_instruction(instruction)
 			.expect("execute generated current Update");

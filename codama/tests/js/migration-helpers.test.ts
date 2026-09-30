@@ -7,9 +7,11 @@ import {
 	stateNeedsMigration,
 } from "../../clients/js/migrations_program/src/generated/accounts/state.js";
 import {
-	normalizeValueChangedEventEvent,
+	decodeValueChangedEventEvent,
+	decodeValueChangedEventV0Event,
 	parseMigrationsProgramEventsFromLogs,
 	parseValueChangedEventEventFromLog,
+	parseValueChangedEventV0EventFromLog,
 } from "../../clients/js/migrations_program/src/generated/events/logs.js";
 import { getValueChangedEventEventDecoder } from "../../clients/js/migrations_program/src/generated/events/valueChangedEvent.js";
 import {
@@ -180,60 +182,64 @@ test("the generated event decoder enforces the current envelope", () => {
 	);
 });
 
-test("a log written at an older version projects into the current shape", () => {
-	// Version zero carried only `value`; the projection zero-fills `memo`.
-	const historical = valueChangedEventBytes(0, 42n, 0);
-	const normalized = normalizeValueChangedEventEvent(historical);
+test("a log written at an older version decodes with that version's event", () => {
+	// Version zero carried only `value`; it is its own event, not a projection.
+	const historical = decodeValueChangedEventV0Event(
+		valueChangedEventBytes(0, 42n, 0),
+	);
+	assert.equal(historical.name, "valueChangedEventV0");
+	assert.equal(historical.data.value, 42n);
+	assert.equal(historical.data.migrationVersion, 0);
+	assert.equal(historical.data.discriminator, 4);
+	assert.equal("memo" in historical.data, false);
 
-	assert.equal(normalized.name, "valueChangedEvent");
-	assert.equal(normalized.sourceVersion, 0);
-	assert.equal(normalized.wasMigrated, true);
-	assert.equal(normalized.data.value, 42n);
-	assert.equal(normalized.data.memo, 0);
-	assert.equal(normalized.data.migrationVersion, 1);
-	assert.equal(normalized.data.discriminator, 4);
-
-	const current = normalizeValueChangedEventEvent(
+	const current = decodeValueChangedEventEvent(
 		valueChangedEventBytes(1, 42n, 7),
 	);
-	assert.equal(current.sourceVersion, 1);
-	assert.equal(current.wasMigrated, false);
+	assert.equal(current.name, "valueChangedEvent");
+	assert.equal(current.data.migrationVersion, 1);
 	assert.equal(current.data.memo, 7);
 });
 
-test("unknown, future, and malformed event logs fail closed", () => {
+test("each event decodes only its own version and fails closed otherwise", () => {
 	assert.throws(
-		() => normalizeValueChangedEventEvent(valueChangedEventBytes(2, 42n, 7)),
-		/log was written by a newer program; upgrade this client/,
+		() => decodeValueChangedEventEvent(valueChangedEventBytes(0, 42n, 0)),
+		/event migration version mismatch: expected 1, received 0/,
+	);
+	assert.throws(
+		() => decodeValueChangedEventV0Event(valueChangedEventBytes(1, 42n, 7)),
+		/event migration version mismatch: expected 0, received 1/,
+	);
+	assert.throws(
+		() => decodeValueChangedEventEvent(valueChangedEventBytes(2, 42n, 7)),
+		/regenerate this client/,
 	);
 	const truncated = new Uint8Array([4, 0, 1, 2, 3]);
-	assert.throws(
-		() => normalizeValueChangedEventEvent(truncated),
-		/log length does not match the v0 schema/,
-	);
+	assert.throws(() => decodeValueChangedEventV0Event(truncated));
 	const foreign = valueChangedEventBytes(0, 42n, 0);
 	foreign[0] = 9;
 	assert.throws(
-		() => normalizeValueChangedEventEvent(foreign),
-		/does not match the "ValueChangedEventEvent" event discriminator/,
+		() => decodeValueChangedEventV0Event(foreign),
+		/does not match the "ValueChangedEventV0Event" event discriminator/,
 	);
 	assert.throws(
-		() => normalizeValueChangedEventEvent(new Uint8Array([4])),
+		() => decodeValueChangedEventEvent(new Uint8Array([4])),
 		/too short for the "ValueChangedEventEvent" event envelope/,
 	);
 });
 
-test("Program data log lines decode through the event entry point", () => {
+test("Program data log lines decode through the event for their version", () => {
 	const log = programDataLog(valueChangedEventBytes(0, 7n, 0));
-	const parsed = parseValueChangedEventEventFromLog(log);
+	assert.equal(parseValueChangedEventEventFromLog(log), null);
+	const parsed = parseValueChangedEventV0EventFromLog(log);
 	assert.notEqual(parsed, null);
-	assert.equal(parsed?.sourceVersion, 0);
-	assert.equal(parsed?.wasMigrated, true);
+	assert.equal(parsed?.name, "valueChangedEventV0");
 	assert.equal(parsed?.data.value, 7n);
 
 	assert.equal(parseValueChangedEventEventFromLog("not a log line"), null);
 	const otherProgram = programDataLog(new Uint8Array([9, 1, 0]));
 	assert.equal(parseValueChangedEventEventFromLog(otherProgram), null);
+	assert.equal(parseValueChangedEventV0EventFromLog(otherProgram), null);
 });
 
 test("the program log parser skips unrelated lines and keeps matching ones", () => {
@@ -241,13 +247,43 @@ test("the program log parser skips unrelated lines and keeps matching ones", () 
 		`Program ${PROGRAM} invoke [1]`,
 		"Program log: Instruction: Update",
 		programDataLog(valueChangedEventBytes(1, 5n, 3)),
+		programDataLog(valueChangedEventBytes(0, 4n, 0)),
 		programDataLog(new Uint8Array([9, 1, 0])),
 		`Program ${PROGRAM} success`,
 	]);
-	assert.equal(events.length, 1);
-	assert.equal(events[0]?.name, "valueChangedEvent");
-	assert.equal(events[0]?.data.memo, 3);
+	assert.deepEqual(
+		events.map((event) => [event.name, event.data.value]),
+		[
+			["valueChangedEvent", 5n],
+			["valueChangedEventV0", 4n],
+		],
+	);
+	const [current] = events;
+	assert.ok(current?.name === "valueChangedEvent");
+	assert.equal(current.data.memo, 3);
 	assert.deepEqual(parseMigrationsProgramEventsFromLogs([]), []);
+});
+
+test("the program log parser rejects versions no generated event describes", () => {
+	const frame = (line: string) => [
+		`Program ${PROGRAM} invoke [1]`,
+		line,
+		`Program ${PROGRAM} success`,
+	];
+	assert.throws(
+		() =>
+			parseMigrationsProgramEventsFromLogs(
+				frame(programDataLog(valueChangedEventBytes(2, 1n, 1))),
+			),
+		/log carries migration version 2, which this client cannot decode; regenerate it/,
+	);
+	assert.throws(
+		() =>
+			parseMigrationsProgramEventsFromLogs(
+				frame(programDataLog(new Uint8Array([4]))),
+			),
+		/log is too short for its version envelope/,
+	);
 });
 
 test("the program log parser only trusts lines this program emitted", () => {

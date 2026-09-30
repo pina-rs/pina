@@ -88,18 +88,15 @@ export function identifyTodoProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): TodoProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return TodoProgramInstruction.Initialize;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return TodoProgramInstruction.ToggleCompleted;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return TodoProgramInstruction.UpdateDigest;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return TodoProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return TodoProgramInstruction.ToggleCompleted;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return TodoProgramInstruction.UpdateDigest;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "todoProgram" },

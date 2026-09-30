@@ -14,11 +14,9 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class WriteInstructionData {
   const WriteInstructionData({required this.index, required this.value})
-    : discriminator = 2,
-      migrationVersion = 0;
+    : discriminator = 2;
 
   final int discriminator;
-  final int migrationVersion;
   final int index;
   final BigInt value;
 }
@@ -26,7 +24,6 @@ class WriteInstructionData {
 Encoder<WriteInstructionData> getWriteInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('index', getU8Encoder()),
     ('value', getU64Encoder()),
   ]);
@@ -35,7 +32,6 @@ Encoder<WriteInstructionData> getWriteInstructionDataEncoder() {
     structEncoder,
     (WriteInstructionData value) => <String, Object?>{
       'discriminator': 2,
-      'migrationVersion': 0,
       'index': value.index,
       'value': value.value,
     },
@@ -45,7 +41,6 @@ Encoder<WriteInstructionData> getWriteInstructionDataEncoder() {
 Decoder<WriteInstructionData> getWriteInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('index', getU8Decoder()),
     ('value', getU64Decoder()),
   ]);
@@ -60,7 +55,6 @@ Decoder<WriteInstructionData> getWriteInstructionDataDecoder() {
 
   (WriteInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

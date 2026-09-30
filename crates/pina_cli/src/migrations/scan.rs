@@ -25,6 +25,10 @@ use crate::project::Project;
 pub(super) struct CurrentContract {
 	pub(super) identity: ContractIdentity,
 	pub(super) rust_name: String,
+	/// Whether the source puts the version envelope after the discriminator.
+	/// Only an instruction recorded by an auto policy without the
+	/// `migrations` token omits it.
+	pub(super) envelope: bool,
 	pub(super) schema: DataSchema,
 	pub(super) process: Option<ProcessContract>,
 }
@@ -116,6 +120,7 @@ pub(super) fn scan_current_contracts(
 			CurrentContract {
 				identity,
 				rust_name: account.name.clone(),
+				envelope: true,
 				schema,
 				process: None,
 			},
@@ -128,7 +133,7 @@ pub(super) fn scan_current_contracts(
 	for instruction in ir
 		.instructions
 		.iter()
-		.filter(|instruction| instruction.is_migratable())
+		.filter(|instruction| instruction.is_recorded())
 	{
 		let discriminator = &instruction.discriminator;
 		let identity = ContractIdentity::try_new(
@@ -154,6 +159,7 @@ pub(super) fn scan_current_contracts(
 			CurrentContract {
 				identity,
 				rust_name: instruction.rust_name.clone(),
+				envelope: instruction.is_migratable(),
 				schema,
 				process: Some(process_contract(instruction)),
 			},
@@ -181,6 +187,7 @@ pub(super) fn scan_current_contracts(
 			CurrentContract {
 				identity,
 				rust_name: event.name,
+				envelope: true,
 				schema: event.schema,
 				process: None,
 			},
@@ -276,7 +283,6 @@ pub(super) fn process_contract(instruction: &InstructionIr) -> ProcessContract {
 }
 
 pub(super) fn validate_program_configuration(
-	project: &Project,
 	program_id: &str,
 	manifest: &MigrationManifest,
 ) -> Result<(), MigrationError> {
@@ -284,12 +290,6 @@ pub(super) fn validate_program_configuration(
 		return Err(MigrationError::ProgramIdentityChanged {
 			expected: program_id.to_owned(),
 			found: manifest.program_id.clone(),
-		});
-	}
-	if manifest.version_type != project.migration_version_type {
-		return Err(MigrationError::VersionTypeChanged {
-			expected: project.migration_version_type.to_string(),
-			found: manifest.version_type.to_string(),
 		});
 	}
 	Ok(())

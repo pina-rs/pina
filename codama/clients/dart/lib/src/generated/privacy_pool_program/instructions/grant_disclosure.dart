@@ -14,11 +14,9 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class GrantDisclosureInstructionData {
   const GrantDisclosureInstructionData({required this.reserved})
-    : discriminator = 8,
-      migrationVersion = 0;
+    : discriminator = 8;
 
   final int discriminator;
-  final int migrationVersion;
   final int reserved;
 }
 
@@ -26,7 +24,6 @@ Encoder<GrantDisclosureInstructionData>
 getGrantDisclosureInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('reserved', getU8Encoder()),
   ]);
 
@@ -34,7 +31,6 @@ getGrantDisclosureInstructionDataEncoder() {
     structEncoder,
     (GrantDisclosureInstructionData value) => <String, Object?>{
       'discriminator': 8,
-      'migrationVersion': 0,
       'reserved': value.reserved,
     },
   );
@@ -44,7 +40,6 @@ Decoder<GrantDisclosureInstructionData>
 getGrantDisclosureInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('reserved', getU8Decoder()),
   ]);
 
@@ -61,7 +56,6 @@ getGrantDisclosureInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(8)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

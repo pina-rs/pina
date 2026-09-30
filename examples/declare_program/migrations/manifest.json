@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "Dec1areProgram11111111111111111111111111111",
 	"versionType": "u8",
 	"auto": [
@@ -9,40 +9,25 @@
 	],
 	"contracts": {
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "ValidateExternalProgramInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "external_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "external_program"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

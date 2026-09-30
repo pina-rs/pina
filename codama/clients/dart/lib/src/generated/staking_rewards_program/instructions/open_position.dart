@@ -13,19 +13,15 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class OpenPositionInstructionData {
-  const OpenPositionInstructionData({required this.bump})
-    : discriminator = 1,
-      migrationVersion = 0;
+  const OpenPositionInstructionData({required this.bump}) : discriminator = 1;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
 }
 
 Encoder<OpenPositionInstructionData> getOpenPositionInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
   ]);
 
@@ -33,7 +29,6 @@ Encoder<OpenPositionInstructionData> getOpenPositionInstructionDataEncoder() {
     structEncoder,
     (OpenPositionInstructionData value) => <String, Object?>{
       'discriminator': 1,
-      'migrationVersion': 0,
       'bump': value.bump,
     },
   );
@@ -42,7 +37,6 @@ Encoder<OpenPositionInstructionData> getOpenPositionInstructionDataEncoder() {
 Decoder<OpenPositionInstructionData> getOpenPositionInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
   ]);
 
@@ -56,7 +50,6 @@ Decoder<OpenPositionInstructionData> getOpenPositionInstructionDataDecoder() {
 
   (OpenPositionInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

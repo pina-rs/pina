@@ -43,15 +43,15 @@ pub struct FillIx {
 
 impl FillIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 7;
+	pub const LEN: usize = 6;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 7], ProgramError> {
-		let mut data = [0u8; 7];
-		data[..2].copy_from_slice(&FILL_DISCRIMINATOR);
-		data[2..6].copy_from_slice(&self.bytes.to_le_bytes());
-		data[6..7].copy_from_slice(&self.fill.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 6], ProgramError> {
+		let mut data = [0u8; 6];
+		data[..1].copy_from_slice(&FILL_DISCRIMINATOR);
+		data[1..5].copy_from_slice(&self.bytes.to_le_bytes());
+		data[5..6].copy_from_slice(&self.fill.to_le_bytes());
 
 		Ok(data)
 	}
@@ -79,4 +79,4 @@ impl Fill {
 	}
 }
 
-const FILL_DISCRIMINATOR: [u8; 2] = [1, 0];
+const FILL_DISCRIMINATOR: [u8; 1] = [1];

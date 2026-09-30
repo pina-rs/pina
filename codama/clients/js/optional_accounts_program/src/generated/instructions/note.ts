@@ -36,22 +36,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const NOTE_DISCRIMINATOR = 3;
 
 export function getNoteDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(NOTE_DISCRIMINATOR);
-}
-
-export const NOTE_DISCRIMINATOR2 = 0;
-
-export function getNoteDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(NOTE_DISCRIMINATOR2);
 }
 
 export type NoteInstruction<
@@ -74,10 +65,7 @@ export type NoteInstruction<
 		]
 	>;
 
-export type NoteInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type NoteInstructionData = { discriminator: number };
 
 export type NoteInstructionDataArgs = {};
 
@@ -85,11 +73,8 @@ export function getNoteInstructionDataEncoder(): FixedSizeEncoder<
 	NoteInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
@@ -99,9 +84,6 @@ export function getNoteInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(NOTE_DISCRIMINATOR, getU8Decoder()),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

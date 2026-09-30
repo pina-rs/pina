@@ -13,31 +13,25 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class NoteInstructionData {
-  const NoteInstructionData() : discriminator = 3, migrationVersion = 0;
+  const NoteInstructionData() : discriminator = 3;
 
   final int discriminator;
-  final int migrationVersion;
 }
 
 Encoder<NoteInstructionData> getNoteInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
   ]);
 
   return transformEncoder(
     structEncoder,
-    (NoteInstructionData value) => <String, Object?>{
-      'discriminator': 3,
-      'migrationVersion': 0,
-    },
+    (NoteInstructionData value) => <String, Object?>{'discriminator': 3},
   );
 }
 
 Decoder<NoteInstructionData> getNoteInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -50,7 +44,6 @@ Decoder<NoteInstructionData> getNoteInstructionDataDecoder() {
 
   (NoteInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

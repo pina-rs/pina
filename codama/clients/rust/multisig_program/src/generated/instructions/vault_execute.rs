@@ -9,7 +9,6 @@
 )]
 
 pub const VAULT_EXECUTE_DISCRIMINATOR: u8 = 10u8;
-pub const VAULT_EXECUTE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -92,7 +91,6 @@ impl VaultExecuteInstructionData {
 		<VaultExecuteInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = VAULT_EXECUTE_DISCRIMINATOR;
-			data.migration_version = VAULT_EXECUTE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -106,5 +104,4 @@ impl VaultExecuteInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct VaultExecuteInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 }

@@ -55,7 +55,7 @@ describe("Dart and JavaScript PinaPod contract parity", () => {
 		);
 	});
 
-	test("initialize data matches the shared 165-byte golden", () => {
+	test("initialize data matches the shared 164-byte golden", () => {
 		const encoded = getInitializeInstructionDataEncoder().encode({
 			bio: "bio",
 			bump: 9,

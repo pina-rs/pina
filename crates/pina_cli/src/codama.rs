@@ -583,20 +583,6 @@ fn expand_cli_clients(mut clients: BTreeSet<ClientLanguage>) -> BTreeSet<ClientL
 	clients
 }
 
-/// Read one program's checked-in event histories, naming the example on failure.
-fn read_event_histories(
-	example: &str,
-	program_path: &Path,
-) -> Result<crate::client_events::EventClientHistoryIndex, CodamaError> {
-	crate::client_events::read_histories(program_path).map_err(|message| {
-		CodamaError::EventHistories {
-			example: example.to_owned(),
-			path: program_path.to_path_buf(),
-			message,
-		}
-	})
-}
-
 fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	let examples = plan
 		.programs
@@ -611,7 +597,6 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	let mut idl_paths = Vec::with_capacity(plan.programs.len());
-	let mut event_histories = Vec::with_capacity(plan.programs.len());
 	for (example, program_path) in &plan.programs {
 		let name_override = plan.override_idl_names.then_some(example.as_str());
 		let idl = generate_idl(program_path, name_override).map_err(|source| {
@@ -636,22 +621,17 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			}
 		})?;
 		idl_paths.push(idl_path);
-		event_histories.push(read_event_histories(example, program_path)?);
 	}
 
 	if plan.clients.contains(&ClientLanguage::Rust) {
 		let settings = plan.generation[&ClientLanguage::Rust];
 
-		for (index, (example, idl_path)) in examples.iter().zip(idl_paths.iter()).enumerate() {
+		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
 			let crate_dir = plan.rust_out.join(example);
 			validate_render_target(&crate_dir)?;
 			let render_config = RenderConfig {
 				mode: rust_render_mode(settings.mode),
 				scaffold: settings.scaffold,
-				event_histories: event_histories
-					.get(index)
-					.map(crate::client_events::EventClientHistoryIndex::renderer_histories)
-					.unwrap_or_default(),
 				..RenderConfig::default()
 			};
 			let scaffolds_manifest = scaffolds_manifest(&crate_dir, settings.scaffold);
@@ -692,12 +672,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		}
 
 		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
-		harden_generated_clients(
-			&plan.typescript_out,
-			&examples,
-			&idl_paths,
-			&event_histories,
-		)?;
+		harden_generated_clients(&plan.typescript_out, &examples, &idl_paths)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::Dart) {
@@ -711,7 +686,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 
 		validate_dart_client_idls(&plan.dart_out, &examples, &idl_paths)?;
 		run_client_generation(plan, ClientLanguage::Dart, &idl_paths)?;
-		harden_generated_dart_clients(&plan.dart_out, &examples, &idl_paths, &event_histories)?;
+		harden_generated_dart_clients(&plan.dart_out, &examples, &idl_paths)?;
 		write_dart_package_barrels(&plan.dart_out, &examples)?;
 	}
 
@@ -2557,34 +2532,6 @@ mod tests {
 			assert_eq!(rust_render_mode(mode), rust);
 			assert_eq!(cpi_render_mode(mode), cpi);
 		}
-	}
-
-	#[test]
-	fn event_history_failures_name_the_example() {
-		let temp =
-			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		let program = temp.path().join("example");
-		let migrations = program.join("migrations");
-		std::fs::create_dir_all(&migrations)
-			.unwrap_or_else(|error| panic!("failed to create migrations dir: {error}"));
-		std::fs::write(migrations.join("manifest.json"), b"not json")
-			.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
-
-		let error =
-			read_event_histories("example", &program).expect_err("an invalid manifest must fail");
-		assert!(matches!(error, CodamaError::EventHistories { .. }));
-		let message = error.to_string();
-		assert!(message.contains("example"), "unexpected message: {message}");
-		assert!(
-			message.contains("invalid migration manifest JSON"),
-			"unexpected message: {message}"
-		);
-
-		let clean =
-			Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana_program");
-		let histories = read_event_histories("hello_solana_program", &clean)
-			.unwrap_or_else(|error| panic!("missing manifest should be empty: {error}"));
-		assert!(histories.renderer_histories().is_empty());
 	}
 
 	#[cfg(unix)]

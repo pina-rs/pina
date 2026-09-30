@@ -9,7 +9,6 @@
 )]
 
 pub const MULTISIG_CREATE_DISCRIMINATOR: u8 = 2u8;
-pub const MULTISIG_CREATE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -111,7 +110,6 @@ impl MultisigCreateInstructionData {
 		<MultisigCreateInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = MULTISIG_CREATE_DISCRIMINATOR;
-			data.migration_version = MULTISIG_CREATE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -125,7 +123,6 @@ impl MultisigCreateInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct MultisigCreateInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub bump: u8,
 	pub threshold: u16,
 	pub timelock: u32,

@@ -44,7 +44,6 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -52,12 +51,6 @@ export const SET_VERIFICATION_KEY_DISCRIMINATOR = 1;
 
 export function getSetVerificationKeyDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(SET_VERIFICATION_KEY_DISCRIMINATOR);
-}
-
-export const SET_VERIFICATION_KEY_DISCRIMINATOR2 = 0;
-
-export function getSetVerificationKeyDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(SET_VERIFICATION_KEY_DISCRIMINATOR2);
 }
 
 export type SetVerificationKeyInstruction<
@@ -90,7 +83,6 @@ export type SetVerificationKeyInstruction<
 
 export type SetVerificationKeyInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	bump: number;
 	/** Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`]. */
 	slot: number;
@@ -126,7 +118,6 @@ export function getSetVerificationKeyInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["slot", getU8Encoder()],
 			["icLen", getU8Encoder()],
@@ -139,7 +130,7 @@ export function getSetVerificationKeyInstructionDataEncoder(): FixedSizeEncoder<
 			["ic2", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 			["ic3", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 		]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -154,7 +145,6 @@ export function getSetVerificationKeyInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["slot", getU8Decoder()],
 		["icLen", getU8Decoder()],

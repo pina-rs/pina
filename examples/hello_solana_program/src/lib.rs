@@ -193,8 +193,9 @@ mod tests {
 
 	#[test]
 	fn instruction_data_try_from_bytes() {
-		// The envelope is the discriminator plus the migration version byte.
-		let data = [0u8, 0u8];
+		// The payload is the discriminator alone; instructions carry no
+		// migration envelope unless they opt into migrations.
+		let data = [0u8];
 		let result = HelloInstructionData::try_from_bytes(&data);
 		assert!(result.is_ok());
 	}

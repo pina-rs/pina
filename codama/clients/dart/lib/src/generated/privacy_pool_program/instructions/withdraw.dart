@@ -19,11 +19,9 @@ class WithdrawInstructionData {
     required this.proofA,
     required this.proofB,
     required this.proofC,
-  }) : discriminator = 5,
-       migrationVersion = 0;
+  }) : discriminator = 5;
 
   final int discriminator;
-  final int migrationVersion;
   final Uint8List nullifier;
   final Uint8List root;
   final Uint8List proofA;
@@ -34,7 +32,6 @@ class WithdrawInstructionData {
 Encoder<WithdrawInstructionData> getWithdrawInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     (
       'nullifier',
       fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
@@ -49,7 +46,6 @@ Encoder<WithdrawInstructionData> getWithdrawInstructionDataEncoder() {
     structEncoder,
     (WithdrawInstructionData value) => <String, Object?>{
       'discriminator': 5,
-      'migrationVersion': 0,
       'nullifier': value.nullifier,
       'root': value.root,
       'proofA': value.proofA,
@@ -62,7 +58,6 @@ Encoder<WithdrawInstructionData> getWithdrawInstructionDataEncoder() {
 Decoder<WithdrawInstructionData> getWithdrawInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('nullifier', fixDecoderSize(getBytesDecoder(), 32)),
     ('root', fixDecoderSize(getBytesDecoder(), 32)),
     ('proofA', fixDecoderSize(getBytesDecoder(), 64)),
@@ -80,7 +75,6 @@ Decoder<WithdrawInstructionData> getWithdrawInstructionDataDecoder() {
 
   (WithdrawInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(5)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

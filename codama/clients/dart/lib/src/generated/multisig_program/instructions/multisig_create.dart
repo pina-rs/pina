@@ -21,11 +21,9 @@ class MultisigCreateInstructionData {
     required this.memberPermissions,
     required this.configAuthority,
     required this.rentCollector,
-  }) : discriminator = 2,
-       migrationVersion = 0;
+  }) : discriminator = 2;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
   final int threshold;
   final int timelock;
@@ -39,7 +37,6 @@ Encoder<MultisigCreateInstructionData>
 getMultisigCreateInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('threshold', getU16Encoder()),
     ('timelock', getU32Encoder()),
@@ -56,7 +53,6 @@ getMultisigCreateInstructionDataEncoder() {
     structEncoder,
     (MultisigCreateInstructionData value) => <String, Object?>{
       'discriminator': 2,
-      'migrationVersion': 0,
       'bump': value.bump,
       'threshold': value.threshold,
       'timelock': value.timelock,
@@ -72,7 +68,6 @@ Decoder<MultisigCreateInstructionData>
 getMultisigCreateInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('threshold', getU16Decoder()),
     ('timelock', getU32Decoder()),
@@ -95,7 +90,6 @@ getMultisigCreateInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

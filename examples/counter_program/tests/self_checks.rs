@@ -36,9 +36,9 @@ fn discriminator_roundtrip() {
 #[test]
 fn counter_state_layout() {
 	// CounterState: 1 (discriminator) + 1 (migration version) + 1 (bump) +
-	// 8 (count) = 11 bytes. Migrations are on, so every envelope carries the
-	// version byte and the generated `tests/abi_layout.rs` pins the same
-	// geometry.
+	// 8 (count) = 11 bytes. Migrations are on, so every account envelope
+	// carries the version byte and the generated `tests/abi_layout.rs` pins
+	// the same geometry.
 	assert_eq!(CounterState::SIZE, 11);
 }
 
@@ -83,9 +83,9 @@ fn counter_state_deserialize_roundtrip() {
 
 #[test]
 fn initialize_instruction_data_layout() {
-	// InitializeInstruction: 1 (discriminator) + 1 (migration version) +
-	// 1 (bump) = 3 bytes.
-	assert_eq!(InitializeInstruction::SIZE, 3);
+	// InitializeInstruction: 1 (discriminator) + 1 (bump) = 2 bytes.
+	// Instructions carry no version envelope unless they opt into migrations.
+	assert_eq!(InitializeInstruction::SIZE, 2);
 	assert!(InitializeInstruction::matches_discriminator(&[
 		CounterInstruction::Initialize as u8
 	]));
@@ -93,8 +93,8 @@ fn initialize_instruction_data_layout() {
 
 #[test]
 fn increment_instruction_data_layout() {
-	// IncrementInstruction: 1 (discriminator) + 1 (migration version).
-	assert_eq!(IncrementInstruction::SIZE, 2);
+	// IncrementInstruction: 1 (discriminator).
+	assert_eq!(IncrementInstruction::SIZE, 1);
 	assert!(IncrementInstruction::matches_discriminator(&[
 		CounterInstruction::Increment as u8
 	]));
@@ -102,8 +102,8 @@ fn increment_instruction_data_layout() {
 
 #[test]
 fn initialize_instruction_try_from_bytes() {
-	// discriminator + version + bump.
-	let data = [CounterInstruction::Initialize as u8, 0u8, 42u8];
+	// discriminator + bump.
+	let data = [CounterInstruction::Initialize as u8, 42u8];
 	let ix =
 		InitializeInstruction::try_from_bytes(&data).unwrap_or_else(|e| panic!("failed: {e:?}"));
 	assert_eq!(ix.bump, 42);
@@ -111,7 +111,7 @@ fn initialize_instruction_try_from_bytes() {
 
 #[test]
 fn increment_instruction_try_from_bytes() {
-	let data = [CounterInstruction::Increment as u8, 0u8];
+	let data = [CounterInstruction::Increment as u8];
 	let result = IncrementInstruction::try_from_bytes(&data);
 	assert!(result.is_ok());
 }

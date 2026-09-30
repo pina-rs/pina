@@ -9,18 +9,7 @@
           "type": "string"
         },
         "executableSha256": {
-          "type": "string"
-        },
-        "manifestSha256": {
-          "type": "string"
-        },
-        "previousReceiptSha256": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "programId": {
+          "description": "SHA-256 of the program executable the deployment ships.",
           "type": "string"
         },
         "rpcUrl": {
@@ -31,93 +20,55 @@
           "additionalProperties": {
             "$ref": "#/$defs/PublishedContract"
           },
-          "description": "Highest version that the in-flight deployment may make live, with the\nschema history the deployment freezes.",
+          "description": "The pinned schema history the in-flight deployment may make live.",
           "type": "object"
         }
       },
       "required": [
         "cluster",
         "rpcUrl",
-        "programId",
         "executableSha256",
-        "manifestSha256",
         "versions"
       ],
       "type": "object"
     },
     "PublicationReceipt": {
       "additionalProperties": false,
-      "description": "One successful persistent deployment receipt.",
+      "description": "One successful persistent deployment receipt.\n\nThe program a receipt deployed is the manifest's `programId`: the ledger\nbelongs to the manifest beside it and never names another program.",
       "properties": {
         "abandoned": {
           "description": "Marks a receipt created by reconciling an ambiguous deployment as\nabandoned. The pinned versions stay frozen because the deployment may\nstill have gone live.",
           "type": "boolean"
         },
         "executableSha256": {
-          "type": "string"
-        },
-        "manifestSha256": {
-          "type": "string"
-        },
-        "previousReceiptSha256": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "programId": {
+          "description": "SHA-256 of the deployed program executable.",
           "type": "string"
         },
         "rpcUrl": {
           "description": "Credential-free RPC endpoint used by the deployment plan.",
           "type": "string"
         },
-        "sequence": {
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        },
         "versions": {
           "additionalProperties": {
             "$ref": "#/$defs/PublishedContract"
           },
-          "description": "Highest version made live for every contract identity, with the schema\nhistory those deployments froze.",
+          "description": "The pinned schema history of every contract the deployment made live.",
           "type": "object"
         }
       },
       "required": [
-        "sequence",
         "rpcUrl",
-        "programId",
         "executableSha256",
-        "manifestSha256",
         "versions"
       ],
       "type": "object"
     },
     "PublishedContract": {
-      "additionalProperties": false,
-      "description": "One contract's published state as frozen by a receipt.",
-      "properties": {
-        "history": {
-          "description": "Schema and transition pins for every version up to and including\n`version`. Empty for receipts whose history cannot be reconstructed.",
-          "items": {
-            "$ref": "#/$defs/PublishedSchema"
-          },
-          "type": "array"
-        },
-        "version": {
-          "description": "Highest version made live for the contract.\n\nRedundant with `history.len() - 1` for a pinned receipt, but retained so\nan unpinned receipt can still name the version it made live.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
+      "description": "One contract's published state as frozen by a receipt.\n\nEntry `n` pins version `n`, and the pins cover every version up to and\nincluding the highest one made live, so that version is the position of the\nlast pin rather than a stored number. Serialized as the bare list of pins.",
+      "items": {
+        "$ref": "#/$defs/PublishedSchema"
       },
-      "required": [
-        "version",
-        "history"
-      ],
-      "type": "object"
+      "type": "array"
     },
     "PublishedSchema": {
       "additionalProperties": false,
@@ -141,10 +92,10 @@
       "type": "object"
     }
   },
-  "$id": "https://pina-rs.github.io/pina/abi/schemas/0.20/publications.schema.json",
+  "$id": "https://pina-rs.github.io/pina/abi/schemas/0.21/publications.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Local, hash-chained record of versions that have been made persistent.",
+  "description": "Local record of the versions that have been made persistent.\n\nReceipts are appended in deployment order. The file lives in version\ncontrol, which is what keeps it append-only: a hash chain over the receipts\ncould be recomputed by anyone able to edit them, so none is stored.",
   "properties": {
     "abiVersion": {
       "description": "The ABI document version that wrote this ledger.",

@@ -244,7 +244,9 @@ fn proposal_create_ix(
 }
 
 fn bare_ix(discriminant: u8) -> Vec<u8> {
-	vec![discriminant, 0]
+	// Instructions carry no version envelope, so an argument-free
+	// instruction is its discriminator alone.
+	vec![discriminant]
 }
 
 /// Flatten addresses into the roster wire form.

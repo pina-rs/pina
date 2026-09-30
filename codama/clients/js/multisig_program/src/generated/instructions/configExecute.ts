@@ -38,22 +38,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CONFIG_EXECUTE_DISCRIMINATOR = 11;
 
 export function getConfigExecuteDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CONFIG_EXECUTE_DISCRIMINATOR);
-}
-
-export const CONFIG_EXECUTE_DISCRIMINATOR2 = 0;
-
-export function getConfigExecuteDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CONFIG_EXECUTE_DISCRIMINATOR2);
 }
 
 export type ConfigExecuteInstruction<
@@ -100,10 +91,7 @@ export type ConfigExecuteInstruction<
 		]
 	>;
 
-export type ConfigExecuteInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type ConfigExecuteInstructionData = { discriminator: number };
 
 export type ConfigExecuteInstructionDataArgs = {};
 
@@ -111,11 +99,8 @@ export function getConfigExecuteInstructionDataEncoder(): FixedSizeEncoder<
 	ConfigExecuteInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 11, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 11 }),
 	);
 }
 
@@ -128,9 +113,6 @@ export function getConfigExecuteInstructionDataDecoder(): FixedSizeDecoder<
 			CONFIG_EXECUTE_DISCRIMINATOR,
 			getU8Decoder(),
 		),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

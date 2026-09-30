@@ -71,15 +71,15 @@ pub struct ConfigAuthorityExecuteIx {
 
 impl ConfigAuthorityExecuteIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 132;
+	pub const LEN: usize = 131;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 132], ProgramError> {
-		let mut data = [0u8; 132];
-		data[..2].copy_from_slice(&CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR);
-		data[2..4].copy_from_slice(&self.actions_len.to_le_bytes());
-		data[4..132].copy_from_slice(&self.actions);
+	pub fn to_bytes(&self) -> Result<[u8; 131], ProgramError> {
+		let mut data = [0u8; 131];
+		data[..1].copy_from_slice(&CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR);
+		data[1..3].copy_from_slice(&self.actions_len.to_le_bytes());
+		data[3..131].copy_from_slice(&self.actions);
 
 		Ok(data)
 	}
@@ -115,4 +115,4 @@ impl<'account> ConfigAuthorityExecute<'account> {
 	}
 }
 
-const CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR: [u8; 2] = [12, 0];
+const CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR: [u8; 1] = [12];

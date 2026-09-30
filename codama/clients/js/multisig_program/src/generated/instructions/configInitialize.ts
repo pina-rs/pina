@@ -42,22 +42,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProgramConfigPda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CONFIG_INITIALIZE_DISCRIMINATOR = 0;
 
 export function getConfigInitializeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CONFIG_INITIALIZE_DISCRIMINATOR);
-}
-
-export const CONFIG_INITIALIZE_DISCRIMINATOR2 = 0;
-
-export function getConfigInitializeDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CONFIG_INITIALIZE_DISCRIMINATOR2);
 }
 
 export type ConfigInitializeInstruction<
@@ -88,7 +79,6 @@ export type ConfigInitializeInstruction<
 
 export type ConfigInitializeInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	bump: number;
 	treasury: Address;
 	creationFee: bigint;
@@ -106,12 +96,11 @@ export function getConfigInitializeInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["treasury", getAddressEncoder()],
 			["creationFee", getU64Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
 
@@ -126,7 +115,6 @@ export function getConfigInitializeInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["treasury", getAddressDecoder()],
 		["creationFee", getU64Decoder()],

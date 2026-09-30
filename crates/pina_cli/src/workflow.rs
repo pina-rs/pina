@@ -968,8 +968,6 @@ mod tests {
 			clients_dir: root.join("clients"),
 			clients: Vec::new(),
 			client_generation: BTreeMap::new(),
-			migration_version_type: pina_abi::MigrationVersionType::U8,
-			migration_auto: pina_abi::MigrationAuto::none(),
 			migration_answers: Default::default(),
 			lint_levels: BTreeMap::new(),
 		};

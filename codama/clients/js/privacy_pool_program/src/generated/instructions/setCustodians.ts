@@ -44,7 +44,6 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -52,12 +51,6 @@ export const SET_CUSTODIANS_DISCRIMINATOR = 2;
 
 export function getSetCustodiansDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(SET_CUSTODIANS_DISCRIMINATOR);
-}
-
-export const SET_CUSTODIANS_DISCRIMINATOR2 = 0;
-
-export function getSetCustodiansDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(SET_CUSTODIANS_DISCRIMINATOR2);
 }
 
 export type SetCustodiansInstruction<
@@ -86,7 +79,6 @@ export type SetCustodiansInstruction<
 
 export type SetCustodiansInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	custodians: ReadonlyUint8Array;
 };
 
@@ -99,27 +91,23 @@ export function getSetCustodiansInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["custodians", fixPinaPodEncoderSize(getBytesEncoder(), 96)]]),
-		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
+			"custodians",
+			fixPinaPodEncoderSize(getBytesEncoder(), 96),
+		]]),
+		(value) => ({ ...value, discriminator: 2 }),
 	);
 }
 
 export function getSetCustodiansInstructionDataDecoder(): FixedSizeDecoder<
 	SetCustodiansInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				SET_CUSTODIANS_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["custodians", fixDecoderSize(getBytesDecoder(), 96)],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			SET_CUSTODIANS_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["custodians", fixDecoderSize(getBytesDecoder(), 96)]]);
 }
 
 export function getSetCustodiansInstructionDataCodec(): FixedSizeCodec<

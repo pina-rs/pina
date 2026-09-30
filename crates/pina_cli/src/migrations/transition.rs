@@ -51,6 +51,9 @@ pub(super) struct TransitionRequest<'a> {
 	pub(super) destination: &'a DataSchema,
 	pub(super) destination_process: Option<&'a ProcessContract>,
 	pub(super) preserve_manual: bool,
+	/// The manifest's version envelope width, which sizes every generated
+	/// transition's header.
+	pub(super) version_type: MigrationVersionType,
 }
 
 pub(super) fn create_transition(
@@ -69,6 +72,7 @@ pub(super) fn create_transition(
 		destination,
 		destination_process,
 		preserve_manual,
+		version_type,
 	} = request;
 	// The account-list proof is derived from the neighbouring versions on load
 	// rather than stored, so this call only has to fail closed here.
@@ -82,7 +86,11 @@ pub(super) fn create_transition(
 	// transition can never be labelled automatic while writing movement its own
 	// plan never justified. The proof already refuses developer-owned
 	// conversions, so its verdict is the mode.
-	let plan = automatic_move_plan(&source.schema, &intent, destination);
+	let plan = automatic_move_plan(&source.schema, &intent, destination).filter(|plan| {
+		// A zero-filled instruction argument is a default the handler cannot
+		// tell from a value the client sent, so the developer chooses it.
+		identity.kind != ContractKind::Instruction || plan.zero_fills.is_empty()
+	});
 	let mode = if plan.is_some() {
 		TransitionMode::Automatic
 	} else {
@@ -93,7 +101,7 @@ pub(super) fn create_transition(
 		(TransitionMode::Automatic, Some(plan)) => {
 			automatic_transition_source(
 				identity,
-				project.migration_version_type,
+				version_type,
 				source_version,
 				destination_version,
 				plan,
@@ -102,7 +110,7 @@ pub(super) fn create_transition(
 		_ => {
 			manual_transition_source(
 				identity,
-				project.migration_version_type,
+				version_type,
 				source,
 				source_version,
 				destination_version,
@@ -154,7 +162,7 @@ pub(super) fn create_transition(
 		(source_version, source),
 		stale_ladder,
 		destination,
-		project.migration_version_type.bytes(),
+		version_type.bytes(),
 		output,
 	);
 	let implementation_sha256 = Some(hash_transition_file(&path)?);
@@ -730,16 +738,17 @@ pub(super) fn manual_transition_source(
 				migrate,
 			)
 		}
+		// Events carry no transitions; only instructions reach this arm.
 		ContractKind::Instruction | ContractKind::Event => {
 			let source_size = source_size.ok_or_else(|| {
 				MigrationError::InvalidHistory(format!(
-					"instruction and event histories must use fixed layouts; `{}` does not",
+					"instruction histories must use fixed layouts; `{}` does not",
 					identity.key()
 				))
 			})?;
 			let destination_size = destination_size.ok_or_else(|| {
 				MigrationError::InvalidHistory(format!(
-					"instruction and event histories must use fixed layouts; `{}` does not",
+					"instruction histories must use fixed layouts; `{}` does not",
 					identity.key()
 				))
 			})?;
@@ -794,6 +803,10 @@ pub(super) fn verify_transition_files(
 	key: &str,
 	history: &ContractHistory,
 ) -> Result<(), MigrationError> {
+	// Events and snapshot-only instructions record no transitions.
+	if !history.is_migrated() {
+		return Ok(());
+	}
 	// A transition sits on the version it converts into, so the entering
 	// transition of version `number` is the step from `number - 1`.
 	for (number, version) in history.versions.iter().enumerate().skip(1) {

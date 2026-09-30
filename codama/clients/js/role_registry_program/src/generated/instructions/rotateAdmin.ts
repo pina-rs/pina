@@ -37,22 +37,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ROTATE_ADMIN_DISCRIMINATOR = 4;
 
 export function getRotateAdminDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ROTATE_ADMIN_DISCRIMINATOR);
-}
-
-export const ROTATE_ADMIN_DISCRIMINATOR2 = 0;
-
-export function getRotateAdminDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(ROTATE_ADMIN_DISCRIMINATOR2);
 }
 
 export type RotateAdminInstruction<
@@ -79,10 +70,7 @@ export type RotateAdminInstruction<
 		]
 	>;
 
-export type RotateAdminInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type RotateAdminInstructionData = { discriminator: number };
 
 export type RotateAdminInstructionDataArgs = {};
 
@@ -90,11 +78,8 @@ export function getRotateAdminInstructionDataEncoder(): FixedSizeEncoder<
 	RotateAdminInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 4, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 4 }),
 	);
 }
 
@@ -104,9 +89,6 @@ export function getRotateAdminInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(ROTATE_ADMIN_DISCRIMINATOR, getU8Decoder()),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

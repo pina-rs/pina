@@ -340,10 +340,11 @@ void main() {
 
       expect(data.length, fixture['size']);
       expect(data, orderedEquals(_decodeHex(fixture['encodedHex']! as String)));
-      // Envelope: discriminator, migration version, bump, then the payload.
-      expect(data.sublist(0, 3), orderedEquals([0, 0, 9]));
-      expect(data.sublist(3, 8), orderedEquals([4, 110, 97, 109, 101]));
-      expect(data.sublist(36, 40), orderedEquals([3, 98, 105, 111]));
+      // Discriminator, bump, then the payload. The instruction is recorded
+      // without a version envelope, so no version byte follows.
+      expect(data.sublist(0, 2), orderedEquals([0, 9]));
+      expect(data.sublist(2, 7), orderedEquals([4, 110, 97, 109, 101]));
+      expect(data.sublist(35, 39), orderedEquals([3, 98, 105, 111]));
 
       final parsed = parseInitializeInstruction(instruction);
       expect(parsed.discriminator, 0);
@@ -492,66 +493,59 @@ void main() {
       );
     });
 
-    test('project a log written at an older version', () {
-      // Version zero carried only the u64 payload; projection zero-fills memo.
-      final normalized = migrations_program.normalizeValueChangedEventEvent(
+    test('decode a log written at an older version with its own event', () {
+      // Version zero carried only the u64 payload. It is decoded exactly as
+      // written, by the event generated for that version.
+      final historical = migrations_program.decodeValueChangedEventV0Event(
         _valueChangedEventBytes(0, BigInt.from(42), 0),
       );
+      expect(historical.name, 'valueChangedEventV0');
+      expect(historical.migrationVersion, 0);
+      expect(historical.value, BigInt.from(42));
 
-      expect(normalized.name, 'valueChangedEvent');
-      expect(normalized.sourceVersion, 0);
-      expect(normalized.wasMigrated, isTrue);
-      expect(normalized.data.value, BigInt.from(42));
-      expect(normalized.data.memo, 0);
-      expect(normalized.data.migrationVersion, 1);
-
-      final current = migrations_program.normalizeValueChangedEventEvent(
-        _valueChangedEventBytes(1, BigInt.from(42), 7),
+      expect(
+        () => migrations_program.decodeValueChangedEventV0Event(
+          _valueChangedEventBytes(1, BigInt.from(42), 7),
+        ),
+        throwsA(_rangeErrorContaining('expected exactly 10 bytes')),
       );
-      expect(current.sourceVersion, 1);
-      expect(current.wasMigrated, isFalse);
-      expect(current.data.memo, 7);
     });
 
-    test('fail closed for future, truncated, and foreign records', () {
+    test('fail closed for unknown, truncated, and foreign records', () {
+      final program = migrations_program.migrationsProgramProgramAddress.value;
+      List<Object> parse(List<int> bytes) =>
+          migrations_program.parseMigrationsProgramEventsFromLogs([
+            'Program $program invoke [1]',
+            'Program data: ${base64.encode(bytes)}',
+            'Program $program success',
+          ]);
+
       expect(
-        () => migrations_program.normalizeValueChangedEventEvent(
-          _valueChangedEventBytes(2, BigInt.from(42), 7),
-        ),
-        throwsA(_rangeErrorContaining('newer program; upgrade this client')),
+        () => parse(_valueChangedEventBytes(2, BigInt.from(42), 7)),
+        throwsA(_rangeErrorContaining('which this client cannot decode')),
       );
       expect(
-        () => migrations_program.normalizeValueChangedEventEvent(
-          Uint8List.fromList([4, 0, 1, 2, 3]),
-        ),
-        throwsA(
-          _rangeErrorContaining('log length does not match the v0 schema'),
-        ),
+        () => parse(const [4]),
+        throwsA(_rangeErrorContaining('too short for its version envelope')),
       );
       final foreign = _valueChangedEventBytes(0, BigInt.from(42), 0)..[0] = 9;
-      expect(
-        () => migrations_program.normalizeValueChangedEventEvent(foreign),
-        throwsA(_rangeErrorContaining('event discriminator')),
-      );
-      expect(
-        () => migrations_program.normalizeValueChangedEventEvent(
-          Uint8List.fromList([4]),
-        ),
-        throwsA(_rangeErrorContaining('too short')),
-      );
+      expect(parse(foreign), isEmpty);
     });
 
     test('decode Program data log lines through the program parser', () {
       final historical =
           'Program data: '
           '${base64.encode(_valueChangedEventBytes(0, BigInt.from(7), 0))}';
-      final parsed = migrations_program.parseValueChangedEventEventFromLog(
+      // Each version claims only the records it emitted.
+      expect(
+        migrations_program.parseValueChangedEventEventFromLog(historical),
+        isNull,
+      );
+      final parsed = migrations_program.parseValueChangedEventV0EventFromLog(
         historical,
       );
       expect(parsed, isNotNull);
-      expect(parsed!.sourceVersion, 0);
-      expect(parsed.wasMigrated, isTrue);
-      expect(parsed.data.value, BigInt.from(7));
+      expect(parsed!.value, BigInt.from(7));
 
       expect(
         migrations_program.parseValueChangedEventEventFromLog('nope'),
@@ -571,12 +565,15 @@ void main() {
           'Program log: Instruction: Update',
           'Program data: '
               '${base64.encode(_valueChangedEventBytes(1, BigInt.from(5), 3))}',
+          historical,
           'Program data: ${base64.encode(const [9, 1, 0])}',
           'Program $program success',
         ],
       );
-      expect(discovered, hasLength(1));
-      expect(discovered.first.name, 'valueChangedEvent');
+      expect(discovered.map((event) => event.name), [
+        'valueChangedEvent',
+        'valueChangedEventV0',
+      ]);
     });
 
     test('attribute log lines to the program that emitted them', () {
@@ -603,10 +600,7 @@ void main() {
           ]);
       expect(
         discovered.map(
-          (event) =>
-              (event as migrations_program.NormalizedValueChangedEventEvent)
-                  .data
-                  .value,
+          (event) => (event as migrations_program.ValueChangedEventEvent).value,
         ),
         [BigInt.from(5), BigInt.from(6)],
       );

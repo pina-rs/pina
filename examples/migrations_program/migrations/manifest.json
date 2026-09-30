@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "State",
 			"versions": [
 				{
@@ -28,10 +23,8 @@
 								"name": "value",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				},
 				{
 					"schema": {
@@ -49,8 +42,7 @@
 								"name": "enabled",
 								"rustType": "bool"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"transition": {
 						"mode": "automatic",
@@ -77,8 +69,7 @@
 								"name": "revision",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"transition": {
 						"mode": "automatic",
@@ -88,11 +79,6 @@
 			]
 		},
 		"account:1:02": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "ManualState",
 			"versions": [
 				{
@@ -103,10 +89,8 @@
 								"name": "amount",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				},
 				{
 					"schema": {
@@ -116,8 +100,7 @@
 								"name": "amount",
 								"rustType": "u16"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"transition": {
 						"mode": "manual",
@@ -132,8 +115,7 @@
 								"name": "code",
 								"rustType": "String<5>"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"transition": {
 						"mode": "manual",
@@ -143,11 +125,6 @@
 			]
 		},
 		"account:1:03": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "03"
-			},
 			"rustName": "CompactState",
 			"versions": [
 				{
@@ -158,10 +135,8 @@
 								"name": "name",
 								"rustType": "String<4>"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				},
 				{
 					"schema": {
@@ -175,8 +150,7 @@
 								"name": "tags",
 								"rustType": "Vec<u16, 2>"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"transition": {
 						"mode": "manual",
@@ -186,11 +160,6 @@
 			]
 		},
 		"event:1:04": {
-			"identity": {
-				"kind": "event",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "04"
-			},
 			"rustName": "ValueChangedEvent",
 			"versions": [
 				{
@@ -201,10 +170,8 @@
 								"name": "value",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				},
 				{
 					"schema": {
@@ -218,22 +185,12 @@
 								"name": "memo",
 								"rustType": "u16"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": {
-						"mode": "automatic",
-						"implementationSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
+						]
 					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "UpdateInstruction",
 			"versions": [
 				{
@@ -244,85 +201,15 @@
 								"name": "value",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							}
 						]
-					},
-					"transition": null
-				},
-				{
-					"schema": {
-						"layout": "fixed",
-						"fields": [
-							{
-								"name": "value",
-								"rustType": "u64"
-							},
-							{
-								"name": "memo",
-								"rustType": "u16"
-							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"process": {
-						"accounts": [
-							{
-								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
-							},
-							{
-								"name": "referrer",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
-							},
-							{
-								"name": "state",
-								"writable": true,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
-							},
-							{
-								"name": "migration_payer",
-								"writable": true,
-								"signer": true,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
-							},
-							{
-								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
-							}
-						]
-					},
-					"transition": {
-						"mode": "automatic",
-						"implementationSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
 					}
 				},
 				{
@@ -337,72 +224,48 @@
 								"name": "memo",
 								"rustType": "u16"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "referrer",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "state",
 								"writable": true,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "migration_payer",
 								"writable": true,
 								"signer": true,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "manual_state",
 								"writable": true,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "compact_state",
 								"writable": true,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							}
 						]
 					},
 					"transition": {
 						"mode": "automatic",
-						"implementationSha256": "06a928eefce81d6785af85376d33fc0d513db8e1cb2c15a4679cc879fc88f754"
+						"implementationSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
 					}
 				}
 			]

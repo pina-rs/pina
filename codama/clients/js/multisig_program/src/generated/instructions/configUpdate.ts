@@ -46,7 +46,6 @@ import { findProgramConfigPda } from "../pdas";
 import {
 	getPinaPodBooleanDecoder,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -54,12 +53,6 @@ export const CONFIG_UPDATE_DISCRIMINATOR = 1;
 
 export function getConfigUpdateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CONFIG_UPDATE_DISCRIMINATOR);
-}
-
-export const CONFIG_UPDATE_DISCRIMINATOR2 = 0;
-
-export function getConfigUpdateDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CONFIG_UPDATE_DISCRIMINATOR2);
 }
 
 export type ConfigUpdateInstruction<
@@ -85,7 +78,6 @@ export type ConfigUpdateInstruction<
 
 export type ConfigUpdateInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** When set, `treasury` replaces the configured treasury. */
 	setTreasury: boolean;
 	treasury: Address;
@@ -109,13 +101,12 @@ export function getConfigUpdateInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["setTreasury", getBooleanEncoder()],
 			["treasury", getAddressEncoder()],
 			["setCreationFee", getBooleanEncoder()],
 			["creationFee", getU64Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -130,7 +121,6 @@ export function getConfigUpdateInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["setTreasury", getPinaPodBooleanDecoder()],
 		["treasury", getAddressDecoder()],
 		["setCreationFee", getPinaPodBooleanDecoder()],

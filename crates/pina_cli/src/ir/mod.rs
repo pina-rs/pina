@@ -72,6 +72,10 @@ pub(crate) const COMPACT_ACCOUNT_DOC_MARKER: &str = "\0pina:compact";
 // Migration opt-in follows the same compatibility strategy. The checked-in
 // manifest supplies the current version and global width during IDL lowering.
 pub(crate) const MIGRATABLE_DOC_MARKER: &str = "\0pina:migratable";
+// An instruction an auto policy records without a version envelope: the
+// manifest snapshots it to gate wire-breaking changes, but its bytes carry no
+// version.
+pub(crate) const RECORDED_DOC_MARKER: &str = "\0pina:recorded";
 
 impl AccountIr {
 	pub(crate) fn is_compact(&self) -> bool {
@@ -117,13 +121,23 @@ impl InstructionIr {
 	pub(crate) fn visible_docs(&self) -> Vec<String> {
 		self.docs
 			.iter()
-			.filter(|doc| doc.as_str() != MIGRATABLE_DOC_MARKER)
+			.filter(|doc| !matches!(doc.as_str(), MIGRATABLE_DOC_MARKER | RECORDED_DOC_MARKER))
 			.cloned()
 			.collect()
 	}
 
+	/// Whether the instruction carries the version envelope: only an explicit
+	/// `migrations` token opts an instruction into migrations.
 	pub(crate) fn is_migratable(&self) -> bool {
 		self.docs.iter().any(|doc| doc == MIGRATABLE_DOC_MARKER)
+	}
+
+	/// Whether the migration manifest records the instruction, with or without
+	/// an envelope.
+	pub(crate) fn is_recorded(&self) -> bool {
+		self.docs
+			.iter()
+			.any(|doc| matches!(doc.as_str(), MIGRATABLE_DOC_MARKER | RECORDED_DOC_MARKER))
 	}
 }
 

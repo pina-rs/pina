@@ -33,28 +33,22 @@ enum StakingRewardsProgramInstruction {
 StakingRewardsProgramInstruction identifyStakingRewardsProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return StakingRewardsProgramInstruction.initializePool;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return StakingRewardsProgramInstruction.openPosition;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return StakingRewardsProgramInstruction.deposit;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
     return StakingRewardsProgramInstruction.withdraw;
   }
-  if (containsBytes(data, getU8Encoder().encode(4), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(4), 0)) {
     return StakingRewardsProgramInstruction.claim;
   }
-  if (containsBytes(data, getU8Encoder().encode(5), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(5), 0)) {
     return StakingRewardsProgramInstruction.setRewardIndex;
   }
 

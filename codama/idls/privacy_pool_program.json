@@ -1591,20 +1591,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "configBump",
 						"type": {
 							"kind": "numberTypeNode",
@@ -1698,22 +1684,6 @@
 								"number": 0
 							}
 						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
 					}
 				]
 			},
@@ -1763,20 +1733,6 @@
 						"defaultValue": {
 							"kind": "numberValueNode",
 							"number": 1
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
 						}
 					},
 					{
@@ -1914,22 +1870,6 @@
 								"number": 1
 							}
 						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
 					}
 				]
 			},
@@ -1976,20 +1916,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "custodians",
 						"type": {
 							"kind": "fixedSizeTypeNode",
@@ -2014,22 +1940,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 2
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}
@@ -2078,20 +1988,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "requester",
 						"type": {
 							"kind": "publicKeyTypeNode"
@@ -2124,22 +2020,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 3
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}
@@ -2216,20 +2096,6 @@
 						"defaultValue": {
 							"kind": "numberValueNode",
 							"number": 4
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
 						}
 					},
 					{
@@ -2323,22 +2189,6 @@
 								"number": 4
 							}
 						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
 					}
 				]
 			},
@@ -2424,20 +2274,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "nullifier",
 						"docs": [
 							"Nullifier derived by the circuit from the spent note's secrets."
@@ -2512,22 +2348,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 5
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}
@@ -2610,20 +2430,6 @@
 						"defaultValue": {
 							"kind": "numberValueNode",
 							"number": 6
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
 						}
 					},
 					{
@@ -2766,22 +2572,6 @@
 								"number": 6
 							}
 						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
 					}
 				]
 			},
@@ -2852,20 +2642,6 @@
 						"defaultValue": {
 							"kind": "numberValueNode",
 							"number": 7
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
 						}
 					},
 					{
@@ -2966,22 +2742,6 @@
 								"number": 7
 							}
 						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
 					}
 				]
 			},
@@ -3028,20 +2788,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "reserved",
 						"docs": [
 							"Reserved; must be zero."
@@ -3067,22 +2813,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 8
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}
@@ -3138,20 +2868,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "reserved",
 						"docs": [
 							"Reserved; must be zero."
@@ -3177,22 +2893,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 9
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}
@@ -3241,20 +2941,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "approve",
 						"docs": [
 							"Nonzero resolves in the requester's favor (execution may proceed);",
@@ -3281,22 +2967,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 10
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}
@@ -3366,20 +3036,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "reserved",
 						"docs": [
 							"Reserved; must be zero."
@@ -3405,22 +3061,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 11
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}
@@ -3462,20 +3102,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "reserved",
 						"docs": [
 							"Reserved; must be zero."
@@ -3501,22 +3127,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 12
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}

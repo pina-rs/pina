@@ -34,22 +34,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CHALLENGE_DISCLOSURE_DISCRIMINATOR = 9;
 
 export function getChallengeDisclosureDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CHALLENGE_DISCLOSURE_DISCRIMINATOR);
-}
-
-export const CHALLENGE_DISCLOSURE_DISCRIMINATOR2 = 0;
-
-export function getChallengeDisclosureDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CHALLENGE_DISCLOSURE_DISCRIMINATOR2);
 }
 
 export type ChallengeDisclosureInstruction<
@@ -80,7 +71,6 @@ export type ChallengeDisclosureInstruction<
 
 export type ChallengeDisclosureInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** Reserved; must be zero. */
 	reserved: number;
 };
@@ -95,27 +85,23 @@ export function getChallengeDisclosureInstructionDataEncoder(): FixedSizeEncoder
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
+			"reserved",
 			getU8Encoder(),
-		], ["reserved", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 9, migrationVersion: 0 }),
+		]]),
+		(value) => ({ ...value, discriminator: 9 }),
 	);
 }
 
 export function getChallengeDisclosureInstructionDataDecoder(): FixedSizeDecoder<
 	ChallengeDisclosureInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				CHALLENGE_DISCLOSURE_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["reserved", getU8Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			CHALLENGE_DISCLOSURE_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["reserved", getU8Decoder()]]);
 }
 
 export function getChallengeDisclosureInstructionDataCodec(): FixedSizeCodec<

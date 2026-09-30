@@ -40,64 +40,49 @@ enum MultisigProgramInstruction {
 
 /// Identifies the type of a MultisigProgram instruction.
 MultisigProgramInstruction identifyMultisigProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return MultisigProgramInstruction.configInitialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return MultisigProgramInstruction.configUpdate;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return MultisigProgramInstruction.multisigCreate;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
     return MultisigProgramInstruction.multisigImport;
   }
-  if (containsBytes(data, getU8Encoder().encode(4), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(4), 0)) {
     return MultisigProgramInstruction.proposalCreate;
   }
-  if (containsBytes(data, getU8Encoder().encode(5), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(5), 0)) {
     return MultisigProgramInstruction.proposalActivate;
   }
-  if (containsBytes(data, getU8Encoder().encode(6), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(6), 0)) {
     return MultisigProgramInstruction.proposalApprove;
   }
-  if (containsBytes(data, getU8Encoder().encode(7), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(7), 0)) {
     return MultisigProgramInstruction.proposalReject;
   }
-  if (containsBytes(data, getU8Encoder().encode(8), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(8), 0)) {
     return MultisigProgramInstruction.proposalRevoke;
   }
-  if (containsBytes(data, getU8Encoder().encode(9), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(9), 0)) {
     return MultisigProgramInstruction.proposalCancel;
   }
-  if (containsBytes(data, getU8Encoder().encode(10), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(10), 0)) {
     return MultisigProgramInstruction.vaultExecute;
   }
-  if (containsBytes(data, getU8Encoder().encode(11), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(11), 0)) {
     return MultisigProgramInstruction.configExecute;
   }
-  if (containsBytes(data, getU8Encoder().encode(12), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(12), 0)) {
     return MultisigProgramInstruction.configAuthorityExecute;
   }
-  if (containsBytes(data, getU8Encoder().encode(13), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(13), 0)) {
     return MultisigProgramInstruction.spendingLimitUse;
   }
-  if (containsBytes(data, getU8Encoder().encode(14), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(14), 0)) {
     return MultisigProgramInstruction.proposalClose;
   }
 

@@ -1,39 +1,26 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"receipts": [
 		{
-			"sequence": 0,
 			"rpcUrl": "fixture",
-			"programId": "Counter111111111111111111111111111111111111",
 			"executableSha256": "0000000000000000000000000000000000000000000000000000000000000000",
-			"manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
 			"versions": {
-				"account:1:01": {
-					"version": 0,
-					"history": [
-						{
-							"schemaSha256": "87b19a95066b6ac2ae1368bb0a7ecd3435bca7742378d4f4ef6708fbf3242dc0"
-						}
-					]
-				},
-				"instruction:1:00": {
-					"version": 0,
-					"history": [
-						{
-							"schemaSha256": "b883a87466c9662fda9abde04df710e5eb31718b0d9dd740c4de1da8980eea96"
-						}
-					]
-				},
-				"instruction:1:01": {
-					"version": 0,
-					"history": [
-						{
-							"schemaSha256": "c6007589c1827dda3e45fcd0facfc3979fe3982e2c0aa226fb79657844a3cba1"
-						}
-					]
-				}
-			},
-			"previousReceiptSha256": null
+				"account:1:01": [
+					{
+						"schemaSha256": "87b19a95066b6ac2ae1368bb0a7ecd3435bca7742378d4f4ef6708fbf3242dc0"
+					}
+				],
+				"instruction:1:00": [
+					{
+						"schemaSha256": "b883a87466c9662fda9abde04df710e5eb31718b0d9dd740c4de1da8980eea96"
+					}
+				],
+				"instruction:1:01": [
+					{
+						"schemaSha256": "c6007589c1827dda3e45fcd0facfc3979fe3982e2c0aa226fb79657844a3cba1"
+					}
+				]
+			}
 		}
 	]
 }

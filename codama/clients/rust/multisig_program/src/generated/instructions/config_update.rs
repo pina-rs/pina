@@ -9,7 +9,6 @@
 )]
 
 pub const CONFIG_UPDATE_DISCRIMINATOR: u8 = 1u8;
-pub const CONFIG_UPDATE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -74,7 +73,6 @@ impl ConfigUpdateInstructionData {
 		<ConfigUpdateInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CONFIG_UPDATE_DISCRIMINATOR;
-			data.migration_version = CONFIG_UPDATE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -88,7 +86,6 @@ impl ConfigUpdateInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ConfigUpdateInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// When set, `treasury` replaces the configured treasury.
 	pub set_treasury: bool,
 	pub treasury: solana_pubkey::Pubkey,

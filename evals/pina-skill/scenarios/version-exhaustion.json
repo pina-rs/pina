@@ -3,40 +3,39 @@
 	"title": "Widen the version envelope before launch",
 	"fixture": "base-counter",
 	"prompt": "Our roadmap has this counter changing shape a lot — we expect far more than 255 schema revisions over the program's life. Nothing is deployed yet, so we can still change fundamentals. Make the version numbering handle that scale, and explain what the constraint was. Keep the program building and the migration history consistent.",
-	"expectation": "Version width is program-wide in `[migrations].version_type` (u8 default; u16/u32 available, u64 rejected). Because nothing is published, the widening path is to re-baseline: the agent should widen the setting and regenerate history. The agent must not try to hand-widen the manifest or claim the width can be changed after release.",
+	"expectation": "Version width is program-wide and recorded only as `versionType` in `migrations/manifest.json` (u8 default; u16/u32 available, u64 rejected). Because nothing is published, `pina migrations create --version-type u16` (or `u32`) is allowed and rewrites the width in place. The agent should run it and leave the history consistent. It must not put the width back in `pina.toml` (the retired `[migrations].version_type` key fails every command that reads it), hand-edit the manifest, delete `migrations/`, or claim the width can be changed after release.",
 	"checks": [
 		{
 			"id": "version-type-widened",
 			"kind": "file",
-			"path": "pina.toml",
-			"match": "version_type\\s*=\\s*\"u(16|32)\"",
-			"why": "The width lives in `[migrations].version_type`."
-		},
-		{
-			"id": "manifest-width-matches",
-			"kind": "file",
 			"path": "migrations/manifest.json",
 			"match": "\"versionType\": \"u(16|32)\"",
-			"why": "The regenerated manifest records the widened width."
+			"why": "The width lives only in the manifest's `versionType`."
+		},
+		{
+			"id": "widened-through-create",
+			"kind": "transcript",
+			"pattern": "--version-type[ =]u(16|32)",
+			"why": "`pina migrations create --version-type` is the supported way to change the width before publication; a hand edit or a deleted `migrations/` is not."
 		},
 		{
 			"id": "history-consistent",
 			"kind": "command",
 			"command": "pina migrations check",
-			"why": "A width mismatch between config and manifest is a hard check failure."
+			"why": "The widened history must check clean, and a retired `[migrations]` key left in `pina.toml` fails every command that reads it."
 		},
 		{
 			"id": "versions-remaining-improved",
 			"kind": "command",
-			"command": "python3 -c \"import json,re,subprocess; toml=open('pina.toml').read(); width=re.search(r'version_type\\s*=\\s*\\\"(u16|u32)\\\"', toml).group(1); expected={'u16':65535,'u32':4294967295}[width]; out=subprocess.run(['pina','migrations','status','--json'],capture_output=True,text=True).stdout; remaining={s['versionsRemaining'] for s in json.loads(out)['statuses']}; print('width', width, 'remaining', sorted(remaining)); raise SystemExit(0 if remaining=={expected} else 1)\"",
+			"command": "python3 -c \"import json,subprocess; width=json.load(open('migrations/manifest.json'))['versionType']; expected={'u16':65535,'u32':4294967295}[width]; out=subprocess.run(['pina','migrations','status','--json'],capture_output=True,text=True).stdout; remaining={s['versionsRemaining'] for s in json.loads(out)['statuses'] if s['envelope']}; print('width', width, 'remaining', sorted(remaining)); raise SystemExit(0 if remaining=={expected} else 1)\"",
 			"expectOutput": ["width"],
-			"why": "The reported budget must match whichever wider width the agent chose: u16 leaves 65535 and u32 leaves 4294967295. Both are correct answers to the request, so the check derives the expectation from the chosen width instead of pinning one."
+			"why": "The reported budget must match whichever wider width the manifest records: u16 leaves 65535 and u32 leaves 4294967295. Both are correct answers to the request, so the check derives the expectation from the recorded width instead of pinning one. Snapshot-only instructions consume no version and report zero, so only enveloped contracts count."
 		},
 		{
 			"id": "program-compiles",
 			"kind": "command",
 			"command": "cargo check --quiet",
-			"why": "The macros read the recorded width, so a mismatch blocks the build."
+			"why": "The macros read the width from the manifest, so the program must still build against the widened envelope."
 		}
 	]
 }

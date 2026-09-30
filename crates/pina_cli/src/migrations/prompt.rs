@@ -76,6 +76,10 @@ pub struct MigrationAnswers {
 	/// Acknowledge that a first-time envelope on an already-published contract
 	/// changes its wire format.
 	pub(super) envelope_ack: bool,
+	/// The auto policy to record, when `--auto` sets one.
+	pub(super) auto: Option<pina_abi::MigrationAuto>,
+	/// The version envelope width to record, when `--version-type` sets one.
+	pub(super) version_type: Option<pina_abi::MigrationVersionType>,
 }
 
 impl MigrationAnswers {
@@ -102,6 +106,19 @@ impl MigrationAnswers {
 	/// already-published contract.
 	pub fn set_envelope_ack(&mut self, acknowledged: bool) {
 		self.envelope_ack = acknowledged;
+	}
+
+	/// Record the policy the manifest should hold after this run.
+	///
+	/// `None` keeps what the manifest records, or the defaults (no auto
+	/// policy, `u8` versions) when there is no manifest yet.
+	pub fn set_policy(
+		&mut self,
+		auto: Option<pina_abi::MigrationAuto>,
+		version_type: Option<pina_abi::MigrationVersionType>,
+	) {
+		self.auto = auto;
+		self.version_type = version_type;
 	}
 
 	/// Layer CLI arguments over the persisted `[migrations.answers]` table.
@@ -200,6 +217,8 @@ impl MigrationAnswers {
 			manual: manual.iter().cloned().collect(),
 			no_interactive,
 			envelope_ack: false,
+			auto: None,
+			version_type: None,
 		};
 		for rename in renames {
 			let (from, to) = rename.split_once(':').ok_or_else(|| {

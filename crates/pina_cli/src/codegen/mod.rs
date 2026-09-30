@@ -144,6 +144,9 @@ pub(crate) fn try_ir_to_root_node_with_migrations(
 			migrations,
 		)?;
 		program = program.add_event(build_event_node(event, &ir.pinapod_enums, migration)?);
+		for historical in historical_event_nodes(ir, event, migration, migrations)? {
+			program = program.add_event(historical);
+		}
 	}
 
 	for pda in &ir.pdas {
@@ -1024,6 +1027,7 @@ mod tests {
 		let metadata = IdlMigrationMetadata {
 			version_type: MigrationVersionType::U16,
 			current_versions: BTreeMap::from([(account_key.clone(), 7), (instruction_key, 9)]),
+			historical_events: BTreeMap::new(),
 		};
 
 		let missing = try_ir_to_root_node(&ir)
@@ -1036,6 +1040,7 @@ mod tests {
 		let account_only_metadata = IdlMigrationMetadata {
 			version_type: MigrationVersionType::U16,
 			current_versions: BTreeMap::from([(account_key.clone(), 7)]),
+			historical_events: BTreeMap::new(),
 		};
 		let missing_instruction =
 			try_ir_to_root_node_with_migrations(&ir, Some(&account_only_metadata))
@@ -1131,7 +1136,8 @@ mod tests {
 			.key();
 		let metadata = IdlMigrationMetadata {
 			version_type: MigrationVersionType::U8,
-			current_versions: BTreeMap::from([(event_key, 1)]),
+			current_versions: BTreeMap::from([(event_key.clone(), 1)]),
+			historical_events: BTreeMap::new(),
 		};
 
 		let root = try_ir_to_root_node_with_migrations(&ir, Some(&metadata))
@@ -1186,6 +1192,98 @@ mod tests {
 		assert!(!json.to_string().contains("pina:migratable"));
 		assert!(json.get("versions").is_none());
 		assert!(!json.to_string().contains("transition"));
+	}
+
+	/// Each earlier event version is its own IDL event, discriminated by the
+	/// event's discriminator and that version, so clients decode old logs
+	/// with the layout that wrote them.
+	#[test]
+	fn historical_event_versions_become_their_own_events() {
+		let discriminator = DiscriminatorIr {
+			value: 4,
+			repr_size: 1,
+		};
+		let field = |name: &str, rust_type: &str| {
+			FieldIr {
+				name: name.to_owned(),
+				rust_type: rust_type.to_owned(),
+				docs: Vec::new(),
+			}
+		};
+		let event = |name: &str, docs: Vec<String>| {
+			crate::ir::EventIr {
+				name: name.to_owned(),
+				discriminator: discriminator.clone(),
+				fields: vec![field("value", "u64"), field("memo", "u16")],
+				docs,
+			}
+		};
+		let mut ir = ProgramIr {
+			name: "migration_program".to_owned(),
+			public_key: "11111111111111111111111111111111".to_owned(),
+			pinapod_enums: vec![],
+			accounts: vec![],
+			instructions: vec![],
+			events: vec![event(
+				"ValueChangedEvent",
+				vec![crate::ir::MIGRATABLE_DOC_MARKER.to_owned()],
+			)],
+			errors: vec![],
+			pdas: vec![],
+		};
+		let event_identity = ContractIdentity::try_new(ContractKind::Event, 1, 4);
+		let event_identity = event_identity.unwrap_or_else(|error| panic!("identity: {error}"));
+		let event_key = event_identity.key();
+		let v0 = pina_abi::DataSchema::try_new(
+			pina_abi::LayoutKind::Fixed,
+			vec![pina_abi::FieldSchema {
+				name: "value".to_owned(),
+				rust_type: "u64".to_owned(),
+			}],
+		);
+		let v0 = v0.unwrap_or_else(|error| panic!("v0 schema: {error}"));
+		let metadata = IdlMigrationMetadata {
+			version_type: MigrationVersionType::U8,
+			current_versions: BTreeMap::from([(event_key.clone(), 1)]),
+			historical_events: BTreeMap::from([(event_key, vec![v0])]),
+		};
+
+		let root = try_ir_to_root_node_with_migrations(&ir, Some(&metadata));
+		let root = root.unwrap_or_else(|error| panic!("event IDL codegen failed: {error}"));
+		let json = serde_json::to_value(root);
+		let json = json.unwrap_or_else(|error| panic!("serialize generated IDL: {error}"));
+		assert_eq!(
+			json.pointer("/program/events/1/name"),
+			Some(&serde_json::json!("valueChangedEventV0")),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/data/fields/1/defaultValue/number"),
+			Some(&serde_json::json!(0)),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/discriminators/1/constant/value/number"),
+			Some(&serde_json::json!(0)),
+		);
+		assert_eq!(
+			json.pointer("/program/events/1/data/fields/2/name"),
+			Some(&serde_json::json!("value")),
+		);
+		assert!(json.pointer("/program/events/1/data/fields/3").is_none());
+		assert!(
+			json.pointer("/program/events/1/docs/0")
+				.and_then(serde_json::Value::as_str)
+				.is_some_and(|doc| doc.starts_with("Version 0 of `ValueChangedEvent`")),
+		);
+
+		// A user event may not take a name reserved for a historical version.
+		ir.events.push(event("ValueChangedEventV0", Vec::new()));
+		let error = try_ir_to_root_node_with_migrations(&ir, Some(&metadata))
+			.expect_err("a colliding event name must fail");
+		assert!(
+			error
+				.to_string()
+				.contains("collides with the name reserved")
+		);
 	}
 
 	#[test]
@@ -1535,6 +1633,81 @@ mod tests {
 			PdaSeedValueValue::Account(account) if account.name.as_ref() == "authority"
 		));
 	}
+}
+
+/// Build one event node per earlier version of a migration-aware event.
+///
+/// Events are versioned, not migrated: a log record keeps the layout of the
+/// version that emitted it, so an older record is decoded with that version's
+/// own schema instead of being converted. Each historical version is listed as
+/// its own event, `<Event>V<n>`, whose discriminators are the event's
+/// discriminator and its version, so every generated client decodes the full
+/// history with the codecs it already renders.
+fn historical_event_nodes(
+	ir: &ProgramIr,
+	event: &crate::ir::EventIr,
+	migration: Option<CurrentMigration>,
+	metadata: Option<&IdlMigrationMetadata>,
+) -> Result<Vec<EventNode>, IdlError> {
+	let (Some(migration), Some(metadata)) = (migration, metadata) else {
+		return Ok(Vec::new());
+	};
+	let identity = ContractIdentity::try_new(
+		ContractKind::Event,
+		event.discriminator.repr_size,
+		event.discriminator.value,
+	)
+	.map_err(IdlError::Other)?;
+	let Some(schemas) = metadata.historical_events.get(&identity.key()) else {
+		return Ok(Vec::new());
+	};
+
+	schemas
+		.iter()
+		.enumerate()
+		.map(|(version, schema)| {
+			let name = format!("{}V{version}", event.name);
+			if ir
+				.events
+				.iter()
+				.any(|other| CamelCaseString::new(&other.name) == CamelCaseString::new(&name))
+			{
+				return Err(IdlError::Other(format!(
+					"event `{name}` collides with the name reserved for version {version} of \
+					 migration-aware event `{}`; rename it",
+					event.name
+				)));
+			}
+			let historical = crate::ir::EventIr {
+				name,
+				discriminator: event.discriminator.clone(),
+				fields: schema
+					.fields
+					.iter()
+					.map(|field| {
+						FieldIr {
+							name: field.name.clone(),
+							rust_type: field.rust_type.clone(),
+							docs: Vec::new(),
+						}
+					})
+					.collect(),
+				docs: vec![format!(
+					"Version {version} of `{}`, as emitted before its current layout. Log records \
+					 carrying this version decode with this event.",
+					event.name
+				)],
+			};
+			build_event_node(
+				&historical,
+				&ir.pinapod_enums,
+				Some(CurrentMigration {
+					version_type: migration.version_type,
+					version: version as u32,
+				}),
+			)
+		})
+		.collect()
 }
 
 /// Build a Codama event node: camel-cased name, constant discriminator at

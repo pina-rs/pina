@@ -4,26 +4,36 @@
 	"fixture": "base-counter-published",
 	"agent": false,
 	"prompt": "",
-	"expectation": "Each check reproduces a failure an agent hit, or could hit, in the round-four evaluation, and asserts the CLI now fails closed or recovers deterministically. Every check works on a private copy of the fixture, so the checks are independent of each other.",
+	"expectation": "Each check reproduces a failure an agent hit, or could hit, in the round-four evaluation or after the ABI 0.21 changes that moved the migration policy into the manifest, and asserts the CLI now fails closed or recovers deterministically. Every check works on a private copy of the fixture, so the checks are independent of each other.",
 	"checks": [
 		{
 			"id": "unpinned-receipts-are-refused",
 			"kind": "command",
-			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && python3 -c \"import json; p='migrations/publications.json'; d=json.load(open(p)); [v.__setitem__('history', []) for r in d['receipts'] for v in r['versions'].values()]; json.dump(d, open(p, 'w'), indent=1)\" && pina migrations check",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && python3 -c \"import json; p='migrations/publications.json'; d=json.load(open(p)); [r['versions'].__setitem__(k, []) for r in d['receipts'] for k in list(r['versions'])]; json.dump(d, open(p, 'w'), indent=1)\" && pina migrations check",
 			"expectExit": 1,
 			"expectOutput": [
-				"--pin-legacy"
+				"pins no versions"
 			],
 			"why": "A receipt without schema pins cannot tell a rewritten published schema from the shipped one, so blanking pins must never make a check pass."
 		},
 		{
+			"id": "unpinned-legacy-ledgers-name-the-repair",
+			"kind": "command",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && python3 -c \"import json; p='migrations/publications.json'; d=json.load(open(p)); program=json.load(open('migrations/manifest.json'))['programId']; d['abiVersion']='0.20'; d['receipts']=[dict(r, sequence=i, programId=program, manifestSha256='1'*64, previousReceiptSha256=None, versions={k: {'version': len(v)-1, 'history': []} for k, v in r['versions'].items()}) for i, r in enumerate(d['receipts'])]; json.dump(d, open(p, 'w'), indent=1)\" && pina migrations check",
+			"expectExit": 1,
+			"expectOutput": [
+				"--pin-legacy"
+			],
+			"why": "An ABI 0.20 ledger could name published versions without pinning them; reading one must fail and name the repair instead of trusting the unpinned entries."
+		},
+		{
 			"id": "pin-legacy-reproduces-the-original-receipts",
 			"kind": "command",
-			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && cp migrations/publications.json /tmp/pinned-original.json && python3 -c \"import json; p='migrations/publications.json'; d=json.load(open(p)); [v.__setitem__('history', []) for r in d['receipts'] for v in r['versions'].values()]; json.dump(d, open(p, 'w'), indent=1)\" && pina migrations reconcile --pin-legacy && cmp migrations/publications.json /tmp/pinned-original.json && pina migrations check",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && cp migrations/publications.json /tmp/pinned-original.json && python3 -c \"import json; p='migrations/publications.json'; d=json.load(open(p)); program=json.load(open('migrations/manifest.json'))['programId']; d['abiVersion']='0.20'; d['receipts']=[dict(r, sequence=i, programId=program, manifestSha256='1'*64, previousReceiptSha256=None, versions={k: {'version': len(v)-1, 'history': []} for k, v in r['versions'].items()}) for i, r in enumerate(d['receipts'])]; json.dump(d, open(p, 'w'), indent=1)\" && pina migrations reconcile --pin-legacy && cmp migrations/publications.json /tmp/pinned-original.json && pina migrations check",
 			"expectOutput": [
 				"Migration history is consistent"
 			],
-			"why": "Pinning an untampered manifest must reproduce the receipts byte for byte and leave a consistent history."
+			"why": "Pinning an unpinned 0.20 ledger against an untampered manifest must reproduce the current receipts byte for byte and leave a consistent history."
 		},
 		{
 			"id": "a-stale-manual-body-is-moved-aside",
@@ -44,14 +54,24 @@
 			"why": "`--manual` on an unchanged automatic draft used to be ignored without a word."
 		},
 		{
-			"id": "idl-refuses-without-a-snapshot",
+			"id": "retired-pina-toml-keys-name-their-flag",
 			"kind": "command",
-			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && rm -rf migrations && pina idl",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && printf '\\n[migrations]\\nauto = true\\n' >> pina.toml && pina migrations check",
 			"expectExit": 1,
 			"expectOutput": [
-				"has no checked-in snapshot"
+				"pina migrations create --auto true"
 			],
-			"why": "Without a manifest an auto policy compiles envelope-free; an IDL generated then would give every client the wrong wire format."
+			"why": "The policy lives only in the manifest, so a `pina.toml` copy would be read by nothing; every command that reads `pina.toml` must refuse the retired key and name the flag that records it."
+		},
+		{
+			"id": "version-width-freezes-at-publication",
+			"kind": "command",
+			"command": "d=$(mktemp -d) && cp -r . \"$d\" && cd \"$d\" && pina migrations create --version-type u16 --no-interactive",
+			"expectExit": 1,
+			"expectOutput": [
+				"frozen as u8"
+			],
+			"why": "Widening after publication would change every live envelope, so `--version-type` must refuse once a receipt exists."
 		},
 		{
 			"id": "skill-names-the-new-stop-signs",

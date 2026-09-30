@@ -17,11 +17,9 @@ class ConfigInitializeInstructionData {
     required this.bump,
     required this.treasury,
     required this.creationFee,
-  }) : discriminator = 0,
-       migrationVersion = 0;
+  }) : discriminator = 0;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
   final Address treasury;
   final BigInt creationFee;
@@ -31,7 +29,6 @@ Encoder<ConfigInitializeInstructionData>
 getConfigInitializeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('treasury', getAddressEncoder()),
     ('creationFee', getU64Encoder()),
@@ -41,7 +38,6 @@ getConfigInitializeInstructionDataEncoder() {
     structEncoder,
     (ConfigInitializeInstructionData value) => <String, Object?>{
       'discriminator': 0,
-      'migrationVersion': 0,
       'bump': value.bump,
       'treasury': value.treasury,
       'creationFee': value.creationFee,
@@ -53,7 +49,6 @@ Decoder<ConfigInitializeInstructionData>
 getConfigInitializeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('treasury', getAddressDecoder()),
     ('creationFee', getU64Decoder()),
@@ -72,7 +67,6 @@ getConfigInitializeInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

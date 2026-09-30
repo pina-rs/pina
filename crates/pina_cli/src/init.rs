@@ -113,7 +113,7 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 		"    pina keys new                  # write target/deploy/<name>-keypair.json and \
 		 declare_id!"
 	);
-	println!("    pina migrations create         # record the version-0 baseline");
+	println!("    pina migrations create --auto true  # track every contract; record version 0");
 	println!();
 	println!("    pina lint                      # run Pina's security lints");
 	println!("    pina build                     # build SBF and generate the IDL");
@@ -124,7 +124,10 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!();
 	println!(
 		"  Run `pina migrations create` only after the declared program address is final: the \
-		 recorded history is bound to that address."
+		 recorded history is bound to that address. Versions are counted per contract, so the \
+		 default `u8` width gives each one 255 versions; add `--version-type u16` (or `u32`) to \
+		 that first run only if one contract may need more, because the width freezes at the \
+		 first deployment."
 	);
 	println!(
 		"  The program keypair lives under the git-ignored `target/deploy/`, so `cargo clean` \
@@ -143,11 +146,11 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 
 /// `pina.toml` for a new program.
 ///
-/// Migrations are on by default. The recorded history is bound to the declared
-/// program address, so the manifest is deliberately *not* scaffolded here: the
-/// placeholder `declare_id!` would pin the history to an address the user is
-/// about to replace. `pina migrations create` is the bootstrap step, and it runs
-/// once the real address is in place.
+/// The migration policy is not configured here: it lives in the migration
+/// manifest, and the manifest is deliberately *not* scaffolded because the
+/// placeholder `declare_id!` would bind the history to an address the user is
+/// about to replace. `pina migrations create --auto true` is the bootstrap
+/// step, and it runs once the real address is in place.
 fn pina_toml_template() -> String {
 	r#"[project]
 program = "."
@@ -157,15 +160,6 @@ output = "clients"
 languages = ["cpi", "rust", "typescript"]
 mode = "auto"
 scaffold = true
-
-# ABI migrations. Versions are counted per contract, so `u8` gives every
-# account, instruction, and event its own 255-version budget. The width is
-# program-wide and freezes at the first published release, so it cannot be
-# widened later; pick `u16` or `u32` before launch only if one contract is
-# expected to need more.
-[migrations]
-version_type = "u8"
-auto = true
 "#
 	.to_owned()
 }
@@ -173,11 +167,11 @@ auto = true
 /// Build script that keeps macro expansion fresh when the migration policy or
 /// manifest changes.
 ///
-/// A proc macro does not re-expand when `pina.toml` or the manifest changes, so
-/// the recorded `auto` policy needs this directive to take effect on the next
-/// build. `pina migrations create` scaffolds the same file when it is missing, and
-/// the crate-level doc comment keeps the script warning-clean in projects that
-/// lint with `-D warnings`.
+/// A proc macro does not re-expand when the manifest changes, so the recorded
+/// `auto` policy needs this directive to take effect on the next build. `pina
+/// migrations create` scaffolds the same file when it is missing, and the
+/// crate-level doc comment keeps the script warning-clean in projects that lint
+/// with `-D warnings`.
 fn build_script_template() -> String {
 	"//! Re-expand Pina macros when the migration manifest changes.\n\nfn main() \
 	 {\n\tprintln!(\"cargo:rerun-if-changed=migrations/manifest.json\");\n}\n"
@@ -684,10 +678,11 @@ mod tests {
 		assert!(!surfpool_cargo.contains("surfpool-sdk"));
 	}
 
-	/// Migrations are on by default, and the manifest is deliberately absent:
-	/// it would bind the recorded history to the placeholder program address.
+	/// The migration policy lives in the manifest, and the manifest is
+	/// deliberately absent: it would bind the recorded history to the
+	/// placeholder program address.
 	#[test]
-	fn init_project_enables_migrations_without_pinning_the_placeholder_address() {
+	fn init_project_leaves_the_migration_policy_to_the_manifest() {
 		let dir = TempDir::new("migrations_default");
 		init_project(&dir.path, "my_program", false)
 			.unwrap_or_else(|err| panic!("expected init to succeed: {err}"));
@@ -696,19 +691,7 @@ mod tests {
 			.unwrap_or_else(|err| panic!("expected pina.toml to be readable: {err}"));
 		let parsed: toml::Value = toml::from_str(&config)
 			.unwrap_or_else(|err| panic!("scaffolded pina.toml must parse: {err}"));
-		let migrations = parsed
-			.get("migrations")
-			.and_then(toml::Value::as_table)
-			.unwrap_or_else(|| panic!("scaffold must configure [migrations]"));
-
-		assert_eq!(
-			migrations.get("version_type").and_then(toml::Value::as_str),
-			Some("u8")
-		);
-		assert_eq!(
-			migrations.get("auto").and_then(toml::Value::as_bool),
-			Some(true)
-		);
+		assert!(parsed.get("migrations").is_none(), "{config}");
 
 		// The scaffold must not pre-record a history: `create` pins the declared
 		// program address, and the scaffold still carries the placeholder.

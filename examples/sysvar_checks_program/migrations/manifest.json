@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 	"versionType": "u8",
 	"auto": [
@@ -9,48 +9,27 @@
 	],
 	"contracts": {
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "SysvarsCheckInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
 							{
-								"name": "clock",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "clock"
 							},
 							{
-								"name": "rent",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "rent"
 							},
 							{
-								"name": "stake_history",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "stake_history"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

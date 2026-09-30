@@ -20,11 +20,9 @@ class DepositInstructionData {
     required this.envelopeLen,
     required this.envelope,
     required this.shares,
-  }) : discriminator = 4,
-       migrationVersion = 0;
+  }) : discriminator = 4;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
   final Uint8List commitment;
   final Uint8List viewPubkey;
@@ -36,7 +34,6 @@ class DepositInstructionData {
 Encoder<DepositInstructionData> getDepositInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     (
       'commitment',
@@ -58,7 +55,6 @@ Encoder<DepositInstructionData> getDepositInstructionDataEncoder() {
     structEncoder,
     (DepositInstructionData value) => <String, Object?>{
       'discriminator': 4,
-      'migrationVersion': 0,
       'bump': value.bump,
       'commitment': value.commitment,
       'viewPubkey': value.viewPubkey,
@@ -72,7 +68,6 @@ Encoder<DepositInstructionData> getDepositInstructionDataEncoder() {
 Decoder<DepositInstructionData> getDepositInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('commitment', fixDecoderSize(getBytesDecoder(), 32)),
     ('viewPubkey', fixDecoderSize(getBytesDecoder(), 32)),
@@ -91,7 +86,6 @@ Decoder<DepositInstructionData> getDepositInstructionDataDecoder() {
 
   (DepositInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

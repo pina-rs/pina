@@ -76,18 +76,18 @@ pub struct WithdrawIx {
 
 impl WithdrawIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 322;
+	pub const LEN: usize = 321;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 322], ProgramError> {
-		let mut data = [0u8; 322];
-		data[..2].copy_from_slice(&WITHDRAW_DISCRIMINATOR);
-		data[2..34].copy_from_slice(&self.nullifier);
-		data[34..66].copy_from_slice(&self.root);
-		data[66..130].copy_from_slice(&self.proof_a);
-		data[130..258].copy_from_slice(&self.proof_b);
-		data[258..322].copy_from_slice(&self.proof_c);
+	pub fn to_bytes(&self) -> Result<[u8; 321], ProgramError> {
+		let mut data = [0u8; 321];
+		data[..1].copy_from_slice(&WITHDRAW_DISCRIMINATOR);
+		data[1..33].copy_from_slice(&self.nullifier);
+		data[33..65].copy_from_slice(&self.root);
+		data[65..129].copy_from_slice(&self.proof_a);
+		data[129..257].copy_from_slice(&self.proof_b);
+		data[257..321].copy_from_slice(&self.proof_c);
 
 		Ok(data)
 	}
@@ -123,4 +123,4 @@ impl<'account> Withdraw<'account> {
 	}
 }
 
-const WITHDRAW_DISCRIMINATOR: [u8; 2] = [5, 0];
+const WITHDRAW_DISCRIMINATOR: [u8; 1] = [5];

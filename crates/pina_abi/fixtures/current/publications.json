@@ -1,35 +1,55 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"receipts": [
 		{
-			"sequence": 0,
 			"rpcUrl": "fixture",
-			"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
 			"executableSha256": "0000000000000000000000000000000000000000000000000000000000000000",
-			"manifestSha256": "1111111111111111111111111111111111111111111111111111111111111111",
 			"versions": {
-				"account:1:01": {
-					"version": 1,
-					"history": []
-				},
-				"account:1:02": {
-					"version": 1,
-					"history": []
-				},
-				"account:1:03": {
-					"version": 1,
-					"history": []
-				},
-				"event:1:04": {
-					"version": 1,
-					"history": []
-				},
-				"instruction:1:00": {
-					"version": 1,
-					"history": []
-				}
-			},
-			"previousReceiptSha256": null
+				"account:1:01": [
+					{
+						"schemaSha256": "fc50469544b1b137ad1418775cc54e96cb82c4033d5d2bd5d4b4be8b2c675d10"
+					},
+					{
+						"schemaSha256": "0fd06b17605b2adc100c3b8aed6d813babab8393e07adf2139099fa0b70c6da8",
+						"transitionSha256": "6bda773f65d18948730da72fd92083f2b309b0ba1ce35d714e952e5508a5fda0"
+					}
+				],
+				"account:1:02": [
+					{
+						"schemaSha256": "38bad8bc9e37ea4a422715cffd95bf3f10652ffd3c44cd31b7a479ab3f6bb4d8"
+					},
+					{
+						"schemaSha256": "8987d191d07275a9b25d63af30e0afb22e0b3abdc4bcc99804660f401effa150",
+						"transitionSha256": "f191f13303cf51ca540056ebbda747f0844a1279b8e0bdf125d909546e1d5b54"
+					}
+				],
+				"account:1:03": [
+					{
+						"schemaSha256": "99f22f1c7bb20151cfa9229b3b6b97ad9160091bfb526c9c12b011b89f5fa9c3"
+					},
+					{
+						"schemaSha256": "6df091cab98908e26f4536a026f72c888d01cff2dc1610b2b743dcff646e01ca",
+						"transitionSha256": "4760911720a193a16955bca7ec3a67984a26fee17c09d67ecdbe8cefce120283"
+					}
+				],
+				"event:1:04": [
+					{
+						"schemaSha256": "f84fea2ce909521189b04f6ccc69f8bc191098770d9d7a08220ae6d3e34e43e6"
+					},
+					{
+						"schemaSha256": "b16746feb2ea35413fcc06f392d263dbbe11febcd227806b70d1885f95c86df6"
+					}
+				],
+				"instruction:1:00": [
+					{
+						"schemaSha256": "f84fea2ce909521189b04f6ccc69f8bc191098770d9d7a08220ae6d3e34e43e6"
+					},
+					{
+						"schemaSha256": "b16746feb2ea35413fcc06f392d263dbbe11febcd227806b70d1885f95c86df6",
+						"transitionSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
+					}
+				]
+			}
 		}
 	]
 }

@@ -88,18 +88,15 @@ export function identifyEscrowProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): EscrowProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return EscrowProgramInstruction.Make;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return EscrowProgramInstruction.Take;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return EscrowProgramInstruction.Cancel;
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return EscrowProgramInstruction.Make;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return EscrowProgramInstruction.Take;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return EscrowProgramInstruction.Cancel;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "escrowProgram" },

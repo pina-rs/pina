@@ -51,56 +51,43 @@ enum PrivacyPoolProgramInstruction {
 PrivacyPoolProgramInstruction identifyPrivacyPoolProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return PrivacyPoolProgramInstruction.initialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return PrivacyPoolProgramInstruction.setVerificationKey;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return PrivacyPoolProgramInstruction.setCustodians;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
     return PrivacyPoolProgramInstruction.registerRequester;
   }
-  if (containsBytes(data, getU8Encoder().encode(4), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(4), 0)) {
     return PrivacyPoolProgramInstruction.deposit;
   }
-  if (containsBytes(data, getU8Encoder().encode(5), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(5), 0)) {
     return PrivacyPoolProgramInstruction.withdraw;
   }
-  if (containsBytes(data, getU8Encoder().encode(6), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(6), 0)) {
     return PrivacyPoolProgramInstruction.transfer;
   }
-  if (containsBytes(data, getU8Encoder().encode(7), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(7), 0)) {
     return PrivacyPoolProgramInstruction.requestDisclosure;
   }
-  if (containsBytes(data, getU8Encoder().encode(8), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(8), 0)) {
     return PrivacyPoolProgramInstruction.grantDisclosure;
   }
-  if (containsBytes(data, getU8Encoder().encode(9), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(9), 0)) {
     return PrivacyPoolProgramInstruction.challengeDisclosure;
   }
-  if (containsBytes(data, getU8Encoder().encode(10), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(10), 0)) {
     return PrivacyPoolProgramInstruction.resolveChallenge;
   }
-  if (containsBytes(data, getU8Encoder().encode(11), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(11), 0)) {
     return PrivacyPoolProgramInstruction.approveDisclosure;
   }
-  if (containsBytes(data, getU8Encoder().encode(12), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(12), 0)) {
     return PrivacyPoolProgramInstruction.cancelDisclosure;
   }
 

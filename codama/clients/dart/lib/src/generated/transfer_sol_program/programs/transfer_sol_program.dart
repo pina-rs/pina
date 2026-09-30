@@ -23,12 +23,10 @@ enum TransferSolProgramInstruction { cpiTransfer, directTransfer }
 TransferSolProgramInstruction identifyTransferSolProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return TransferSolProgramInstruction.cpiTransfer;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return TransferSolProgramInstruction.directTransfer;
   }
 

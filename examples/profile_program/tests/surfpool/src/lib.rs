@@ -46,8 +46,8 @@ fn initialize_instruction(
 	name: &str,
 	bio: &str,
 ) -> pina_test::Instruction {
-	// discriminator + migration version + bump, then the bounded text fields.
-	let mut data = vec![ProfileInstruction::Initialize as u8, 0u8, bump];
+	// discriminator + bump, then the bounded text fields.
+	let mut data = vec![ProfileInstruction::Initialize as u8, bump];
 	data.extend_from_slice(&bounded_text::<33>(name));
 	data.extend_from_slice(&bounded_text::<129>(bio));
 
@@ -61,8 +61,8 @@ fn initialize_instruction(
 	)
 }
 
-/// `payload` excludes the discriminator byte; the discriminator and migration
-/// version byte are prepended here.
+/// `payload` excludes the discriminator byte, which is prepended here.
+/// Instructions carry no version envelope unless they opt into migrations.
 fn with_payload(
 	program: &ProgramTest,
 	authority: &Pubkey,
@@ -70,7 +70,7 @@ fn with_payload(
 	kind: ProfileInstruction,
 	payload: &[u8],
 ) -> pina_test::Instruction {
-	let mut data = vec![kind as u8, 0u8];
+	let mut data = vec![kind as u8];
 	data.extend_from_slice(payload);
 
 	program.instruction(

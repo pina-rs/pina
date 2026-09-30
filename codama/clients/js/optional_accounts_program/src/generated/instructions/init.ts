@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findStorePda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INIT_DISCRIMINATOR = 0;
 
 export function getInitDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INIT_DISCRIMINATOR);
-}
-
-export const INIT_DISCRIMINATOR2 = 0;
-
-export function getInitDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(INIT_DISCRIMINATOR2);
 }
 
 export type InitInstruction<
@@ -84,7 +75,6 @@ export type InitInstruction<
 
 export type InitInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** The PDA bump seed, computed off-chain. */
 	bump: number;
 };
@@ -99,24 +89,20 @@ export function getInitInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
+			"bump",
 			getU8Encoder(),
-		], ["bump", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
+		]]),
+		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
 
 export function getInitInstructionDataDecoder(): FixedSizeDecoder<
 	InitInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(INIT_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["bump", getU8Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(INIT_DISCRIMINATOR, getU8Decoder()),
+	], ["bump", getU8Decoder()]]);
 }
 
 export function getInitInstructionDataCodec(): FixedSizeCodec<

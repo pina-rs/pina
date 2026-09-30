@@ -40,22 +40,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const REMOVE_TAG_DISCRIMINATOR = 3;
 
 export function getRemoveTagDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REMOVE_TAG_DISCRIMINATOR);
-}
-
-export const REMOVE_TAG_DISCRIMINATOR2 = 0;
-
-export function getRemoveTagDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REMOVE_TAG_DISCRIMINATOR2);
 }
 
 export type RemoveTagInstruction<
@@ -80,7 +71,6 @@ export type RemoveTagInstruction<
 
 export type RemoveTagInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** The zero-based index of the tag to remove. */
 	index: bigint;
 };
@@ -95,24 +85,20 @@ export function getRemoveTagInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["index", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+			"index",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
 export function getRemoveTagInstructionDataDecoder(): FixedSizeDecoder<
 	RemoveTagInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(REMOVE_TAG_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["index", getU64Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(REMOVE_TAG_DISCRIMINATOR, getU8Decoder()),
+	], ["index", getU64Decoder()]]);
 }
 
 export function getRemoveTagInstructionDataCodec(): FixedSizeCodec<

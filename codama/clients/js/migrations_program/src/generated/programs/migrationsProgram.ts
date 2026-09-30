@@ -90,6 +90,7 @@ export function identifyMigrationsProgramAccount(
 
 export enum MigrationsProgramEvent {
 	ValueChangedEvent,
+	ValueChangedEventV0,
 }
 
 export function identifyMigrationsProgramEvent(
@@ -100,6 +101,10 @@ export function identifyMigrationsProgramEvent(
 		containsBytes(data, getU8Encoder().encode(4), 0) &&
 		containsBytes(data, getU8Encoder().encode(1), 1)
 	) return MigrationsProgramEvent.ValueChangedEvent;
+	if (
+		containsBytes(data, getU8Encoder().encode(4), 0) &&
+		containsBytes(data, getU8Encoder().encode(0), 1)
+	) return MigrationsProgramEvent.ValueChangedEventV0;
 	throw new Error(
 		"The provided event could not be identified as a migrationsProgram event.",
 	);
@@ -116,7 +121,7 @@ export function identifyMigrationsProgramInstruction(
 	const data = "data" in instruction ? instruction.data : instruction;
 	if (
 		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(2), 1)
+		containsBytes(data, getU8Encoder().encode(1), 1)
 	) return MigrationsProgramInstruction.Update;
 	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
 		return MigrationsProgramInstruction.Relay;

@@ -41,10 +41,7 @@ fn fails_duplicate_mutable_accepts_distinct_accounts() {
 
 		program
 			.send(
-				&[
-					DuplicateMutableInstruction::FailsDuplicateMutable as u8,
-					0u8,
-				],
+				&[DuplicateMutableInstruction::FailsDuplicateMutable as u8],
 				accounts(&first, &second, false),
 			)
 			.expect("distinct writable accounts pass the guard");
@@ -67,10 +64,7 @@ fn fails_duplicate_mutable_rejects_the_same_account() {
 		let same = program.payer();
 		let error = program
 			.send(
-				&[
-					DuplicateMutableInstruction::FailsDuplicateMutable as u8,
-					0u8,
-				],
+				&[DuplicateMutableInstruction::FailsDuplicateMutable as u8],
 				accounts(&same, &same, false),
 			)
 			.expect_err("a duplicated writable account must fail");
@@ -88,10 +82,7 @@ fn fails_duplicate_mutable_rejects_the_same_account() {
 		program.fund(&other, 1_000_000_000).expect("fund other");
 		program
 			.send(
-				&[
-					DuplicateMutableInstruction::FailsDuplicateMutable as u8,
-					0u8,
-				],
+				&[DuplicateMutableInstruction::FailsDuplicateMutable as u8],
 				accounts(&same, &other, false),
 			)
 			.expect("the guard accepts distinct accounts after the failure");
@@ -114,20 +105,14 @@ fn allows_duplicate_mutable_and_readonly() {
 
 		program
 			.send(
-				&[
-					DuplicateMutableInstruction::AllowsDuplicateMutable as u8,
-					0u8,
-				],
+				&[DuplicateMutableInstruction::AllowsDuplicateMutable as u8],
 				accounts(&same, &same, false),
 			)
 			.expect("duplicated writable metas are allowed here");
 
 		program
 			.send(
-				&[
-					DuplicateMutableInstruction::AllowsDuplicateReadonly as u8,
-					0u8,
-				],
+				&[DuplicateMutableInstruction::AllowsDuplicateReadonly as u8],
 				accounts(&same, &same, true),
 			)
 			.expect("duplicated readonly metas are always allowed");
@@ -135,10 +120,7 @@ fn allows_duplicate_mutable_and_readonly() {
 		// Readonly duplicates stay valid across instruction variants.
 		program
 			.send(
-				&[
-					DuplicateMutableInstruction::FailsDuplicateMutable as u8,
-					0u8,
-				],
+				&[DuplicateMutableInstruction::FailsDuplicateMutable as u8],
 				accounts(&same, &same, true),
 			)
 			.expect_err("FailsDuplicateMutable requires writable accounts");

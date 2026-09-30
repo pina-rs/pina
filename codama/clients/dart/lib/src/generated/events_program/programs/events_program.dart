@@ -21,16 +21,13 @@ enum EventsProgramInstruction { initialize, testEvent, testEventCpi }
 
 /// Identifies the type of a EventsProgram instruction.
 EventsProgramInstruction identifyEventsProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return EventsProgramInstruction.initialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return EventsProgramInstruction.testEvent;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return EventsProgramInstruction.testEventCpi;
   }
 

@@ -221,58 +221,45 @@ export function identifyPrivacyPoolProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PrivacyPoolProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.Initialize;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.SetVerificationKey;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.SetCustodians;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.RegisterRequester;
-	if (
-		containsBytes(data, getU8Encoder().encode(4), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.Deposit;
-	if (
-		containsBytes(data, getU8Encoder().encode(5), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.Withdraw;
-	if (
-		containsBytes(data, getU8Encoder().encode(6), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.Transfer;
-	if (
-		containsBytes(data, getU8Encoder().encode(7), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.RequestDisclosure;
-	if (
-		containsBytes(data, getU8Encoder().encode(8), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.GrantDisclosure;
-	if (
-		containsBytes(data, getU8Encoder().encode(9), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.ChallengeDisclosure;
-	if (
-		containsBytes(data, getU8Encoder().encode(10), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.ResolveChallenge;
-	if (
-		containsBytes(data, getU8Encoder().encode(11), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.ApproveDisclosure;
-	if (
-		containsBytes(data, getU8Encoder().encode(12), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramInstruction.CancelDisclosure;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return PrivacyPoolProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return PrivacyPoolProgramInstruction.SetVerificationKey;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return PrivacyPoolProgramInstruction.SetCustodians;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return PrivacyPoolProgramInstruction.RegisterRequester;
+	}
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return PrivacyPoolProgramInstruction.Deposit;
+	}
+	if (containsBytes(data, getU8Encoder().encode(5), 0)) {
+		return PrivacyPoolProgramInstruction.Withdraw;
+	}
+	if (containsBytes(data, getU8Encoder().encode(6), 0)) {
+		return PrivacyPoolProgramInstruction.Transfer;
+	}
+	if (containsBytes(data, getU8Encoder().encode(7), 0)) {
+		return PrivacyPoolProgramInstruction.RequestDisclosure;
+	}
+	if (containsBytes(data, getU8Encoder().encode(8), 0)) {
+		return PrivacyPoolProgramInstruction.GrantDisclosure;
+	}
+	if (containsBytes(data, getU8Encoder().encode(9), 0)) {
+		return PrivacyPoolProgramInstruction.ChallengeDisclosure;
+	}
+	if (containsBytes(data, getU8Encoder().encode(10), 0)) {
+		return PrivacyPoolProgramInstruction.ResolveChallenge;
+	}
+	if (containsBytes(data, getU8Encoder().encode(11), 0)) {
+		return PrivacyPoolProgramInstruction.ApproveDisclosure;
+	}
+	if (containsBytes(data, getU8Encoder().encode(12), 0)) {
+		return PrivacyPoolProgramInstruction.CancelDisclosure;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "privacyPoolProgram" },

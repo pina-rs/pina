@@ -25,7 +25,7 @@ fn accepts_an_authority_and_a_system_owned_wallet() {
 
 		program
 			.send(
-				&[SystemAccountsInstruction::Initialize as u8, 0u8],
+				&[SystemAccountsInstruction::Initialize as u8],
 				vec![
 					AccountMeta::new_readonly(authority, true),
 					AccountMeta::new_readonly(wallet, false),
@@ -54,7 +54,7 @@ fn rejects_a_wallet_that_is_not_system_owned() {
 
 		let error = program
 			.send(
-				&[SystemAccountsInstruction::Initialize as u8, 0u8],
+				&[SystemAccountsInstruction::Initialize as u8],
 				vec![
 					AccountMeta::new_readonly(authority, true),
 					AccountMeta::new_readonly(wallet, false),
@@ -84,7 +84,7 @@ fn requires_authority_signature() {
 		let wallet = program.payer();
 		let error = program
 			.send(
-				&[SystemAccountsInstruction::Initialize as u8, 0u8],
+				&[SystemAccountsInstruction::Initialize as u8],
 				vec![
 					AccountMeta::new_readonly(authority, false),
 					AccountMeta::new_readonly(wallet, false),

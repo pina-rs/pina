@@ -12,10 +12,6 @@ use cargo_metadata::MetadataCommand;
 use cargo_metadata::Package;
 use cargo_metadata::TargetKind;
 use clap::ValueEnum;
-use pina_abi::AUTO_KIND_NAMES;
-use pina_abi::ContractKind;
-use pina_abi::MigrationAuto;
-use pina_abi::MigrationVersionType;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -136,13 +132,6 @@ pub struct Project {
 	pub clients_dir: PathBuf,
 	pub clients: Vec<ClientLanguage>,
 	pub client_generation: BTreeMap<ClientLanguage, ClientGenerationConfig>,
-	/// Program-wide migration version encoding.
-	pub migration_version_type: MigrationVersionType,
-	/// Program-wide migration opt-in policy from `[migrations].auto`.
-	///
-	/// `pina migrations create` records this policy into the manifest, which is
-	/// the only policy source macros consult.
-	pub migration_auto: MigrationAuto,
 	/// Persisted disambiguation answers from `[migrations.answers]`.
 	pub migration_answers: MigrationsAnswersConfig,
 	#[serde(skip)]
@@ -170,18 +159,18 @@ struct ProjectConfig {
 struct LintsConfig(BTreeMap<String, String>);
 
 /// Program-wide migration settings.
+///
+/// The version envelope width and the auto policy are recorded only in
+/// `migrations/manifest.json`, the one source macros read. Their retired
+/// `pina.toml` keys are still parsed so discovery can name the flag that now
+/// sets them instead of failing with a bare unknown-field error.
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct MigrationsConfig {
-	/// Version envelope width, one of `u8`, `u16`, or `u32`.
-	///
-	/// `version-type` is accepted as an alias because it was the only kebab-case
-	/// key in `pina.toml`; `snake_case` is the canonical spelling.
+	/// Retired: set with `pina migrations create --version-type`.
 	#[serde(alias = "version-type")]
-	version_type: MigrationVersionType,
-	/// Kinds automatically enveloped by `pina migrations create`. Accepts `true`
-	/// (every kind), `false`, or a list of kind names, so the raw TOML value is
-	/// resolved into [`MigrationAuto`] with actionable errors.
+	version_type: Option<toml::Value>,
+	/// Retired: set with `pina migrations create --auto`.
 	auto: Option<toml::Value>,
 	/// Persisted disambiguation answers consulted before `pina migrations
 	/// make` prompts; command-line flags override these per field.
@@ -391,11 +380,16 @@ pub enum ProjectError {
 	)]
 	InvalidLintLevel { name: String, level: String },
 
-	#[error("Invalid `[migrations].auto` in pina.toml: {reason}")]
-	InvalidMigrationAuto { reason: String },
-
-	#[error("Unknown migration kind `{name}` in [migrations].auto; expected {AUTO_KIND_NAMES}")]
-	UnknownMigrationKind { name: String },
+	#[error(
+		"`[migrations].{key}` no longer belongs in pina.toml: migrations/manifest.json records \
+		 it, and macros read only the manifest. Remove the key and run `pina migrations create \
+		 {flag} {value}` to record it."
+	)]
+	RetiredMigrationSetting {
+		key: &'static str,
+		flag: &'static str,
+		value: String,
+	},
 }
 
 impl Project {
@@ -482,7 +476,7 @@ impl Project {
 			.clients
 			.resolved_generation(&templates, &clients_dir)?;
 		let lint_levels = resolve_lint_levels(config.lints.0)?;
-		let migration_auto = resolve_migration_auto(config.migrations.auto.as_ref())?;
+		reject_retired_migration_settings(&config.migrations)?;
 
 		Ok(Self {
 			program_dir,
@@ -495,8 +489,6 @@ impl Project {
 			clients_dir,
 			clients: config.clients.languages,
 			client_generation,
-			migration_version_type: config.migrations.version_type,
-			migration_auto,
 			migration_answers: config.migrations.answers,
 			lint_levels,
 			root,
@@ -564,8 +556,6 @@ impl Project {
 			clients_dir,
 			clients: clients_config.languages,
 			client_generation,
-			migration_version_type: MigrationVersionType::default(),
-			migration_auto: MigrationAuto::none(),
 			migration_answers: MigrationsAnswersConfig::default(),
 			lint_levels: BTreeMap::new(),
 			root,
@@ -1076,70 +1066,47 @@ fn resolve_lint_levels(
 	Ok(levels)
 }
 
-/// Resolve `[migrations].auto` from its raw TOML value.
-///
-/// `true` is sugar for every kind, `false` clears the policy, and a list names
-/// kinds using the same plural spelling as [`ContractKind`]'s configuration
-/// name.
-fn resolve_migration_auto(value: Option<&toml::Value>) -> Result<MigrationAuto, ProjectError> {
-	let Some(value) = value else {
-		return Ok(MigrationAuto::none());
-	};
-
-	match value {
-		toml::Value::Boolean(true) => Ok(MigrationAuto::all()),
-		toml::Value::Boolean(false) => Ok(MigrationAuto::none()),
-		toml::Value::Array(entries) => resolve_migration_auto_entries(entries),
-		other => {
-			Err(ProjectError::InvalidMigrationAuto {
-				reason: format!(
-					"expected `true`, `false`, or a list of kind names; found {}",
-					other.type_str()
-				),
-			})
-		}
-	}
-}
-
-fn resolve_migration_auto_entries(entries: &[toml::Value]) -> Result<MigrationAuto, ProjectError> {
-	let mut auto = MigrationAuto::none();
-	for entry in entries {
-		let Some(name) = entry.as_str() else {
-			let reason = match entry {
-				// A `true` entry means the developer combined both spellings.
-				toml::Value::Boolean(true) => {
-					format!(
-						"`auto = true` already selects every kind, so it cannot be combined with \
-						 a kind list; list only {AUTO_KIND_NAMES}"
-					)
-				}
-				toml::Value::Boolean(false) => {
-					format!(
-						"`false` is not a kind name; write `auto = false` to disable the policy, \
-						 or list {AUTO_KIND_NAMES}"
-					)
-				}
-				other => {
-					format!(
-						"expected only {AUTO_KIND_NAMES} in the list; found {}",
-						other.type_str()
-					)
-				}
-			};
-			return Err(ProjectError::InvalidMigrationAuto { reason });
-		};
-		let kind = ContractKind::from_config_name(name).ok_or_else(|| {
-			ProjectError::UnknownMigrationKind {
-				name: name.to_owned(),
-			}
-		})?;
-		if !auto.insert(kind) {
-			return Err(ProjectError::InvalidMigrationAuto {
-				reason: format!("duplicate kind `{name}`"),
+/// Refuse the migration keys the manifest now owns, naming the flag and the
+/// value that record the same setting.
+fn reject_retired_migration_settings(config: &MigrationsConfig) -> Result<(), ProjectError> {
+	let retired = [
+		(
+			"version_type",
+			"--version-type",
+			config.version_type.as_ref(),
+		),
+		("auto", "--auto", config.auto.as_ref()),
+	];
+	for (key, flag, value) in retired {
+		if let Some(value) = value {
+			return Err(ProjectError::RetiredMigrationSetting {
+				key,
+				flag,
+				value: retired_flag_value(value),
 			});
 		}
 	}
-	Ok(auto)
+	Ok(())
+}
+
+/// Spell a retired `pina.toml` value the way its `create` flag accepts it.
+fn retired_flag_value(value: &toml::Value) -> String {
+	match value {
+		toml::Value::String(text) => text.clone(),
+		toml::Value::Boolean(flag) => flag.to_string(),
+		toml::Value::Array(entries) => {
+			entries
+				.iter()
+				.map(|entry| {
+					entry
+						.as_str()
+						.map_or_else(|| entry.to_string(), str::to_owned)
+				})
+				.collect::<Vec<_>>()
+				.join(",")
+		}
+		other => other.to_string(),
+	}
 }
 
 fn is_link_like(metadata: &std::fs::Metadata) -> bool {
@@ -1502,28 +1469,35 @@ mode = "overwrite"
 		assert!(error.to_string().contains("unknown field"));
 	}
 
+	/// The manifest owns the version width and the auto policy, so their old
+	/// `pina.toml` keys fail discovery with the flag and value that replace
+	/// them, including the legacy kebab spelling.
 	#[test]
-	fn config_rejects_u64_migration_version_width() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		write_program(temp.path(), "counter");
-		fs::write(
-			temp.path().join(CONFIG_FILE_NAME),
-			"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u64\"\n",
-		)
-		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
-
-		let error = Project::discover(temp.path())
-			.expect_err("the runtime implements only u8, u16, and u32 envelopes");
-		let message = error.to_string();
-
-		assert!(
-			message.contains("u64"),
-			"error names the rejected width: {message}"
-		);
-		for width in ["u8", "u16", "u32"] {
+	fn retired_migration_keys_name_the_flag_that_replaces_them() {
+		for (config, expected) in [
+			(
+				"version_type = \"u16\"\n",
+				"`[migrations].version_type` no longer belongs in pina.toml",
+			),
+			("version-type = \"u32\"\n", "--version-type u32"),
+			("auto = true\n", "pina migrations create --auto true"),
+			(
+				"auto = [\"accounts\", \"events\"]\n",
+				"--auto accounts,events",
+			),
+			("auto = [\"accounts\", 3]\n", "--auto accounts,3"),
+			("auto = 7\n", "--auto 7"),
+		] {
+			let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+			discover_with_migrations(temp.path(), config);
+			let error = Project::discover(temp.path()).expect_err("retired keys must fail closed");
 			assert!(
-				message.contains(width),
-				"error lists the supported width `{width}`: {message}"
+				matches!(error, ProjectError::RetiredMigrationSetting { .. }),
+				"unexpected error for {config}: {error}"
+			);
+			assert!(
+				error.to_string().contains(expected),
+				"unexpected message for {config}: {error}"
 			);
 		}
 	}
@@ -1531,31 +1505,23 @@ mode = "overwrite"
 	/// Snake case is the canonical `pina.toml` spelling; the kebab-case keys
 	/// that shipped first keep parsing so existing checkouts keep building.
 	#[test]
-	fn migrations_keys_accept_snake_case_and_the_legacy_kebab_spelling() {
+	fn migrations_answers_accept_snake_case_and_the_legacy_kebab_spelling() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		discover_with_migrations(
 			temp.path(),
-			"auto = true\n\n[migrations.answers]\nassume_removed = [\"legacy\"]\n",
+			"\n[migrations.answers]\nassume_removed = [\"legacy\"]\n",
 		);
 		let project = Project::discover(temp.path())
 			.unwrap_or_else(|error| panic!("snake_case must parse: {error}"));
-
-		assert_eq!(project.migration_version_type, MigrationVersionType::U8);
-		assert_eq!(project.migration_auto, MigrationAuto::all());
 		assert_eq!(project.migration_answers.assume_removed, vec!["legacy"]);
 
 		let legacy = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		write_program(legacy.path(), "counter");
-		fs::write(
-			legacy.path().join(CONFIG_FILE_NAME),
-			"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \
-			 \"u16\"\n\n[migrations.answers]\nassume-removed = [\"legacy\"]\n",
-		)
-		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+		discover_with_migrations(
+			legacy.path(),
+			"\n[migrations.answers]\nassume-removed = [\"legacy\"]\n",
+		);
 		let project = Project::discover(legacy.path())
 			.unwrap_or_else(|error| panic!("the legacy kebab spelling must keep parsing: {error}"));
-
-		assert_eq!(project.migration_version_type, MigrationVersionType::U16);
 		assert_eq!(project.migration_answers.assume_removed, vec!["legacy"]);
 	}
 
@@ -2189,97 +2155,8 @@ mode = "overwrite"
 		write_program(root, "counter");
 		fs::write(
 			root.join(CONFIG_FILE_NAME),
-			format!(
-				"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\n{migrations}"
-			),
+			format!("[project]\nprogram = \".\"\n\n[migrations]\n{migrations}"),
 		)
 		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
-	}
-
-	fn auto_policy(config: &str) -> MigrationAuto {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		discover_with_migrations(temp.path(), config);
-		Project::discover(temp.path())
-			.unwrap_or_else(|error| panic!("discovery failed: {error}"))
-			.migration_auto
-	}
-
-	#[test]
-	fn migrations_auto_accepts_true_false_and_kind_lists() {
-		assert_eq!(auto_policy("auto = true\n"), MigrationAuto::all());
-		assert_eq!(auto_policy("auto = false\n"), MigrationAuto::none());
-		assert_eq!(auto_policy(""), MigrationAuto::none());
-
-		let mut staged = MigrationAuto::none();
-		staged.add(ContractKind::Account);
-		staged.add(ContractKind::Event);
-		assert_eq!(auto_policy("auto = [\"accounts\", \"events\"]\n"), staged);
-		assert_eq!(
-			auto_policy("auto = [\"instructions\", \"accounts\", \"events\"]\n"),
-			MigrationAuto::all()
-		);
-		assert!(auto_policy("auto = true\n").contains(ContractKind::Instruction));
-	}
-
-	#[test]
-	fn migrations_auto_rejects_unknown_kinds_with_the_valid_spellings() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		discover_with_migrations(temp.path(), "auto = [\"states\"]\n");
-
-		let error = Project::discover(temp.path()).expect_err("unknown kinds must fail closed");
-		assert!(
-			matches!(error, ProjectError::UnknownMigrationKind { ref name } if name == "states")
-		);
-		let message = error.to_string();
-		assert!(message.contains("accounts"), "message: {message}");
-		assert!(message.contains("events"), "message: {message}");
-		assert!(message.contains("instructions"), "message: {message}");
-	}
-
-	#[test]
-	fn migrations_auto_rejects_combined_lists_duplicates_and_other_shapes() {
-		for (config, expected) in [
-			(
-				"auto = [true]\n",
-				"`auto = true` already selects every kind, so it cannot be combined with a kind \
-				 list",
-			),
-			(
-				"auto = [\"accounts\", true]\n",
-				"`auto = true` already selects every kind, so it cannot be combined with a kind \
-				 list",
-			),
-			(
-				"auto = [false]\n",
-				"`false` is not a kind name; write `auto = false` to disable the policy",
-			),
-			(
-				"auto = [\"accounts\", 3]\n",
-				"expected only `accounts`, `events`, or `instructions` in the list; found integer",
-			),
-			("auto = [\"accounts\", \"accounts\"]\n", "duplicate kind"),
-			(
-				"auto = \"accounts\"\n",
-				"expected `true`, `false`, or a list",
-			),
-			(
-				"auto = { accounts = true }\n",
-				"expected `true`, `false`, or a list",
-			),
-		] {
-			let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-			discover_with_migrations(temp.path(), config);
-
-			let error =
-				Project::discover(temp.path()).expect_err("invalid auto shapes must fail closed");
-			assert!(
-				matches!(error, ProjectError::InvalidMigrationAuto { .. }),
-				"unexpected error for {config}: {error}"
-			);
-			assert!(
-				error.to_string().contains(expected),
-				"unexpected message for {config}: {error}"
-			);
-		}
 	}
 }

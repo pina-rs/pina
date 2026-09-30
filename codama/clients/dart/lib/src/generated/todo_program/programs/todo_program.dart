@@ -24,16 +24,13 @@ enum TodoProgramInstruction { initialize, toggleCompleted, updateDigest }
 
 /// Identifies the type of a TodoProgram instruction.
 TodoProgramInstruction identifyTodoProgramInstruction(Uint8List data) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return TodoProgramInstruction.initialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return TodoProgramInstruction.toggleCompleted;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return TodoProgramInstruction.updateDigest;
   }
 

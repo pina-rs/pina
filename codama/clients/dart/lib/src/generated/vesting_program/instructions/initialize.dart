@@ -19,11 +19,9 @@ class InitializeInstructionData {
     required this.cliffTs,
     required this.endTs,
     required this.bump,
-  }) : discriminator = 0,
-       migrationVersion = 0;
+  }) : discriminator = 0;
 
   final int discriminator;
-  final int migrationVersion;
   final BigInt totalAmount;
   final BigInt startTs;
   final BigInt cliffTs;
@@ -34,7 +32,6 @@ class InitializeInstructionData {
 Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('totalAmount', getU64Encoder()),
     ('startTs', getU64Encoder()),
     ('cliffTs', getU64Encoder()),
@@ -46,7 +43,6 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
     structEncoder,
     (InitializeInstructionData value) => <String, Object?>{
       'discriminator': 0,
-      'migrationVersion': 0,
       'totalAmount': value.totalAmount,
       'startTs': value.startTs,
       'cliffTs': value.cliffTs,
@@ -59,7 +55,6 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
 Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('totalAmount', getU64Decoder()),
     ('startTs', getU64Decoder()),
     ('cliffTs', getU64Decoder()),
@@ -77,7 +72,6 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
 
   (InitializeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

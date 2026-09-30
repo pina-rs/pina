@@ -155,8 +155,8 @@ fn initialize_pool_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		// discriminator + migration version + bump.
-		&[StakingInstruction::InitializePool as u8, 0u8, bump],
+		// discriminator + bump.
+		&[StakingInstruction::InitializePool as u8, bump],
 		vec![
 			AccountMeta::new(*admin, true),
 			AccountMeta::new_readonly(*stake_mint, false),
@@ -179,8 +179,8 @@ fn open_position_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		// discriminator + migration version + bump.
-		&[StakingInstruction::OpenPosition as u8, 0u8, bump],
+		// discriminator + bump.
+		&[StakingInstruction::OpenPosition as u8, bump],
 		vec![
 			AccountMeta::new(*user, true),
 			AccountMeta::new_readonly(*pool, false),
@@ -200,8 +200,8 @@ fn deposit_instruction(
 	stake_vault: &Pubkey,
 	amount: u64,
 ) -> pina_test::Instruction {
-	// discriminator + migration version, then the u64 amount.
-	let mut data = vec![StakingInstruction::Deposit as u8, 0u8];
+	// discriminator, then the u64 amount.
+	let mut data = vec![StakingInstruction::Deposit as u8];
 	data.extend_from_slice(&amount.to_le_bytes());
 
 	program.instruction(
@@ -230,7 +230,7 @@ fn withdraw_instruction(
 	stake_vault: &Pubkey,
 	amount: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![StakingInstruction::Withdraw as u8, 0u8];
+	let mut data = vec![StakingInstruction::Withdraw as u8];
 	data.extend_from_slice(&amount.to_le_bytes());
 
 	program.instruction(
@@ -260,7 +260,7 @@ fn set_reward_index_instruction(
 	reward_vault: &Pubkey,
 	new_index: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![StakingInstruction::SetRewardIndex as u8, 0u8];
+	let mut data = vec![StakingInstruction::SetRewardIndex as u8];
 	data.extend_from_slice(&new_index.to_le_bytes());
 
 	program.instruction(
@@ -285,7 +285,7 @@ fn claim_instruction(
 	reward_vault: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[StakingInstruction::Claim as u8, 0u8],
+		&[StakingInstruction::Claim as u8],
 		vec![
 			AccountMeta::new(*user, true),
 			AccountMeta::new_readonly(*reward_mint, false),

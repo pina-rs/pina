@@ -122,15 +122,6 @@ pub(crate) fn expand(
 	let migration_impl = migration.as_ref().map(|migration| {
 		migration.implementation(&crate_path, &struct_name, &discriminator, &variant)
 	});
-	let event_migration_impl = match migration.as_ref() {
-		Some(migration) => {
-			match migration.event_implementation(&crate_path, &struct_name) {
-				Ok(value) => Some(value),
-				Err(error) => return error.to_compile_error(),
-			}
-		}
-		None => None,
-	};
 	let emit_helper = generate_emit_helper(&crate_path);
 	// `emit` materializes the complete record in one stack frame, so an
 	// oversized schema would exhaust the 4 KiB SBF stack at runtime instead of
@@ -161,7 +152,6 @@ pub(crate) fn expand(
 		}
 
 		#migration_impl
-		#event_migration_impl
 
 		#value_validation_impl
 	};

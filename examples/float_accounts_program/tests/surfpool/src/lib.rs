@@ -20,8 +20,8 @@ fn create_instruction(
 	f32_bits: u32,
 	f64_bits: u64,
 ) -> pina_test::Instruction {
-	// discriminator + migration version, then the f32 and f64 bit patterns.
-	let mut data = vec![FloatInstruction::Create as u8, 0u8];
+	// discriminator, then the f32 and f64 bit patterns.
+	let mut data = vec![FloatInstruction::Create as u8];
 	data.extend_from_slice(&f32_bits.to_le_bytes());
 	data.extend_from_slice(&f64_bits.to_le_bytes());
 
@@ -43,7 +43,7 @@ fn update_instruction(
 	f32_bits: u32,
 	f64_bits: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![FloatInstruction::Update as u8, 0u8];
+	let mut data = vec![FloatInstruction::Update as u8];
 	data.extend_from_slice(&f32_bits.to_le_bytes());
 	data.extend_from_slice(&f64_bits.to_le_bytes());
 
@@ -192,7 +192,7 @@ fn update_rejects_a_stranger_signer() {
 			.fund(&stranger.pubkey(), 1_000_000_000)
 			.expect("fund stranger");
 
-		let mut payload = vec![FloatInstruction::Update as u8, 0u8];
+		let mut payload = vec![FloatInstruction::Update as u8];
 		payload.extend_from_slice(&3.0_f32.to_bits().to_le_bytes());
 		payload.extend_from_slice(&4.0_f64.to_bits().to_le_bytes());
 

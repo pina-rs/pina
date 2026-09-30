@@ -9,7 +9,6 @@
 )]
 
 pub const REQUEST_DISCLOSURE_DISCRIMINATOR: u8 = 7u8;
-pub const REQUEST_DISCLOSURE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -104,7 +103,6 @@ impl RequestDisclosureInstructionData {
 		<RequestDisclosureInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUEST_DISCLOSURE_DISCRIMINATOR;
-			data.migration_version = REQUEST_DISCLOSURE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -118,7 +116,6 @@ impl RequestDisclosureInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RequestDisclosureInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub bump: u8,
 	pub nonce: u64,
 	/// Tier being invoked; see the `TIER_*` constants.

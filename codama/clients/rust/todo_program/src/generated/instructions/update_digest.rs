@@ -9,7 +9,6 @@
 )]
 
 pub const UPDATE_DIGEST_DISCRIMINATOR: u8 = 2u8;
-pub const UPDATE_DIGEST_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -70,7 +69,6 @@ impl UpdateDigestInstructionData {
 		<UpdateDigestInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = UPDATE_DIGEST_DISCRIMINATOR;
-			data.migration_version = UPDATE_DIGEST_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -84,6 +82,5 @@ impl UpdateDigestInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct UpdateDigestInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub digest: [u8; 32],
 }

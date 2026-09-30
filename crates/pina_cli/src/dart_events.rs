@@ -1,11 +1,10 @@
 //! Generated Dart modules for the event log read path.
 //!
 //! The Dart renderer does not emit event nodes yet, so Pina generates them
-//! here from the Codama IDL. Every event gets a typed decoder and a
-//! `Program data:` log entry point; migration-aware events additionally carry
-//! the version envelope, a historical projection derived from the checked-in
-//! migration manifest, and the source-version provenance the runtime exposes
-//! through `CurrentEventData::source_version`.
+//! here from the Codama IDL. Every event node gets a typed decoder and a
+//! `Program data:` log entry point. A migration-aware event contributes one node
+//! per version, each claiming only the records its version emitted, so a log is
+//! always decoded with the layout that wrote it.
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -21,8 +20,6 @@ use codama_nodes::TypeNode;
 use codama_nodes::ValueNode;
 use heck::ToSnakeCase as _;
 
-use crate::client_events::EventClientHistory;
-use crate::client_events::EventClientHistoryIndex;
 use crate::client_migrations::pascal_case;
 use crate::error::CodamaError;
 
@@ -112,8 +109,8 @@ struct DartEnvelope {
 	version_bytes: usize,
 }
 
-/// Everything the Dart emitter needs about one event.
-struct EventFacts<'a> {
+/// Everything the Dart emitter needs about one event node.
+struct EventFacts {
 	name: String,
 	pascal: String,
 	fields: Vec<DartField>,
@@ -121,10 +118,9 @@ struct EventFacts<'a> {
 	discriminator: Vec<u8>,
 	discriminator_value: u64,
 	envelope: Option<DartEnvelope>,
-	history: Option<&'a EventClientHistory>,
 }
 
-impl EventFacts<'_> {
+impl EventFacts {
 	fn header_size(&self) -> usize {
 		self.discriminator.len()
 			+ self
@@ -143,7 +139,6 @@ impl EventFacts<'_> {
 pub(crate) fn emit_dart_event_modules(
 	generated: &Path,
 	program: &str,
-	histories: &EventClientHistoryIndex,
 	root: &RootNode,
 ) -> Result<bool, CodamaError> {
 	if root.program.events.is_empty() {
@@ -152,7 +147,7 @@ pub(crate) fn emit_dart_event_modules(
 	let program_pascal = pascal_case(&snake_to_camel(program));
 	let mut events = Vec::new();
 	for event in &root.program.events {
-		let facts = event_facts(event, &root.program, histories).map_err(|message| {
+		let facts = event_facts(event, &root.program).map_err(|message| {
 			CodamaError::DartClient {
 				path: generated.to_path_buf(),
 				source: message.into(),
@@ -249,7 +244,7 @@ fn register_program_barrel(generated: &Path) -> Result<(), CodamaError> {
 }
 
 /// The shared `event_log.dart` support module.
-fn support_module(program_pascal: &str, events: &[EventFacts<'_>]) -> String {
+fn support_module(program_pascal: &str, events: &[EventFacts]) -> String {
 	let wide_versions = events.iter().any(|facts| {
 		facts
 			.envelope
@@ -306,15 +301,6 @@ int readLittleEndian(List<int> data, int offset, int width) {
   }
   return value;
 }
-
-/// Encode a little-endian unsigned integer of `width` bytes.
-Uint8List writeLittleEndian(int value, int width) {
-  final bytes = Uint8List(width);
-  for (var index = 0; index < width; index++) {
-    bytes[index] = (value >> (8 * index)) & 0xff;
-  }
-  return bytes;
-}
 ",
 		);
 	}
@@ -350,7 +336,7 @@ fn dart_string_literal(value: &str) -> String {
 fn events_barrel(
 	program_pascal: &str,
 	program_address: &str,
-	events: &[EventFacts<'_>],
+	events: &[EventFacts],
 	exports: &[String],
 ) -> String {
 	let mut lines = vec![
@@ -394,8 +380,8 @@ fn events_barrel(
 		"/// and lines outside any frame are skipped rather than trusted.",
 		"///",
 		"/// Unrelated lines are skipped. A line this program emitted that names an event",
-		"/// but carries an unknown, future, or non-projectable version throws instead of",
-		"/// being silently dropped. The per-event `parse*FromLog` helpers decode one line",
+		"/// but carries a version no generated event describes throws instead of being",
+		"/// silently dropped. The per-event `parse*FromLog` helpers decode one line",
 		"/// without this attribution and are only safe for data already known to come",
 		"/// from this program.",
 	] {
@@ -433,14 +419,97 @@ fn events_barrel(
 		lines.push("      continue;".to_owned());
 		lines.push("    }".to_owned());
 	}
+	let families = enveloped_families(events);
+	if !families.is_empty() {
+		lines.push("    final unknownVersion = _unrecognizedEventVersion(log);".to_owned());
+		lines.push("    if (unknownVersion != null) {".to_owned());
+		lines.push("      throw RangeError(unknownVersion);".to_owned());
+		lines.push("    }".to_owned());
+	}
 	lines.push("  }".to_owned());
 	lines.push("  return discovered;".to_owned());
 	lines.push("}".to_owned());
+	if !families.is_empty() {
+		lines.push(String::new());
+		lines.extend(unrecognized_version_function(&families));
+	}
 	lines.join("\n") + "\n"
 }
 
+/// One entry per enveloped discriminator, named by the first node carrying it:
+/// the current version precedes its historical `<Event>V<n>` nodes.
+fn enveloped_families(events: &[EventFacts]) -> Vec<&EventFacts> {
+	let mut families: Vec<&EventFacts> = Vec::new();
+	for facts in events {
+		if facts.envelope.is_some()
+			&& !families
+				.iter()
+				.any(|known| known.discriminator == facts.discriminator)
+		{
+			families.push(facts);
+		}
+	}
+	families
+}
+
+/// The fail-closed check for a migration-aware event whose log record carries
+/// a version no generated event describes: a newer program than this client,
+/// or a corrupt record. Either way, misreading it is worse than failing.
+fn unrecognized_version_function(families: &[&EventFacts]) -> Vec<String> {
+	let mut lines = vec![
+		"/// Explain a `Program data:` line that names a migration-aware event but that".to_owned(),
+		"/// no generated event claimed, or return null for an unrelated line.".to_owned(),
+		"String? _unrecognizedEventVersion(String log) {".to_owned(),
+		"  final bytes = decodeProgramDataLog(log);".to_owned(),
+		"  if (bytes == null) {".to_owned(),
+		"    return null;".to_owned(),
+		"  }".to_owned(),
+	];
+	for facts in families {
+		let width = facts.discriminator.len();
+		let envelope = facts
+			.envelope
+			.as_ref()
+			.expect("enveloped families carry an envelope");
+		let matches = facts
+			.discriminator
+			.iter()
+			.enumerate()
+			.map(|(index, byte)| format!("bytes[{index}] == {byte}"))
+			.collect::<Vec<_>>()
+			.join(" && ");
+		let read = version_read(width, envelope.version_bytes);
+		let name = &facts.name;
+		lines.push(format!("  if (bytes.length >= {width} && {matches}) {{"));
+		lines.push(format!(
+			"    return bytes.length < {}",
+			width + envelope.version_bytes
+		));
+		lines.push(format!(
+			"        ? 'event \"{name}\" log is too short for its version envelope'"
+		));
+		lines.push(format!(
+			"        : 'event \"{name}\" log carries migration version ${{{read}}}, which this \
+			 client cannot decode; regenerate it';"
+		));
+		lines.push("  }".to_owned());
+	}
+	lines.push("  return null;".to_owned());
+	lines.push("}".to_owned());
+	lines
+}
+
+/// A Dart expression reading the little-endian version at `offset`.
+fn version_read(offset: usize, width: usize) -> String {
+	if width == 1 {
+		format!("bytes[{offset}]")
+	} else {
+		format!("readLittleEndian(bytes, {offset}, {width})")
+	}
+}
+
 /// The per-event module.
-fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> String {
+fn event_module(program_pascal: &str, facts: &EventFacts) -> String {
 	let pascal = &facts.pascal;
 	let camel = lower_camel(pascal);
 	let class_name = format!("{pascal}Event");
@@ -478,22 +547,16 @@ fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> String {
 	lines.push("import 'event_log.dart';".to_owned());
 	lines.push(String::new());
 	lines.push(format!("/// Event record `{pascal}`."));
-	if facts.envelope.is_none() {
-		lines.push(format!(
-			"class {class_name} extends {program_pascal}Event {{"
-		));
-	} else {
-		lines.push(format!("class {class_name} {{"));
-	}
+	lines.push(format!(
+		"class {class_name} extends {program_pascal}Event {{"
+	));
 	lines.push(format!("\tconst {class_name}({{"));
 	lines.push(constructor_arguments);
 	lines.push("\t});".to_owned());
 	lines.push(String::new());
 	lines.push(fields);
 	lines.push(String::new());
-	if facts.envelope.is_none() {
-		lines.push("\t@override".to_owned());
-	}
+	lines.push("\t@override".to_owned());
 	lines.push(format!("\tString get name => '{}';", facts.name));
 	lines.push(String::new());
 	lines.push(format!(
@@ -514,7 +577,7 @@ fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> String {
 	));
 	if let Some(envelope) = &facts.envelope {
 		lines.push(String::new());
-		lines.push("/// The version this client was generated from.".to_owned());
+		lines.push("/// The migration version this event decodes.".to_owned());
 		lines.push(format!(
 			"const {camel}EventMigrationVersion = {};",
 			envelope.version,
@@ -526,7 +589,7 @@ fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> String {
 	));
 	lines.push(format!("const {camel}EventSize = {size};"));
 	lines.push(String::new());
-	lines.push(format!("/// Decode one current-version `{pascal}` record."));
+	lines.push(format!("/// Decode one `{pascal}` record."));
 	lines.push(format!(
 		"{class_name} decode{pascal}Event(Uint8List data) {{"
 	));
@@ -549,40 +612,20 @@ fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> String {
 	lines.push("}".to_owned());
 	lines.push(String::new());
 
-	if let (Some(envelope), Some(history)) = (&facts.envelope, facts.history) {
-		lines.extend(projection_module(
-			program_pascal,
-			facts,
-			envelope,
-			history,
-			&class_name,
-			&camel,
-		));
-	}
-
 	lines.push(format!("/// A decoded `{pascal}` log record."));
-	lines.push(if facts.envelope.is_some() {
-		format!("typedef Decoded{pascal}Event = Normalized{pascal}Event;")
-	} else {
-		format!("typedef Decoded{pascal}Event = {class_name};")
-	});
+	lines.push(format!("typedef Decoded{pascal}Event = {class_name};"));
 	lines.push(String::new());
 	lines.push(
 		"/// Decode a `Program data:` log line, or return null when the line is not".to_owned(),
 	);
 	lines.push("/// this event.".to_owned());
-	let return_type = if facts.envelope.is_some() {
-		format!("Normalized{pascal}Event?")
-	} else {
-		format!("{class_name}?")
-	};
 	lines.push(format!(
-		"{return_type} parse{pascal}EventFromLog(String log) {{"
+		"{class_name}? parse{pascal}EventFromLog(String log) {{"
 	));
 	lines.push("\tfinal bytes = decodeProgramDataLog(log);".to_owned());
 	lines.push(format!(
 		"\tif (bytes == null || bytes.length < {}) {{",
-		facts.discriminator.len()
+		facts.header_size()
 	));
 	lines.push("\t\treturn null;".to_owned());
 	lines.push("\t}".to_owned());
@@ -596,18 +639,24 @@ fn event_module(program_pascal: &str, facts: &EventFacts<'_>) -> String {
 	lines.push("\t\t\treturn null;".to_owned());
 	lines.push("\t\t}".to_owned());
 	lines.push("\t}".to_owned());
-	if facts.envelope.is_some() {
-		lines.push(format!("\treturn normalize{pascal}Event(bytes);"));
-	} else {
-		lines.push(format!("\treturn decode{pascal}Event(bytes);"));
+	if let Some(envelope) = &facts.envelope {
+		// Another version of this event shares the discriminator, so only
+		// this node's own version is claimed here.
+		lines.push(format!(
+			"\tif ({} != {camel}EventMigrationVersion) {{",
+			version_read(facts.discriminator.len(), envelope.version_bytes)
+		));
+		lines.push("\t\treturn null;".to_owned());
+		lines.push("\t}".to_owned());
 	}
+	lines.push(format!("\treturn decode{pascal}Event(bytes);"));
 	lines.push("}".to_owned());
 
 	lines.join("\n") + "\n"
 }
 
 /// The generated field reads plus the version guard.
-fn decode_field_reads(facts: &EventFacts<'_>) -> String {
+fn decode_field_reads(facts: &EventFacts) -> String {
 	let mut lines = String::new();
 	for (index, field) in facts.fields.iter().enumerate() {
 		let decoder = &field.decoder;
@@ -619,9 +668,7 @@ fn decode_field_reads(facts: &EventFacts<'_>) -> String {
 		// A `migrationVersion` field only exists on envelope events.
 		if let (DartFieldKind::Version, Some(envelope)) = (&field.kind, facts.envelope.as_ref()) {
 			let expected = envelope.version;
-			let stale = "the log predates this client; project it through the checked-in event \
-			             history or decode it with a client generated from the schema that wrote \
-			             it";
+			let stale = "decode it with the event for that version";
 			let future = "the log was written by a newer program; upgrade this client";
 			let _ = writeln!(lines, "\tif (v{index} != {expected}) {{");
 			let _ = writeln!(lines, "\t\tthrow RangeError(");
@@ -656,231 +703,7 @@ fn decode_field_reads(facts: &EventFacts<'_>) -> String {
 	lines
 }
 
-/// The normalization API for one migration-aware event.
-fn projection_module(
-	program_pascal: &str,
-	facts: &EventFacts<'_>,
-	envelope: &DartEnvelope,
-	history: &EventClientHistory,
-	class_name: &str,
-	camel: &str,
-) -> Vec<String> {
-	let pascal = &facts.pascal;
-	let current = envelope.version;
-	let header_size = facts.header_size();
-	let version_offset = facts.discriminator.len();
-	let version_end = header_size;
-	let wide_version = envelope.version_bytes > 1;
-	let mut lines = Vec::new();
-
-	let steps = history
-		.steps
-		.iter()
-		.map(|step| {
-			let moves = step
-				.moves
-				.iter()
-				.map(|movement| {
-					format!(
-						"({}, {}, {})",
-						movement.source_offset, movement.destination_offset, movement.size,
-					)
-				})
-				.collect::<Vec<_>>()
-				.join(", ");
-			format!(
-				"\t({}, {}, {}, {}, {}, [{}]),",
-				step.from,
-				step.to,
-				step.automatic,
-				step.source_payload_size,
-				step.destination_payload_size,
-				moves,
-			)
-		})
-		.collect::<Vec<_>>()
-		.join("\n");
-
-	lines.push("/// Event bytes projected into the current shape.".to_owned());
-	lines.push(format!(
-		"class Normalized{pascal}Event extends {program_pascal}Event {{"
-	));
-	lines.push(format!("\tconst Normalized{pascal}Event({{"));
-	lines.push("\t\trequired this.data,".to_owned());
-	lines.push("\t\trequired this.sourceVersion,".to_owned());
-	lines.push("\t\trequired this.wasMigrated,".to_owned());
-	lines.push("\t});".to_owned());
-	lines.push(String::new());
-	lines.push(format!("\tfinal {class_name} data;"));
-	lines.push(String::new());
-	lines.push(
-		"\t/// The version carried by the immutable log record, matching the runtime's".to_owned(),
-	);
-	lines.push("\t/// `CurrentEventData::source_version`.".to_owned());
-	lines.push("\tfinal int sourceVersion;".to_owned());
-	lines.push(String::new());
-	lines.push("\t/// Whether a historical projection ran.".to_owned());
-	lines.push("\tfinal bool wasMigrated;".to_owned());
-	lines.push(String::new());
-	lines.push("\t@override".to_owned());
-	lines.push(format!("\tString get name => '{}';", facts.name));
-	lines.push("}".to_owned());
-	lines.push(String::new());
-	lines.push(
-		"/// Adjacent projections from the checked-in migration manifest: `(from, to,".to_owned(),
-	);
-	lines.push("/// automatic, source payload size, destination payload size, moves)`.".to_owned());
-	lines.push(format!(
-		"const List<(int, int, bool, int, int, List<(int, int, int)>)> _{camel}ProjectionSteps = ["
-	));
-	lines.push(steps);
-	lines.push("];".to_owned());
-	lines.push(String::new());
-	lines.push(
-		"/// Project current or historical bytes into the current shape, mirroring the".to_owned(),
-	);
-	lines.push(
-		"/// runtime's `normalize_event_data`. Unknown, future, non-exact, and manual".to_owned(),
-	);
-	lines.push("/// transitions fail closed.".to_owned());
-	lines.push(format!(
-		"Normalized{pascal}Event normalize{pascal}Event(Uint8List data) {{"
-	));
-	lines.push(format!("\tif (data.length < {header_size}) {{"));
-	lines.push(format!(
-		"\t\tthrow RangeError('the provided data is too short for the \"{pascal}\" event \
-		 envelope');"
-	));
-	lines.push("\t}".to_owned());
-	lines.push(format!(
-		"\tfor (var index = 0; index < {}; index++) {{",
-		facts.discriminator.len()
-	));
-	lines.push(format!(
-		"\t\tif (data[index] != _{camel}EventDiscriminatorBytes[index]) {{"
-	));
-	lines.push(format!(
-		"\t\t\tthrow RangeError('the provided data does not match the \"{pascal}\" event \
-		 discriminator');"
-	));
-	lines.push("\t\t}".to_owned());
-	lines.push("\t}".to_owned());
-	if wide_version {
-		lines.push(format!(
-			"\tfinal sourceVersion = readLittleEndian(data, {version_offset}, {});",
-			envelope.version_bytes
-		));
-	} else {
-		lines.push(format!("\tfinal sourceVersion = data[{version_offset}];"));
-	}
-	lines.push(format!("\tif (sourceVersion > {current}) {{"));
-	lines.push("\t\tthrow RangeError(".to_owned());
-	lines.push(format!(
-		"\t\t\t'event migration version mismatch: expected {current}, received $sourceVersion \
-		 (the log was written by a newer program; upgrade this client)',"
-	));
-	lines.push("\t\t);".to_owned());
-	lines.push("\t}".to_owned());
-	lines.push(format!("\tif (sourceVersion == {current}) {{"));
-	lines.push(format!("\t\treturn Normalized{pascal}Event("));
-	lines.push(format!("\t\t\tdata: decode{pascal}Event(data),"));
-	lines.push("\t\t\tsourceVersion: sourceVersion,".to_owned());
-	lines.push("\t\t\twasMigrated: false,".to_owned());
-	lines.push("\t\t);".to_owned());
-	lines.push("\t}".to_owned());
-	lines.push(format!(
-		"\tfinal projected = _project{pascal}Event(data, sourceVersion);"
-	));
-	lines.push(format!("\treturn Normalized{pascal}Event("));
-	lines.push(format!("\t\tdata: decode{pascal}Event(projected),"));
-	lines.push("\t\tsourceVersion: sourceVersion,".to_owned());
-	lines.push("\t\twasMigrated: true,".to_owned());
-	lines.push("\t);".to_owned());
-	lines.push("}".to_owned());
-	lines.push(String::new());
-	lines.push(format!(
-		"Uint8List _project{pascal}Event(Uint8List data, int sourceVersion) {{"
-	));
-	lines.push("\tvar version = sourceVersion;".to_owned());
-	lines.push(format!(
-		"\tvar payload = Uint8List.fromList(data.sublist({header_size}));"
-	));
-	lines.push(format!("\twhile (version != {current}) {{"));
-	lines.push("\t\t(int, int, bool, int, int, List<(int, int, int)>)? step;".to_owned());
-	lines.push(format!(
-		"\t\tfor (final candidate in _{camel}ProjectionSteps) {{"
-	));
-	lines.push("\t\t\tif (candidate.$1 == version) {".to_owned());
-	lines.push("\t\t\t\tstep = candidate;".to_owned());
-	lines.push("\t\t\t\tbreak;".to_owned());
-	lines.push("\t\t\t}".to_owned());
-	lines.push("\t\t}".to_owned());
-	lines.push("\t\tif (step == null) {".to_owned());
-	lines.push("\t\t\tthrow RangeError(".to_owned());
-	lines.push(format!(
-		"\t\t\t\t'event migration version mismatch: expected {current}, received $version (this \
-		 client has no checked-in projection for it)',"
-	));
-	lines.push("\t\t\t);".to_owned());
-	lines.push("\t\t}".to_owned());
-	lines.push("\t\tif (!step.$3) {".to_owned());
-	lines.push("\t\t\tthrow RangeError(".to_owned());
-	lines.push(format!(
-		"\t\t\t\t'event migration version mismatch: expected {current}, received ${{step.$1}} \
-		 (the v${{step.$1}} to v${{step.$2}} transition is manual, so only an on-chain projection \
-		 or a client generated from that schema can represent it)',"
-	));
-	lines.push("\t\t\t);".to_owned());
-	lines.push("\t\t}".to_owned());
-	lines.push("\t\tif (payload.length != step.$4) {".to_owned());
-	lines.push("\t\t\tthrow RangeError(".to_owned());
-	lines.push(format!(
-		"\t\t\t\t'event migration version mismatch: expected {current}, received $version (the \
-		 log length does not match the v$version schema)',"
-	));
-	lines.push("\t\t\t);".to_owned());
-	lines.push("\t\t}".to_owned());
-	lines.push("\t\tfinal destination = Uint8List(step.$5);".to_owned());
-	lines.push("\t\tfor (final (sourceOffset, destinationOffset, size) in step.$6) {".to_owned());
-	lines.push(
-		"\t\t\tdestination.setRange(destinationOffset, destinationOffset + size, payload, \
-		 sourceOffset);"
-			.to_owned(),
-	);
-	lines.push("\t\t}".to_owned());
-	lines.push("\t\tpayload = destination;".to_owned());
-	lines.push("\t\tversion = step.$2;".to_owned());
-	lines.push("\t}".to_owned());
-	lines.push(String::new());
-	lines.push(format!(
-		"\tfinal projected = Uint8List({header_size} + payload.length);"
-	));
-	lines.push(format!(
-		"\tprojected.setRange(0, {}, _{camel}EventDiscriminatorBytes);",
-		facts.discriminator.len()
-	));
-	if wide_version {
-		lines.push(format!(
-			"\tprojected.setRange({version_offset}, {version_end}, writeLittleEndian({current}, \
-			 {}));",
-			envelope.version_bytes
-		));
-	} else {
-		lines.push(format!("\tprojected[{version_offset}] = {current};"));
-	}
-	lines.push(format!(
-		"\tprojected.setRange({header_size}, projected.length, payload);"
-	));
-	lines.push("\treturn projected;".to_owned());
-	lines.push("}".to_owned());
-	lines
-}
-
-fn event_facts<'a>(
-	event: &EventNode,
-	program: &ProgramNode,
-	histories: &'a EventClientHistoryIndex,
-) -> Result<Option<EventFacts<'a>>, String> {
+fn event_facts(event: &EventNode, program: &ProgramNode) -> Result<Option<EventFacts>, String> {
 	let TypeNode::Struct(data) = event.data.as_ref() else {
 		return Ok(None);
 	};
@@ -889,12 +712,6 @@ fn event_facts<'a>(
 	};
 	let discriminator = discriminator_value.to_le_bytes()[..discriminator_width].to_vec();
 	let envelope = envelope_facts(event);
-	let history = envelope.as_ref().and_then(|_| {
-		let mut padded = [0_u8; 8];
-		let width = discriminator.len().min(padded.len());
-		padded[..width].copy_from_slice(&discriminator[..width]);
-		histories.get(discriminator.len(), u64::from_le_bytes(padded))
-	});
 	let (fields, imports) = dart_fields(data, envelope.as_ref(), program)?;
 	Ok(Some(EventFacts {
 		name: event.name.as_ref().to_owned(),
@@ -904,7 +721,6 @@ fn event_facts<'a>(
 		discriminator,
 		discriminator_value,
 		envelope,
-		history,
 	}))
 }
 
@@ -980,12 +796,12 @@ fn constant_discriminator(event: &EventNode) -> Option<(u64, usize)> {
 	})
 }
 
-fn discriminator_literal(facts: &EventFacts<'_>) -> String {
+fn discriminator_literal(facts: &EventFacts) -> String {
 	facts.discriminator_value.to_string()
 }
 
 /// `[4]`, `[0, 1]`, ... for byte-array comparisons.
-fn discriminator_bytes_literal(facts: &EventFacts<'_>) -> String {
+fn discriminator_bytes_literal(facts: &EventFacts) -> String {
 	let bytes = facts
 		.discriminator
 		.iter()
@@ -1266,26 +1082,6 @@ mod tests {
 			.unwrap_or_else(|error| panic!("decode {}: {error}", path.display()))
 	}
 
-	fn history() -> EventClientHistory {
-		EventClientHistory {
-			rust_name: "ValueChangedEvent".to_owned(),
-			discriminator: vec![4],
-			current_version: 1,
-			steps: vec![crate::client_events::EventProjectionStep {
-				from: 0,
-				to: 1,
-				automatic: true,
-				source_payload_size: 8,
-				destination_payload_size: 10,
-				moves: vec![crate::client_events::EventFieldMove {
-					source_offset: 0,
-					destination_offset: 0,
-					size: 8,
-				}],
-			}],
-		}
-	}
-
 	fn test_program() -> ProgramNode {
 		ProgramNode::new("eventsProgram", "11111111111111111111111111111111")
 	}
@@ -1524,8 +1320,7 @@ mod tests {
 			NumberFormat::U8,
 			Number::UnsignedInteger(9),
 		)];
-		let histories = EventClientHistoryIndex::default();
-		let facts = event_facts(&event, &program, &histories)
+		let facts = event_facts(&event, &program)
 			.unwrap_or_else(|error| panic!("facts: {error}"))
 			.unwrap_or_else(|| panic!("event facts"));
 		let module = event_module("EventsProgram", &facts);
@@ -1604,11 +1399,7 @@ mod tests {
 			NumberFormat::U8,
 			Number::UnsignedInteger(4),
 		)];
-		let histories = EventClientHistoryIndex::default();
-		assert!(matches!(
-			event_facts(&event, &test_program(), &histories),
-			Ok(None)
-		));
+		assert!(matches!(event_facts(&event, &test_program()), Ok(None)));
 		// The envelope reader also rejects non-struct data on its own.
 		assert!(envelope_facts(&event).is_none());
 	}
@@ -1784,22 +1575,16 @@ mod tests {
 			NumberFormat::U16,
 			Number::UnsignedInteger(2),
 		);
-		let mut histories = EventClientHistoryIndex::default();
-		histories.insert_for_test(history());
 		let program = test_program();
-		let facts = event_facts(&event, &program, &histories)
+		let facts = event_facts(&event, &program)
 			.unwrap_or_else(|error| panic!("facts: {error}"))
 			.unwrap_or_else(|| panic!("event facts"));
 		let module = event_module("EventsProgram", &facts);
-		assert!(module.contains("readLittleEndian(data,"), "{module}");
-		assert!(module.contains("writeLittleEndian("), "{module}");
+		assert!(module.contains("readLittleEndian(bytes, 1, 2)"), "{module}");
 
 		let support = support_module("EventsProgram", std::slice::from_ref(&facts));
 		assert!(support.contains("int readLittleEndian("), "{support}");
-		assert!(
-			support.contains("Uint8List writeLittleEndian("),
-			"{support}"
-		);
+		assert!(!support.contains("writeLittleEndian("), "{support}");
 	}
 
 	#[test]
@@ -1811,13 +1596,8 @@ mod tests {
 		let temporary = tempfile::tempdir().expect("temp dir");
 		let generated = temporary.path().join("lib/src/generated/events_program");
 		std::fs::create_dir_all(&generated).expect("generated dir");
-		let error = emit_dart_event_modules(
-			&generated,
-			"events_program",
-			&EventClientHistoryIndex::default(),
-			&root,
-		)
-		.expect_err("unsupported fields must fail generation");
+		let error = emit_dart_event_modules(&generated, "events_program", &root)
+			.expect_err("unsupported fields must fail generation");
 		assert!(
 			error.to_string().contains("does not support yet"),
 			"{error}"
@@ -1827,13 +1607,8 @@ mod tests {
 		for event in &mut root.program.events {
 			event.discriminators.clear();
 		}
-		let error = emit_dart_event_modules(
-			&generated,
-			"events_program",
-			&EventClientHistoryIndex::default(),
-			&root,
-		)
-		.expect_err("events without discriminators must fail generation");
+		let error = emit_dart_event_modules(&generated, "events_program", &root)
+			.expect_err("events without discriminators must fail generation");
 		assert!(
 			error.to_string().contains("no constant discriminator"),
 			"{error}"
@@ -1843,14 +1618,13 @@ mod tests {
 	#[test]
 	fn emit_reports_io_failures() {
 		let root = read_idl("events_program.json");
-		let histories = EventClientHistoryIndex::default();
 
 		let temporary = tempfile::tempdir().expect("temp dir");
 		let generated = temporary.path().join("lib/src/generated/events_program");
 		std::fs::create_dir_all(&generated).expect("generated dir");
 		std::fs::write(generated.join("events"), b"file").expect("blocked events path");
 		assert!(
-			emit_dart_event_modules(&generated, "events_program", &histories, &root).is_err(),
+			emit_dart_event_modules(&generated, "events_program", &root).is_err(),
 			"a blocked events directory must fail"
 		);
 
@@ -1858,7 +1632,7 @@ mod tests {
 		let generated = temporary.path().join("lib/src/generated/events_program");
 		std::fs::create_dir_all(generated.join("events/event_log.dart")).expect("blocked support");
 		assert!(
-			emit_dart_event_modules(&generated, "events_program", &histories, &root).is_err(),
+			emit_dart_event_modules(&generated, "events_program", &root).is_err(),
 			"a blocked support module must fail"
 		);
 
@@ -1866,7 +1640,7 @@ mod tests {
 		let generated = temporary.path().join("lib/src/generated/events_program");
 		std::fs::create_dir_all(generated.join("events/my_event.dart")).expect("blocked event");
 		assert!(
-			emit_dart_event_modules(&generated, "events_program", &histories, &root).is_err(),
+			emit_dart_event_modules(&generated, "events_program", &root).is_err(),
 			"a blocked event module must fail"
 		);
 
@@ -1874,7 +1648,7 @@ mod tests {
 		let generated = temporary.path().join("lib/src/generated/events_program");
 		std::fs::create_dir_all(generated.join("events/events.dart")).expect("blocked barrel");
 		assert!(
-			emit_dart_event_modules(&generated, "events_program", &histories, &root).is_err(),
+			emit_dart_event_modules(&generated, "events_program", &root).is_err(),
 			"a blocked barrel must fail"
 		);
 	}
@@ -1922,18 +1696,16 @@ mod tests {
 	}
 
 	#[test]
-	fn emits_projection_for_migration_aware_events() {
+	fn emits_version_scoped_decoders_for_migration_aware_events() {
 		let root = read_idl("migrations_program.json");
-		let mut histories = EventClientHistoryIndex::default();
-		histories.insert_for_test(history());
 		let program = pascal_case(&snake_to_camel("migrations_program"));
-		let facts = event_facts(&root.program.events[0], &root.program, &histories)
+		let facts = event_facts(&root.program.events[0], &root.program)
 			.unwrap_or_else(|error| panic!("facts: {error}"))
 			.unwrap_or_else(|| panic!("event facts"));
 		let module = event_module(&program, &facts);
 
 		for expected in [
-			"class ValueChangedEventEvent {",
+			"class ValueChangedEventEvent extends MigrationsProgramEvent {",
 			"final int discriminator;",
 			"final int migrationVersion;",
 			"final BigInt value;",
@@ -1941,14 +1713,12 @@ mod tests {
 			"const valueChangedEventEventDiscriminator = 4;",
 			"const valueChangedEventEventMigrationVersion = 1;",
 			"const valueChangedEventEventSize = 12;",
-			"class NormalizedValueChangedEventEvent extends MigrationsProgramEvent {",
-			"final int sourceVersion;",
-			"final bool wasMigrated;",
-			"(0, 1, true, 8, 10, [(0, 0, 8)]),",
+			"typedef DecodedValueChangedEventEvent = ValueChangedEventEvent;",
+			"if (bytes[1] != valueChangedEventEventMigrationVersion) {",
+			"decode it with the event for that version",
 			"upgrade this client",
 			"import 'dart:typed_data';",
 			"var cursor = 0;",
-			"normalizeValueChangedEventEvent",
 			"parseValueChangedEventEventFromLog",
 		] {
 			assert!(
@@ -1956,22 +1726,95 @@ mod tests {
 				"missing `{expected}` in:\n{module}"
 			);
 		}
+		assert!(!module.contains("Normalized"), "{module}");
+		assert!(!module.contains("ProjectionSteps"), "{module}");
+	}
+
+	#[test]
+	fn the_barrel_fails_closed_on_an_unclaimed_version() {
+		let program = test_program();
+		let current = envelope_event("valueChanged", NumberFormat::U8, Number::UnsignedInteger(1));
+		let historical = envelope_event(
+			"valueChangedV0",
+			NumberFormat::U8,
+			Number::UnsignedInteger(0),
+		);
+		let events = [current, historical]
+			.iter()
+			.map(|event| {
+				let facts = event_facts(event, &program);
+				let facts = facts.unwrap_or_else(|error| panic!("facts: {error}"));
+				facts.unwrap_or_else(|| panic!("event facts"))
+			})
+			.collect::<Vec<_>>();
+		let barrel = events_barrel(
+			"EventsProgram",
+			"11111111111111111111111111111111",
+			&events,
+			&["event_log.dart".to_owned()],
+		);
+
+		assert!(barrel.contains("final unknownVersion = _unrecognizedEventVersion(log);"));
+		// One check per discriminator, named by the current version's node.
+		assert_eq!(
+			barrel.matches("bytes.length >= 1 && bytes[0] == 4").count(),
+			1
+		);
+		assert!(
+			barrel.contains("event \"valueChanged\" log carries migration version ${bytes[1]}")
+		);
+
+		let wide = version_read(1, 4);
+		assert_eq!(wide, "readLittleEndian(bytes, 1, 4)");
+	}
+
+	/// A barrel whose events carry no version envelope has no version to
+	/// reject, so it emits no fail-closed version check.
+	#[test]
+	fn a_barrel_without_enveloped_events_has_no_version_check() {
+		let program = test_program();
+		let mut event = EventNode::new(
+			"plainChanged",
+			StructTypeNode::new(vec![
+				event_number_field(
+					"discriminator",
+					NumberFormat::U8,
+					Number::UnsignedInteger(4),
+				),
+				plain_field("value", number(NumberFormat::U64)),
+			]),
+		);
+		event.discriminators = vec![event_discriminator(
+			NumberFormat::U8,
+			Number::UnsignedInteger(4),
+		)];
+		let facts = event_facts(&event, &program);
+		let facts = facts.unwrap_or_else(|error| panic!("facts: {error}"));
+		let facts = facts.unwrap_or_else(|| panic!("event facts"));
+		let barrel = events_barrel(
+			"EventsProgram",
+			"11111111111111111111111111111111",
+			&[facts],
+			&["event_log.dart".to_owned()],
+		);
+
+		assert!(barrel.contains("final plainChanged = parsePlainChangedEventFromLog(log);"));
+		assert!(!barrel.contains("_unrecognizedEventVersion"));
 	}
 
 	#[test]
 	fn emits_current_only_decoders_for_events_without_history() {
 		let root = read_idl("events_program.json");
 		let program = pascal_case(&snake_to_camel("events_program"));
-		let histories = EventClientHistoryIndex::default();
-		let facts = event_facts(&root.program.events[0], &root.program, &histories)
+		let facts = event_facts(&root.program.events[0], &root.program)
 			.unwrap_or_else(|error| panic!("facts: {error}"))
 			.unwrap_or_else(|| panic!("event facts"));
 		let module = event_module(&program, &facts);
 
 		// The program envelopes events, so the emitted class is the enveloped
 		// current shape: it carries the discriminator and migration version as
-		// fields, and with no recorded history there are no projection steps.
-		assert!(module.contains("class MyEventEvent {"));
+		// fields.
+		assert!(module.contains("class MyEventEvent extends EventsProgramEvent {"));
 		assert!(module.contains("required this.discriminator,"));
 		assert!(module.contains("required this.migrationVersion,"));
 		assert!(module.contains("Uint8List label;"));
@@ -1985,8 +1828,7 @@ mod tests {
 		for event in &mut root.program.events {
 			event.discriminators.clear();
 		}
-		let histories = EventClientHistoryIndex::default();
-		let facts = event_facts(&root.program.events[0], &root.program, &histories);
+		let facts = event_facts(&root.program.events[0], &root.program);
 		assert!(
 			matches!(facts, Ok(None)),
 			"an event without a discriminator has no log entry point",
@@ -2006,13 +1848,12 @@ mod tests {
 	fn barrel_dispatches_every_event() {
 		let root = read_idl("events_program.json");
 		let program = pascal_case(&snake_to_camel("events_program"));
-		let histories = EventClientHistoryIndex::default();
 		let events = root
 			.program
 			.events
 			.iter()
 			.map(|event| {
-				event_facts(event, &root.program, &histories)
+				event_facts(event, &root.program)
 					.unwrap_or_else(|error| panic!("facts: {error}"))
 					.unwrap_or_else(|| panic!("event facts"))
 			})
@@ -2055,8 +1896,7 @@ mod tests {
 		}
 		let program = root.program.clone();
 		let event = root.program.events.remove(0);
-		let histories = EventClientHistoryIndex::default();
-		let facts = event_facts(&event, &program, &histories);
+		let facts = event_facts(&event, &program);
 		let message = facts
 			.err()
 			.unwrap_or_else(|| panic!("unsupported field must fail"));
@@ -2084,8 +1924,6 @@ mod tests {
 	#[test]
 	fn writes_event_modules_and_registers_the_barrel() {
 		let root = read_idl("migrations_program.json");
-		let mut histories = EventClientHistoryIndex::default();
-		histories.insert_for_test(history());
 		let temporary = tempfile::tempdir().expect("temp dir");
 		let generated = temporary
 			.path()
@@ -2095,8 +1933,7 @@ mod tests {
 		std::fs::write(&barrel, "export 'accounts/accounts.dart';\n").expect("barrel");
 
 		let needs_helper =
-			emit_dart_event_modules(&generated, "migrations_program", &histories, &root)
-				.expect("emit modules");
+			emit_dart_event_modules(&generated, "migrations_program", &root).expect("emit modules");
 		assert!(!needs_helper, "the event module does not use bool fields");
 
 		let support = std::fs::read_to_string(generated.join("events/event_log.dart"))
@@ -2104,14 +1941,12 @@ mod tests {
 		assert!(support.contains("abstract class MigrationsProgramEvent"));
 		let event = std::fs::read_to_string(generated.join("events/value_changed_event.dart"))
 			.expect("event module");
-		assert!(
-			event.contains("class NormalizedValueChangedEventEvent extends MigrationsProgramEvent")
-		);
+		assert!(event.contains("class ValueChangedEventEvent extends MigrationsProgramEvent"));
 		let barrel_source = std::fs::read_to_string(&barrel).expect("barrel");
 		assert!(barrel_source.contains("export 'events/events.dart';"));
 
 		// Re-running generation must not duplicate the barrel export.
-		emit_dart_event_modules(&generated, "migrations_program", &histories, &root)
+		emit_dart_event_modules(&generated, "migrations_program", &root)
 			.expect("emit modules twice");
 		let barrel_source = std::fs::read_to_string(&barrel).expect("barrel");
 		assert_eq!(barrel_source.matches("events/events.dart").count(), 1);
@@ -2124,13 +1959,8 @@ mod tests {
 		let generated = temporary.path().join("lib/src/generated/counter_program");
 		std::fs::create_dir_all(&generated).expect("generated dir");
 
-		let needs_helper = emit_dart_event_modules(
-			&generated,
-			"counter_program",
-			&EventClientHistoryIndex::default(),
-			&root,
-		)
-		.expect("no-op emit");
+		let needs_helper =
+			emit_dart_event_modules(&generated, "counter_program", &root).expect("no-op emit");
 		assert!(!needs_helper);
 		assert!(!generated.join("events/event_log.dart").exists());
 	}
@@ -2145,8 +1975,7 @@ mod tests {
 		}
 		let program = root.program.clone();
 		let event = root.program.events.remove(0);
-		let histories = EventClientHistoryIndex::default();
-		let facts = event_facts(&event, &program, &histories)
+		let facts = event_facts(&event, &program)
 			.unwrap_or_else(|error| panic!("facts: {error}"))
 			.unwrap_or_else(|| panic!("event facts"));
 		let module = event_module("EventsProgram", &facts);

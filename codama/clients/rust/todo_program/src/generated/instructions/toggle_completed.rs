@@ -9,7 +9,6 @@
 )]
 
 pub const TOGGLE_COMPLETED_DISCRIMINATOR: u8 = 1u8;
-pub const TOGGLE_COMPLETED_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -70,7 +69,6 @@ impl ToggleCompletedInstructionData {
 		<ToggleCompletedInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TOGGLE_COMPLETED_DISCRIMINATOR;
-			data.migration_version = TOGGLE_COMPLETED_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -84,5 +82,4 @@ impl ToggleCompletedInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ToggleCompletedInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 }

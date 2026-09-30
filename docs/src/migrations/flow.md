@@ -6,21 +6,32 @@ An interactive version of this page is at [flow-interactive.html](./flow-interac
 
 ## The one-paragraph answer
 
-**Migration happens on-chain, inside the program, on demand.** A client never migrates account data and never needs to know a migration exists. Every wire carrier — account, instruction payload, event — carries a version envelope right after its discriminator, every client writes the version it was generated with, and the program normalizes whatever arrives into its current representation inside the transaction that touched it. If the transaction fails, Solana rolls the migration back with everything else.
+**Migration happens on-chain, inside the program, on demand.** A client never migrates account data and never needs to know a migration exists. An account carries a version envelope right after its discriminator, and the program migrates a stale account to its current representation inside the transaction that touches it. An instruction payload is recorded as a snapshot that fails the build on a wire-breaking change; only an instruction that opts in with `migrations` carries the envelope, and the generated dispatcher normalizes an older payload before the handler runs. An event is versioned, not migrated: the program emits only the current version, and generated clients decode each historical version with the schema that emitted it. Wherever an envelope exists, every client writes the version it was generated with. If the transaction fails, Solana rolls the migration back with everything else.
+
+## What each contract kind carries
+
+| Kind                                    | Wire format                         | Recorded history                                           | After publication, a schema change…                                                    |
+| --------------------------------------- | ----------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Account                                 | `[discriminator][version][payload]` | every version, joined by adjacent transitions              | appends a version; stale accounts migrate on-chain when touched                        |
+| Instruction under `auto` only           | `[discriminator][payload]`          | one snapshot, recorded as `"envelope": false`              | is rejected; only appending optional accounts is allowed, in place                     |
+| Instruction with the `migrations` token | `[discriminator][version][payload]` | every version, joined by adjacent transitions              | appends a version; the dispatcher normalizes older payloads before the handler runs    |
+| Event with `migrations` or under `auto` | `[discriminator][version][payload]` | every version, each with its own schema and no transitions | appends a version; the program emits only the newest, and clients decode every version |
+
+The manifest key `kind:width:hex` (for example `instruction:1:00`) is the contract's identity, and version numbers are positions in its `versions` array. [ABI document versioning](./abi-versioning.md) covers the document itself.
 
 ## Development-time flow
 
 ### Opting in
 
-One contract opts in with the `migrations` token; a whole program opts in through `[migrations].auto`:
+One contract opts in with the `migrations` token; a whole program opts in with the `--auto` flag of `pina migrations create`:
 
-```toml
-[migrations]
-version_type = "u8"
-auto = true # or ["accounts", "events", "instructions"], or a staged subset
+```bash
+pina migrations create --auto true # or --auto accounts,events,instructions, or a staged subset
 ```
 
-`pina migrations create` records the policy in `migrations/manifest.json` and snapshots every contract of the listed kinds, so the manifest stays the checked-in source of truth that macros consult. A declaration the manifest does not record yet still fails the build with the `pina migrations create` remedy. Because a proc macro does not re-expand when `pina.toml` changes, a program with a policy also gets a build script emitting `cargo:rerun-if-changed=migrations/manifest.json`; `create` scaffolds it or reports the exact line when a hand-written build script must be edited. Explicit `migrations = false` overrides the policy for one contract, and removing an envelope the manifest already records fails closed as a wire-format change.
+`create` records the policy as `auto` in `migrations/manifest.json` and snapshots every contract of the listed kinds; a later run without the flag keeps it. The manifest is the only home of the policy and of the version width, so it stays the checked-in source of truth that macros consult. `pina.toml` holds neither: its retired `[migrations].auto` and `[migrations].version_type` keys fail every command that reads it, naming the flag that replaces them. A declaration the manifest does not record yet still fails the build with the `pina migrations create` remedy. Because a proc macro does not re-expand when the manifest changes, a program with a policy also gets a build script emitting `cargo:rerun-if-changed=migrations/manifest.json`; `create` scaffolds it or reports the exact line when a hand-written build script must be edited. Explicit `migrations = false` overrides the policy for one contract, and removing an envelope the manifest already records fails closed as a wire-format change, whether it comes from the token, from `--auto`, or from a hand edit of the manifest's `auto`.
+
+The policy envelopes accounts and events. It records an instruction without an envelope unless the declaration opts in with `#[instruction(discriminator = X, migrations)]`.
 
 ```text
                  ┌──────────────────────────────┐
@@ -93,7 +104,28 @@ auto = true # or ["accounts", "events", "instructions"], or a staged subset
         └──────────────────────────────┘
 ```
 
-Once a version appears in a receipt or pending record it is frozen: `create` appends the next version instead of rewriting it, and any edit to a pinned schema or transition hash fails every later check.
+Once a version appears in a receipt or pending record it is frozen: `create` appends the next version instead of rewriting it, and any edit to a pinned schema or transition hash fails every later check. A snapshot-only instruction has no next version, so its published payload is fixed.
+
+Drift is decided by what a field stores, not by how its type is spelled. Respelling `PodU64` as `u64`, or `Address` as `[u8; 32]`, stores the same bytes under the same reading, so it consumes no version and fails no build, and the recorded spelling and pinned hashes stay as they were. Types that only share a width, such as `u64` and `i64`, are a real change that needs a manual transition.
+
+### Instructions: a snapshot unless they opt in
+
+An instruction covered by `auto` keeps its plain wire format, `[discriminator][payload]`, and the manifest records exactly one version of it with `"envelope": false`. The snapshot is a gate, not a history:
+
+- The proc macro compares the struct with the snapshot and fails the build when they drift.
+- While nothing is published, `pina migrations create` replaces the snapshot with the current struct.
+- Once published, a payload change fails with `PublishedPayloadChanged`, because no byte tells the program which layout a client sent. Declare a new discriminator for the new payload, or restore the published fields.
+- Appending optional accounts to a published snapshot is allowed: `create` extends its process contract in place without consuming a version, and older clients simply omit the new slots.
+- A published snapshot cannot gain an envelope (`EnvelopeAddition`), because existing clients send no version byte. Declare a new discriminator for the migration-aware instruction.
+- An instruction that stops asking to be recorded (`migrations = false`, or an `auto` policy that no longer covers instructions) leaves a stale snapshot behind. `pina migrations check` fails with `StaleSnapshot` and `create` releases it; nothing on the wire changes.
+
+An instruction that must keep accepting older payloads under one discriminator opts into full migrations with `#[instruction(discriminator = X, migrations)]`. It carries the envelope `[discriminator][version][payload]`, and every later version has an adjacent transition at `migrations/transitions/instruction_<width>_<hex>/vN_to_vN+1.rs`. `create` never zero-fills an added instruction argument, because the handler could not tell that default from a value a client sent: a transition that adds an argument is scaffolded as a manual transition for you to fill in. A transition that only moves or drops bytes stays automatic.
+
+An envelope is part of the wire format, so it can change only before publication. When the source stops asking for an envelope the manifest records, the macro fails the build: "removing an envelope is a wire-format change that `pina migrations create` must record deliberately". Before publication, `pina migrations create` then records the instruction as a snapshot again; after publication it fails with `EnvelopeRemoval`. An explicit `migrations = false` on an enveloped contract is always rejected. A program published under ABI `0.20`, where every recorded instruction was enveloped, keeps its wire format by adding `migrations` to each of those `#[instruction]` attributes.
+
+### Events: versioned, not migrated
+
+Transaction logs are immutable, so an event is never converted. An event with `migrations`, or covered by `auto`, carries the envelope `[discriminator][version][payload]`. The program emits only the current version. Changing a published event's schema appends a version with its own schema and writes no transition file; there is no `migrations/transitions/event_*` directory. Generated clients decode each version with that version's schema, as described in [Generated client helpers](#generated-client-helpers).
 
 ### Persisted answers
 
@@ -109,7 +141,7 @@ assume_removed = []
 
 ## Runtime flow inside the program
 
-This is the generated dispatcher's decision tree for one instruction invocation:
+This is the generated dispatcher's decision tree for one invocation of an instruction that opts into migrations. An instruction recorded as a snapshot has no version to inspect: the dispatcher parses its payload directly, and only the account branch applies.
 
 ```text
                 transaction arrives
@@ -181,13 +213,16 @@ The version envelope supports `u8`, `u16`, and `u32` encodings (program-wide, `u
 
 Accounts in one instruction migrate independently — a mixed set (`Profile@v0`, `Journal@v1`, …) each climb their own ladder atomically within the same invocation.
 
+The payload normalization is generated, not written in the handler. `#[discriminator(entrypoint)]` routes every instruction the manifest records with an envelope through that instruction's generated `process_versioned`, which converts a historical payload into the current layout and then calls `ProcessAccountInfos::process_from_version(self, data, source_version)`. The default implementation forwards to `process(data)`, so a handler reads `data` as the current layout. Override `process_from_version` only when the handler must tell a field a transition filled in from one the client sent. A program with a hand-written dispatcher calls `<Instruction>::process_versioned(parsed_accounts, data)` itself, and `pina::normalize_instruction_data` returns a `NormalizedInstruction` (`as_bytes()`, `source_version()`, `was_migrated()`) for manual use.
+
 ## What is expected from each side
 
 |                     | Client (generated)                                                   | Program (generated + handler)                                                                                                   |
 | ------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Version envelope    | writes its frozen version automatically; caller never sees it        | reads it before any payload decode                                                                                              |
 | Account data        | never migrates, never rewrites; **refuses to decode** other versions | migrates on demand, on-chain, in-transaction                                                                                    |
-| Instruction payload | encodes args in its version's shape                                  | normalizes stale payloads into current args                                                                                     |
+| Instruction payload | encodes args in its version's shape                                  | normalizes stale payloads of an instruction that opts into migrations; a snapshot-only payload never changes once published     |
+| Events              | decodes each record with the schema of the version that emitted it   | emits only the current version                                                                                                  |
 | Rent for growth     | supplies an explicit payer account when the instruction declares one | transfers only the deficit, capped, never refunds                                                                               |
 | Old clients         | keep sending their old bytes unchanged                               | are the reason the whole system exists                                                                                          |
 | Breaking cases      | —                                                                    | fail closed: unknown/future versions, privilege changes, unprovable process changes are rejected or require a new discriminator |
@@ -279,7 +314,7 @@ Generated clients turn that flow into a one-call routine. Next to each migratabl
 - the generic `needsMigration` envelope check is that per-account helper (`stateNeedsMigration` for a `State` account, and so on);
 - `<account>NeedsMigration(bytes)` — a cheap envelope check that returns true only when the bytes name this account's discriminator and a version older than the client's schema. Future versions and foreign discriminators return false; the decoder explains those when the account is decoded.
 
-The clients also emit a `Migrate` instruction composer (TypeScript `getMigrateInstruction`, Dart `getMigrateInstruction`, Rust `Migrate::new().instruction()`). Migratable **events** get the same envelope treatment on the read path: transaction logs are immutable, so instead of migrating them each client emits a log entry point (`parse<Program>EventsFromLogs` in TypeScript and Dart, `project_from_bytes` in Rust) that enforces the version envelope and, when the checked-in migration manifest proves the transition is automatic, projects historical bytes into the current shape. The decoded record reports `sourceVersion` and `wasMigrated`, mirroring the runtime's `CurrentEventData::source_version`. Manual transitions are the documented limit: generated clients cannot represent them, so those log versions fail closed with a message naming the transition. The event parser also attributes each line to the program that emitted it by following the transaction's `invoke`/`success` frames, so pass it a transaction's complete, ordered logs. In the `Migrate` composer, the payer and system program slots are always sent, and `systemProgram` defaults to the system program because the program rejects anything else in slot 1. Every migratable slot is optional: omitted slots become program-address placeholders and trailing omitted migratable slots are truncated, so a client sends only the accounts it needs. The intended catch → migrate → retry loop:
+The clients also emit a `Migrate` instruction composer (TypeScript `getMigrateInstruction`, Dart `getMigrateInstruction`, Rust `Migrate::new().instruction()`). In the `Migrate` composer, the payer and system program slots are always sent, and `systemProgram` defaults to the system program because the program rejects anything else in slot 1. Every migratable slot is optional: omitted slots become program-address placeholders and trailing omitted migratable slots are truncated, so a client sends only the accounts it needs. The intended catch → migrate → retry loop:
 
 ```ts
 const account = await fetchEncodedAccount(rpc, address);
@@ -292,6 +327,8 @@ if (account.exists && stateNeedsMigration(account.data)) {
 ```
 
 `migrateIfNeeded` — fetching, checking, and migrating in one call over an RPC handle — is designed in [ADR 0008](../adrs/0008-migration-ux-and-legacy-adoption.md).
+
+Versioned **events** are decoded, never converted. The IDL lists each earlier version of an event as its own event node named `<Event>V<n>` (for example `ValueChangedEventV0`), with that version's schema and codec, next to the current event. The program-level log parser (`parse<Program>EventsFromLogs` in TypeScript and Dart) dispatches each record by discriminator and version to the matching event and throws on a version no generated event describes — for example `event "valueChangedEvent" log carries migration version 2, which this client cannot decode; regenerate it`. A decoded record carries that version's own fields: nothing is projected into the current shape or zero-filled. In Rust, each version's `try_from_bytes` tells a stale record from a future one and names the event generated for the other version. The parser also attributes each line to the program that emitted it by following the transaction's `invoke`/`success` frames, so pass it a transaction's complete, ordered logs. Clients render these decoders from the IDL alone; the migration manifest is read only when the IDL is generated.
 
 ## The sweep instruction
 
@@ -403,7 +440,7 @@ client encodes v_N payload ──► program sees version == current
                           migration work done
 ```
 
-One version-byte comparison is the entire overhead.
+For an enveloped contract, one version comparison is the entire overhead. A snapshot-only instruction has no version to compare.
 
 ### 2. Old client → updated program (the migration path)
 
@@ -434,6 +471,8 @@ failure anywhere: everything rolls back
 
 The old client cannot tell that anything happened. This is the property the whole design protects: **backwards compatibility is the default, and the program owns it.**
 
+The payload step runs only for an instruction that opts into migrations. A snapshot-only instruction cannot change its payload after publication, so an old client's request is already in the current layout and only the account steps apply.
+
 ### 3. Old client → rolled-back program (the honest limit)
 
 Rolling back the _binary_ to a previous executable does not roll back accounts. Accounts written by version N carry `N`; a program compiled when `current == N-1` sees those as **future** versions and rejects them without trial decoding. The supported rollback is redeploying an executable built from the current manifest history (an old _binary_ with the current _ABI_), which keeps every live account readable. This is a deliberate security stance, not an implementation gap: silently guessing at newer layouts would let a rolled-back program misinterpret post-rollback data.
@@ -448,9 +487,9 @@ Rolling back the _binary_ to a previous executable does not roll back accounts. 
 
 Run out of versions and nothing can fix it afterwards. Two facts decide how much this matters.
 
-**Versions are counted per contract, not per program.** Every account, instruction, and event owns an independent history that starts at `0`, keyed by its own discriminator in `migrations/manifest.json`. A program can hold one account at version `3` and another still at `0`; they do not share a counter, and exhausting one says nothing about the rest. So the budget is "255 versions of _this one contract_", not "255 versions of the program".
+**Versions are counted per contract, not per program.** Every account, instruction, and event owns an independent history that starts at `0`, keyed by its own discriminator in `migrations/manifest.json`. A snapshot-only instruction never consumes a version. A program can hold one account at version `3` and another still at `0`; they do not share a counter, and exhausting one says nothing about the rest. So the budget is "255 versions of _this one contract_", not "255 versions of the program".
 
-**The width is program-wide and freezes at the first publication.** `[migrations].version_type` chooses one width for every contract, and once a version appears in a publication receipt it cannot be changed: `create` and `check` both fail with `VersionTypeChanged`, and receipts pin the manifest hash. Before the first release the width is still yours to choose — delete the `migrations/` directory and re-run `create` with the wider setting to re-baseline. After the first release there is no widening path.
+**The width is program-wide and freezes at the first publication.** `pina migrations create --version-type` records one width for every contract as `versionType` in the manifest, and a later run without the flag keeps it. Before the first release the width is still yours to choose: `pina migrations create --version-type u16` rewrites it in place, because every history is still a single draft. Once a receipt or pending record exists the width is frozen, and the flag fails with "Migration version encoding is frozen as u8 because a deployment published it, so it cannot become u16". After the first release there is no widening path.
 
 That combination makes `u8` the right default. 255 versions of a single account type is not a realistic lifetime for a program that migrates sensibly, and it costs one byte per enveloped account; `u16` costs two and is worth choosing up front only if you expect a single contract to exceed 255 revisions.
 
@@ -458,6 +497,7 @@ That combination makes `u8` the right default. 255 versions of a single account 
 
 ```text
 account State v3 (published, 252 version(s) remaining)
+instruction InitializeInstruction (published, snapshot without envelope)
 ```
 
 ### When a contract does reach its ceiling

@@ -187,7 +187,8 @@ pub(super) fn resolve_field_changes(
 		// Claimed targets — by recorded or answered renames, by earlier
 		// questions, or by earlier removals — never pair twice.
 		let candidate = added.iter().find(|added_field| {
-			added_field.rust_type == removed_field.rust_type
+			pina_abi::wire_type(&added_field.rust_type)
+				== pina_abi::wire_type(&removed_field.rust_type)
 				&& !claimed_targets.contains(added_field.name.as_str())
 		});
 		if dropped.contains(removed_field.name.as_str()) {
@@ -418,15 +419,16 @@ pub(super) fn automatic_move_plan(
 			zero_fills.push((destination_offset, destination_size));
 			continue;
 		};
-		// The stored type must match exactly. Equal width is not enough: reading
-		// `u64` bytes as `i64`, or `u32` as `f32`, silently reinterprets a live
-		// value, so those changes stay manual.
+		// The stored type must match on the wire. Equal width is not enough:
+		// reading `u64` bytes as `i64`, or `u32` as `f32`, silently reinterprets
+		// a live value, so those changes stay manual. Only true respellings,
+		// such as `PodU64` for `u64`, count as the same type.
 		let stored_type = stored
 			.fields
 			.iter()
 			.find(|candidate| candidate.name == stored_name)
-			.map(|candidate| candidate.rust_type.as_str());
-		if stored_type != Some(field.rust_type.as_str()) {
+			.map(|candidate| pina_abi::wire_type(&candidate.rust_type));
+		if stored_type != Some(pina_abi::wire_type(&field.rust_type)) {
 			return None;
 		}
 		// Two destination fields may not read one stored field: the second copy
