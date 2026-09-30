@@ -211,6 +211,59 @@ fn cannot_initialize_an_existing_counter() {
 	});
 }
 
+/// `Initialize` checks the counter's address with `sha256`, which skips the
+/// ed25519 curve check `create_program_address` makes. The runtime repeats
+/// that check when the create-account CPI signs for the counter, so a bump
+/// whose hash lands on the curve derives an address the program's check
+/// accepts, and the account must still not be created.
+#[test]
+#[ignore = "run with pina test"]
+fn rejects_a_bump_whose_derived_address_is_on_the_curve() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let authority = program.payer();
+		let seeds: [&[u8]; 2] = [SEED_COUNTER, authority.as_ref()];
+		let on_curve_bump = (0..=u8::MAX)
+			.find(|bump| {
+				Pubkey::create_program_address(&[seeds[0], seeds[1], &[*bump]], &program_id)
+					.is_err()
+			})
+			.expect("a bump whose derived address is on the curve");
+		let counter = Pubkey::new_from_array(
+			pina::Address::derive_address(&seeds, Some(on_curve_bump), &ID).to_bytes(),
+		);
+
+		let error = program
+			.send_instruction(initialize_instruction(
+				&program,
+				&authority,
+				&counter,
+				on_curve_bump,
+			))
+			.expect_err("the runtime refuses to sign for an on-curve address");
+
+		assert_eq!(error.operation(), "execute program instruction");
+		assert!(
+			error
+				.message()
+				.contains("Provided seeds do not result in a valid address"),
+			"the runtime's signer derivation rejects the bump: {}",
+			error.message()
+		);
+		assert_eq!(
+			program.balance(&counter).expect("fetch counter balance"),
+			0,
+			"no account is created at the on-curve address"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 /// The entrypoint's account array is `ENTRYPOINT_ACCOUNT_CAPACITY` slots —
 /// the widest instruction plus one spare — and the loader skips accounts past
 /// it. The spare slot keeps an extra trailing account visible, so an

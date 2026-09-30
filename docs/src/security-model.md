@@ -109,7 +109,9 @@ Closing guidance under Pinocchio 0.11:
 - **The skipped check adds nothing here.** The only address it would additionally reject is an on-curve address equal to the hash, for which no one can derive a private key.
 - **Seed lengths are still checked.** `sha256` concatenates the seeds, so a 33-byte seed hashes exactly like a 32-byte seed followed by a 1-byte one, which can be a valid program address. `create_program_address` rejects any seed longer than `MAX_SEED_LEN`, and `is_derived_address` does the same before hashing. A seed of constant or fixed-size length, which every generated loader passes, folds the check away.
 
-Keep `create_program_address` (through `assert_seeds_with_bump`) for a bump a caller supplies, and the canonical loaders (`load_checked_pda`, `load_checked_pda_mut`, `with_checked_pda`) when the bump must be the highest valid one. Both still check the curve.
+The PDA creation builders check the target address the same way before the create-account CPI. There the runtime performs the curve check itself: the allocation signs for the address through `invoke_signed` with the same seeds and bump, and the runtime refuses to sign for an on-curve address, failing the instruction with "Could not create program address with signer seeds". `counter_program`'s Surfpool suite proves it with a bump whose derived address is on the curve: the program's check accepts that address, the runtime rejects the signature, and no account is created.
+
+Keep `create_program_address` (through `assert_seeds_with_bump`) for a bump a caller supplies when no `invoke_signed` follows, and the canonical loaders and builders (`load_checked_pda`, `load_checked_pda_mut`, `with_checked_pda`, `CreateProgramAccount`) when the bump must be the highest valid one. Both still check the curve.
 
 ## Content validation with PinaPod
 

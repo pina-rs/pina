@@ -292,6 +292,7 @@ dependencies = [
  "pinocchio-system",
  "solana-address",
  "solana-program-log",
+ "solana-sha256-hasher",
 ]
 
 [[package]]

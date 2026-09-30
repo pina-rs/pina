@@ -12,9 +12,9 @@ The size work that followed ADR 0010, recorded in the [program-size guide](../pr
 | Fixture |  Pina | Quasar | Anchor v2 |
 | ------- | ----: | -----: | --------: |
 | hello   | 1,984 |  2,520 |     1,880 |
-| counter | 8,648 |  7,808 |     8,696 |
+| counter | 8,424 |  7,808 |     8,696 |
 
-Every check the fixtures ran before still runs. The counter is now 48 bytes under Anchor v2 and 840 bytes over Quasar.
+Every check the fixtures ran before still runs. The counter is now 272 bytes under Anchor v2 and 616 bytes over Quasar.
 
 ### ADR 0010's reason for rejecting a dispatcher no longer holds
 
@@ -99,9 +99,10 @@ This is a proposal. It is not accepted until the fleet measurements and runtime 
 7. **Re-verify existing PDAs with `sha256`.** The stored-bump loaders of accounts the program already owns and has initialized (`load_pda` and `load_pda_mut`) compare the account's address with `sha256(seeds ‖ bump ‖ program_id ‖ "ProgramDerivedAddress")` instead of calling `sol_create_program_address`.
    - **What is skipped:** the syscall is the same hash plus a check that the result is off the ed25519 curve.
    - **Why it is sound for these loaders:** every account a pina program initializes at a seed-derived address went through `invoke_signed` with those seeds, and the runtime only signs for an off-curve address, so the stored bump already produced a valid PDA. Matching the hash identifies the same account. The only address the skipped check would add is an on-curve address equal to the hash, whose private key no one can derive and which the program never created.
-   - **Where it does not apply:** account creation and checks against a caller-supplied bump keep `create_program_address`, and the canonical-bump loaders (`load_checked_pda` and `load_checked_pda_mut`) keep `try_find_program_address`, because proving a bump is the highest valid one needs the curve check.
+   - **Creation:** the builders' pre-check before the create-account CPI uses the same hash. There the runtime repeats the curve check itself, because it only signs the allocation for an off-curve address; an on-curve bump fails with "Could not create program address with signer seeds".
+   - **Where it does not apply:** checks of a caller-supplied bump that no `invoke_signed` follows keep `create_program_address`, and the canonical-bump loaders (`load_checked_pda` and `load_checked_pda_mut`) keep `try_find_program_address`, because proving a bump is the highest valid one needs the curve check.
    - Anchor v2 and Quasar verify stored-bump PDAs this way.
-   - The stored-bump loaders now do this (`pina::is_derived_address`); the counter's `increment` measured 1,738 → 378.
+   - The stored-bump loaders and the creation pre-check now do this. On the counter, `increment` measured 1,738 → 378 and `initialize` 3,073 → 1,713.
 
 8. **Keep the program-ID check unless the maintainers decide otherwise.** It costs 16 instructions per call. Its main protection is a clear error when the same bytecode runs at another address, since owner and PDA checks against `ID` already fail there. Making it opt-out is a product decision this ADR leaves open.
 
