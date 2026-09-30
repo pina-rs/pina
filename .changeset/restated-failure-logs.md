@@ -1,8 +1,5 @@
 ---
 pina: fix
-# The guides and compute-unit policy this change edits belong to `pina_root`,
-# which is unpublished, so the coverage is recorded without a bump.
-pina_root: none
 ---
 
 # Stop logging failure messages that restate the error

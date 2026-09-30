@@ -1,8 +1,5 @@
 ---
 pina: fix
-# The devenv task, guides, and expansion snapshots this change edits belong to
-# `pina_root`, which is unpublished, so the coverage is recorded without a bump.
-pina_root: none
 ---
 
 # Convert entrypoint errors inline
