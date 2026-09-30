@@ -494,7 +494,10 @@ fn read_bounded_keypair(
 }
 
 fn validate_destination(path: &Path, force: bool) -> Result<(), KeysError> {
-	let has_link = read_result(path, crate::path_security::has_link_like_component(path))?;
+	let has_link = read_result(
+		path,
+		crate::path_security::has_user_controlled_link_like_component(path),
+	)?;
 
 	if has_link {
 		return Err(KeysError::UnsafeDestination {
@@ -584,7 +587,10 @@ fn write_source(
 	contents: &[u8],
 	generated: Option<(&Path, &same_file::Handle)>,
 ) -> Result<(), KeysError> {
-	let has_link = read_result(path, crate::path_security::has_link_like_component(path))?;
+	let has_link = read_result(
+		path,
+		crate::path_security::has_user_controlled_link_like_component(path),
+	)?;
 
 	if has_link {
 		return Err(KeysError::UnsafeDestination {
