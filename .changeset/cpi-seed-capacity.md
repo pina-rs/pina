@@ -1,9 +1,5 @@
 ---
 pina: fix
-# The comparison fixtures' lock files and the guides this change edits belong
-# to `pina_root`, which is unpublished, so the coverage is recorded without a
-# bump.
-pina_root: none
 ---
 
 # Shrink PDA-creation seed and signer arrays
