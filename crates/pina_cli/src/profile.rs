@@ -38,7 +38,7 @@ pub enum ProfileInputError {
 
 /// Validate that an output path cannot truncate or replace the input program.
 pub fn validate_profile_output(input: &Path, output: &Path) -> Result<(), ProfileInputError> {
-	let link_result = crate::path_security::has_link_like_component(output);
+	let link_result = crate::path_security::has_untrusted_link_component(output);
 	let has_link = inspect_output(output, link_result)?;
 
 	if has_link {
