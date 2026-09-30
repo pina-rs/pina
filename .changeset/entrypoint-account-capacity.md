@@ -1,10 +1,6 @@
 ---
 pina: feat
 pina_macros: feat
-# The comparison fixtures, guides, ADR, and expansion snapshot this change edits
-# belong to `pina_root`, which is unpublished, so the coverage is recorded
-# without a bump.
-pina_root: none
 ---
 
 # Generate a safe entrypoint account capacity

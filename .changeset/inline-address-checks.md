@@ -1,8 +1,5 @@
 ---
 pina: fix
-# The guides this change edits belong to `pina_root`, which is unpublished,
-# so the coverage is recorded without a bump.
-pina_root: none
 ---
 
 # Keep address-check errors visible to the entrypoint
