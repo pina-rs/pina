@@ -236,6 +236,7 @@ fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
 fn validate_output_path_components(path: &Path) -> Result<()> {
 	let absolute = std::path::absolute(path).map_err(|source| read_file_error(path, source))?;
 	let mut current = PathBuf::new();
+	let mut depth = 0_usize;
 
 	for component in absolute.components() {
 		current.push(component);
@@ -244,13 +245,15 @@ fn validate_output_path_components(path: &Path) -> Result<()> {
 			continue;
 		}
 
+		depth += 1;
+
 		let metadata = match fs::symlink_metadata(&current) {
 			Ok(metadata) => metadata,
 			Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),
 			Err(source) => return Err(read_file_error(&current, source)),
 		};
 
-		if is_user_controlled_link_like(&metadata) {
+		if is_untrusted_link(&metadata, depth == 1) {
 			return Err(RenderError::UnsafeOutputPath {
 				path: path.to_path_buf(),
 				reason: format!(
@@ -279,20 +282,29 @@ fn is_link_like(metadata: &fs::Metadata) -> bool {
 	metadata.file_type().is_symlink()
 }
 
-fn is_user_controlled_link_like(metadata: &fs::Metadata) -> bool {
-	if !is_link_like(metadata) {
-		return false;
-	}
+/// Return whether a link-like path component could redirect a write.
+///
+/// Every symbolic link and reparse point is untrusted except a system alias: a
+/// root-owned link directly below the filesystem root, such as macOS's `/var`
+/// and `/tmp` or a merged-`/usr` system's `/bin`. Only root can create or
+/// replace an entry there, and no repository or project tree occupies that
+/// depth, so the exception cannot admit a project's own links even when the
+/// renderer runs as root. Windows reparse points are always untrusted because
+/// their owner is not available through the portable metadata API.
+fn is_untrusted_link(metadata: &fs::Metadata, top_level: bool) -> bool {
+	is_link_like(metadata) && !(top_level && is_owned_by_root(metadata))
+}
 
-	#[cfg(unix)]
-	{
-		use std::os::unix::fs::MetadataExt as _;
+#[cfg(unix)]
+fn is_owned_by_root(metadata: &fs::Metadata) -> bool {
+	use std::os::unix::fs::MetadataExt as _;
 
-		metadata.uid() != 0
-	}
+	metadata.uid() == 0
+}
 
-	#[cfg(not(unix))]
-	true
+#[cfg(not(unix))]
+fn is_owned_by_root(_metadata: &fs::Metadata) -> bool {
+	false
 }
 
 fn validate_tree_has_no_symlinks(path: &Path) -> Result<()> {
