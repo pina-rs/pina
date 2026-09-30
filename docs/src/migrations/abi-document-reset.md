@@ -160,9 +160,9 @@ The `0.21` ledger keeps only what nothing else records. `PublicationReceipt` and
 
 | Error                                                                                                       | Cause and remedy                                                                                          |
 | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `missing a string \`abiVersion\` field`                                                                     | a pre-0.20 document — this guide                                                                          |
+| ``missing a string \``abiVersion\` field`                                                                   | a pre-0.20 document — this guide                                                                          |
 | `records ABI version 9.9, but this Pina build supports 0.21; upgrade Pina`                                  | the document is newer than your build — upgrade Pina; the check is a capability marker, like `Cargo.lock` |
-| `predates the oldest supported version 0.20; regenerate it with \`pina migrations create\``                 | a document older than the reset — [Start fresh](#start-fresh)                                             |
+| ``predates the oldest supported version 0.20; regenerate it with \``pina migrations create\``               | a document older than the reset — [Start fresh](#start-fresh)                                             |
 | `names ... without pinning its published schemas`                                                           | a converted ledger whose histories were emptied — [Pin the receipts](#3-pin-the-receipts)                 |
 | `` `[migrations].auto` no longer belongs in pina.toml ``                                                    | a retired `pina.toml` key — delete it; the manifest records the setting                                   |
 | `pins ... for ... , which the manifest does not record` or `pinned schema ... but the manifest now records` | a receipt history that was not emptied — [Keep your history](#keep-your-history)                          |

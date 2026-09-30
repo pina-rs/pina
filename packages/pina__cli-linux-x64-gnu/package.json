@@ -4,15 +4,15 @@
 	"description": "Prebuilt Pina CLI binary for Linux x64 (glibc)",
 	"homepage": "https://pina.rs",
 	"bugs": { "url": "https://github.com/pina-rs/pina/issues" },
-	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/pina-rs/pina.git",
 		"directory": "packages/pina__cli-linux-x64-gnu"
 	},
+	"license": "Apache-2.0",
 	"files": ["bin"],
 	"os": ["linux"],
 	"cpu": ["x64"],
-	"libc": ["glibc"],
-	"publishConfig": { "access": "public", "provenance": true }
+	"publishConfig": { "access": "public", "provenance": true },
+	"libc": ["glibc"]
 }

@@ -33,6 +33,10 @@ const ACCOUNTS_SUFFIX: &str = "Accounts";
 /// program declare two entrypoints.
 const UNIQUENESS_MARKER: &str = "__pina_entrypoint_must_be_unique_per_program";
 
+/// Account slots the reserved `Migrate` route reads before its migratable
+/// accounts: the payer and the system program.
+const MIGRATE_LEADING_SLOTS: usize = 2;
+
 /// One resolved variant → accounts-struct route.
 struct Route {
 	/// The enum variant this route dispatches.
@@ -260,6 +264,16 @@ pub(crate) fn expand(
 							 ACCOUNT_BOUND, so a smaller value means a route was missed",
 						),
 					);
+					const _: () = assert!(
+						#bound < #enum_name::ENTRYPOINT_ACCOUNT_CAPACITY
+							|| #enum_name::ENTRYPOINT_ACCOUNT_CAPACITY
+								== #crate_path::pinocchio::MAX_TX_ACCOUNTS,
+						concat!(
+							"ENTRYPOINT_ACCOUNT_CAPACITY must leave a spare slot past `",
+							#name,
+							"`, or `finish_exact` cannot see an extra trailing account",
+						),
+					);
 				}
 			});
 
@@ -276,23 +290,30 @@ pub(crate) fn expand(
 							<= #crate_path::pinocchio::MAX_TX_ACCOUNTS,
 						"MAX_INSTRUCTION_ACCOUNTS must not exceed the entrypoint's account array",
 					);
+					const _: () = assert!(
+						#enum_name::ENTRYPOINT_ACCOUNT_CAPACITY
+							<= #crate_path::pinocchio::MAX_TX_ACCOUNTS,
+						"ENTRYPOINT_ACCOUNT_CAPACITY must not exceed the transaction's account limit",
+					);
 
 					#(#assertions)*
 				};
 			}
 		});
 
-	let (migrate_helper, migrate_prelude) = match migration_ladder {
-		Some((helper, prelude)) => (Some(helper), Some(prelude)),
-		None => (None, None),
-	};
+	let migrate_helper = migration_ladder.as_ref().map(|route| &route.helper);
+	let migrate_prelude = migration_ladder.as_ref().map(|route| &route.prelude);
+	let migrate_slots = migration_ladder.as_ref().map(|route| route.account_slots);
+	let capacity_values = capacity_values(&bound_values, migrate_slots);
+	let capacity_count = Literal::usize_unsuffixed(capacity_values.len());
 
 	// `macro_export` lifts the name into the crate root regardless of the module
 	// the enum lives in, so a second opt-in anywhere in the crate collides on it.
 	let entrypoint_docs = format!(
 		"Dispatches one instruction to its accounts struct.\n\nPass this to `nostd_entrypoint!` \
-		 as `nostd_entrypoint!({enum_name}::process_instruction)`. Program-specific behavior \
-		 beyond routing belongs in each accounts struct's `ProcessAccountInfos::process`."
+		 as `nostd_entrypoint!({enum_name}::process_instruction, \
+		 {enum_name}::ENTRYPOINT_ACCOUNT_CAPACITY)`. Program-specific behavior beyond routing \
+		 belongs in each accounts struct's `ProcessAccountInfos::process`."
 	);
 
 	let uniqueness_marker = {
@@ -316,12 +337,11 @@ pub(crate) fn expand(
 			/// declares an unbounded trailing slice cannot inflate the cap.
 			///
 			/// This is the count a program declares, not a security boundary. Passing
-			/// it to `nostd_entrypoint!` would size the runtime's account array below
-			/// the transaction maximum, and the loader *skips* any account beyond that
-			/// array instead of failing, so `finish_exact` would no longer reject an
-			/// instruction that supplies too many accounts. Keep the entrypoint at its
-			/// default maximum and use this constant as the declaration and test
-			/// contract it is.
+			/// it to `nostd_entrypoint!` would size the runtime's account array to
+			/// exactly the widest instruction, and the loader *skips* any account
+			/// beyond that array instead of failing, so `finish_exact` would no longer
+			/// see — or reject — an extra trailing account. Pass
+			/// [`Self::ENTRYPOINT_ACCOUNT_CAPACITY`] to bound the array safely.
 			pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
 				const fn maximum(values: [usize; #bound_count]) -> usize {
 					let mut index = 0;
@@ -339,6 +359,49 @@ pub(crate) fn expand(
 				}
 
 				clamp(maximum([#(#bound_values),*]), #maximum_accounts)
+			};
+
+			/// The account-array size to pass to `nostd_entrypoint!` as its second
+			/// argument: one slot more than any route reads, or the transaction
+			/// maximum when a route accepts unbounded trailing accounts.
+			///
+			/// Pinocchio's deserializer walks accounts five at a time, so an array
+			/// of five or fewer slots drops that loop and shrinks the deployed
+			/// program. A larger bounded array keeps the loop and adds one that
+			/// skips accounts past the array, so it grows the program; measure
+			/// before passing a capacity above five.
+			///
+			/// The loader skips accounts beyond the entrypoint's array rather than
+			/// rejecting them, and the spare slot is what keeps a smaller array
+			/// safe: every instruction whose accounts struct ends with
+			/// `finish_exact` still sees the first extra account and rejects it
+			/// with `TooManyAccountKeys`, exactly as it would with the full array.
+			/// Accounts past the spare slot are never
+			/// materialized, so the one observable difference is precedence: a
+			/// writable account whose duplicate sits past the spare slot fails with
+			/// `TooManyAccountKeys` instead of `DuplicateMutableAccount`.
+			///
+			/// A program with a hand-written router, or one that reads accounts
+			/// outside its routed accounts structs, must size its array itself.
+			pub const ENTRYPOINT_ACCOUNT_CAPACITY: usize = {
+				const fn maximum(values: [usize; #capacity_count]) -> usize {
+					let mut index = 0;
+					let mut highest = 0;
+					while index < values.len() {
+						if values[index] > highest {
+							highest = values[index];
+						}
+						index += 1;
+					}
+					highest
+				}
+
+				let highest = maximum([#(#capacity_values),*]);
+				if highest >= #crate_path::pinocchio::MAX_TX_ACCOUNTS {
+					#crate_path::pinocchio::MAX_TX_ACCOUNTS
+				} else {
+					highest + 1
+				}
 			};
 
 			#[doc = #entrypoint_docs]
@@ -370,17 +433,48 @@ pub(crate) fn expand(
 	})
 }
 
+/// The account counts `ENTRYPOINT_ACCOUNT_CAPACITY` must exceed: every
+/// route's declared bound, then the reserved `Migrate` route's slots when the
+/// program has one.
+///
+/// The reserved route reads its slots straight from the account slice and
+/// treats a missing slot as omitted, so the entrypoint's array must hold all of
+/// them as well as every routed instruction's declared accounts.
+fn capacity_values(
+	bound_values: &[proc_macro2::TokenStream],
+	migrate_slots: Option<usize>,
+) -> Vec<proc_macro2::TokenStream> {
+	bound_values
+		.iter()
+		.cloned()
+		.chain(migrate_slots.map(|slots| {
+			let slots = Literal::usize_unsuffixed(slots);
+			quote!(#slots)
+		}))
+		.collect()
+}
+
+/// The reserved `Migrate` route of a program with migratable accounts.
+struct MigrateRoute {
+	/// The `process_migrate` associated function.
+	helper: proc_macro2::TokenStream,
+	/// The width-matched `is_migrate_instruction` guard run before dispatch.
+	prelude: proc_macro2::TokenStream,
+	/// Account slots the route reads: the leading slots plus one per ladder
+	/// entry.
+	account_slots: usize,
+}
+
 /// Resolve the optional reserved-`Migrate` routing.
 ///
 /// The ladder is derived from the checked-in manifest: every enveloped account
 /// contract becomes an optional reserved-instruction slot, in the manifest's
 /// identity-sorted order — the same order generated clients compose. Returns
-/// the `process_migrate` helper and the width-matched `is_migrate_instruction`
-/// guard, or `None` when the program has no manifest or no migratable accounts.
+/// `None` when the program has no manifest or no migratable accounts.
 fn resolve_migrations(
 	args: &DiscriminatorArgs,
 	enum_name: &Ident,
-) -> syn::Result<Option<(proc_macro2::TokenStream, proc_macro2::TokenStream)>> {
+) -> syn::Result<Option<MigrateRoute>> {
 	let crate_path = &args.crate_path;
 	let declared_ladder = &args.migrations;
 	// The budget is optional: with no declared ceiling the reserved route
@@ -434,7 +528,7 @@ fn resolve_migrations(
 }
 
 /// Emit the reserved-`Migrate` helper and the dispatch prelude for a validated
-/// ladder.
+/// ladder, and count the account slots the route reads.
 ///
 /// `max_lamports` tightens the route when present; `None` emits a call with no
 /// declared ceiling.
@@ -447,7 +541,7 @@ fn migrate_emission(
 	ladder: &[proc_macro2::TokenStream],
 	max_lamports: Option<&Expr>,
 	program_id: &Expr,
-) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+) -> MigrateRoute {
 	// `None` states the absence of a declared ceiling rather than inventing
 	// one; the executor then enforces none.
 	let budget = max_lamports.map_or_else(
@@ -455,8 +549,7 @@ fn migrate_emission(
 		|expr| quote!(::core::option::Option::Some(#expr)),
 	);
 	let steps = ladder.iter().enumerate().map(|(position, account)| {
-		// Slots 0 and 1 are the payer and the system program.
-		let index = Literal::usize_unsuffixed(position + 2);
+		let index = Literal::usize_unsuffixed(position + MIGRATE_LEADING_SLOTS);
 
 		quote! {
 			migrate.run_optional::<#account>(#index)?;
@@ -521,7 +614,11 @@ fn migrate_emission(
 		}
 	};
 
-	(helper, prelude)
+	MigrateRoute {
+		helper,
+		prelude,
+		account_slots: MIGRATE_LEADING_SLOTS + ladder.len(),
+	}
 }
 
 #[cfg(test)]
@@ -785,13 +882,19 @@ mod tests {
 			ladder_of("State"),
 		]
 		.map(|path| ::quote::ToTokens::to_token_stream(&path));
-		let (helper, prelude) = migrate_emission(
+		let MigrateRoute {
+			helper,
+			prelude,
+			account_slots,
+		} = migrate_emission(
 			&crate_path,
 			Primitive::U8,
 			&ladder,
 			Some(&budget),
 			&program_id,
 		);
+		// The payer and system program lead the four migratable slots.
+		assert_eq!(account_slots, 6);
 		let helper = squeezed(&helper.to_string());
 		let prelude = squeezed(&prelude.to_string());
 
@@ -835,7 +938,7 @@ mod tests {
 			(Primitive::U32, "::pina::is_migrate_instruction_u32(data)"),
 			(Primitive::U64, "::pina::is_migrate_instruction_u64(data)"),
 		] {
-			let (_, prelude) =
+			let MigrateRoute { prelude, .. } =
 				migrate_emission(&crate_path, primitive, &ladder, Some(&budget), &program_id);
 			let prelude = squeezed(&prelude.to_string());
 
@@ -859,7 +962,8 @@ mod tests {
 		let crate_path: Path = syn::parse_quote!(::pina);
 		let program_id: Expr = syn::parse_quote!(ID);
 		let ladder = [ladder_of("State")].map(|path| ::quote::ToTokens::to_token_stream(&path));
-		let (helper, _) = migrate_emission(&crate_path, Primitive::U8, &ladder, None, &program_id);
+		let MigrateRoute { helper, .. } =
+			migrate_emission(&crate_path, Primitive::U8, &ladder, None, &program_id);
 		let helper = squeezed(&helper.to_string());
 
 		// No ceiling is stated as `None` rather than a sentinel maximum, and the
@@ -886,10 +990,55 @@ mod tests {
 		);
 
 		assert!(
-			expanded.contains("nostd_entrypoint!(CounterInstruction::process_instruction)"),
+			expanded.contains(
+				"nostd_entrypoint!(CounterInstruction::process_instruction,\
+				 CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY)"
+			),
 			"the doc must name the enum; got: {expanded}"
 		);
-		assert!(!expanded.contains("nostd_entrypoint!(Self::process_instruction)"));
+		assert!(!expanded.contains("nostd_entrypoint!(Self::process_instruction"));
+	}
+
+	#[test]
+	fn entrypoint_account_capacity_is_generated_with_its_spare_slot_guard() {
+		let expanded = expand_with(
+			quote!(entrypoint),
+			quote!(
+				pub enum CounterInstruction {
+					Run = 0,
+				}
+			),
+		);
+
+		assert!(
+			expanded.contains("pubconstENTRYPOINT_ACCOUNT_CAPACITY:usize"),
+			"expanded: {expanded}"
+		);
+		assert!(
+			expanded.contains("ENTRYPOINT_ACCOUNT_CAPACITYmustleaveaspareslotpast"),
+			"the capacity test must guard the spare slot; got: {expanded}"
+		);
+		assert!(
+			expanded.contains("highest+1"),
+			"the capacity must add the spare slot; got: {expanded}"
+		);
+	}
+
+	#[test]
+	fn capacity_values_append_the_migrate_route_slots() {
+		let bounds = vec![quote!(3), quote!(2)];
+
+		let without = capacity_values(&bounds, None)
+			.iter()
+			.map(ToString::to_string)
+			.collect::<Vec<_>>();
+		assert_eq!(without, ["3", "2"]);
+
+		let with = capacity_values(&bounds, Some(MIGRATE_LEADING_SLOTS + 4))
+			.iter()
+			.map(ToString::to_string)
+			.collect::<Vec<_>>();
+		assert_eq!(with, ["3", "2", "6"]);
 	}
 
 	#[test]

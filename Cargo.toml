@@ -225,18 +225,6 @@ repository = "https://github.com/pina-rs/pina"
 rust-version = "1.89.0"
 
 [workspace.dependencies]
-# Host-only proving stack for the privacy pool example. Aligned on the
-# arkworks 0.5 line so `light-poseidon` parameters and `ark-groth16` circuits
-# share one field implementation.
-ark-bn254 = { default-features = false, version = "0.5.0" }
-ark-ec = { default-features = false, version = "0.5.0" }
-ark-ff = { default-features = false, version = "0.5.0" }
-ark-groth16 = { default-features = false, version = "0.5.0" }
-ark-r1cs-std = { default-features = false, version = "0.5.0" }
-ark-relations = { default-features = false, version = "0.5.0" }
-ark-serialize = { default-features = false, version = "0.5.0" }
-ark-snark = { default-features = false, version = "0.5.0" }
-ark-std = { default-features = false, version = "0.5.0" }
 atomic-write-file = { default-features = false, version = "^0.3" }
 base64 = { default-features = false, version = "^0.23.1" }
 bs58 = { default-features = false, version = "^0.5.1" }
@@ -250,6 +238,20 @@ comfy-table = { default-features = false, version = "^8.0.0" }
 darling = { default-features = false, version = "0.24.0" }
 ed25519-dalek = { version = "3.0.0", default-features = false }
 
+# Host-only proving stack for the privacy pool example. Aligned on the
+# arkworks 0.5 line so `light-poseidon` parameters and `ark-groth16` circuits
+# share one field implementation.
+ark-bn254 = { default-features = false, version = "0.5.0" }
+ark-ec = { default-features = false, version = "0.5.0" }
+ark-ff = { default-features = false, version = "0.5.0" }
+ark-groth16 = { default-features = false, version = "0.5.0" }
+ark-r1cs-std = { default-features = false, version = "0.5.0" }
+ark-relations = { default-features = false, version = "0.5.0" }
+ark-serialize = { default-features = false, version = "0.5.0" }
+ark-snark = { default-features = false, version = "0.5.0" }
+ark-std = { default-features = false, version = "0.5.0" }
+light-poseidon = { default-features = false, version = "0.4.0" }
+
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
 getrandom = { default-features = false, version = "0.4.2" }
@@ -257,7 +259,6 @@ heck = { default-features = false, version = "^0.5" }
 http = { default-features = false, version = "^1" }
 insta = { default-features = false, version = "^1" }
 insta-cmd = { default-features = false, version = "^0.7.0" }
-light-poseidon = { default-features = false, version = "0.4.0" }
 macrotest = { default-features = false, version = "^1.2" }
 mollusk-svm = { default-features = false, version = "0.15.1" }
 # Emits the normalized CLI-surface snapshot release automation diffs.
@@ -268,7 +269,6 @@ object = { default-features = false, version = "^0.40.0" }
 owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
 pastey = { default-features = false, version = "^0.2" }
-pina_test = { path = "crates/pina_test", version = "0.22.0" }
 # Pinapod defines the account wire format and its derive, and 0.4.5 is the
 # first release rejecting array-nested dynamic prefixes at compile time, so
 # a schema cannot declare one wire layout and compile another.
@@ -336,6 +336,7 @@ pina_lints = { default-features = false, path = "crates/pina_lints", version = "
 pina_macros = { default-features = false, path = "crates/pina_macros", version = "0.22.0" }
 pina_profile = { default-features = false, path = "crates/pina_profile", version = "0.22.0" }
 pina_sdk_ids = { default-features = false, path = "crates/pina_sdk_ids", version = "0.22.0" }
+pina_test = { path = "crates/pina_test", version = "0.22.0" }
 
 [workspace.metadata.bin]
 # `cargo-expand` is installed directly by `test:all`. The pinned release has no
@@ -371,8 +372,8 @@ edition_2024_expr_fragment_specifier = "allow"
 [workspace.lints.rust.unexpected_cfgs]
 level = "warn"
 check-cfg = [
-	'cfg(coverage)',
-	'cfg(kani)',
+	"cfg(coverage)",
+	"cfg(kani)",
 	'cfg(target_os, values("solana"))',
 	'cfg(target_feature, values("static-syscalls"))',
 ]

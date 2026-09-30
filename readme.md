@@ -1,7 +1,11 @@
 # pina
 
 <p align="center">
-	<img src="./.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="180">
+	<img
+		src="./.github/assets/logo.png"
+		alt="The Pina logo: a low-poly origami pineapple"
+		width="180"
+	>
 </p>
 
 <br>

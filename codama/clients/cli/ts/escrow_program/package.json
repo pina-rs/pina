@@ -1,9 +1,9 @@
 {
 	"name": "escrow-program-cli",
 	"version": "0.1.0",
+	"private": true,
 	"description": "Command-line interface for escrowProgram",
 	"type": "module",
-	"private": true,
 	"bin": {
 		"escrow-program-cli": "./src/main.ts"
 	},

@@ -44,6 +44,19 @@ use crate::ProgramResult;
 
 const MAX_CPI_SIGNERS: usize = 16;
 
+/// Seed-array capacities for the PDA-creation spine, smallest first.
+///
+/// The derivation seeds and the target signer's seeds are stack arrays whose
+/// every slot must be initialized, and because both arrays escape to syscalls
+/// LLVM cannot drop the stores to slots the runtime never reads. The spine
+/// therefore picks the smallest capacity that holds the seeds plus the bump.
+/// At a call site whose seed count is a compile-time constant — every
+/// `#[pda]`-generated seed array — only one capacity survives inlining, so a
+/// two-seed PDA carries 4-slot arrays instead of 16-slot ones. Seed counts
+/// past the medium capacity fall back to `MAX_SEEDS`.
+const SMALL_SEED_CAPACITY: usize = 4;
+const MEDIUM_SEED_CAPACITY: usize = 8;
+
 #[inline(always)]
 fn canonical_pda(
 	account: &AccountView,
@@ -137,7 +150,7 @@ impl CompactCreationTarget<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.invoke_signed_inner_validated(signers, rent)
+		.invoke_signed_inner_validated_at_full_capacity(signers, rent)
 	}
 }
 
@@ -1340,12 +1353,6 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	}
 
 	#[inline(always)]
-	// The seed and signer slices below use `[..len + 1]` rather than the
-	// more readable `[..=len]` clippy prefers: the inclusive form
-	// monomorphizes a 216-byte `RangeInclusive<usize>::index` copy per
-	// element type (three across this spine, ~1.3 KB per PDA-creating
-	// program) while the exclusive form inlines.
-	#[allow(clippy::range_plus_one)]
 	fn invoke_signed_inner(&self, signers: &[Signer<'_, '_>], rent: Option<Rent>) -> ProgramResult {
 		if signers.len() >= MAX_CPI_SIGNERS {
 			return Err(ProgramError::InvalidArgument);
@@ -1355,27 +1362,46 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 			return Err(ProgramError::InvalidSeeds);
 		}
 
+		if self.seeds.len() < SMALL_SEED_CAPACITY {
+			self.derive_and_allocate::<SMALL_SEED_CAPACITY>(signers, rent)
+		} else if self.seeds.len() < MEDIUM_SEED_CAPACITY {
+			self.derive_and_allocate::<MEDIUM_SEED_CAPACITY>(signers, rent)
+		} else {
+			self.derive_and_allocate::<MAX_SEEDS>(signers, rent)
+		}
+	}
+
+	/// Checks that `seeds` and `bump` derive the target address, then
+	/// allocates it. The caller guarantees `seeds.len() < CAPACITY` and
+	/// `signers.len() < MAX_CPI_SIGNERS`.
+	#[inline(always)]
+	// The seed slices below use `[..len + 1]` rather than the more readable
+	// `[..=len]` clippy prefers: the inclusive form monomorphizes a 216-byte
+	// `RangeInclusive<usize>::index` copy per element type (~1.3 KB per
+	// PDA-creating program across this spine) while the exclusive form
+	// inlines. `len + 1` cannot overflow because `len < CAPACITY`.
+	#[allow(clippy::range_plus_one)]
+	fn derive_and_allocate<const CAPACITY: usize>(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult {
+		let seeds_len = self.seeds.len();
 		let bump_array = [self.bump];
-		let mut derivation_seeds: [&[u8]; MAX_SEEDS] = [&[]; MAX_SEEDS];
-		derivation_seeds[..self.seeds.len()].copy_from_slice(self.seeds);
-		derivation_seeds[self.seeds.len()] = bump_array.as_slice();
-		// Exclusive bound: `[..=len]` would monomorphize a 216-byte
-		// `RangeInclusive<usize>::index` per element type across the seed and
-		// signer assemblies below, while `[..len + 1]` inlines; `len + 1`
-		// cannot overflow because the `len < MAX_SEEDS` check above ran.
+		let mut derivation_seeds: [&[u8]; CAPACITY] = [&[]; CAPACITY];
+		derivation_seeds[..seeds_len].copy_from_slice(self.seeds);
+		derivation_seeds[seeds_len] = bump_array.as_slice();
 		let expected_address =
-			crate::create_program_address(&derivation_seeds[..self.seeds.len() + 1], self.owner)?;
+			crate::create_program_address(&derivation_seeds[..seeds_len + 1], self.owner)?;
 
 		if self.account.address() != &expected_address {
 			return Err(ProgramError::InvalidSeeds);
 		}
 
-		self.invoke_signed_inner_validated(signers, rent)
+		self.allocate_with_seed_capacity::<CAPACITY>(signers, rent)
 	}
 
 	#[inline(always)]
-	// Same `[..len + 1]` rationale as `invoke_signed_inner` above.
-	#[allow(clippy::range_plus_one)]
 	fn invoke_signed_inner_validated(
 		&self,
 		signers: &[Signer<'_, '_>],
@@ -1385,24 +1411,87 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 			return Err(ProgramError::InvalidArgument);
 		}
 
-		let bump_array = [self.bump];
-		let combined_seeds = combine_seeds_with_bump(self.seeds, &bump_array)?;
-
-		// Same exclusive-bound rationale as `invoke_signed_inner`: the
-		// `len < MAX_SEEDS` check in the caller guards the `+ 1`.
-		let target_signer = Signer::from(&combined_seeds[..self.seeds.len() + 1]);
-		let empty_seeds: [Seed<'_>; 0] = [];
-		let empty_signer = Signer::from(&empty_seeds);
-		let mut all_signers: [Signer<'_, '_>; MAX_CPI_SIGNERS] =
-			core::array::from_fn(|_| empty_signer.clone());
-		all_signers[0] = target_signer;
-		for (destination, signer) in all_signers[1..].iter_mut().zip(signers) {
-			*destination = signer.clone();
+		if self.seeds.len() >= MAX_SEEDS {
+			return Err(ProgramError::InvalidSeeds);
 		}
-		// Exclusive bound for the same reason as the seed slices above; the
-		// `len < MAX_CPI_SIGNERS` check at the top of this function guards
-		// the `+ 1`.
-		let all_signers = &all_signers[..signers.len() + 1];
+
+		if self.seeds.len() < SMALL_SEED_CAPACITY {
+			self.allocate_with_seed_capacity::<SMALL_SEED_CAPACITY>(signers, rent)
+		} else if self.seeds.len() < MEDIUM_SEED_CAPACITY {
+			self.allocate_with_seed_capacity::<MEDIUM_SEED_CAPACITY>(signers, rent)
+		} else {
+			self.allocate_with_seed_capacity::<MAX_SEEDS>(signers, rent)
+		}
+	}
+
+	/// [`Self::invoke_signed_inner_validated`] at the full seed capacity, for
+	/// an outlined creation path shared by callers with different seed
+	/// counts.
+	///
+	/// Picking a capacity from a runtime seed count keeps every capacity's
+	/// copy of the CPI sequence, so a shared path such as
+	/// `CompactCreationTarget::allocate_zeroed` carries one full-capacity copy
+	/// instead of three.
+	// Only the compact creation path calls it; tests reach it under every
+	// feature set.
+	#[cfg(any(test, all(feature = "account-resize", feature = "compact")))]
+	#[inline(always)]
+	fn invoke_signed_inner_validated_at_full_capacity(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult {
+		if signers.len() >= MAX_CPI_SIGNERS {
+			return Err(ProgramError::InvalidArgument);
+		}
+
+		if self.seeds.len() >= MAX_SEEDS {
+			return Err(ProgramError::InvalidSeeds);
+		}
+
+		self.allocate_with_seed_capacity::<MAX_SEEDS>(signers, rent)
+	}
+
+	/// Allocates the target, signing for it with `seeds` plus `bump`. The
+	/// caller guarantees `seeds.len() < CAPACITY` and
+	/// `signers.len() < MAX_CPI_SIGNERS`.
+	#[inline(always)]
+	// Same `[..len + 1]` rationale as `derive_and_allocate` above; both
+	// guarantees in the doc comment bound the `+ 1`.
+	#[allow(clippy::range_plus_one)]
+	fn allocate_with_seed_capacity<const CAPACITY: usize>(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult {
+		let seeds_len = self.seeds.len();
+		let bump_array = [self.bump];
+		let mut target_seeds: [Seed<'_>; CAPACITY] =
+			core::array::from_fn(|_| Seed::from(&[] as &[u8]));
+		for (destination, seed) in target_seeds.iter_mut().zip(self.seeds) {
+			*destination = Seed::from(*seed);
+		}
+		target_seeds[seeds_len] = Seed::from(bump_array.as_slice());
+		let target_signer = Signer::from(&target_seeds[..seeds_len + 1]);
+
+		// Without extra signers the target's signer is the whole list, so the
+		// 16-slot array — every slot of which must be initialized before it
+		// escapes to the CPI syscall — only exists on the path that needs it.
+		let empty_seeds: [Seed<'_>; 0] = [];
+		let extended_signers: [Signer<'_, '_>; MAX_CPI_SIGNERS];
+		let all_signers = if signers.is_empty() {
+			core::slice::from_ref(&target_signer)
+		} else {
+			let empty_signer = Signer::from(&empty_seeds);
+			let mut all_signers: [Signer<'_, '_>; MAX_CPI_SIGNERS] =
+				core::array::from_fn(|_| empty_signer.clone());
+			all_signers[0] = target_signer.clone();
+			for (destination, signer) in all_signers[1..].iter_mut().zip(signers) {
+				*destination = signer.clone();
+			}
+			extended_signers = all_signers;
+			&extended_signers[..signers.len() + 1]
+		};
 
 		let space = usize::try_from(self.space).map_err(|_| ProgramError::InvalidArgument)?;
 		let rent = if let Some(rent) = rent {
@@ -3587,6 +3676,157 @@ mod tests {
 		}
 		.invoke_signed_with_rent(&[], rent)
 		.unwrap_or_else(|error| panic!("allocate fully funded PDA: {error:?}"));
+	}
+
+	/// Every seed count the runtime accepts routes through one of the spine's
+	/// seed-array capacities. Each must derive, sign for, and allocate the PDA
+	/// on both the derive-and-check and the already-proven paths, with and
+	/// without extra signers, and must still reject a mismatched address.
+	#[test]
+	fn pda_allocation_covers_every_seed_capacity() {
+		let owner = Address::new_from_array([9; 32]);
+		let seed_bytes: [[u8; 1]; MAX_SEEDS - 1] =
+			core::array::from_fn(|index| [u8::try_from(index).unwrap_or(u8::MAX)]);
+		let all_seeds: [&[u8]; MAX_SEEDS - 1] =
+			core::array::from_fn(|index| seed_bytes[index].as_slice());
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let empty_seeds: [Seed<'_>; 0] = [];
+		let extra_signer = Signer::from(&empty_seeds);
+		let signer_lists: [&[Signer<'_, '_>]; 2] = [&[], core::slice::from_ref(&extra_signer)];
+
+		for count in 1..MAX_SEEDS {
+			let seeds = &all_seeds[..count];
+			let found = crate::try_find_program_address(seeds, &owner);
+			assert!(found.is_some(), "derive the {count}-seed address");
+			let (address, bump) = found.unwrap_or_default();
+
+			for signers in signer_lists {
+				let mut stored_derived = TestAccount::<8>::new(address, owner, 0, 0);
+				let derived = stored_derived.view();
+				let result = AllocateAccountWithNonCanonicalBump {
+					account: &derived,
+					payer: &payer,
+					space: 8,
+					owner: &owner,
+					seeds,
+					bump,
+				}
+				.invoke_signed_with_rent(signers, test_rent());
+				assert_eq!(result, Ok(()), "derive and allocate {count} seeds");
+
+				let mut stored_proven = TestAccount::<8>::new(address, owner, 0, 0);
+				let proven = stored_proven.view();
+				let result = AllocateAccountWithNonCanonicalBump {
+					account: &proven,
+					payer: &payer,
+					space: 8,
+					owner: &owner,
+					seeds,
+					bump,
+				}
+				.invoke_signed_inner_validated(signers, Some(test_rent()));
+				assert_eq!(result, Ok(()), "allocate {count} proven seeds");
+
+				let mut stored_shared = TestAccount::<8>::new(address, owner, 0, 0);
+				let shared = stored_shared.view();
+				let result = AllocateAccountWithNonCanonicalBump {
+					account: &shared,
+					payer: &payer,
+					space: 8,
+					owner: &owner,
+					seeds,
+					bump,
+				}
+				.invoke_signed_inner_validated_at_full_capacity(signers, Some(test_rent()));
+				assert_eq!(result, Ok(()), "allocate {count} shared-path seeds");
+
+				let mut stored_mismatch =
+					TestAccount::<8>::new(Address::new_from_array([7; 32]), owner, 0, 0);
+				let mismatch = stored_mismatch.view();
+				let rejected = AllocateAccountWithNonCanonicalBump {
+					account: &mismatch,
+					payer: &payer,
+					space: 8,
+					owner: &owner,
+					seeds,
+					bump,
+				}
+				.invoke_signed_with_rent(signers, test_rent());
+				assert_eq!(rejected, Err(ProgramError::InvalidSeeds), "{count} seeds");
+			}
+		}
+	}
+
+	/// Every entry into the allocation spine rejects a seed list that leaves no
+	/// room for the bump, before any capacity is chosen.
+	#[test]
+	fn pda_allocation_rejects_seed_lists_without_room_for_the_bump() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: [&[u8]; MAX_SEEDS] = [b"seed"; MAX_SEEDS];
+		let mut stored_target =
+			TestAccount::<8>::new(Address::new_from_array([2; 32]), owner, 0, 0);
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let target = stored_target.view();
+		let payer = stored_payer.view();
+		let allocate = AllocateAccountWithNonCanonicalBump {
+			account: &target,
+			payer: &payer,
+			space: 8,
+			owner: &owner,
+			seeds: &seeds,
+			bump: 255,
+		};
+
+		assert_eq!(
+			allocate.invoke_signed_with_rent(&[], test_rent()),
+			Err(ProgramError::InvalidSeeds)
+		);
+		assert_eq!(
+			allocate.invoke_signed_inner_validated(&[], Some(test_rent())),
+			Err(ProgramError::InvalidSeeds)
+		);
+		assert_eq!(
+			allocate.invoke_signed_inner_validated_at_full_capacity(&[], Some(test_rent())),
+			Err(ProgramError::InvalidSeeds)
+		);
+	}
+
+	/// Every entry into the allocation spine rejects a signer list that leaves
+	/// no room for the target's own signer.
+	#[test]
+	fn pda_allocation_rejects_signer_lists_without_room_for_the_target() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"seed"];
+		let mut stored_target =
+			TestAccount::<8>::new(Address::new_from_array([2; 32]), owner, 0, 0);
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let target = stored_target.view();
+		let payer = stored_payer.view();
+		let empty_seeds: [Seed<'_>; 0] = [];
+		let signers: [Signer<'_, '_>; MAX_CPI_SIGNERS] =
+			core::array::from_fn(|_| Signer::from(&empty_seeds));
+		let allocate = AllocateAccountWithNonCanonicalBump {
+			account: &target,
+			payer: &payer,
+			space: 8,
+			owner: &owner,
+			seeds,
+			bump: 255,
+		};
+
+		assert_eq!(
+			allocate.invoke_signed_with_rent(&signers, test_rent()),
+			Err(ProgramError::InvalidArgument)
+		);
+		assert_eq!(
+			allocate.invoke_signed_inner_validated(&signers, Some(test_rent())),
+			Err(ProgramError::InvalidArgument)
+		);
+		assert_eq!(
+			allocate.invoke_signed_inner_validated_at_full_capacity(&signers, Some(test_rent())),
+			Err(ProgramError::InvalidArgument)
+		);
 	}
 
 	#[cfg(feature = "account-resize")]

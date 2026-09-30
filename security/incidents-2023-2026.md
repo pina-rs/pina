@@ -6,7 +6,7 @@ Scope: major exploits and near-misses touching the Solana ecosystem from Septemb
 
 ## Conclusions
 
-- The dominant loss driver on Solana in the window was **privileged-key compromise with no on-chain containment** — not missing per-instruction checks. Drift (~$285M, April 2026), DEXX (~$21M), and the custodial bot drainers all ended the same way: one leaked or fooled key moved everything, and nothing in the program could slow, cap, or halt the drain.
+- The dominant loss driver on Solana in the window was **privileged-key compromise with no on-chain containment** — not missing per-instruction checks. Drift (~~$285M, April 2026), DEXX (~~$21M), and the custodial bot drainers all ended the same way: one leaked or fooled key moved everything, and nothing in the program could slow, cap, or halt the drain.
 - The second class is **unvalidated price input**. Loopscale (~$5.8M) fell to a malicious feed deployed under the real oracle program, which owner checks alone cannot catch; only address pinning plus freshness bounds can.
 - The third class is **arithmetic edge cases that survive audits until a degenerate configuration makes them profitable** (Cetus on Sui, Balancer cross-chain). Checked arithmetic — including shift operators — on every asset path is the program-level defense.
 - Frequently repeated "Solana hack" attributions are wrong in both directions: PlayDapp (February 2024) was an Ethereum ERC-20 mint-authority compromise, not a Solana program; and the Raydium loss was ~$4.4M–$5.5M, not the ~$440k often quoted.

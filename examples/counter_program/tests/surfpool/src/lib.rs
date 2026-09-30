@@ -211,6 +211,82 @@ fn cannot_initialize_an_existing_counter() {
 	});
 }
 
+/// The entrypoint's account array is `ENTRYPOINT_ACCOUNT_CAPACITY` slots —
+/// the widest instruction plus one spare — and the loader skips accounts past
+/// it. The spare slot keeps an extra trailing account visible, so an
+/// over-supplied instruction is rejected whether its extras fit inside the
+/// array or run past it.
+#[test]
+#[ignore = "run with pina test"]
+fn rejects_extra_trailing_accounts_inside_and_past_the_entrypoint_capacity() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+
+		let authority = program.payer();
+		let counter = pda_address(&program_id, &authority);
+		let bump = counter_bump(&program_id, &authority);
+		let capacity = CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY;
+		assert_eq!(
+			capacity,
+			CounterInstruction::MAX_INSTRUCTION_ACCOUNTS + 1,
+			"the counter's routes are bounded, so the capacity is one spare slot"
+		);
+		let extras = (1..=capacity)
+			.map(|seed| {
+				AccountMeta::new_readonly(
+					Pubkey::new_from_array([u8::try_from(seed).expect("small seed"); 32]),
+					false,
+				)
+			})
+			.collect::<Vec<_>>();
+		let too_many_account_keys = "0xfffffffe";
+
+		for extra_count in [1, extras.len()] {
+			let mut initialize = initialize_instruction(&program, &authority, &counter, bump);
+			initialize
+				.accounts
+				.extend_from_slice(&extras[..extra_count]);
+			let error = program
+				.send_instruction(initialize)
+				.expect_err("Initialize rejects extra trailing accounts");
+			assert!(
+				error.message().contains(too_many_account_keys),
+				"Initialize with {extra_count} extra accounts: {}",
+				error.message()
+			);
+		}
+
+		program
+			.send_instruction(initialize_instruction(&program, &authority, &counter, bump))
+			.expect("Initialize with its exact accounts succeeds");
+
+		for extra_count in [1, extras.len()] {
+			let mut increment = increment_instruction(&program, &authority, &counter);
+			increment.accounts.extend_from_slice(&extras[..extra_count]);
+			let error = program
+				.send_instruction(increment)
+				.expect_err("Increment rejects extra trailing accounts");
+			assert!(
+				error.message().contains(too_many_account_keys),
+				"Increment with {extra_count} extra accounts: {}",
+				error.message()
+			);
+		}
+
+		let account = program.account(&counter).expect("fetch counter account");
+		assert_eq!(
+			account.data[3..],
+			0u64.to_le_bytes(),
+			"rejected increments leave the count untouched"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 #[test]
 #[ignore = "run with pina test"]
 fn counters_are_isolated_per_authority() {

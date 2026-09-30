@@ -1,9 +1,9 @@
 {
 	"name": "hello-solana-program-cli",
 	"version": "0.1.0",
+	"private": true,
 	"description": "Command-line interface for helloSolanaProgram",
 	"type": "module",
-	"private": true,
 	"bin": {
 		"hello-solana-program-cli": "./src/main.ts"
 	},

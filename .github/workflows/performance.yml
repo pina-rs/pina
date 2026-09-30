@@ -517,7 +517,11 @@ jobs:
 
   comment:
     name: PR performance comment
-    if: ${{ always() && !contains(github.event.pull_request.labels.*.name, 'release') }}
+    # `!cancelled()` still runs this job when a benchmark job fails, so a real
+    # failure is reported as an unavailable section. It skips a run that
+    # concurrency cancelled for a newer push: that run has no reports to post,
+    # and its failing check would outlive the run that replaced it.
+    if: ${{ !cancelled() && !contains(github.event.pull_request.labels.*.name, 'release') }}
     needs:
       - instruction-compute
       - token-loader-compute
@@ -549,6 +553,8 @@ jobs:
           latest_tag="$(git describe --tags --abbrev=0 "$BASE_SHA" 2>/dev/null || true)"
           base_short="${BASE_SHA:0:8}"
           head_short="${HEAD_SHA:0:8}"
+          # The download creates this directory only when an artifact exists.
+          mkdir -p ./target/performance
 
           append_report() {
             local path="$1"
