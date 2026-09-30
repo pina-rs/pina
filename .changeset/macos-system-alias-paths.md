@@ -1,5 +1,8 @@
 ---
 pina_cli: fix
+# `pina_root` owns the whole repository path, so it also claims these
+# `crates/pina_cli` files; it is unpublished, so no bump is recorded.
+pina_root: none
 ---
 
 # Accept macOS system path aliases in link checks

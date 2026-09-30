@@ -10,10 +10,12 @@ use std::path::PathBuf;
 ///
 /// Every symbolic link and reparse point is untrusted except a system alias: a
 /// root-owned link directly below the filesystem root, such as macOS's `/var`
-/// and `/tmp` or a merged-`/usr` system's `/bin`. Only root can create or
-/// replace an entry there, and no repository or project tree occupies that
-/// depth, so the exception cannot admit a project's own links even when the
-/// command runs as root. Windows reparse points are always untrusted because
+/// and `/tmp` or a merged-`/usr` system's `/bin`, traversed as an ancestor.
+/// Only root can create or replace an entry there, and no repository or
+/// project tree occupies that depth, so the exception cannot admit a
+/// project's own links even when the command runs as root. The final
+/// component is never trusted, because a write to it would replace the alias
+/// itself. Windows reparse points are always untrusted because
 /// their owner is not available through the portable metadata API.
 ///
 /// A path that traverses a non-directory component can never resolve, and the
@@ -30,7 +32,9 @@ pub(crate) fn has_untrusted_link_component(path: &Path) -> Result<bool, std::io:
 	let mut depth = 0_usize;
 	let mut parent_is_directory = true;
 
-	for component in absolute.components() {
+	let mut components = absolute.components().peekable();
+
+	while let Some(component) = components.next() {
 		current.push(component);
 
 		if matches!(component, Component::Prefix(_) | Component::RootDir) {
@@ -38,9 +42,10 @@ pub(crate) fn has_untrusted_link_component(path: &Path) -> Result<bool, std::io:
 		}
 
 		depth += 1;
+		let alias_position = depth == 1 && components.peek().is_some();
 
 		match fs::symlink_metadata(&current) {
-			Ok(metadata) if is_untrusted_link(&metadata, depth == 1) => return Ok(true),
+			Ok(metadata) if is_untrusted_link(&metadata, alias_position) => return Ok(true),
 			// A trusted alias is traversed, so its target decides whether a
 			// miss beneath it is an ordinary absent entry.
 			Ok(metadata) if is_link_like(&metadata) => parent_is_directory = current.is_dir(),
@@ -66,8 +71,8 @@ pub(crate) fn has_untrusted_link_component(path: &Path) -> Result<bool, std::io:
 	Ok(false)
 }
 
-fn is_untrusted_link(metadata: &fs::Metadata, top_level: bool) -> bool {
-	is_link_like(metadata) && !(top_level && is_owned_by_root(metadata))
+fn is_untrusted_link(metadata: &fs::Metadata, alias_position: bool) -> bool {
+	is_link_like(metadata) && !(alias_position && is_owned_by_root(metadata))
 }
 
 #[cfg(unix)]
@@ -192,7 +197,7 @@ mod tests {
 
 	#[cfg(unix)]
 	#[test]
-	fn system_aliases_below_the_filesystem_root_are_trusted() {
+	fn system_aliases_are_trusted_only_as_ancestors() {
 		let aliases = fs::read_dir("/")
 			.unwrap_or_else(|error| panic!("read root failed: {error}"))
 			.map(|entry| entry.unwrap_or_else(|error| panic!("root entry failed: {error}")))
@@ -220,6 +225,14 @@ mod tests {
 				!has_untrusted_link_component(&destination)
 					.unwrap_or_else(|error| panic!("alias inspection failed: {error}")),
 				"{} should be trusted",
+				alias.display()
+			);
+			// Writing to the alias itself would replace it, so it is never
+			// trusted as the final component.
+			assert!(
+				has_untrusted_link_component(&alias)
+					.unwrap_or_else(|error| panic!("alias inspection failed: {error}")),
+				"{} should be refused as a destination",
 				alias.display()
 			);
 		}
