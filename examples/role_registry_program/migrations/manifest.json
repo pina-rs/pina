@@ -87,26 +87,16 @@
 							{
 								"name": "admin",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "registry_config",
 								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
 								"pda": "registry_config"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
 					}
@@ -140,42 +130,23 @@
 							{
 								"name": "admin",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "grantee",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "grantee"
 							},
 							{
 								"name": "registry_config",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "role_entry",
 								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
 								"pda": "role_entry"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
 					}
@@ -200,27 +171,14 @@
 						"accounts": [
 							{
 								"name": "admin",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "registry_config",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "registry_config"
 							},
 							{
 								"name": "role_entry",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							}
 						]
 					}
@@ -240,27 +198,14 @@
 						"accounts": [
 							{
 								"name": "admin",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "registry_config",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "registry_config"
 							},
 							{
 								"name": "role_entry",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							}
 						]
 					}
@@ -280,27 +225,14 @@
 						"accounts": [
 							{
 								"name": "admin",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "new_admin",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "new_admin"
 							},
 							{
 								"name": "registry_config",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							}
 						]
 					}

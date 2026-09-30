@@ -23,15 +23,13 @@ The manifest key `kind:width:hex` (for example `instruction:1:00`) is the contra
 
 ### Opting in
 
-One contract opts in with the `migrations` token; a whole program opts in through `[migrations].auto`:
+One contract opts in with the `migrations` token; a whole program opts in with the `--auto` flag of `pina migrations create`:
 
-```toml
-[migrations]
-version_type = "u8"
-auto = true # or ["accounts", "events", "instructions"], or a staged subset
+```bash
+pina migrations create --auto true # or --auto accounts,events,instructions, or a staged subset
 ```
 
-`pina migrations create` records the policy in `migrations/manifest.json` and snapshots every contract of the listed kinds, so the manifest stays the checked-in source of truth that macros consult. A declaration the manifest does not record yet still fails the build with the `pina migrations create` remedy. Because a proc macro does not re-expand when `pina.toml` changes, a program with a policy also gets a build script emitting `cargo:rerun-if-changed=migrations/manifest.json`; `create` scaffolds it or reports the exact line when a hand-written build script must be edited. Explicit `migrations = false` overrides the policy for one contract, and removing an envelope the manifest already records fails closed as a wire-format change.
+`create` records the policy as `auto` in `migrations/manifest.json` and snapshots every contract of the listed kinds; a later run without the flag keeps it. The manifest is the only home of the policy and of the version width, so it stays the checked-in source of truth that macros consult. `pina.toml` holds neither: its retired `[migrations].auto` and `[migrations].version_type` keys fail every command that reads it, naming the flag that replaces them. A declaration the manifest does not record yet still fails the build with the `pina migrations create` remedy. Because a proc macro does not re-expand when the manifest changes, a program with a policy also gets a build script emitting `cargo:rerun-if-changed=migrations/manifest.json`; `create` scaffolds it or reports the exact line when a hand-written build script must be edited. Explicit `migrations = false` overrides the policy for one contract, and removing an envelope the manifest already records fails closed as a wire-format change, whether it comes from the token, from `--auto`, or from a hand edit of the manifest's `auto`.
 
 The policy envelopes accounts and events. It records an instruction without an envelope unless the declaration opts in with `#[instruction(discriminator = X, migrations)]`.
 
@@ -107,6 +105,8 @@ The policy envelopes accounts and events. It records an instruction without an e
 ```
 
 Once a version appears in a receipt or pending record it is frozen: `create` appends the next version instead of rewriting it, and any edit to a pinned schema or transition hash fails every later check. A snapshot-only instruction has no next version, so its published payload is fixed.
+
+Drift is decided by what a field stores, not by how its type is spelled. Respelling `PodU64` as `u64`, or `Address` as `[u8; 32]`, stores the same bytes under the same reading, so it consumes no version and fails no build, and the recorded spelling and pinned hashes stay as they were. Types that only share a width, such as `u64` and `i64`, are a real change that needs a manual transition.
 
 ### Instructions: a snapshot unless they opt in
 
@@ -489,7 +489,7 @@ Run out of versions and nothing can fix it afterwards. Two facts decide how much
 
 **Versions are counted per contract, not per program.** Every account, instruction, and event owns an independent history that starts at `0`, keyed by its own discriminator in `migrations/manifest.json`. A snapshot-only instruction never consumes a version. A program can hold one account at version `3` and another still at `0`; they do not share a counter, and exhausting one says nothing about the rest. So the budget is "255 versions of _this one contract_", not "255 versions of the program".
 
-**The width is program-wide and freezes at the first publication.** `[migrations].version_type` chooses one width for every contract, and once a version appears in a publication receipt it cannot be changed: `create` and `check` both fail with `VersionTypeChanged`, and receipts pin the manifest hash. Before the first release the width is still yours to choose — delete the `migrations/` directory and re-run `create` with the wider setting to re-baseline. After the first release there is no widening path.
+**The width is program-wide and freezes at the first publication.** `pina migrations create --version-type` records one width for every contract as `versionType` in the manifest, and a later run without the flag keeps it. Before the first release the width is still yours to choose: `pina migrations create --version-type u16` rewrites it in place, because every history is still a single draft. Once a receipt or pending record exists the width is frozen, and the flag fails with "Migration version encoding is frozen as u8 because a deployment published it, so it cannot become u16". After the first release there is no widening path.
 
 That combination makes `u8` the right default. 255 versions of a single account type is not a realistic lifetime for a program that migrates sensibly, and it costs one byte per enveloped account; `u16` costs two and is worth choosing up front only if you expect a single contract to exceed 255 revisions.
 

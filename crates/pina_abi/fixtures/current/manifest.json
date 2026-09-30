@@ -207,11 +207,7 @@
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							}
 						]
 					}
@@ -234,43 +230,26 @@
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "referrer",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "state",
 								"writable": true,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "migration_payer",
 								"writable": true,
 								"signer": true,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							}
 						]
 					},
@@ -297,59 +276,36 @@
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "referrer",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "state",
 								"writable": true,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "migration_payer",
 								"writable": true,
 								"signer": true,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "manual_state",
 								"writable": true,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							},
 							{
 								"name": "compact_state",
 								"writable": true,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							}
 						]
 					},

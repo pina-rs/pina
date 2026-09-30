@@ -107,74 +107,37 @@
 							{
 								"name": "admin",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "stake_mint",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "stake_mint"
 							},
 							{
-								"name": "reward_mint",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "reward_mint"
 							},
 							{
 								"name": "pool_state",
 								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
 								"pda": "pool"
 							},
 							{
 								"name": "stake_vault",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "reward_vault",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "associated_token_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-								"pda": null
+								"defaultValue": "publicKey:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							},
 							{
-								"name": "token_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "token_program"
 							}
 						]
 					}
@@ -200,34 +163,19 @@
 							{
 								"name": "user",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "pool_state",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "pool_state"
 							},
 							{
 								"name": "position_state",
 								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
 								"pda": "position"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
 					}
@@ -253,74 +201,37 @@
 							{
 								"name": "user",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "stake_mint",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "stake_mint"
 							},
 							{
 								"name": "pool_state",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "position_state",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "user_stake_ata",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "stake_vault",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "associated_token_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-								"pda": null
+								"defaultValue": "publicKey:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 							},
 							{
-								"name": "token_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "token_program"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
 					}
@@ -345,67 +256,33 @@
 						"accounts": [
 							{
 								"name": "user",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "stake_mint",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "stake_mint"
 							},
 							{
 								"name": "pool_state",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "position_state",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "user_stake_ata",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "stake_vault",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
-								"name": "token_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "token_program"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
 					}
@@ -426,74 +303,37 @@
 							{
 								"name": "user",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
-								"name": "reward_mint",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "reward_mint"
 							},
 							{
 								"name": "pool_state",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "position_state",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "user_reward_ata",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "reward_vault",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "associated_token_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-								"pda": null
+								"defaultValue": "publicKey:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 							},
 							{
-								"name": "token_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "token_program"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
 					}
@@ -518,43 +358,20 @@
 						"accounts": [
 							{
 								"name": "admin",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "pool_state",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
-								"name": "reward_mint",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "reward_mint"
 							},
 							{
-								"name": "token_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "token_program"
 							},
 							{
-								"name": "reward_vault",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "reward_vault"
 							}
 						]
 					}

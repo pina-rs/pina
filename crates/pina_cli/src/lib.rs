@@ -59,57 +59,6 @@ pub use crate::project::GenerationMode;
 /// `program_path` should point to the crate root (the directory containing
 /// `Cargo.toml`). If `name_override` is provided it replaces the package name
 /// from `Cargo.toml`.
-/// Refuse an IDL for a program whose `pina.toml` opts contracts into the
-/// version envelope before `pina migrations create` has recorded them.
-///
-/// Without a manifest the macros and the IDL both see no policy, so the build
-/// passes and every generated client would omit the version byte the program
-/// gains once the baseline is snapshotted.
-fn reject_unsnapshotted_auto_policy(
-	program_path: &Path,
-	name_override: Option<&str>,
-	recorded: &pina_abi::MigrationAuto,
-) -> Result<(), IdlError> {
-	if !recorded.is_empty() || program_path.join(pina_abi::MANIFEST_PATH).exists() {
-		return Ok(());
-	}
-	let configured_auto = project::Project::discover(program_path)
-		.map(|project| project.migration_auto)
-		.unwrap_or_default();
-	if configured_auto.is_empty() {
-		return Ok(());
-	}
-	let configured = parse_program_with_auto(program_path, name_override, &configured_auto)?;
-	let pending = configured
-		.accounts
-		.iter()
-		.find(|account| account.is_migratable())
-		.map(|account| ("account", account.name.clone()))
-		.or_else(|| {
-			configured
-				.instructions
-				.iter()
-				.find(|instruction| instruction.is_migratable())
-				.map(|instruction| ("instruction", instruction.name.clone()))
-		})
-		.or_else(|| {
-			configured
-				.events
-				.iter()
-				.find(|event| event.is_migratable())
-				.map(|event| ("event", event.name.clone()))
-		});
-	match pending {
-		Some((kind, name)) => {
-			Err(IdlError::Other(format!(
-				"Migration-aware {kind} `{name}` has no checked-in snapshot, so an IDL generated \
-				 now would omit its version envelope. Run `pina migrations create` first."
-			)))
-		}
-		None => Ok(()),
-	}
-}
-
 pub fn generate_idl(
 	program_path: &Path,
 	name_override: Option<&str>,
@@ -118,7 +67,6 @@ pub fn generate_idl(
 	// same contracts the macros enveloped.
 	let auto = migrations::manifest_auto_policy(program_path);
 	let ir = parse_program_with_auto(program_path, name_override, &auto)?;
-	reject_unsnapshotted_auto_policy(program_path, name_override, &auto)?;
 	let needs_migration_constants = ir.accounts.iter().any(ir::AccountIr::is_migratable)
 		|| ir.instructions.iter().any(ir::InstructionIr::is_migratable)
 		|| ir.events.iter().any(ir::EventIr::is_migratable);

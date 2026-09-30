@@ -20,28 +20,13 @@
 					"process": {
 						"accounts": [
 							{
-								"name": "clock",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "clock"
 							},
 							{
-								"name": "rent",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "rent"
 							},
 							{
-								"name": "stake_history",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "stake_history"
 							}
 						]
 					}

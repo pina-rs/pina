@@ -47,26 +47,16 @@
 							{
 								"name": "authority",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "store",
 								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
 								"pda": "store"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
 					}
@@ -86,18 +76,12 @@
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "store",
 								"writable": true,
-								"signer": false,
 								"optional": true,
-								"defaultValue": null,
 								"pda": "store"
 							}
 						]
@@ -118,27 +102,17 @@
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "store",
-								"writable": false,
-								"signer": false,
 								"optional": true,
-								"defaultValue": null,
 								"pda": "store"
 							},
 							{
 								"name": "witness",
-								"writable": false,
 								"signer": true,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							}
 						]
 					}
@@ -158,19 +132,11 @@
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "note",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							}
 						]
 					}

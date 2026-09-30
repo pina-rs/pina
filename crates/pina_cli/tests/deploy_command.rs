@@ -78,11 +78,8 @@ impl ProjectFixture {
 	}
 
 	fn enable_migrations(&self) {
-		fs::write(
-			self.root.join("pina.toml"),
-			"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\n",
-		)
-		.unwrap_or_else(|error| panic!("write migration config: {error}"));
+		fs::write(self.root.join("pina.toml"), "[project]\nprogram = \".\"\n")
+			.unwrap_or_else(|error| panic!("write migration config: {error}"));
 		fs::write(
 			self.root.join("src/lib.rs"),
 			format!(

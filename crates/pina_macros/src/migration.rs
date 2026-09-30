@@ -1266,13 +1266,16 @@ pub(crate) fn resolve_opt_in(
 	declared: Option<bool>,
 	manifest: Option<&MigrationManifest>,
 ) -> syn::Result<Coverage> {
+	let records_envelope = || {
+		manifest.is_some_and(|manifest| {
+			manifest
+				.contract_for_source(kind, &item.ident.to_string())
+				.is_ok_and(|history| history.envelope)
+		})
+	};
 	match declared {
 		Some(false) => {
-			if manifest.is_some_and(|manifest| {
-				manifest
-					.contract_for_source(kind, &item.ident.to_string())
-					.is_ok_and(|history| history.envelope)
-			}) {
+			if records_envelope() {
 				return Err(syn::Error::new_spanned(
 					item,
 					format!(
@@ -1287,6 +1290,22 @@ pub(crate) fn resolve_opt_in(
 			Ok(Coverage::None)
 		}
 		None if !manifest.is_some_and(|manifest| manifest.auto.contains(kind)) => {
+			// Neither a token nor the recorded policy covers the declaration,
+			// so expanding it bare would silently drop an envelope the manifest
+			// records, for instance after a hand edit of its `auto` policy.
+			if records_envelope() {
+				return Err(syn::Error::new_spanned(
+					item,
+					format!(
+						"`{}` has no `migrations` token and the recorded auto policy does not \
+						 cover it, but the migration manifest records it with a version \
+						 envelope; removing an envelope is a wire-format change that `pina \
+						 migrations create` must record deliberately. Restore the `migrations` \
+						 token or the policy that covered it",
+						item.ident
+					),
+				));
+			}
 			Ok(Coverage::None)
 		}
 		None if kind == ContractKind::Instruction => Ok(Coverage::Snapshot),
@@ -1971,7 +1990,9 @@ fn verify_source_schema(
 	actual: &DataSchema,
 	expected: &DataSchema,
 ) -> syn::Result<()> {
-	if actual == expected {
+	// A respelling that stores the same bytes (`PodU64` for `u64`) still
+	// matches the recorded snapshot.
+	if actual.same_wire(expected) {
 		return Ok(());
 	}
 
@@ -2157,6 +2178,16 @@ mod tests {
 			message.contains("pina migrations create"),
 			"message: {message}"
 		);
+	}
+
+	/// A respelling that stores the same bytes still matches its snapshot.
+	#[test]
+	fn a_wire_equivalent_respelling_matches_its_snapshot() {
+		let item = item_struct("State");
+		let parsed = syn::parse_str::<ItemStruct>("struct State { value: PodU64 }");
+		let respelled = parsed.unwrap_or_else(|error| panic!("respelled: {error}"));
+		let result = verify_source_schema(&item, &test_schema(&respelled), &test_schema(&item));
+		assert!(result.is_ok(), "a respelling is not drift");
 	}
 
 	fn gate_contract(
@@ -2513,14 +2544,15 @@ mod tests {
 				expected
 			);
 
-			// A policy for another kind leaves this declaration opted out.
+			// A policy for another kind leaves an unrecorded declaration opted
+			// out.
 			let other = ContractKind::ALL
 				.into_iter()
 				.find(|candidate| *candidate != kind)
 				.unwrap_or_else(|| panic!("a second kind exists"));
 			let mut policy = MigrationAuto::none();
 			policy.add(other);
-			let manifest = manifest_for(&item, kind, policy);
+			let manifest = manifest_for(&item_struct("Unrelated"), kind, policy);
 			assert_eq!(
 				resolve_opt_in(&item, kind, None, Some(&manifest))
 					.unwrap_or_else(|error| panic!("uncovered kind: {error}")),
@@ -2581,6 +2613,22 @@ mod tests {
 		);
 		let coverage = coverage.unwrap_or_else(|error| panic!("snapshot opt-out: {error}"));
 		assert_eq!(coverage, Coverage::None);
+	}
+
+	/// A recorded envelope never disappears silently: a declaration the
+	/// policy stopped covering fails the build instead of expanding bare.
+	#[test]
+	fn an_uncovered_declaration_cannot_drop_a_recorded_envelope() {
+		let item = item_struct("State");
+		let manifest = manifest_for(&item, ContractKind::Account, MigrationAuto::none());
+		let error = resolve_opt_in(&item, ContractKind::Account, None, Some(&manifest)).err();
+		let error = error.map(|error| error.to_string());
+		assert!(
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("records it with a version envelope")),
+			"got: {error:?}"
+		);
 	}
 
 	#[test]

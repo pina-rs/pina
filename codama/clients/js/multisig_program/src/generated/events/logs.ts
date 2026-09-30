@@ -18,7 +18,7 @@ import {
 /**
  * Decode one `proposalStatusEvent` record: only records carrying this event's migration version decode.
  */
-export function normalizeProposalStatusEventEvent(
+export function decodeProposalStatusEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
 ): DecodedProposalStatusEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -77,7 +77,7 @@ export function parseProposalStatusEventEventFromLog(
 	if (bytes[1] !== 0) {
 		return null;
 	}
-	return normalizeProposalStatusEventEvent(bytes);
+	return decodeProposalStatusEventEvent(bytes);
 }
 
 /**

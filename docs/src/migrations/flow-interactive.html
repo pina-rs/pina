@@ -259,24 +259,21 @@
 		<div class="step-num">1</div>
 		<div>
 			<div class="step-title">Turn migrations on once</div>
-			<div class="step-what">One line in <code class="inline">pina.toml</code>, then you can stop thinking about it.</div>
+			<div class="step-what">One command records the policy, then you can stop thinking about it.</div>
 		</div>
 		<div class="step-caret">▶</div>
 	</button>
 	<div class="step-body">
-		<p>Add a <code class="inline">[migrations]</code> section to your program's <code class="inline">pina.toml</code> and pick how wide the version counter should be. <code class="inline">u8</code> is fine for almost every program, and distinguishes 256 versions per contract.</p>
-		<div class="cmd"><span class="prompt">$ </span>cat pina.toml
-<span class="comment">[project]
-program = "."
-
-[migrations]
-version_type = "u8"</span></div>
+		<p>Run <code class="inline">pina migrations create --auto true</code> once the program address is final. It records the policy in <code class="inline">migrations/manifest.json</code>, the only place it lives, and snapshots every contract as version 0. The version counter is <code class="inline">u8</code> unless you add <code class="inline">--version-type u16</code> to that first run. <code class="inline">u8</code> is fine for almost every program, and distinguishes 256 versions per contract.</p>
+		<div class="cmd"><span class="prompt">$ </span>pina migrations create --auto true
+<span class="comment">Auto policy: accounts, instructions, events</span></div>
 		<details class="under">
 			<summary>What happens under the hood</summary>
 			<div class="under-body">
 				<p>Accounts and events gain a <strong>version envelope</strong>. The version number sits immediately after the existing discriminator. The framework owns these bytes, so your code never reads or writes them by hand.</p>
 				<p>Instructions keep their plain <code>[discriminator][payload]</code> format. The manifest records one snapshot of each (<code>"envelope": false</code>), and the build fails if the struct drifts from it. An instruction that must accept older payloads under the same discriminator opts in with <code>#[instruction(discriminator = X, migrations)]</code> and gains the envelope too.</p>
-				<p>The encoding (<code>u8</code>, <code>u16</code>, or <code>u32</code>) is program-wide, so every contract shares one envelope size. Generated code picks the matching implementation, not you.</p>
+				<p>The encoding (<code>u8</code>, <code>u16</code>, or <code>u32</code>) is program-wide, so every contract shares one envelope size. Generated code picks the matching implementation, not you. The width can change only while nothing is published; the first deployment freezes it.</p>
+				<p>Nothing about migrations goes in <code>pina.toml</code>. The manifest is the one copy the macros read, so a second copy could only disagree with it, and the retired <code>[migrations]</code> keys fail every command that reads <code>pina.toml</code>, naming the flag that replaces them.</p>
 			</div>
 		</details>
 	</div>
@@ -357,7 +354,7 @@ stderr: error: ambiguous field changes need an explicit answer
 				<p>Two files change. <code>migrations/manifest.json</code> records the new version and its full schema snapshot. <code>migrations/transitions/account_1_03/…</code> holds a generated Rust transition that copies overlapping bytes field by field and zero-fills anything new.</p>
 				<div class="tree"><span class="d">migrations/</span>
 ├── <span class="f">manifest.json</span>        <span class="c">← every version's schema, per contract</span>
-├── <span class="f">publications.json</span>    <span class="c">← hash-chained release ledger (step 6)</span>
+├── <span class="f">publications.json</span>    <span class="c">← append-only release ledger (step 6)</span>
 └── <span class="d">transitions/</span>
     ├── <span class="d">account_1_02/</span>   <span class="c">← v1 → v2 for the State account</span>
     └── <span class="d">instruction_1_00/</span> <span class="c">← only for an instruction with <code>migrations</code></span></div>
@@ -405,7 +402,7 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 		<details class="under">
 			<summary>What happens under the hood</summary>
 			<div class="under-body">
-				<p>Deploy appends a receipt to <code>publications.json</code> recording which ELF bytes went on-chain, which manifest versions they carried, and the hash of the previous receipt. Each receipt is hash-chained to the last, so the history cannot be edited or reordered later.</p>
+				<p>Deploy appends a receipt to <code>publications.json</code> recording which ELF bytes went on-chain and pinning the schema hash of every version they carried. Receipts are appended in deployment order and the file lives in version control, which is what keeps the history from being edited or reordered later.</p>
 				<p>Once a version is published it becomes <strong>immutable</strong>. Its schema snapshot and transition files are frozen, and any later edit to them fails <code>pina migrations check</code>. Shipped migrations are history, not drafts. If a deploy dies halfway, <code>pina migrations reconcile</code> inspects the pending receipt and either completes it or abandons it explicitly. An abandoned receipt still freezes whatever shipped.</p>
 			</div>
 		</details>
@@ -670,19 +667,19 @@ if let Some(state) = state {
 <p class="lead">Everything a developer or an agent needs, in one table.</p>
 <table>
 	<tr><th>Command</th><th>When</th><th>What it does</th></tr>
-	<tr><td><code>pina migrations create</code></td><td>After changing a struct</td><td>Records the new version and generates transitions. Asks questions on a terminal; add <code>--rename from:to</code>, <code>--assume-removed field</code>, <code>--no-interactive</code>, or <code>--json</code> to answer without one.</td></tr>
+	<tr><td><code>pina migrations create</code></td><td>After changing a struct</td><td>Records the new version and generates transitions. <code>--auto</code> and <code>--version-type</code> record the policy, usually once on the first run. Asks questions on a terminal; add <code>--rename from:to</code>, <code>--assume-removed field</code>, <code>--no-interactive</code>, or <code>--json</code> to answer without one.</td></tr>
 	<tr><td><code>pina migrations check</code></td><td>CI, pre-commit</td><td>Non-mutating gate. Catches drift, unfinished TODO transitions, and any edit to frozen published files. Exits 1 with a readable reason.</td></tr>
 	<tr><td><code>pina migrations status</code></td><td>Curiosity, support</td><td>Reports each contract's local version and publication state. <code>--json</code> for tooling.</td></tr>
 	<tr><td><code>pina migrations reconcile</code></td><td>A deploy died halfway</td><td>Inspects the pending publication receipt, then completes it or abandons it with <code>--abandon</code>.</td></tr>
 	<tr><td><code>pina build</code></td><td>Always</td><td>The drift gate. Fails until every schema change is recorded and every TODO transition is filled.</td></tr>
-	<tr><td><code>pina deploy --cluster &lt;CLUSTER&gt;</code></td><td>Shipping</td><td>Deploys and appends a hash-chained receipt, freezing the shipped versions. Loopback targets record one only with <code>--record-publication</code>.</td></tr>
+	<tr><td><code>pina deploy --cluster &lt;CLUSTER&gt;</code></td><td>Shipping</td><td>Deploys and appends a receipt pinning the shipped versions, which freezes them. Loopback targets record one only with <code>--record-publication</code>.</td></tr>
 	<tr><td><code>pina generate</code></td><td>After <code>create</code></td><td>Regenerates the TypeScript, Dart, Rust, and CPI clients with the new shape and current version constants.</td></tr>
 </table>
 
 <!-- ============ GUARANTEES ============ -->
 <h2>Limits and guarantees</h2>
 <div class="box warn"><b>Hard limits, and all of them fail cleanly.</b> At most <code>MAX_INLINE_STEPS</code> adjacent versions are walked in one instruction; an account further behind fails with <code>MigrationUnavailable</code>, so publish smaller, more frequent versions. The normalization workspace is capped at 1 KiB of stack (<code>MigrationWorkspaceExceeded</code> past that, and generated code does not compile past it). Growth is capped by <code>MAX_PERMITTED_DATA_INCREASE</code> per instruction (<code>MigrationAccountGrowthExceeded</code>), measured from the size captured before the whole inline ladder and not per hop, and by the payer's <code>max_lamports</code> budget overall (<code>MigrationLamportBudgetExceeded</code>). Exceeding any of these fails the transaction. It never silently skips a migration. Older builds reported the workspace, growth, and lamport-budget failures as the legacy aggregate <code>MigrationBudgetExceeded</code>; <code>MigrationUnavailable</code> was already its own code and was not part of that split.</div>
-<div class="box info"><b>The ledger proves history, not identity.</b> <code>publications.json</code> is SHA-256-chained and freezes on publish, so accidental drift cannot slip through. It is not a signature scheme: anyone with write access to the repo can regenerate it. Treat it as a build-time integrity check, not as proof of what happened on-chain.</div>
+<div class="box info"><b>The ledger proves history, not identity.</b> <code>publications.json</code> pins the SHA-256 of every published schema and transition and freezes on publish, so accidental drift cannot slip through. It is not a signature scheme: anyone with write access to the repo can rewrite it, which is why it carries no hash chain and relies on version control to stay append-only. Treat it as a build-time integrity check, not as proof of what happened on-chain.</div>
 
 <h3 style="font-size:18px; margin-top: 28px;">The reserved Migrate instruction</h3>
 <p>Pina reserves the all-ones value of every instruction discriminator width for a framework migration instruction, and <code class="inline">#[discriminator]</code> rejects user variants that claim it at compile time. A program with migratable accounts routes it before parsing its own enum:</p>

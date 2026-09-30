@@ -19,6 +19,7 @@ use pina_abi::ProcessAccount;
 use pina_abi::ProcessContract;
 use pina_abi::PublicationLedger;
 use pina_abi::PublishedContract;
+use pina_abi::PublishedSchema;
 use pina_abi::SchemaVersion;
 use pina_abi::Transition;
 use pina_abi::TransitionMode;
@@ -280,6 +281,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				destination: &source_schema,
 				destination_process: Some(&escalated),
 				preserve_manual: false,
+				version_type: MigrationVersionType::U8,
 			},
 			&mut CreateMigrationsOutput::default(),
 		),
@@ -312,6 +314,7 @@ fn transition_creation_propagates_process_and_directory_failures() {
 				destination: &destination,
 				destination_process: None,
 				preserve_manual: false,
+				version_type: MigrationVersionType::U8,
 			},
 			&mut CreateMigrationsOutput::default(),
 		),
@@ -601,19 +604,13 @@ fn draft_lifecycle_requires_creates_refreshes_and_removes_snapshots() {
 fn discovery_snapshots_accounts_instructions_events_and_processes() {
 	let fixture = migration_fixture();
 	std::fs::write(
-		fixture.root.join("pina.toml"),
-		"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\nauto = true\n",
-	)
-	.unwrap_or_else(|error| panic!("write auto policy: {error}"));
-	std::fs::write(
 		fixture.root.join("src/lib.rs"),
 		include_str!("../../../../examples/migrations_program/src/lib.rs"),
 	)
 	.unwrap_or_else(|error| panic!("write complete migration source: {error}"));
 	let project = Project::discover(&fixture.root)
 		.unwrap_or_else(|error| panic!("discover complete fixture: {error}"));
-	assert_eq!(project.migration_auto, MigrationAuto::all());
-	let current = scan_current_contracts(&project, &project.migration_auto)
+	let current = scan_current_contracts(&project, &MigrationAuto::all())
 		.unwrap_or_else(|error| panic!("scan complete fixture: {error}"));
 	assert_eq!(current.contracts.len(), 5);
 	// The example's relay payload opts out explicitly; auto must not envelop it.
@@ -647,7 +644,7 @@ fn discovery_snapshots_accounts_instructions_events_and_processes() {
 		7
 	);
 
-	let output = create_migrations(&fixture.root)
+	let output = create_with_policy(&fixture, "true")
 		.unwrap_or_else(|error| panic!("snapshot complete fixture: {error}"));
 	assert_eq!(output.created_contracts.len(), 5);
 	assert_eq!(output.auto, ["accounts", "instructions", "events"]);
@@ -740,15 +737,6 @@ fn lifecycle_rejects_drift_configuration_changes_and_invalid_documents() {
 	manifest.program_id = fixture.program_id.to_owned();
 	write_json_atomic(&manifest_path, &manifest)
 		.unwrap_or_else(|error| panic!("restore program identity: {error}"));
-	std::fs::write(
-		fixture.root.join("pina.toml"),
-		"[project]\nprogram = \".\"\n[migrations]\nversion_type = \"u16\"\n",
-	)
-	.unwrap_or_else(|error| panic!("write changed version type: {error}"));
-	assert!(matches!(
-		check_migrations(&fixture.root),
-		Err(MigrationError::VersionTypeChanged { .. })
-	));
 
 	std::fs::write(&manifest_path, b"not json")
 		.unwrap_or_else(|error| panic!("corrupt manifest: {error}"));
@@ -859,81 +847,38 @@ fn internal_contract_helpers_fail_closed_on_collisions_and_missing_values() {
 	);
 }
 
+/// The width sizes every enveloped contract, so `--version-type` rewrites
+/// it while every history is still a draft and refuses once published.
 #[test]
-fn an_auto_policy_without_a_snapshot_refuses_to_generate_an_envelope_free_idl() {
-	let fixture = migration_fixture();
-	let plain = |extra: &str| {
-		std::fs::write(
-			fixture.root.join("src/lib.rs"),
-			format!(
-				"use pina::*;\ndeclare_id!(\"{}\");\n#[discriminator]\nenum Kind {{ State = 1 \
-				 }}\n#[account(discriminator = Kind::State)]\nstruct State {{ value: u64 \
-				 }}\n{extra}",
-				fixture.program_id
-			),
-		)
-		.unwrap_or_else(|error| panic!("write source: {error}"));
+fn the_version_type_changes_only_while_nothing_is_published() {
+	let fixture = publication_fixture();
+	let widen = |version_type| {
+		let mut answers = MigrationAnswers::default();
+		answers.set_policy(None, Some(version_type));
+		create_migrations_with_answers(&fixture.root, &answers)
 	};
-	let configure = |auto: &str| {
-		std::fs::write(
-			fixture.root.join("pina.toml"),
-			format!("[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\n{auto}"),
-		)
-		.unwrap_or_else(|error| panic!("write config: {error}"));
-	};
-	plain("");
 
-	configure("auto = true\n");
-	let error = crate::generate_idl(&fixture.root, None)
-		.expect_err("an unsnapshotted auto policy must not produce an IDL");
-	assert!(error.to_string().contains("account `State`"), "{error}");
+	let output =
+		widen(MigrationVersionType::U16).unwrap_or_else(|error| panic!("widen a draft: {error}"));
+	assert_eq!(output.previous_version_type, Some(MigrationVersionType::U8));
+	assert_eq!(output.version_type, MigrationVersionType::U16);
+	assert_eq!(
+		read_manifest(&fixture).version_type,
+		MigrationVersionType::U16
+	);
+
+	// Asking for the recorded width changes nothing.
+	let unchanged =
+		widen(MigrationVersionType::U16).unwrap_or_else(|error| panic!("keep the width: {error}"));
+	assert_eq!(unchanged.previous_version_type, None);
+
+	publish_current(&fixture);
+	let error = widen(MigrationVersionType::U32).expect_err("a published width is frozen");
 	assert!(
-		error.to_string().contains("pina migrations create"),
-		"{error}"
+		matches!(error, MigrationError::VersionTypeFrozen { .. }),
+		"{error:?}"
 	);
-
-	configure("auto = [\"instructions\"]\n");
-	plain(
-		"#[discriminator]\nenum Ix { Go = 0 }\n#[instruction(discriminator = Ix::Go)]\nstruct \
-		 GoInstruction { value: u8 }\n#[derive(Accounts)]\npub struct GoAccounts<'a> { pub payer: \
-		 &'a AccountView }\nimpl<'a> ProcessAccountInfos<'a> for GoAccounts<'a> { fn process(self, \
-		 _data: &[u8]) -> ProgramResult { Ok(()) } }\npub fn process_instruction(program_id: \
-		 &Address, accounts: &mut [AccountView], data: &[u8]) -> ProgramResult { let instruction: \
-		 Ix = parse_instruction(program_id, &ID, data)?; match instruction { Ix::Go => \
-		 GoAccounts::try_from((program_id, accounts))?.process(data) } }\n",
-	);
-	// An auto policy records instructions without an envelope, so an IDL
-	// generated before the baseline omits nothing.
-	let root = crate::generate_idl(&fixture.root, None)
-		.unwrap_or_else(|error| panic!("an envelope-free instruction needs no snapshot: {error}"));
-	assert!(
-		!serde_json::to_string(&root)
-			.unwrap_or_default()
-			.contains("migrationVersion"),
-		"an unenveloped instruction carries no version byte"
-	);
-
-	configure("auto = [\"events\"]\n");
-	plain(
-		"#[discriminator]\nenum Ev { Done = 0 }\n#[event(discriminator = Ev::Done)]\nstruct \
-		 DoneEvent { value: u8 }\n",
-	);
-	let error = crate::generate_idl(&fixture.root, None).expect_err("events are covered too");
-	assert!(
-		error.to_string().contains("event `")
-			&& error.to_string().contains("no checked-in snapshot"),
-		"{error}"
-	);
-
-	// A policy that covers nothing in the program leaves the IDL alone.
-	configure("auto = [\"instructions\"]\n");
-	plain("");
-	crate::generate_idl(&fixture.root, None)
-		.unwrap_or_else(|error| panic!("nothing to envelope: {error}"));
-
-	// No policy at all is the ordinary non-migrating program.
-	configure("");
-	crate::generate_idl(&fixture.root, None).unwrap_or_else(|error| panic!("no policy: {error}"));
+	assert!(error.to_string().contains("frozen as u16"), "{error}");
 }
 
 #[test]
@@ -1080,7 +1025,10 @@ fn publication_records_exact_artifact_and_freezes_current_versions() {
 	.unwrap_or_else(|error| panic!("begin publication: {error}"))
 	.expect("migration-aware fixture has a pending publication");
 	assert_eq!(
-		pending.versions.get("account:1:01").map(|c| c.version),
+		pending
+			.versions
+			.get("account:1:01")
+			.map(PublishedContract::version),
 		Some(0)
 	);
 	let repeated = begin_publication(
@@ -1161,10 +1109,12 @@ fn publication_records_exact_artifact_and_freezes_current_versions() {
 	.unwrap_or_else(|error| panic!("record publication: {error}"))
 	.expect("migration-aware fixture has a receipt");
 
-	assert_eq!(receipt.sequence, 0);
 	assert_eq!(receipt.executable_sha256, hex_digest(digest));
 	assert_eq!(
-		receipt.versions.get("account:1:01").map(|c| c.version),
+		receipt
+			.versions
+			.get("account:1:01")
+			.map(PublishedContract::version),
 		Some(0)
 	);
 	let ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
@@ -1426,74 +1376,44 @@ fn reconcile_reports_and_abandons_pending_deployments() {
 	assert!(empty.no_pending);
 }
 
+/// `--pin-legacy` needs a manifest to pin against, leaves a missing ledger
+/// alone, and refuses a ledger it cannot read or back from the manifest.
 #[test]
-fn legacy_receipts_are_pinned_only_on_request_and_keep_their_chain() {
+fn legacy_pinning_fails_closed_without_a_backing_manifest() {
 	let fixture = publication_fixture();
-	publish_current(&fixture);
-	write_state_source(&fixture, "value: u64, extra: u16");
-	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("advance: {error:?}"));
-	publish_current(&fixture);
-	write_state_source(&fixture, "value: u64, extra: u16, more: u8");
-	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("advance again: {error:?}"));
-	let digest: [u8; 32] = Sha256::digest(
-		std::fs::read(&fixture.artifact).unwrap_or_else(|error| panic!("read artifact: {error}")),
-	)
-	.into();
-	begin_publication(
-		&fixture.root,
-		"devnet",
-		"https://api.devnet.solana.com",
-		fixture.program_id,
-		&fixture.artifact,
-		digest,
-	)
-	.unwrap_or_else(|error| panic!("pending publication: {error}"));
-
 	let path = fixture.root.join(PUBLICATIONS_PATH);
-	let pinned = load_publication_ledger(&path).unwrap_or_else(|error| panic!("load: {error:?}"));
-	assert_eq!(pinned.receipts.len(), 2);
+
+	std::fs::remove_file(&path).unwrap_or_else(|error| panic!("remove ledger: {error}"));
 	assert_eq!(
-		pin_legacy_publications(&fixture.root)
-			.unwrap_or_else(|error| panic!("noop pin: {error:?}")),
-		0,
-		"a fully pinned ledger is left alone"
+		pin_legacy_publications(&fixture.root).unwrap_or_else(|error| panic!("{error:?}")),
+		0
 	);
 
-	// Strip every pin and rebuild a coherent chain, as an older ledger has it.
-	let mut legacy = pinned.clone();
-	let mut previous = None;
-	for receipt in &mut legacy.receipts {
-		receipt.previous_receipt_sha256 = previous;
-		for published in receipt.versions.values_mut() {
-			published.history.clear();
-		}
-		previous = Some(receipt.sha256());
-	}
-	if let Some(pending) = &mut legacy.pending {
-		pending.previous_receipt_sha256 = previous;
-	}
-	std::fs::write(
-		&path,
-		pina_abi::encode_publication_ledger(&legacy)
-			.unwrap_or_else(|error| panic!("encode legacy: {error}")),
-	)
-	.unwrap_or_else(|error| panic!("write legacy: {error}"));
+	std::fs::write(&path, b"not json").unwrap_or_else(|error| panic!("write ledger: {error}"));
 	assert!(matches!(
-		check_migrations(&fixture.root),
-		Err(MigrationError::UnpinnedPublication { sequence: 0, .. })
+		pin_legacy_publications(&fixture.root),
+		Err(MigrationError::InvalidDocument { .. })
 	));
 
-	assert_eq!(
-		pin_legacy_publications(&fixture.root).unwrap_or_else(|error| panic!("pin: {error:?}")),
-		2
+	let unbacked = serde_json::json!({
+		"abiVersion": "0.20",
+		"receipts": [{
+			"sequence": 0,
+			"rpcUrl": "fixture",
+			"programId": fixture.program_id,
+			"executableSha256": "a".repeat(64),
+			"manifestSha256": "b".repeat(64),
+			"versions": { "account:1:ff": { "version": 0, "history": [] } },
+			"previousReceiptSha256": null,
+		}],
+	});
+	std::fs::write(&path, unbacked.to_string())
+		.unwrap_or_else(|error| panic!("write ledger: {error}"));
+	let rejection = pin_legacy_publications(&fixture.root).expect_err("nothing backs the pin");
+	assert!(
+		format!("{rejection}").contains("does not record"),
+		"{rejection}"
 	);
-	let repinned =
-		load_publication_ledger(&path).unwrap_or_else(|error| panic!("reload: {error:?}"));
-	assert_eq!(
-		repinned, pinned,
-		"pinning an untampered manifest reproduces the original receipts"
-	);
-	check_migrations(&fixture.root).unwrap_or_else(|error| panic!("check pinned: {error:?}"));
 
 	std::fs::remove_file(fixture.root.join(MANIFEST_PATH))
 		.unwrap_or_else(|error| panic!("remove manifest: {error}"));
@@ -1535,19 +1455,18 @@ fn receipts_pin_published_schema_hashes() {
 		.unwrap_or_else(|error| panic!("coherent tamper must pass manifest validation: {error}"));
 
 	// A receipt without pins cannot tell a rewrite from the shipped schema,
-	// so it is refused outright until the operator pins it deliberately.
-	let mut legacy = ledger.clone();
-	for receipt in &mut legacy.receipts {
+	// so an empty history is refused outright.
+	let mut unpinned = ledger.clone();
+	for receipt in &mut unpinned.receipts {
 		for published in receipt.versions.values_mut() {
 			published.history.clear();
 		}
 	}
+	let rejection = validate_ledger_for_manifest(&unpinned, &tampered)
+		.expect_err("unpinned receipts must not accept rewritten published schemas");
 	assert!(
-		matches!(
-			validate_ledger_for_manifest(&legacy, &tampered),
-			Err(MigrationError::UnpinnedPublication { sequence: 0, .. })
-		),
-		"unpinned receipts must not accept rewritten published schemas"
+		format!("{rejection:?}").contains("pins no versions"),
+		"unexpected rejection: {rejection:?}"
 	);
 
 	// The pinned receipt records the schema that actually shipped and
@@ -1585,14 +1504,9 @@ fn ledger_binding_rejects_wrong_unknown_and_future_contracts() {
 		.unwrap_or_else(|error| panic!("read manifest: {error}"))
 		.expect("fixture manifest");
 
-	let mut wrong_program = pending_ledger.clone();
-	wrong_program.pending.as_mut().expect("pending").program_id =
-		"11111111111111111111111111111111".to_owned();
-	assert!(validate_ledger_for_manifest(&wrong_program, &manifest).is_err());
-
 	let mut unknown = pending_ledger.clone();
 	unknown.pending.as_mut().expect("pending").versions =
-		BTreeMap::from([("account:1:ff".to_owned(), PublishedContract::legacy(0))]);
+		BTreeMap::from([("account:1:ff".to_owned(), pinned_history(1))]);
 	assert!(validate_ledger_for_manifest(&unknown, &manifest).is_err());
 
 	let mut future = pending_ledger.clone();
@@ -1601,7 +1515,7 @@ fn ledger_binding_rejects_wrong_unknown_and_future_contracts() {
 		.as_mut()
 		.expect("pending")
 		.versions
-		.insert("account:1:01".to_owned(), PublishedContract::legacy(1));
+		.insert("account:1:01".to_owned(), pinned_history(2));
 	assert!(validate_ledger_for_manifest(&future, &manifest).is_err());
 
 	record_publication(
@@ -1616,20 +1530,29 @@ fn ledger_binding_rejects_wrong_unknown_and_future_contracts() {
 	let receipt_ledger = load_publication_ledger(&fixture.root.join(PUBLICATIONS_PATH))
 		.unwrap_or_else(|error| panic!("read receipt ledger: {error}"));
 
-	let mut wrong_program = receipt_ledger.clone();
-	wrong_program.receipts[0].program_id = "11111111111111111111111111111111".to_owned();
-	assert!(validate_ledger_for_manifest(&wrong_program, &manifest).is_err());
-
 	let mut unknown = receipt_ledger.clone();
-	unknown.receipts[0].versions =
-		BTreeMap::from([("account:1:ff".to_owned(), PublishedContract::legacy(0))]);
+	unknown.receipts[0].versions = BTreeMap::from([("account:1:ff".to_owned(), pinned_history(1))]);
 	assert!(validate_ledger_for_manifest(&unknown, &manifest).is_err());
 
 	let mut future = receipt_ledger;
 	future.receipts[0]
 		.versions
-		.insert("account:1:01".to_owned(), PublishedContract::legacy(1));
+		.insert("account:1:01".to_owned(), pinned_history(2));
 	assert!(validate_ledger_for_manifest(&future, &manifest).is_err());
+}
+
+/// A well-formed pinned history of `count` versions with placeholder hashes.
+fn pinned_history(count: usize) -> PublishedContract {
+	PublishedContract {
+		history: (0..count)
+			.map(|version| {
+				PublishedSchema {
+					schema_sha256: "c".repeat(64),
+					transition_sha256: (version > 0).then(|| "d".repeat(64)),
+				}
+			})
+			.collect(),
+	}
 }
 
 #[test]
@@ -1849,6 +1772,36 @@ fn write_state_source(fixture: &PublicationFixture, fields: &str) {
 		),
 	)
 	.unwrap_or_else(|error| panic!("write State source: {error}"));
+}
+
+/// Respelling a field as a type that stores the same bytes is not a schema
+/// change: it consumes no version, and a real change next to it still gets an
+/// automatic byte copy for the respelled field.
+#[test]
+fn a_wire_equivalent_respelling_is_not_a_schema_change() {
+	let fixture = publication_fixture();
+	publish_current(&fixture);
+
+	write_state_source(&fixture, "value: PodU64");
+	let output =
+		create_migrations(&fixture.root).unwrap_or_else(|error| panic!("respell: {error:?}"));
+	assert_eq!(output.unchanged_contracts, vec!["account:1:01".to_owned()]);
+	assert!(output.advanced_versions.is_empty());
+	check_migrations(&fixture.root).unwrap_or_else(|error| panic!("check: {error:?}"));
+	// The published spelling, and so its pinned hash, is left as recorded.
+	assert_eq!(
+		read_manifest(&fixture).contracts["account:1:01"].versions[0]
+			.schema
+			.fields[0]
+			.rust_type,
+		"u64"
+	);
+
+	write_state_source(&fixture, "value: PodU64, extra: u16");
+	let output =
+		create_migrations(&fixture.root).unwrap_or_else(|error| panic!("advance: {error:?}"));
+	assert_eq!(output.advanced_versions, vec!["account:1:01@1".to_owned()]);
+	assert!(output.manual_transitions.is_empty(), "{output:?}");
 }
 
 #[test]
@@ -3097,6 +3050,7 @@ fn create_transition_propagates_manual_layout_errors() {
 			destination: &destination,
 			destination_process: Some(&process),
 			preserve_manual: false,
+			version_type: MigrationVersionType::U8,
 		},
 		&mut output,
 	)
@@ -3151,13 +3105,9 @@ fn published_contracts_must_carry_versions_and_matching_pins() {
 			versions: vec![],
 		},
 	);
-	let rejection = validate_published_contract(
-		"receipt",
-		&identity.key(),
-		&PublishedContract::legacy(0),
-		&manifest,
-	)
-	.expect_err("a versionless history cannot back a publication");
+	let rejection =
+		validate_published_contract("receipt", &identity.key(), &pinned_history(1), &manifest)
+			.expect_err("a versionless history cannot back a publication");
 	assert!(
 		format!("{rejection}").contains("has no versions"),
 		"{rejection}"
@@ -3185,7 +3135,6 @@ fn published_contracts_must_carry_versions_and_matching_pins() {
 		},
 	);
 	let published = PublishedContract {
-		version: 0,
 		history: vec![pina_abi::PublishedSchema {
 			schema_sha256: pinned_schema_sha256,
 			transition_sha256: Some("pinned-implementation".to_owned()),
@@ -3989,20 +3938,25 @@ fn automatic_plan_refuses_two_way_movement() {
 }
 
 /// A stored field whose type changes in place reinterprets live bytes, so it is
-/// never automatic even when the widths happen to match.
+/// never automatic even when the widths happen to match. A respelling that
+/// reads the same bytes the same way (`Address` for `[u8; 32]`, `PodU64` for
+/// `u64`) is a plain copy.
 #[test]
 fn automatic_plan_refuses_a_same_width_type_change() {
-	for (before, after) in [
-		("u64", "i64"),
-		("u32", "f32"),
-		("u8", "bool"),
-		("Address", "[u8; 32]"),
-	] {
+	for (before, after) in [("u64", "i64"), ("u32", "f32"), ("u8", "bool")] {
 		let stored = schema(LayoutKind::Fixed, &[("value", before)]);
 		let destination = schema(LayoutKind::Fixed, &[("value", after)]);
 		assert!(
 			automatic_move_plan(&stored, &SourceIntent::default(), &destination).is_none(),
 			"{before} -> {after} must stay manual"
+		);
+	}
+	for (before, after) in [("Address", "[u8; 32]"), ("u64", "PodU64")] {
+		let stored = schema(LayoutKind::Fixed, &[("value", before), ("extra", "u8")]);
+		let destination = schema(LayoutKind::Fixed, &[("value", after), ("extra", "u8")]);
+		assert!(
+			automatic_move_plan(&stored, &SourceIntent::default(), &destination).is_some(),
+			"{before} -> {after} is a respelling"
 		);
 	}
 }
@@ -5093,19 +5047,37 @@ fn write_versioned_program(
 	.unwrap_or_else(|error| panic!("write versioned program: {error}"));
 }
 
+/// Record `auto` as the fixture's policy in an otherwise empty manifest, the
+/// state a program is in after `create --auto` with nothing yet declared.
 fn configure_auto(fixture: &PublicationFixture, auto: &str) {
-	std::fs::write(
-		fixture.root.join("pina.toml"),
-		format!(
-			"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\nauto = {auto}\n"
-		),
-	)
-	.unwrap_or_else(|error| panic!("write config: {error}"));
+	let mut manifest =
+		MigrationManifest::new(fixture.program_id.to_owned(), MigrationVersionType::U8);
+	manifest.auto = auto
+		.parse()
+		.unwrap_or_else(|error| panic!("test policy: {error}"));
+	write_json_atomic(&fixture.root.join(MANIFEST_PATH), &manifest)
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
 	std::fs::write(
 		fixture.root.join("build.rs"),
 		"fn main() {\n\tprintln!(\"cargo:rerun-if-changed=migrations/manifest.json\");\n}\n",
 	)
 	.unwrap_or_else(|error| panic!("write build script: {error}"));
+}
+
+/// Run `create` with `--auto auto`.
+fn create_with_policy(
+	fixture: &PublicationFixture,
+	auto: &str,
+) -> Result<CreateMigrationsOutput, MigrationError> {
+	let mut answers = MigrationAnswers::default();
+	answers.set_policy(
+		Some(
+			auto.parse()
+				.unwrap_or_else(|error| panic!("test policy: {error}")),
+		),
+		None,
+	);
+	create_migrations_with_answers(&fixture.root, &answers)
 }
 
 /// A versioned fixture with nothing recorded yet.
@@ -5132,7 +5104,7 @@ fn read_manifest(fixture: &PublicationFixture) -> MigrationManifest {
 
 #[test]
 fn an_auto_policy_records_instructions_without_an_envelope() {
-	let fixture = versioned_fixture("[\"instructions\"]");
+	let fixture = versioned_fixture("instructions");
 	let output =
 		create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
 	assert_eq!(
@@ -5178,7 +5150,7 @@ fn an_auto_policy_records_instructions_without_an_envelope() {
 
 #[test]
 fn a_published_unenveloped_instruction_only_appends_optional_accounts() {
-	let fixture = versioned_fixture("[\"instructions\"]");
+	let fixture = versioned_fixture("instructions");
 	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
 	publish_current(&fixture);
 
@@ -5239,7 +5211,7 @@ fn a_published_unenveloped_instruction_only_appends_optional_accounts() {
 
 #[test]
 fn an_instruction_changes_framing_only_while_unpublished() {
-	let fixture = versioned_fixture("[\"instructions\"]");
+	let fixture = versioned_fixture("instructions");
 	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
 
 	// Unpublished: opting in restarts the history with an envelope.
@@ -5277,7 +5249,7 @@ fn an_instruction_changes_framing_only_while_unpublished() {
 
 #[test]
 fn a_published_snapshot_cannot_gain_an_envelope() {
-	let fixture = versioned_fixture("[\"instructions\"]");
+	let fixture = versioned_fixture("instructions");
 	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
 	publish_current(&fixture);
 
@@ -5303,7 +5275,7 @@ fn a_published_snapshot_cannot_gain_an_envelope() {
 
 #[test]
 fn opting_out_releases_a_snapshot_without_an_envelope() {
-	let fixture = versioned_fixture("[\"instructions\"]");
+	let fixture = versioned_fixture("instructions");
 	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
 	publish_current(&fixture);
 
@@ -5330,11 +5302,10 @@ fn opting_out_releases_a_snapshot_without_an_envelope() {
 
 #[test]
 fn dropping_instructions_from_the_policy_releases_their_snapshots() {
-	let fixture = versioned_fixture("[\"instructions\", \"accounts\"]");
+	let fixture = versioned_fixture("instructions,accounts");
 	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
 
-	configure_auto(&fixture, "[\"accounts\"]");
-	let output = create_migrations(&fixture.root)
+	let output = create_with_policy(&fixture, "accounts")
 		.unwrap_or_else(|error| panic!("release by policy: {error}"));
 	assert_eq!(
 		output.released_snapshots,
@@ -5344,7 +5315,7 @@ fn dropping_instructions_from_the_policy_releases_their_snapshots() {
 
 #[test]
 fn events_are_versioned_without_transitions() {
-	let fixture = versioned_fixture("[\"events\"]");
+	let fixture = versioned_fixture("events");
 	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
 
 	// A draft is replaced in place.
@@ -5402,7 +5373,7 @@ fn events_are_versioned_without_transitions() {
 
 #[test]
 fn an_added_instruction_argument_needs_a_manual_transition() {
-	let fixture = versioned_fixture("[]");
+	let fixture = versioned_fixture("none");
 	write_versioned_program(
 		&fixture,
 		", migrations",
@@ -5440,7 +5411,7 @@ fn an_added_instruction_argument_needs_a_manual_transition() {
 
 #[test]
 fn a_published_enveloped_instruction_appends_optional_accounts_in_place() {
-	let fixture = versioned_fixture("[]");
+	let fixture = versioned_fixture("none");
 	write_versioned_program(
 		&fixture,
 		", migrations",

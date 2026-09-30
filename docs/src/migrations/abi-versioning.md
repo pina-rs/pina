@@ -81,23 +81,31 @@ Four rules make the chain trustworthy.
 
 The 0.20 baseline stored facts and re-derived everything else at load, and 0.21 removed the remaining stored copies. What the document used to carry, and where it comes from now:
 
-| Removed field                      | Where it comes from now                                           |
-| ---------------------------------- | ----------------------------------------------------------------- |
-| `ContractHistory.identity` (0.21)  | the `contracts` key `kind:width:hex`, parsed on load              |
-| `DataSchema.codec` (0.21)          | implied by `abiVersion` (`pina_abi::SCHEMA_CODEC`)                |
-| event `Transition` entries (0.21)  | none — events are decoded per version, never converted            |
-| `"transition": null` (0.21)        | an absent `transition` key                                        |
-| `DataSchema.physical`              | derived from `layout` and `fields` by the frozen grammar          |
-| `SchemaVersion.version`            | the version's position in the `versions` array                    |
-| `SchemaVersion.schemaSha256`       | computed from the decoded schema                                  |
-| `SchemaVersion.processSha256`      | computed from the decoded process                                 |
-| `Transition.from` / `to`           | adjacency — the transition sits on version `index` from `index-1` |
-| `Transition` schema/process hashes | the neighbouring versions' computed hashes                        |
-| `Transition.process` proof         | re-derived by `classify_process_transition`                       |
-| `ProcessAccount.constraints`       | not recorded — validation rules live in the IDL clients use       |
-| receipt `cluster`                  | not recorded — `rpc_url` keeps the credential-free endpoint       |
+| Removed field                                         | Where it comes from now                                                                                     |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `ContractHistory.identity` (0.21)                     | the `contracts` key `kind:width:hex`, parsed on load                                                        |
+| `DataSchema.codec` (0.21)                             | implied by `abiVersion` (`pina_abi::SCHEMA_CODEC`)                                                          |
+| event `Transition` entries (0.21)                     | none — events are decoded per version, never converted                                                      |
+| `"transition": null` (0.21)                           | an absent `transition` key                                                                                  |
+| `ProcessAccount` fields at their default (0.21)       | an absent `writable`, `signer`, or `optional` reads as false, and an absent `defaultValue` or `pda` as none |
+| receipt `sequence` (0.21)                             | the receipt's position in `receipts`                                                                        |
+| receipt and pending `programId` (0.21)                | the manifest's `programId`: the ledger belongs to the manifest beside it                                    |
+| receipt and pending `manifestSha256` (0.21)           | not recorded — it hashed a manifest later versions rewrite, and nothing compared it                         |
+| receipt and pending `previousReceiptSha256` (0.21)    | not recorded — version control keeps the ledger append-only                                                 |
+| per-contract `version` in a receipt or pending (0.21) | the position of the contract's last pin                                                                     |
+| `DataSchema.physical`                                 | derived from `layout` and `fields` by the frozen grammar                                                    |
+| `SchemaVersion.version`                               | the version's position in the `versions` array                                                              |
+| `SchemaVersion.schemaSha256`                          | computed from the decoded schema                                                                            |
+| `SchemaVersion.processSha256`                         | computed from the decoded process                                                                           |
+| `Transition.from` / `to`                              | adjacency — the transition sits on version `index` from `index-1`                                           |
+| `Transition` schema/process hashes                    | the neighbouring versions' computed hashes                                                                  |
+| `Transition.process` proof                            | re-derived by `classify_process_transition`                                                                 |
+| `ProcessAccount.constraints`                          | not recorded — validation rules live in the IDL clients use                                                 |
+| receipt `cluster`                                     | not recorded — `rpc_url` keeps the credential-free endpoint                                                 |
 
-What stays is what cannot be derived: `rust_name` (macro lookup), the `auto` policy, `envelope` (written only as `"envelope": false`, on an instruction recorded without one), identity validation including the path-traversal proofs, `mode`, `renames`, `implementation_sha256` (the hash of an external transition file), and the receipt hash chain with its pending and `abandoned` records. Publication receipts pin schema hashes by computing them from the decoded manifest at pin time.
+What stays is what cannot be derived: `rust_name` (macro lookup), the `auto` policy, `envelope` (written only as `"envelope": false`, on an instruction recorded without one), identity validation including the path-traversal proofs, `mode`, `renames`, `implementation_sha256` (the hash of an external transition file), and the publication ledger: each receipt's credential-free `rpcUrl`, its `executableSha256`, the pinned schema history of every contract it made live, and its `abandoned` flag, plus the pending record's `cluster`. Publication receipts pin schema hashes by computing them from the decoded manifest at pin time.
+
+A field's `rustType` is stored as the source spelled it when the version was recorded. Drift is decided with `DataSchema::same_wire`, which compares the layout, the field names, and each type after `pina_abi::wire_type` collapses spellings that store the same bytes under the same reading (`PodU64` and `u64`, `Address` and `[u8; 32]`, `PodString<N>` and `String<N>`, `PodVec<T, N>` and `Vec<T, N>`). A later respelling therefore neither rewrites the recorded spelling nor changes a pinned hash.
 
 The wire codec left the stored schema but not the schema hash. `schemaSha256` still hashes `layout`, `fields`, and `"codec": "pinaPodV2"` in the order 0.20 serialized them, so every published pin keeps its value. A `PinaPod` release that changes wire bytes changes `SCHEMA_CODEC` through a breaking `pina_abi` release, and the converter for that release records the old format on every historical schema it carries forward.
 
@@ -136,20 +144,30 @@ pina abi schema --document manifest > manifest.schema.json
 
 ## Upgrading from ABI 0.20
 
-A `0.20` document still opens: the reader converts it in memory, and the next `pina migrations create` writes it at `0.21`. The manifest step:
+A `0.20` document still opens: the reader converts it in memory, and the next `pina migrations create` writes it at `0.21`. The one exception is a ledger entry that names a published version without pinning it, covered below. The manifest step:
 
 - drops each history's `identity` object after proving that its kind, width, and hex spell the contract key;
 - drops each schema's `"codec": "pinaPodV2"` after proving it is that codec;
 - drops every event transition, because an event is decoded with the schema of the version that emitted it;
 - keeps every instruction enveloped, because every `0.20` instruction history was.
 
-The publication ledger step proves the receipt hash chain as written, drops the pinned `transitionSha256` of every `event:*` contract from each receipt and from the pending record, and seals the chain again over the converted receipts. A ledger whose chain was already broken fails instead of being re-sealed. Every `schemaSha256` pin keeps its value.
+The publication ledger step drops every stored copy of a fact the ledger or its manifest already records:
 
-Three source changes can follow the conversion:
+- drops each receipt's `sequence` after proving it equals the receipt's position;
+- drops `programId` from every receipt and the pending record after proving they all name the same program;
+- drops each contract's `version` after proving it is the position of its last pin, leaving the entry as the bare list of pins;
+- drops `manifestSha256` and the `previousReceiptSha256` chain link unchecked, because nothing compared the one and anyone able to edit the file could recompute the other;
+- drops the pinned `transitionSha256` of every `event:*` contract.
+
+Every `schemaSha256` pin keeps its value. A `0.21` entry must pin every version it made live, so a `0.20` entry that pinned nothing cannot convert, and reading it fails with an error naming `pina migrations reconcile --pin-legacy`. Confirm from version control that `migrations/manifest.json` still records exactly what those receipts shipped, then run that command once: it pins each such entry from the manifest (trust on first use) and writes the ledger in the `0.21` shape.
+
+Five source changes can follow the conversion:
 
 1. **Instructions recorded through `auto`.** An instruction that `0.20` recorded only because `auto` covered instructions stays enveloped after conversion, but under `0.21` an `auto` policy alone records an instruction without one, so the build fails: "the migration manifest records `UpdateInstruction` with a version envelope, but it no longer opts in with the `migrations` token". If the instruction is published, add `migrations` to its `#[instruction]` attribute to keep its wire format; `pina migrations create` rejects the other direction with `EnvelopeRemoval`. If nothing is published, you may instead run `pina migrations create`, which records the instruction as a snapshot without a version byte; delete its `migrations/transitions/instruction_*` directory afterwards, because nothing reads it.
 2. **Event transitions.** `migrations/transitions/event_*` directories are no longer read or verified. Delete them. Code that called `normalize_event_data`, `with_current_event_data`, `MigratableEvent`, or `CurrentEventData` must decode a historical record with the generated client's `<Event>V<n>` event instead.
 3. **Instruction handlers.** `#[discriminator(entrypoint)]` now normalizes an enveloped instruction's payload before the handler runs, through the generated `process_versioned` and `ProcessAccountInfos::process_from_version`. Remove handler-side calls to `with_current_instruction_data`: the payload is already current, and the helper's closure now takes the source version as a second argument, so existing calls no longer compile.
+4. **`pina.toml` migration keys.** `[migrations].version_type` (or `version-type`) and `[migrations].auto` are retired, because the manifest already records both. Every command that reads `pina.toml` fails until they are removed, and the error names the `pina migrations create --version-type` or `--auto` value that records the same setting. `[migrations.answers]` stays.
+5. **TypeScript event decoders.** The generated per-event decoder is `decode<Event>Event` (for example `decodeValueChangedEventEvent` and `decodeValueChangedEventV0Event`), matching the Dart clients. It decodes one version and converts nothing; rename calls to the old `normalize<Event>Event`.
 
 ## Upgrading from pre-0.20 integer formats
 
@@ -168,7 +186,7 @@ This mechanism governs the **document**. It is not the on-chain migration system
 - it does not allocate or consume a contract version;
 - a broken converter cannot corrupt an account, because no account data passes through it.
 
-The publication ledger records a manifest digest, and that digest sits inside each receipt's own hash, so it is covered by the chain. It is not recomputed and compared, though: a receipt's `manifestSha256` is written once at publication and thereafter only carried forward, and validation checks that it is a well-formed digest rather than that it still matches the checked-in manifest. Whether it should become a live assertion is an open question in [ADR 0009](../adrs/0009-abi-document-versioning.md).
+The publication ledger records no manifest digest. A `0.20` receipt carried a `manifestSha256`, but it hashed a manifest that later versions rewrite and nothing compared it, so `0.21` drops it. What a receipt proves comes from its pins instead: the schema and transition hashes of every version it made live, which every later check compares with the checked-in manifest. [ADR 0009](../adrs/0009-abi-document-versioning.md) records the decision.
 
 The on-chain rules — envelopes, adjacent transitions, rent, the publication ledger, and the four scenarios — are in [How ABI migrations flow](./flow.md).
 

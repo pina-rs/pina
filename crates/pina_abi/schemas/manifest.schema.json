@@ -115,7 +115,7 @@
     },
     "ProcessAccount": {
       "additionalProperties": false,
-      "description": "One positional account in an instruction process.\n\nOnly wire facts are recorded: the fields here decide whether old bytes and\nold account lists still parse. Declarative validation rules are program\nsemantics, not wire format, and live in the IDL that clients generate from;\nrecording them here made a validation-only change look like a wire break.",
+      "description": "One positional account in an instruction process.\n\nOnly wire facts are recorded: the fields here decide whether old bytes and\nold account lists still parse. Declarative validation rules are program\nsemantics, not wire format, and live in the IDL that clients generate from;\nrecording them here made a validation-only change look like a wire break.\n\nA field left at its default (read-only, not a signer, required, no known\naddress, no PDA) is not written, so a slot records only what sets it apart.",
       "properties": {
         "defaultValue": {
           "description": "Known address emitted by generated clients, when one exists.",
@@ -129,7 +129,7 @@
           "type": "string"
         },
         "optional": {
-          "description": "Whether an absent value is representable by this process.",
+          "description": "Whether an absent value is representable by this process. Omitted when\nthe slot is required.",
           "type": "boolean"
         },
         "pda": {
@@ -140,19 +140,16 @@
           ]
         },
         "signer": {
-          "description": "Signature expected by the current process.",
+          "description": "Signature expected by the current process. Omitted when not a signer.",
           "type": "boolean"
         },
         "writable": {
-          "description": "Privilege expected by the current process.",
+          "description": "Privilege expected by the current process. Omitted when read-only.",
           "type": "boolean"
         }
       },
       "required": [
-        "name",
-        "writable",
-        "signer",
-        "optional"
+        "name"
       ],
       "type": "object"
     },

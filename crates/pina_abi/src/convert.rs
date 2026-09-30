@@ -9,7 +9,6 @@
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::PublicationReceipt;
 use crate::SCHEMA_CODEC;
 
 /// `0.20 → 0.21` manifest: drop the stored copies of derived facts.
@@ -92,13 +91,26 @@ fn take_identity(key: &str, history: &mut Map<String, Value>) -> Result<String, 
 	Ok(kind.to_owned())
 }
 
-/// `0.20 → 0.21` publication ledger: drop pins for event transitions.
+/// `0.20 → 0.21` publication ledger: drop every stored copy of a fact the
+/// ledger or its manifest already records.
 ///
-/// Events no longer carry transitions, so a pinned event transition hash names
-/// nothing a reader can compare. Removing one changes its receipt's hash, so the
-/// chain is proven as written first and then sealed again over the converted
-/// receipts: a ledger whose chain was already broken fails here instead of
-/// being re-sealed into a valid one.
+/// - `sequence` repeated each receipt's position. It is dropped once it is
+///   proven to equal that position.
+/// - `previousReceiptSha256` chained each record to the receipt before it.
+///   Anyone able to edit the file could recompute the chain, so it proved
+///   nothing version control does not, and it is dropped unchecked: that is
+///   what lets `pina migrations reconcile --pin-legacy` fill in missing pins
+///   without re-sealing a chain no reader keeps.
+/// - `programId` repeated the manifest's program on every record. It is
+///   dropped once every record is proven to name the same program.
+/// - `manifestSha256` hashed a manifest that later versions rewrite, so no
+///   reader could compare it with anything. It is dropped.
+/// - Each contract's `version` repeated the position of its last pin. It is
+///   dropped once it is proven to be that position, and the entry becomes the
+///   bare list of pins. A 0.20 entry that pinned nothing cannot be converted
+///   until [`pin_legacy_publications`](crate::pin_legacy_publications) pins it.
+/// - Event transition pins name transitions events no longer carry. They are
+///   dropped.
 pub(crate) fn publications_0_20_to_0_21(mut value: Value) -> Result<Value, String> {
 	let ledger = value
 		.as_object_mut()
@@ -108,85 +120,100 @@ pub(crate) fn publications_0_20_to_0_21(mut value: Value) -> Result<Value, Strin
 		.and_then(Value::as_array_mut)
 		.ok_or_else(|| "the publication ledger has no `receipts` array".to_owned())?;
 
-	let mut written = None::<String>;
-	for (sequence, receipt) in receipts.iter().enumerate() {
-		if previous_hash(receipt) != written {
+	let mut program = None::<String>;
+	for (position, receipt) in receipts.iter_mut().enumerate() {
+		let label = format!("receipt {position}");
+		let record = record_object(&label, receipt)?;
+		if record
+			.remove("sequence")
+			.and_then(|sequence| sequence.as_u64())
+			!= u64::try_from(position).ok()
+		{
 			return Err(format!(
-				"receipt {sequence} does not extend the previous receipt hash; restore \
+				"{label} records a sequence other than its position; restore \
 				 migrations/publications.json from version control"
 			));
 		}
-		written = Some(receipt_sha256(sequence, receipt)?);
-	}
-
-	let mut sealed = None::<String>;
-	for (sequence, receipt) in receipts.iter_mut().enumerate() {
-		strip_event_transition_pins(receipt);
-		set_previous_hash(receipt, sealed.as_deref());
-		sealed = Some(receipt_sha256(sequence, receipt)?);
+		reshape_record(&label, record, &mut program)?;
 	}
 
 	if let Some(pending) = ledger
 		.get_mut("pending")
 		.filter(|pending| !pending.is_null())
 	{
-		if previous_hash(pending) != written {
-			return Err(
-				"the pending publication does not extend the last receipt hash; restore \
-				 migrations/publications.json from version control"
-					.to_owned(),
-			);
-		}
-		strip_event_transition_pins(pending);
-		set_previous_hash(pending, sealed.as_deref());
+		let label = "the pending publication";
+		reshape_record(label, record_object(label, pending)?, &mut program)?;
 	}
 
 	Ok(value)
 }
 
-/// The `previousReceiptSha256` a receipt or pending record carries.
-fn previous_hash(record: &Value) -> Option<String> {
+fn record_object<'record>(
+	label: &str,
+	record: &'record mut Value,
+) -> Result<&'record mut Map<String, Value>, String> {
 	record
-		.get("previousReceiptSha256")
-		.and_then(Value::as_str)
-		.map(str::to_owned)
+		.as_object_mut()
+		.ok_or_else(|| format!("{label} is not an object"))
 }
 
-fn set_previous_hash(record: &mut Value, previous: Option<&str>) {
-	if let Some(object) = record.as_object_mut() {
-		object.insert(
-			"previousReceiptSha256".to_owned(),
-			previous.map_or(Value::Null, Value::from),
-		);
+/// Drop the program, manifest hash, chain link, and per-contract versions of
+/// one record.
+fn reshape_record(
+	label: &str,
+	record: &mut Map<String, Value>,
+	program: &mut Option<String>,
+) -> Result<(), String> {
+	let named = record
+		.remove("programId")
+		.and_then(|program| program.as_str().map(str::to_owned))
+		.ok_or_else(|| format!("{label} names no `programId`"))?;
+	if program.get_or_insert_with(|| named.clone()) != &named {
+		return Err(format!(
+			"{label} names program {named}, but an earlier record names {}; one ledger \
+			 belongs to one program",
+			program.as_deref().unwrap_or_default()
+		));
 	}
-}
+	record.remove("manifestSha256");
+	record.remove("previousReceiptSha256");
 
-/// Hash one receipt exactly as the typed ledger does.
-///
-/// The receipt shape is unchanged between 0.20 and 0.21, so the typed model
-/// reproduces the hash the writer recorded, including its skipped defaults.
-fn receipt_sha256(sequence: usize, receipt: &Value) -> Result<String, String> {
-	serde_json::from_value::<PublicationReceipt>(receipt.clone())
-		.map(|receipt| receipt.sha256())
-		.map_err(|error| format!("receipt {sequence} is malformed: {error}"))
-}
-
-/// Remove every pinned transition hash from the event contracts of one record.
-fn strip_event_transition_pins(record: &mut Value) {
-	let Some(versions) = record.get_mut("versions").and_then(Value::as_object_mut) else {
-		return;
-	};
+	let versions = record
+		.get_mut("versions")
+		.and_then(Value::as_object_mut)
+		.ok_or_else(|| format!("{label} has no `versions` object"))?;
 	for (key, published) in versions.iter_mut() {
-		if !key.starts_with("event:") {
-			continue;
+		let version = published.get("version").and_then(Value::as_u64);
+		let mut history = published
+			.get_mut("history")
+			.map(Value::take)
+			.and_then(|history| {
+				match history {
+					Value::Array(history) => Some(history),
+					_ => None,
+				}
+			})
+			.ok_or_else(|| format!("{label} has no pinned `history` for `{key}`"))?;
+		if history.is_empty() {
+			return Err(format!(
+				"{label} names `{key}` without pinning its published schemas. Confirm with \
+				 version control that migrations/manifest.json still records exactly what was \
+				 deployed, then run `pina migrations reconcile --pin-legacy` to pin it"
+			));
 		}
-		let Some(history) = published.get_mut("history").and_then(Value::as_array_mut) else {
-			continue;
-		};
-		for pin in history.iter_mut().filter_map(Value::as_object_mut) {
-			pin.remove("transitionSha256");
+		if version != u64::try_from(history.len() - 1).ok() {
+			return Err(format!(
+				"{label} records a version for `{key}` other than the position of its last pin"
+			));
 		}
+		if key.starts_with("event:") {
+			for pin in history.iter_mut().filter_map(Value::as_object_mut) {
+				pin.remove("transitionSha256");
+			}
+		}
+		*published = Value::Array(history);
 	}
+	Ok(())
 }
 
 #[cfg(test)]
@@ -331,94 +358,130 @@ mod tests {
 				"version": 1,
 				"history": [pinned(None), pinned(Some(&transition))],
 			},
-			"event:1:05": { "version": 0, "history": [] },
 		})
 	}
 
-	/// A two-receipt ledger with a pending record, chained as 0.20 wrote it.
+	/// A two-receipt ledger with a pending record, shaped as 0.20 wrote it.
+	/// The chain links are never checked, so any value stands in for them.
 	fn chained_ledger() -> Value {
 		let first = receipt(None, published_versions());
-		let first_hash = receipt_sha256(0, &first).unwrap();
-		let mut second = receipt(Some(&first_hash), published_versions());
+		let mut second = receipt(Some(&"e".repeat(64)), published_versions());
 		second["sequence"] = json!(1);
-		let second_hash = receipt_sha256(1, &second).unwrap();
-		let mut pending = receipt(Some(&second_hash), published_versions());
+		let mut pending = receipt(Some(&"f".repeat(64)), published_versions());
 		pending.as_object_mut().unwrap().remove("sequence");
 		pending["cluster"] = json!("devnet");
 		json!({ "abiVersion": "0.20", "receipts": [first, second], "pending": pending })
 	}
 
 	#[test]
-	fn the_ledger_step_drops_event_transition_pins_and_reseals_the_chain() {
+	fn the_ledger_step_keeps_only_facts_nothing_else_records() {
 		let converted = publications_0_20_to_0_21(chained_ledger()).unwrap();
 		let receipts = converted["receipts"].as_array().unwrap();
 
 		for record in [&receipts[0], &receipts[1], &converted["pending"]] {
-			let event = &record["versions"]["event:1:04"]["history"];
-			assert!(event[1].get("transitionSha256").is_none());
-			// Accounts keep their transition pins.
-			let account = &record["versions"]["account:1:01"]["history"];
+			for dropped in [
+				"sequence",
+				"programId",
+				"manifestSha256",
+				"previousReceiptSha256",
+			] {
+				assert!(
+					record.get(dropped).is_none(),
+					"{dropped} survived: {record}"
+				);
+			}
+			assert_eq!(record["executableSha256"], json!("a".repeat(64)));
+			// A contract entry is the bare list of its pins.
+			let account = &record["versions"]["account:1:01"];
+			assert_eq!(account.as_array().map(Vec::len), Some(2));
 			assert!(account[1].get("transitionSha256").is_some());
+			// Event transition pins are gone; accounts keep theirs.
+			let event = &record["versions"]["event:1:04"];
+			assert!(event[1].get("transitionSha256").is_none());
 		}
-		assert_eq!(receipts[0]["previousReceiptSha256"], Value::Null);
-		let first = receipt_sha256(0, &receipts[0]).unwrap();
-		assert_eq!(receipts[1]["previousReceiptSha256"], json!(first));
-		let second = receipt_sha256(1, &receipts[1]).unwrap();
-		assert_eq!(converted["pending"]["previousReceiptSha256"], json!(second));
+		assert_eq!(converted["pending"]["cluster"], json!("devnet"));
 	}
 
 	#[test]
-	fn the_ledger_step_without_pending_or_event_pins_keeps_its_chain() {
+	fn the_ledger_step_without_pending_keeps_its_receipts() {
 		let first = receipt(
 			None,
-			json!({ "account:1:01": { "version": 0, "history": [] } }),
+			json!({ "account:1:01": { "version": 0, "history": [pinned(None)] } }),
 		);
-		let ledger = json!({ "receipts": [first.clone()], "pending": null });
+		let ledger = json!({ "receipts": [first], "pending": null });
 
 		let converted = publications_0_20_to_0_21(ledger).unwrap();
-		assert_eq!(converted["receipts"][0], first);
+		assert_eq!(
+			converted["receipts"][0],
+			json!({
+				"rpcUrl": "fixture",
+				"executableSha256": "a".repeat(64),
+				"versions": { "account:1:01": [pinned(None)] },
+			})
+		);
 		assert_eq!(converted["pending"], Value::Null);
 	}
 
 	#[test]
-	fn the_ledger_step_refuses_to_reseal_a_broken_chain() {
-		let mut broken = chained_ledger();
-		broken["receipts"][1]["previousReceiptSha256"] = json!("e".repeat(64));
-		let error = publications_0_20_to_0_21(broken).unwrap_err();
-		assert!(error.contains("receipt 1 does not extend"), "{error}");
+	fn the_ledger_step_refuses_facts_it_cannot_prove() {
+		let expect = |ledger: Value, expected: &str| {
+			let error = publications_0_20_to_0_21(ledger).unwrap_err();
+			assert!(
+				error.contains(expected),
+				"expected `{expected}`, got: {error}"
+			);
+		};
 
-		let mut stale_pending = chained_ledger();
-		stale_pending["pending"]["previousReceiptSha256"] = json!("e".repeat(64));
-		let error = publications_0_20_to_0_21(stale_pending).unwrap_err();
-		assert!(
-			error.contains("pending publication does not extend"),
-			"{error}"
+		let mut reordered = chained_ledger();
+		reordered["receipts"][0]["sequence"] = json!(5);
+		expect(
+			reordered,
+			"receipt 0 records a sequence other than its position",
 		);
 
-		let mut malformed = chained_ledger();
-		malformed["receipts"][0]["unexpected"] = json!(true);
-		let error = publications_0_20_to_0_21(malformed).unwrap_err();
-		assert!(error.contains("receipt 0 is malformed"), "{error}");
+		let mut foreign = chained_ledger();
+		foreign["pending"]["programId"] = json!("other");
+		expect(foreign, "one ledger belongs to one program");
 
-		let error = publications_0_20_to_0_21(json!([])).unwrap_err();
-		assert!(error.contains("is not an object"), "{error}");
-		let error = publications_0_20_to_0_21(json!({})).unwrap_err();
-		assert!(error.contains("no `receipts` array"), "{error}");
-	}
+		let mut nameless = chained_ledger();
+		nameless["pending"]
+			.as_object_mut()
+			.unwrap()
+			.remove("programId");
+		expect(nameless, "names no `programId`");
 
-	#[test]
-	fn stripping_tolerates_records_without_versions_or_history() {
-		let mut record = json!({ "previousReceiptSha256": null });
-		strip_event_transition_pins(&mut record);
-		assert_eq!(record, json!({ "previousReceiptSha256": null }));
+		let mut unversioned = chained_ledger();
+		unversioned["pending"]
+			.as_object_mut()
+			.unwrap()
+			.remove("versions");
+		expect(unversioned, "has no `versions` object");
 
-		let unpinned = json!({ "versions": { "event:1:04": { "version": 0 } } });
-		let mut record = unpinned.clone();
-		strip_event_transition_pins(&mut record);
-		assert_eq!(record, unpinned);
+		let mut unpinned = chained_ledger();
+		unpinned["pending"]["versions"]["account:1:01"]["history"] = json!([]);
+		expect(unpinned, "run `pina migrations reconcile --pin-legacy`");
 
-		let mut scalar = json!(1);
-		set_previous_hash(&mut scalar, Some("hash"));
-		assert_eq!(scalar, json!(1));
+		let mut historyless = chained_ledger();
+		historyless["pending"]["versions"]["account:1:01"] = json!({ "version": 0 });
+		expect(historyless, "has no pinned `history`");
+
+		let mut scalar_history = chained_ledger();
+		scalar_history["pending"]["versions"]["account:1:01"]["history"] = json!(1);
+		expect(scalar_history, "has no pinned `history`");
+
+		let mut mismatched = chained_ledger();
+		mismatched["pending"]["versions"]["account:1:01"]["version"] = json!(3);
+		expect(mismatched, "other than the position of its last pin");
+
+		let mut scalar = chained_ledger();
+		scalar["pending"] = json!(1);
+		expect(scalar, "the pending publication is not an object");
+
+		let mut scalar_receipt = chained_ledger();
+		scalar_receipt["receipts"][0] = json!(1);
+		expect(scalar_receipt, "receipt 0 is not an object");
+
+		expect(json!([]), "is not an object");
+		expect(json!({}), "no `receipts` array");
 	}
 }

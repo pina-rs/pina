@@ -283,7 +283,6 @@ pub(super) fn process_contract(instruction: &InstructionIr) -> ProcessContract {
 }
 
 pub(super) fn validate_program_configuration(
-	project: &Project,
 	program_id: &str,
 	manifest: &MigrationManifest,
 ) -> Result<(), MigrationError> {
@@ -291,12 +290,6 @@ pub(super) fn validate_program_configuration(
 		return Err(MigrationError::ProgramIdentityChanged {
 			expected: program_id.to_owned(),
 			found: manifest.program_id.clone(),
-		});
-	}
-	if manifest.version_type != project.migration_version_type {
-		return Err(MigrationError::VersionTypeChanged {
-			expected: project.migration_version_type.to_string(),
-			found: manifest.version_type.to_string(),
 		});
 	}
 	Ok(())

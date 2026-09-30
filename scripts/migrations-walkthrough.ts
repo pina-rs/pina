@@ -208,9 +208,6 @@ function scaffoldProgram(programId: string): void {
 			'program = "."',
 			`idl_dir = ${JSON.stringify(relative(PROGRAM_DIR, IDLS_DIR))}`,
 			"",
-			"[migrations]",
-			'version_type = "u8"',
-			"",
 			"[clients]",
 			`output = ${JSON.stringify(relative(PROGRAM_DIR, CLIENTS))}`,
 			'languages = ["cpi", "rust", "typescript", "dart"]',
@@ -1179,14 +1176,14 @@ async function step8_event(context: StepContext): Promise<void> {
 	const historical = new Uint8Array(10);
 	historical[0] = 3;
 	new DataView(historical.buffer).setBigUint64(2, 64n, true);
-	const decoded = logs.normalizeProfileChangedV0Event(historical);
+	const decoded = logs.decodeProfileChangedV0Event(historical);
 	expect(
 		decoded.name === "profileChangedV0" && decoded.data.score === 64n,
 		"a version-0 log decodes with the version-0 event",
 	);
 	let rejected = false;
 	try {
-		logs.normalizeProfileChangedEvent(historical);
+		logs.decodeProfileChangedEvent(historical);
 	} catch {
 		rejected = true;
 	}

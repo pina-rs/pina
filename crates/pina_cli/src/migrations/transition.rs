@@ -51,6 +51,9 @@ pub(super) struct TransitionRequest<'a> {
 	pub(super) destination: &'a DataSchema,
 	pub(super) destination_process: Option<&'a ProcessContract>,
 	pub(super) preserve_manual: bool,
+	/// The manifest's version envelope width, which sizes every generated
+	/// transition's header.
+	pub(super) version_type: MigrationVersionType,
 }
 
 pub(super) fn create_transition(
@@ -69,6 +72,7 @@ pub(super) fn create_transition(
 		destination,
 		destination_process,
 		preserve_manual,
+		version_type,
 	} = request;
 	// The account-list proof is derived from the neighbouring versions on load
 	// rather than stored, so this call only has to fail closed here.
@@ -97,7 +101,7 @@ pub(super) fn create_transition(
 		(TransitionMode::Automatic, Some(plan)) => {
 			automatic_transition_source(
 				identity,
-				project.migration_version_type,
+				version_type,
 				source_version,
 				destination_version,
 				plan,
@@ -106,7 +110,7 @@ pub(super) fn create_transition(
 		_ => {
 			manual_transition_source(
 				identity,
-				project.migration_version_type,
+				version_type,
 				source,
 				source_version,
 				destination_version,
@@ -158,7 +162,7 @@ pub(super) fn create_transition(
 		(source_version, source),
 		stale_ladder,
 		destination,
-		project.migration_version_type.bytes(),
+		version_type.bytes(),
 		output,
 	);
 	let implementation_sha256 = Some(hash_transition_file(&path)?);

@@ -103,8 +103,13 @@ pub struct CreateMigrationsOutput {
 	pub manual_transitions: Vec<PathBuf>,
 	/// Data-loss warnings for removals the developer explicitly accepted.
 	pub data_warnings: Vec<String>,
-	/// Kinds recorded as automatically enveloped by this run.
+	/// Kinds the recorded auto policy covers after this run.
 	pub auto: Vec<String>,
+	/// The version envelope width recorded after this run.
+	pub version_type: MigrationVersionType,
+	/// The width this run replaced, when `--version-type` changed it.
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub previous_version_type: Option<MigrationVersionType>,
 	/// Build-script action taken for the recorded auto policy.
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub build_script: Option<BuildScriptStatus>,
@@ -234,20 +239,18 @@ pub enum MigrationError {
 	)]
 	ProgramIdentityChanged { expected: String, found: String },
 
-	#[error("Migration version encoding is frozen as {found}, but pina.toml configures {expected}")]
-	VersionTypeChanged { expected: String, found: String },
-
 	#[error(
-		"Migration auto policy is recorded as {found}, but pina.toml configures {expected}. Run \
-		 `pina migrations create` to record the policy flip."
+		"Migration version encoding is frozen as {recorded} because a deployment published it, \
+		 so it cannot become {requested}"
 	)]
-	AutoPolicyChanged { expected: String, found: String },
+	VersionTypeFrozen { recorded: String, requested: String },
 
 	#[error(
 		"{kind} `{name}` ({identity}) is recorded in the migration manifest but is no longer \
 		 migration-aware. Removing an envelope is a wire-format change that `pina migrations \
 		 create` must record deliberately; restore its migration coverage (a `migrations` token \
-		 or the matching `[migrations].auto` kind) or retire the contract deliberately."
+		 or an auto policy covering its kind, set with `pina migrations create --auto`) or \
+		 retire the contract deliberately."
 	)]
 	EnvelopeRemoval {
 		kind: String,
@@ -377,19 +380,8 @@ pub enum MigrationError {
 	#[error("Deployment program ID {deployed} does not match migration history {manifest}")]
 	PublicationProgramMismatch { deployed: String, manifest: String },
 
-	#[error(
-		"Publication receipt {sequence} does not pin the published history of `{contract}`, so \
-		 nothing proves its published schemas are unchanged. Confirm with version control that \
-		 migrations/manifest.json still records exactly what was deployed, then run `pina \
-		 migrations reconcile --pin-legacy` to pin it."
-	)]
-	UnpinnedPublication { sequence: u64, contract: String },
-
 	#[error("Deployed artifact changed before its migration publication was recorded: {path}")]
 	PublicationArtifactChanged { path: PathBuf },
-
-	#[error("Publication receipt sequence exceeded u64")]
-	PublicationSequenceExhausted,
 
 	#[error(
 		"Another deployment may already be live for {program_id} on {cluster}. Restore its exact \
@@ -453,6 +445,31 @@ pub(crate) fn recorded_program_id(program_dir: &Path) -> Option<String> {
 		.map(|manifest| manifest.program_id)
 }
 
+/// Apply a `--version-type` request, returning the width it replaced.
+///
+/// The width sizes every enveloped contract's version field, so it may change
+/// only while nothing is published: before then every history is a single
+/// draft that simply re-expands with the new width.
+fn change_version_type(
+	manifest: &mut MigrationManifest,
+	ledger: &PublicationLedger,
+	requested: Option<MigrationVersionType>,
+) -> Result<Option<MigrationVersionType>, MigrationError> {
+	let Some(requested) = requested.filter(|requested| *requested != manifest.version_type) else {
+		return Ok(None);
+	};
+	if !ledger.receipts.is_empty() || ledger.pending.is_some() {
+		return Err(MigrationError::VersionTypeFrozen {
+			recorded: manifest.version_type.to_string(),
+			requested: requested.to_string(),
+		});
+	}
+	Ok(Some(std::mem::replace(
+		&mut manifest.version_type,
+		requested,
+	)))
+}
+
 /// Move a never-published history to the program ID the source now declares.
 ///
 /// Returns the previous program ID when the manifest was rebound.
@@ -496,14 +513,24 @@ pub fn create_migrations_with_answers(
 	let mut stdin_lock = stdin.lock();
 	let mut stdout_lock = stdout.lock();
 	let mut prompts = PromptIo::new(&mut stdin_lock, &mut stdout_lock, interactive);
-	// `create` records the policy configured in `pina.toml`; every later reader
-	// (macros, build, IDL) trusts only the manifest.
-	let auto = project.migration_auto.clone();
-	let current = scan_current_contracts(&project, &auto)?;
+	// The manifest is the only home of the policy: `--auto` and
+	// `--version-type` change it, and every reader (macros, build, IDL) trusts
+	// what it records. Without a manifest the policy starts empty with `u8`
+	// versions.
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
-	let mut manifest = load_manifest(&manifest_path)?.unwrap_or_else(|| {
-		MigrationManifest::new(current.program_id.clone(), project.migration_version_type)
+	let recorded = load_manifest(&manifest_path)?;
+	let auto = answers.auto.clone().unwrap_or_else(|| {
+		recorded
+			.as_ref()
+			.map_or_else(MigrationAuto::none, |manifest| manifest.auto.clone())
+	});
+	let current = scan_current_contracts(&project, &auto)?;
+	let mut manifest = recorded.unwrap_or_else(|| {
+		MigrationManifest::new(
+			current.program_id.clone(),
+			answers.version_type.unwrap_or_default(),
+		)
 	});
 	reject_opt_outs(&manifest, &current.opt_outs)?;
 	let ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
@@ -512,12 +539,15 @@ pub fn create_migrations_with_answers(
 	// receipt or pending deployment exists the identity is part of the
 	// published record and the mismatch below stays a hard error.
 	let rebound_from_program_id = rebind_unpublished_history(&mut manifest, &ledger, &current);
-	validate_program_configuration(&project, &current.program_id, &manifest)?;
+	validate_program_configuration(&current.program_id, &manifest)?;
 	validate_ledger_for_manifest(&ledger, &manifest)?;
+	let previous_version_type = change_version_type(&mut manifest, &ledger, answers.version_type)?;
+	let version_type = manifest.version_type;
 
 	let mut output = CreateMigrationsOutput {
 		manifest: manifest_path.clone(),
 		rebound_from_program_id,
+		previous_version_type,
 		placeholder_program_id: current.program_id == crate::init::PLACEHOLDER_PROGRAM_ID,
 		..CreateMigrationsOutput::default()
 	};
@@ -592,7 +622,9 @@ pub fn create_migrations_with_answers(
 				.fields
 				.iter()
 				.any(|field| answers.manual.contains(&field.name));
-		if latest.schema == source.schema && latest.process == source.process && !converts_to_manual
+		if latest.schema.same_wire(&source.schema)
+			&& latest.process == source.process
+			&& !converts_to_manual
 		{
 			refresh_draft_transition_hash(&project, &ledger, &key, history, &mut output)?;
 			output.unchanged_contracts.push(key);
@@ -603,7 +635,7 @@ pub fn create_migrations_with_answers(
 			.current_version()
 			.expect("decoded migration histories always contain a current version");
 		if ledger.version_is_frozen(&key, latest_version) {
-			if latest.schema == source.schema {
+			if latest.schema.same_wire(&source.schema) {
 				extend_published_process(&key, history, source, &mut output)?;
 				continue;
 			}
@@ -636,6 +668,7 @@ pub fn create_migrations_with_answers(
 					destination: &source.schema,
 					destination_process: source.process.as_ref(),
 					preserve_manual: false,
+					version_type,
 				},
 				&mut output,
 			)?;
@@ -687,7 +720,9 @@ pub fn create_migrations_with_answers(
 						// layouts it was written against. A process-only
 						// change keeps it; any change to the destination
 						// schema or to the recorded intent regenerates it.
-						preserve_manual: latest.schema == source.schema && !converts_to_manual,
+						preserve_manual: latest.schema.same_wire(&source.schema)
+							&& !converts_to_manual,
+						version_type,
 					},
 					&mut output,
 				)?;
@@ -744,6 +779,7 @@ pub fn create_migrations_with_answers(
 		.iter()
 		.map(|kind| kind.config_name().to_owned())
 		.collect();
+	output.version_type = manifest.version_type;
 	if !manifest.auto.is_empty() {
 		output.build_script = Some(ensure_build_script(&project.program_dir)?);
 	}
@@ -803,7 +839,7 @@ fn record_unmigrated(
 		.current_version()
 		.expect("decoded migration histories always contain a current version");
 	let latest = &history.versions[latest_version as usize];
-	if latest.schema == source.schema && latest.process == source.process {
+	if latest.schema.same_wire(&source.schema) && latest.process == source.process {
 		output.unchanged_contracts.push(key.to_owned());
 		return Ok(());
 	}
@@ -828,7 +864,7 @@ fn record_unmigrated(
 		output.advanced_versions.push(format!("{key}@{next}"));
 		return Ok(());
 	}
-	if latest.schema != source.schema {
+	if !latest.schema.same_wire(&source.schema) {
 		return Err(MigrationError::PublishedPayloadChanged {
 			name: history.rust_name.clone(),
 			identity: key.to_owned(),
@@ -965,7 +1001,7 @@ fn layout_tests_agree(existing: &str, generated: &str) -> bool {
 ///
 /// Ledger validation guarantees every published contract is also in the
 /// manifest, so "published but missing" cannot happen. The reachable case is a
-/// program that is already live where `[migrations].auto` widens — accounts
+/// program that is already live where the auto policy widens — accounts
 /// only today, accounts and events tomorrow — so contracts that carried no
 /// envelope gain one. Their wire format changes even though nothing was
 /// removed: every byte after the discriminator shifts, and every generated
@@ -1019,21 +1055,6 @@ fn envelope_removal(history: &ContractHistory) -> MigrationError {
 	}
 }
 
-/// Fail when the checked-in policy differs from `pina.toml`.
-fn validate_auto_policy(
-	project: &Project,
-	manifest: &MigrationManifest,
-) -> Result<(), MigrationError> {
-	if manifest.auto == project.migration_auto {
-		return Ok(());
-	}
-
-	Err(MigrationError::AutoPolicyChanged {
-		expected: project.migration_auto.to_string(),
-		found: manifest.auto.to_string(),
-	})
-}
-
 /// Verify source, snapshots, process contracts, and frozen transition code.
 pub fn check_migrations(start: &Path) -> Result<Vec<MigrationStatus>, MigrationError> {
 	let project = Project::discover(start)?;
@@ -1072,12 +1093,10 @@ fn check_project_migrations_with_manifest(
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let manifest = load_manifest(&manifest_path)?;
 	// Verification follows the recorded policy because that is what macros
-	// expanded against; a policy difference is reported below as a stale
-	// manifest that only `create` may refresh.
-	let auto = manifest.as_ref().map_or_else(
-		|| project.migration_auto.clone(),
-		|manifest| manifest.auto.clone(),
-	);
+	// expanded against; without a manifest there is no policy at all.
+	let auto = manifest
+		.as_ref()
+		.map_or_else(MigrationAuto::none, |manifest| manifest.auto.clone());
 	let current = scan_current_contracts(project, &auto)?;
 	if current.contracts.is_empty() && manifest.is_none() {
 		return Ok((Vec::new(), None));
@@ -1092,8 +1111,7 @@ fn check_project_migrations_with_manifest(
 	reject_opt_outs(&manifest, &current.opt_outs)?;
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
 	let ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
-	validate_program_configuration(project, &current.program_id, &manifest)?;
-	validate_auto_policy(project, &manifest)?;
+	validate_program_configuration(&current.program_id, &manifest)?;
 	if !manifest.auto.is_empty() {
 		verify_build_script(&project.program_dir)?;
 	}
@@ -1125,7 +1143,7 @@ fn check_project_migrations_with_manifest(
 		if history.envelope && !source.envelope {
 			return Err(envelope_removal(history));
 		}
-		if latest.schema != source.schema
+		if !latest.schema.same_wire(&source.schema)
 			|| latest.process != source.process
 			|| history.envelope != source.envelope
 		{
@@ -1147,7 +1165,7 @@ fn check_project_migrations_with_manifest(
 				pending
 					.versions
 					.get(&key)
-					.is_some_and(|published| published.version >= latest_version)
+					.is_some_and(|published| published.pins(latest_version))
 			}),
 			schema_sha256: latest.schema_sha256(),
 			// A snapshot without an envelope never consumes a version.
@@ -1226,7 +1244,7 @@ pub(crate) fn idl_migration_metadata(
 	};
 
 	Ok(Some(IdlMigrationMetadata {
-		version_type: project.migration_version_type,
+		version_type: manifest.version_type,
 		current_versions: statuses
 			.into_iter()
 			.map(|status| (status.identity, status.current_version))

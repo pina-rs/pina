@@ -22,16 +22,11 @@ scaffold = true # initialize missing manifests and entrypoints
 [lints] # optional per-lint level overrides
 require_canonical_instruction_dispatch_for_idl = "deny"
 
-# Optional ABI migrations. `version_type` is `u8` (default and recommended),
-# `u16`, or `u32`; it freezes at the first published release.
-[migrations]
-version_type = "u8"
-auto = true
-
 # Optional persisted disambiguation answers for `pina migrations create`.
 [migrations.answers]
 rename = ["value:points"]
 assume_removed = []
+manual = []
 
 # Optional target-specific overrides. Any of output, mode, and scaffold may be set.
 [clients.cpi]
@@ -97,18 +92,23 @@ Override the selection for one run with repeatable `--client cpi`, `--client rus
 | ------------------- | -------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `lints.<lint-name>` | no       | built-in level | Per-lint override: `allow`, `warn`, or `deny`. Names are validated against the bundled lint catalog; see [Run Security Lints](./lint.md) for the full lint-level workflow. |
 
-## `[migrations]` fields
+## `[migrations.answers]` fields
 
-These settings opt a program into version-envelope management. See [the migration flow](../migrations/flow.md) for the on-chain behavior; this section covers only the configuration.
+These answers are replayed by `pina migrations create` so fresh clones and CI repeat a decision made once. See [the migration flow](../migrations/flow.md) for the on-chain behavior; this section covers only the configuration.
 
-| Field                               | Required | Default | Meaning                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `migrations.version_type`           | no       | `u8`    | Width of the version envelope: `u8`, `u16`, or `u32`. A width must be chosen before the first publication; the runtime implements only these three. `version-type` is accepted as a deprecated alias.                                                                                                                                        |
-| `migrations.auto`                   | no       | `false` | Program-wide opt-in for `pina migrations create`. `true` enrolls every contract kind, `false` disables the policy, and a list enrolls only the named kinds: `accounts`, `events`, or `instructions`. Accounts and events gain the version envelope; instructions are recorded as snapshots without one unless they opt in with `migrations`. |
-| `migrations.answers.rename`         | no       | `[]`    | Persisted rename answers in `from:to` form (for example `"value:points"`). `pina migrations create` consults them before prompting; command-line flags override them per field, and a contradicting flag fails closed.                                                                                                                       |
-| `migrations.answers.assume_removed` | no       | `[]`    | Persisted data-dropping acknowledgements, replayed the same way. `assume-removed` is accepted as a deprecated alias.                                                                                                                                                                                                                         |
+| Field                               | Required | Default | Meaning                                                                                                                                                                                                                |
+| ----------------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations.answers.rename`         | no       | `[]`    | Persisted rename answers in `from:to` form (for example `"value:points"`). `pina migrations create` consults them before prompting; command-line flags override them per field, and a contradicting flag fails closed. |
+| `migrations.answers.assume_removed` | no       | `[]`    | Persisted data-dropping acknowledgements, replayed the same way. `assume-removed` is accepted as a deprecated alias.                                                                                                   |
+| `migrations.answers.manual`         | no       | `[]`    | Persisted `--manual` answers: added fields whose conversion is written by hand rather than generated.                                                                                                                  |
 
-`auto = true` enrolls every kind, so it cannot be combined with a kind list. `pina migrations create` records the resolved policy into `migrations/manifest.json`, which becomes the checked-in source of truth that macros consult; hand-editing the manifest, `migrations/publications.json`, or generated transition files is never allowed. Individual contracts can still opt out with an explicit `migrations = false` attribute.
+The migration policy is not configured here. The version envelope width and the `auto` policy live only in `migrations/manifest.json`, the one source macros read, and `pina migrations create --version-type` and `--auto` record them there; see [Manage ABI migrations](./migrations.md#opt-whole-kinds-in). The retired `[migrations].version_type` (or `version-type`) and `[migrations].auto` keys fail every command that reads `pina.toml`, with an error naming the flag and value that replace them, for example:
+
+```text
+`[migrations].auto` no longer belongs in pina.toml: migrations/manifest.json records it, and macros read only the manifest. Remove the key and run `pina migrations create --auto true` to record it.
+```
+
+Hand-editing the manifest, `migrations/publications.json`, or generated transition files is never allowed. Individual contracts can still opt out of a recorded policy with an explicit `migrations = false` attribute.
 
 ## Generation modes
 
@@ -221,15 +221,11 @@ mode = "auto"
 scaffold = false
 ```
 
-A migration-aware program with lint strictness raised for the canonical-dispatch rule:
+A migration-aware program with persisted answers and lint strictness raised for the canonical-dispatch rule. Its policy, for example `pina migrations create --auto accounts,events --version-type u16`, is recorded in `migrations/manifest.json` rather than here:
 
 ```toml
 [project]
 program = "."
-
-[migrations]
-version_type = "u16"
-auto = ["accounts", "events"]
 
 [migrations.answers]
 rename = ["value:points"]

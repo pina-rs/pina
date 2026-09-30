@@ -23,7 +23,7 @@ import {
 /**
  * Decode one `myEvent` record: only records carrying this event's migration version decode.
  */
-export function normalizeMyEventEvent(
+export function decodeMyEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
 ): DecodedMyEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -76,13 +76,13 @@ export function parseMyEventEventFromLog(
 	if (bytes[1] !== 0) {
 		return null;
 	}
-	return normalizeMyEventEvent(bytes);
+	return decodeMyEventEvent(bytes);
 }
 
 /**
  * Decode one `myOtherEvent` record: only records carrying this event's migration version decode.
  */
-export function normalizeMyOtherEventEvent(
+export function decodeMyOtherEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
 ): DecodedMyOtherEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -141,7 +141,7 @@ export function parseMyOtherEventEventFromLog(
 	if (bytes[1] !== 0) {
 		return null;
 	}
-	return normalizeMyOtherEventEvent(bytes);
+	return decodeMyOtherEventEvent(bytes);
 }
 
 /**

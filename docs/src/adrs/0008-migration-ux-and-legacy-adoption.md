@@ -76,6 +76,7 @@ ABI 0.21 changes what legacy adoption has to cover. Accounts are unaffected: the
 
 - **Instructions.** Under an `auto` policy an instruction is recorded as a snapshot without an envelope, so its wire format stays `[discriminator][payload]`, the same bytes a program launched before migrations accepts. Covering a launched program's instructions with `auto` therefore needs no bridge: the snapshot records the live payload and gates later changes. Only an instruction that opts in with `#[instruction(discriminator = X, migrations)]` gains an envelope, which changes its live wire format, so it still needs a new discriminator or a deliberate bridge. Once an instruction is published as a snapshot, `create` refuses to add the envelope (`EnvelopeAddition`).
 - **Events.** Events are versioned, not migrated: the program emits only the current version and generated clients decode each historical version with its own schema. A legacy event therefore needs a generated decoder for its unversioned layout rather than a legacy-to-v0 transition.
+- **Opting in.** The context above describes opting in with one annotation and one `pina.toml` setting. The policy now lives only in the manifest: `pina migrations create --auto` records it and `--version-type` records the width, and `pina.toml` refuses the retired `[migrations].auto` and `[migrations].version_type` keys. The mental model is unchanged: turn migrations on once, then stop thinking about them.
 
 ## Security consequences
 

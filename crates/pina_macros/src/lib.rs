@@ -224,7 +224,7 @@ pub fn pda(args: TokenStream, input: TokenStream) -> TokenStream {
 /// return `ProgramError::InvalidInstructionData` by default and call
 /// validation automatically after structural decoding.
 ///
-/// Under a `[migrations].auto` policy that covers instructions, the payload is
+/// Under an auto policy that covers instructions, the payload is
 /// recorded in the migration manifest without a version envelope, and the
 /// build fails when it drifts from that snapshot. Add `migrations` to opt one
 /// instruction into full migrations instead: a version envelope, adjacent

@@ -21,19 +21,11 @@
 						"accounts": [
 							{
 								"name": "account1",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "account2",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							}
 						]
 					}
@@ -67,20 +59,10 @@
 					"process": {
 						"accounts": [
 							{
-								"name": "account1",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "account1"
 							},
 							{
-								"name": "account2",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "account2"
 							}
 						]
 					}

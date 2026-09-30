@@ -18,7 +18,7 @@ import {
 /**
  * Decode one `policyChecked` record: only records carrying this event's migration version decode.
  */
-export function normalizePolicyCheckedEvent(
+export function decodePolicyCheckedEvent(
 	data: ReadonlyUint8Array | Uint8Array,
 ): DecodedPolicyCheckedEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -77,7 +77,7 @@ export function parsePolicyCheckedEventFromLog(
 	if (bytes[1] !== 0) {
 		return null;
 	}
-	return normalizePolicyCheckedEvent(bytes);
+	return decodePolicyCheckedEvent(bytes);
 }
 
 /**

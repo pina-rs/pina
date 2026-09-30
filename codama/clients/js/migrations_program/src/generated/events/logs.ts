@@ -23,7 +23,7 @@ import {
 /**
  * Decode one `valueChangedEvent` record: only records carrying this event's migration version decode.
  */
-export function normalizeValueChangedEventEvent(
+export function decodeValueChangedEventEvent(
 	data: ReadonlyUint8Array | Uint8Array,
 ): DecodedValueChangedEventEvent {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -82,13 +82,13 @@ export function parseValueChangedEventEventFromLog(
 	if (bytes[1] !== 1) {
 		return null;
 	}
-	return normalizeValueChangedEventEvent(bytes);
+	return decodeValueChangedEventEvent(bytes);
 }
 
 /**
  * Decode one `valueChangedEventV0` record: only records carrying this event's migration version decode.
  */
-export function normalizeValueChangedEventV0Event(
+export function decodeValueChangedEventV0Event(
 	data: ReadonlyUint8Array | Uint8Array,
 ): DecodedValueChangedEventV0Event {
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -147,7 +147,7 @@ export function parseValueChangedEventV0EventFromLog(
 	if (bytes[1] !== 0) {
 		return null;
 	}
-	return normalizeValueChangedEventV0Event(bytes);
+	return decodeValueChangedEventV0Event(bytes);
 }
 
 /**

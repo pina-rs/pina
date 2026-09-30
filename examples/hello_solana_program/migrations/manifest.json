@@ -21,11 +21,7 @@
 						"accounts": [
 							{
 								"name": "user",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							}
 						]
 					}

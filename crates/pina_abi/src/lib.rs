@@ -176,6 +176,23 @@ impl std::fmt::Display for MigrationVersionType {
 	}
 }
 
+impl std::str::FromStr for MigrationVersionType {
+	type Err = String;
+
+	/// Parse the spelling the manifest records: `u8`, `u16`, or `u32`.
+	fn from_str(value: &str) -> Result<Self, Self::Err> {
+		[Self::U8, Self::U16, Self::U32]
+			.into_iter()
+			.find(|version_type| version_type.as_str() == value)
+			.ok_or_else(|| {
+				format!(
+					"unsupported migration version type `{value}`; expected `u8`, `u16`, or \
+					 `u32`"
+				)
+			})
+	}
+}
+
 /// Kind of versioned data contract.
 #[derive(
 	Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, schemars::JsonSchema,
@@ -194,7 +211,7 @@ impl ContractKind {
 	/// Every kind in stable configuration order.
 	pub const ALL: [Self; 3] = [Self::Account, Self::Instruction, Self::Event];
 
-	/// Stable `[migrations].auto` spelling for this kind.
+	/// Stable auto-policy spelling for this kind.
 	///
 	/// The configuration spelling is plural because one entry selects a whole
 	/// contract kind, while the manifest keeps the singular [`Self::as_str`]
@@ -208,7 +225,7 @@ impl ContractKind {
 		}
 	}
 
-	/// Resolve one `[migrations].auto` entry.
+	/// Resolve one auto-policy entry.
 	#[must_use]
 	pub fn from_config_name(name: &str) -> Option<Self> {
 		match name {
@@ -236,7 +253,7 @@ impl ContractKind {
 	}
 }
 
-/// Valid `[migrations].auto` kind names, rendered for error messages.
+/// Valid auto-policy kind names, rendered for error messages.
 pub const AUTO_KIND_NAMES: &str = "`accounts`, `events`, or `instructions`";
 
 /// Program-wide opt-in policy that records whole contract kinds.
@@ -246,9 +263,9 @@ pub const AUTO_KIND_NAMES: &str = "`accounts`, `events`, or `instructions`";
 /// snapshot gates wire-breaking changes, and an instruction carries the
 /// envelope only when its declaration opts in with the `migrations` token.
 ///
-/// The policy is recorded in the migration manifest, which is the only source
-/// procedural macros consult. It serializes as a sorted array of the same
-/// plural kind names accepted by `[migrations].auto` in `pina.toml`.
+/// The policy lives only in the migration manifest, the one source procedural
+/// macros and the CLI consult; `pina migrations create --auto` changes it. It
+/// serializes as a sorted array of the plural kind names that flag accepts.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct MigrationAuto {
 	kinds: BTreeSet<ContractKind>,
@@ -313,6 +330,38 @@ impl std::fmt::Display for MigrationAuto {
 			write!(formatter, ", {name}")?;
 		}
 		Ok(())
+	}
+}
+
+impl std::str::FromStr for MigrationAuto {
+	type Err = String;
+
+	/// Parse a policy the way `pina migrations create --auto` spells it.
+	///
+	/// `true` (or `all`) selects every kind and `false` (or `none`) clears the
+	/// policy. Anything else is a comma-separated list of kind names, so the
+	/// [`Display`](std::fmt::Display) form reads back to the same policy.
+	fn from_str(value: &str) -> Result<Self, Self::Err> {
+		match value.trim() {
+			"true" | "all" => return Ok(Self::all()),
+			"false" | "none" => return Ok(Self::none()),
+			_ => {}
+		}
+		let mut auto = Self::none();
+		for name in value.split(',').map(str::trim) {
+			let kind = ContractKind::from_config_name(name).ok_or_else(|| {
+				format!(
+					"unknown migration kind `{name}` in the auto policy; expected `true`, \
+					 `false`, or a comma-separated list of {AUTO_KIND_NAMES}"
+				)
+			})?;
+			if !auto.insert(kind) {
+				return Err(format!(
+					"duplicate migration kind `{name}` in the auto policy"
+				));
+			}
+		}
+		Ok(auto)
 	}
 }
 
@@ -661,6 +710,22 @@ struct SchemaHashPreimage<'a> {
 }
 
 impl DataSchema {
+	/// Whether two schemas store the same bytes under the same reading: the
+	/// same layout, and the same fields in order with names equal and types
+	/// equal after [`wire_type`].
+	///
+	/// Drift is decided with this rather than `==`, so respelling `PodU64` as
+	/// `u64` neither consumes a version nor fails a build. The recorded spelling
+	/// and the pinned hash of a published schema stay as they were.
+	#[must_use]
+	pub fn same_wire(&self, other: &Self) -> bool {
+		self.layout == other.layout
+			&& self.fields.len() == other.fields.len()
+			&& self.fields.iter().zip(&other.fields).all(|(left, right)| {
+				left.name == right.name && wire_type(&left.rust_type) == wire_type(&right.rust_type)
+			})
+	}
+
 	/// Construct a schema, deriving its physical descriptor.
 	pub fn try_new(layout: LayoutKind, fields: Vec<FieldSchema>) -> Result<Self, String> {
 		let schema = Self { layout, fields };
@@ -824,21 +889,30 @@ pub fn classify_process_transition(
 /// old account lists still parse. Declarative validation rules are program
 /// semantics, not wire format, and live in the IDL that clients generate from;
 /// recording them here made a validation-only change look like a wire break.
+///
+/// A field left at its default (read-only, not a signer, required, no known
+/// address, no PDA) is not written, so a slot records only what sets it apart.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct ProcessAccount {
 	/// Stable semantic slot name. Renaming a slot is currently breaking.
 	pub name: String,
-	/// Privilege expected by the current process.
+	/// Privilege expected by the current process. Omitted when read-only.
+	#[serde(default, skip_serializing_if = "std::ops::Not::not")]
 	pub writable: bool,
-	/// Signature expected by the current process.
+	/// Signature expected by the current process. Omitted when not a signer.
+	#[serde(default, skip_serializing_if = "std::ops::Not::not")]
 	pub signer: bool,
-	/// Whether an absent value is representable by this process.
+	/// Whether an absent value is representable by this process. Omitted when
+	/// the slot is required.
+	#[serde(default, skip_serializing_if = "std::ops::Not::not")]
 	pub optional: bool,
 	/// Known address emitted by generated clients, when one exists.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub default_value: Option<String>,
 	/// Stable Pina PDA identity, when the slot is a generated PDA.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub pda: Option<String>,
 }
 
@@ -1536,6 +1610,97 @@ pub fn decode_publication_ledger(source: &[u8]) -> Result<PublicationLedger, Str
 	Ok(ledger)
 }
 
+/// Pin the published schemas a 0.20 publication ledger names without pins.
+///
+/// A 0.20 receipt could record a contract's highest published version with an
+/// empty history, which proves nothing about the schemas it made live. The
+/// 0.21 ledger cannot represent such an entry, so the converter refuses it
+/// until this fills in the pins of versions `0..=version` as `manifest`
+/// records them now. That is trust on first use: the caller confirms from
+/// version control that the manifest still describes what those receipts made
+/// live. A ledger that is not a 0.20 document has nothing to pin.
+///
+/// Returns the number of entries pinned.
+pub fn pin_legacy_publications(
+	ledger: &mut serde_json::Value,
+	manifest: &MigrationManifest,
+) -> Result<usize, String> {
+	if ledger
+		.get(ABI_VERSION_KEY)
+		.and_then(serde_json::Value::as_str)
+		!= Some("0.20")
+	{
+		return Ok(0);
+	}
+	let receipts = ledger
+		.get_mut("receipts")
+		.and_then(serde_json::Value::as_array_mut)
+		.map(|receipts| receipts.iter_mut().collect::<Vec<_>>())
+		.unwrap_or_default();
+	let mut pinned = 0;
+	for (position, receipt) in receipts.into_iter().enumerate() {
+		pinned += pin_legacy_record(&format!("receipt {position}"), receipt, manifest)?;
+	}
+	if let Some(pending) = ledger.get_mut("pending") {
+		pinned += pin_legacy_record("the pending publication", pending, manifest)?;
+	}
+	Ok(pinned)
+}
+
+fn pin_legacy_record(
+	label: &str,
+	record: &mut serde_json::Value,
+	manifest: &MigrationManifest,
+) -> Result<usize, String> {
+	let Some(versions) = record
+		.get_mut("versions")
+		.and_then(serde_json::Value::as_object_mut)
+	else {
+		return Ok(0);
+	};
+	let mut pinned = 0;
+	for (key, entry) in versions.iter_mut() {
+		if entry
+			.get("history")
+			.and_then(serde_json::Value::as_array)
+			.is_none_or(|history| !history.is_empty())
+		{
+			continue;
+		}
+		let published = entry
+			.get("version")
+			.and_then(serde_json::Value::as_u64)
+			.and_then(|version| u32::try_from(version).ok())
+			.ok_or_else(|| format!("{label} names `{key}` without a published version"))?;
+		let history = manifest
+			.contracts
+			.get(key)
+			.ok_or_else(|| format!("{label} names `{key}`, which the manifest does not record"))?;
+		let pins = (0..=published)
+			.map(|number| {
+				let version = history.version(number).ok_or_else(|| {
+					format!(
+						"{label} published `{key}` version {number}, which the manifest does not \
+						 record"
+					)
+				})?;
+				let mut pin = serde_json::json!({ "schemaSha256": version.schema_sha256() });
+				if let Some(transition) = version
+					.transition
+					.as_ref()
+					.and_then(|transition| transition.implementation_sha256.as_deref())
+				{
+					pin["transitionSha256"] = serde_json::Value::from(transition);
+				}
+				Ok::<_, String>(pin)
+			})
+			.collect::<Result<Vec<_>, _>>()?;
+		entry["history"] = serde_json::Value::Array(pins);
+		pinned += 1;
+	}
+	Ok(pinned)
+}
+
 /// Encode one validated current manifest as canonical JSON.
 pub fn encode_manifest(manifest: &MigrationManifest) -> Result<Vec<u8>, String> {
 	manifest.validate()?;
@@ -1563,37 +1728,34 @@ pub struct PublishedSchema {
 }
 
 /// One contract's published state as frozen by a receipt.
+///
+/// Entry `n` pins version `n`, and the pins cover every version up to and
+/// including the highest one made live, so that version is the position of the
+/// last pin rather than a stored number. Serialized as the bare list of pins.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
+#[serde(transparent)]
 pub struct PublishedContract {
-	/// Highest version made live for the contract.
-	///
-	/// Redundant with `history.len() - 1` for a pinned receipt, but retained so
-	/// an unpinned receipt can still name the version it made live.
-	pub version: u32,
-	/// Schema and transition pins for every version up to and including
-	/// `version`. Empty for receipts whose history cannot be reconstructed.
+	/// Schema and transition pins in version order.
 	pub history: Vec<PublishedSchema>,
 }
 
 impl PublishedContract {
-	/// Construct an unpinned entry.
+	/// Return the highest published version, the position of the last pin.
+	///
+	/// A validated ledger never holds an empty history; an empty one reports
+	/// version zero.
 	#[must_use]
-	pub fn legacy(version: u32) -> Self {
-		Self {
-			version,
-			history: Vec::new(),
-		}
+	pub fn version(&self) -> u32 {
+		u32::try_from(self.history.len().saturating_sub(1)).unwrap_or(u32::MAX)
 	}
 
-	/// Return the pinned highest published version.
+	/// Return whether `version` is one of the pinned versions.
 	#[must_use]
-	pub const fn version(&self) -> u32 {
-		self.version
+	pub fn pins(&self, version: u32) -> bool {
+		usize::try_from(version).is_ok_and(|version| version < self.history.len())
 	}
 
-	/// Return the pinned history, empty for unpinned receipts.
+	/// Return the pinned history in version order.
 	#[must_use]
 	pub fn history(&self) -> &[PublishedSchema] {
 		&self.history
@@ -1601,33 +1763,24 @@ impl PublishedContract {
 }
 
 /// One successful persistent deployment receipt.
+///
+/// The program a receipt deployed is the manifest's `programId`: the ledger
+/// belongs to the manifest beside it and never names another program.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct PublicationReceipt {
-	pub sequence: u64,
 	/// Credential-free RPC endpoint used by the deployment plan.
 	pub rpc_url: String,
-	pub program_id: String,
+	/// SHA-256 of the deployed program executable.
 	pub executable_sha256: String,
-	pub manifest_sha256: String,
-	/// Highest version made live for every contract identity, with the schema
-	/// history those deployments froze.
+	/// The pinned schema history of every contract the deployment made live.
 	pub versions: BTreeMap<String, PublishedContract>,
-	pub previous_receipt_sha256: Option<String>,
 	/// Marks a receipt created by reconciling an ambiguous deployment as
 	/// abandoned. The pinned versions stay frozen because the deployment may
 	/// still have gone live.
 	#[serde(default, skip_serializing_if = "std::ops::Not::not")]
 	pub abandoned: bool,
-}
-
-impl PublicationReceipt {
-	/// Hash chained into the next append-only receipt.
-	#[must_use]
-	pub fn sha256(&self) -> String {
-		hash_json(self)
-	}
 }
 
 /// Recoverable record written before a persistent deployment starts.
@@ -1645,16 +1798,17 @@ pub struct PendingPublication {
 	pub cluster: String,
 	/// Credential-free RPC endpoint used by the deployment plan.
 	pub rpc_url: String,
-	pub program_id: String,
+	/// SHA-256 of the program executable the deployment ships.
 	pub executable_sha256: String,
-	pub manifest_sha256: String,
-	/// Highest version that the in-flight deployment may make live, with the
-	/// schema history the deployment freezes.
+	/// The pinned schema history the in-flight deployment may make live.
 	pub versions: BTreeMap<String, PublishedContract>,
-	pub previous_receipt_sha256: Option<String>,
 }
 
-/// Local, hash-chained record of versions that have been made persistent.
+/// Local record of the versions that have been made persistent.
+///
+/// Receipts are appended in deployment order. The file lives in version
+/// control, which is what keeps it append-only: a hash chain over the receipts
+/// could be recomputed by anyone able to edit them, so none is stored.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -1684,7 +1838,7 @@ impl PublicationLedger {
 			receipt
 				.versions
 				.get(contract)
-				.is_some_and(|published| published.version >= version)
+				.is_some_and(|published| published.pins(version))
 		})
 	}
 
@@ -1696,149 +1850,102 @@ impl PublicationLedger {
 				pending
 					.versions
 					.get(contract)
-					.is_some_and(|candidate| candidate.version >= version)
+					.is_some_and(|candidate| candidate.pins(version))
 			})
 	}
 
-	/// Validate receipt sequence and hash-chain integrity.
+	/// Validate every receipt and the pending record.
+	///
+	/// Each record names a well-formed deployment and pins a complete history
+	/// for every contract it made live, and no record regresses a contract to
+	/// a lower version than an earlier record published.
 	pub fn validate(&self) -> Result<(), String> {
 		validate_document_version("publication ledger", &self.abi_version)?;
-		let mut previous = None;
 		let mut published_versions = BTreeMap::<String, u32>::new();
 		for (index, receipt) in self.receipts.iter().enumerate() {
-			if receipt.sequence != index as u64 {
-				return Err(format!(
-					"publication receipt sequence expected {index}, found {}",
-					receipt.sequence
-				));
-			}
-			if receipt.previous_receipt_sha256 != previous {
-				return Err(format!(
-					"publication receipt {} does not extend the previous hash",
-					receipt.sequence
-				));
-			}
-			validate_publication_identity(
-				receipt.sequence,
-				&receipt.program_id,
+			validate_publication_record(
+				&format!("publication receipt {index}"),
+				&receipt.rpc_url,
 				&receipt.executable_sha256,
-				&receipt.manifest_sha256,
-				&receipt.versions,
-			)?;
-			if receipt.rpc_url.is_empty() || receipt.rpc_url.chars().any(char::is_control) {
-				return Err(format!(
-					"publication receipt {} contains an invalid RPC URL",
-					receipt.sequence
-				));
-			}
-			validate_publication_versions(
-				receipt.sequence,
 				&receipt.versions,
 				&mut published_versions,
 			)?;
-			previous = Some(receipt.sha256());
 		}
 		if let Some(pending) = &self.pending {
-			let sequence = self.receipts.len() as u64;
-			if pending.previous_receipt_sha256 != previous {
-				return Err(
-					"pending publication does not extend the previous receipt hash".to_owned(),
-				);
-			}
-			validate_publication_identity(
-				sequence,
-				&pending.program_id,
+			validate_publication_record(
+				"pending publication",
+				&pending.rpc_url,
 				&pending.executable_sha256,
-				&pending.manifest_sha256,
 				&pending.versions,
+				&mut published_versions,
 			)?;
-			if pending.rpc_url.is_empty() || pending.rpc_url.chars().any(char::is_control) {
-				return Err("pending publication contains an invalid RPC URL".to_owned());
-			}
-			validate_publication_versions(sequence, &pending.versions, &mut published_versions)?;
 		}
 		Ok(())
 	}
 }
 
-fn validate_publication_identity(
-	sequence: u64,
-	program_id: &str,
+/// Validate one receipt or pending record, labelled `source` in errors.
+fn validate_publication_record(
+	source: &str,
+	rpc_url: &str,
 	executable_sha256: &str,
-	manifest_sha256: &str,
-	versions: &BTreeMap<String, PublishedContract>,
-) -> Result<(), String> {
-	if program_id.is_empty()
-		|| !is_sha256(executable_sha256)
-		|| !is_sha256(manifest_sha256)
-		|| versions.is_empty()
-	{
-		return Err(format!(
-			"publication receipt {sequence} contains invalid identity or hash fields"
-		));
-	}
-	Ok(())
-}
-
-fn validate_publication_versions(
-	sequence: u64,
 	versions: &BTreeMap<String, PublishedContract>,
 	published_versions: &mut BTreeMap<String, u32>,
 ) -> Result<(), String> {
+	if !is_sha256(executable_sha256) {
+		return Err(format!("{source} contains an invalid executable hash"));
+	}
+	if rpc_url.is_empty() || rpc_url.chars().any(char::is_control) {
+		return Err(format!("{source} contains an invalid RPC URL"));
+	}
+	if versions.is_empty() {
+		return Err(format!("{source} names no contracts"));
+	}
 	for (contract, published) in versions {
 		if contract.is_empty() || contract.chars().any(char::is_control) {
-			return Err(format!(
-				"publication receipt {sequence} contains an invalid contract identity"
-			));
+			return Err(format!("{source} contains an invalid contract identity"));
 		}
-		validate_published_history(sequence, contract, published)?;
+		validate_published_history(source, contract, published)?;
+		let version = published.version();
 		if published_versions
 			.get(contract)
-			.is_some_and(|previous| published.version < *previous)
+			.is_some_and(|previous| version < *previous)
 		{
 			return Err(format!(
-				"publication receipt {sequence} regresses `{contract}` to version {}",
-				published.version
+				"{source} regresses `{contract}` to version {version}"
 			));
 		}
-		published_versions.insert(contract.clone(), published.version);
+		published_versions.insert(contract.clone(), version);
 	}
 	Ok(())
 }
 
-/// Validate one receipt's pinned schema history.
+/// Validate one record's pinned schema history.
 ///
-/// A pinned history covers every version up to and including the published
-/// version. The first entry never has an entering transition. Empty histories
-/// are unpinned receipts and stay unpinned.
+/// The history covers every version up to and including the published one, so
+/// it is never empty, and the first entry never has an entering transition.
 fn validate_published_history(
-	sequence: u64,
+	source: &str,
 	contract: &str,
 	published: &PublishedContract,
 ) -> Result<(), String> {
-	let expected = usize::try_from(published.version)
-		.ok()
-		.and_then(|version| version.checked_add(1));
-	if !published.history.is_empty() && Some(published.history.len()) != expected {
+	if published.history.is_empty() {
 		return Err(format!(
-			"publication receipt {sequence} pins {} history entries for `{contract}` at version {}",
-			published.history.len(),
-			published.version
+			"{source} pins no versions for `{contract}`; restore \
+			 migrations/publications.json from version control"
 		));
 	}
 	for (index, pin) in published.history.iter().enumerate() {
 		if !is_sha256(&pin.schema_sha256) {
 			return Err(format!(
-				"publication receipt {sequence} pins an invalid schema hash for `{contract}` \
-				 version {index}"
+				"{source} pins an invalid schema hash for `{contract}` version {index}"
 			));
 		}
 		if let Some(transition) = &pin.transition_sha256
 			&& !is_sha256(transition)
 		{
 			return Err(format!(
-				"publication receipt {sequence} pins an invalid transition hash for `{contract}` \
-				 version {index}"
+				"{source} pins an invalid transition hash for `{contract}` version {index}"
 			));
 		}
 	}
@@ -1848,8 +1955,7 @@ fn validate_published_history(
 		.is_some_and(|pin| pin.transition_sha256.is_some())
 	{
 		return Err(format!(
-			"publication receipt {sequence} pins a transition entering version zero of \
-			 `{contract}`"
+			"{source} pins a transition entering version zero of `{contract}`"
 		));
 	}
 	Ok(())
@@ -1900,6 +2006,64 @@ pub fn canonical_type(ty: &syn::Type) -> String {
 /// Real schemas stay within a handful of levels; the bound keeps hostile type
 /// strings in a decoded manifest from driving unbounded recursion.
 const MAX_TYPE_NESTING_DEPTH: usize = 32;
+
+/// Canonical wire spelling of one closed-grammar type.
+///
+/// Spellings that store the same bytes under the same reading collapse to one
+/// form: the `Pod*` integer and boolean wrappers to their native names,
+/// `Address` to `[u8; 32]`, `PodString<N>` to `String<N>`, and
+/// `PodVec<T, N>` to `Vec<T, N>`, recursively through arrays, options, and
+/// vectors. Anything else is returned trimmed and otherwise unchanged. Two
+/// types with the same wire spelling never need a transition between them.
+#[must_use]
+pub fn wire_type(ty: &str) -> String {
+	wire_type_at_depth(ty, 0)
+}
+
+fn wire_type_at_depth(ty: &str, depth: usize) -> String {
+	let ty = ty.trim();
+	if depth > MAX_TYPE_NESTING_DEPTH {
+		return ty.to_owned();
+	}
+	let native = match ty {
+		"PodBool" => Some("bool"),
+		"PodU16" => Some("u16"),
+		"PodI16" => Some("i16"),
+		"PodU32" => Some("u32"),
+		"PodI32" => Some("i32"),
+		"PodU64" => Some("u64"),
+		"PodI64" => Some("i64"),
+		"PodU128" => Some("u128"),
+		"PodI128" => Some("i128"),
+		"Address" => Some("[u8; 32]"),
+		_ => None,
+	};
+	if let Some(native) = native {
+		return native.to_owned();
+	}
+	if let Some((element, length)) = parse_array(ty) {
+		return format!("[{}; {length}]", wire_type_at_depth(element, depth + 1));
+	}
+	let Some((name, arguments)) = parse_generic(ty) else {
+		return ty.to_owned();
+	};
+	let nested = |argument: &str| wire_type_at_depth(argument, depth + 1);
+	match (name, arguments.as_slice()) {
+		("Option", [inner]) => format!("Option<{}>", nested(inner)),
+		// `String<N>` is `PodString<N>` with its default one-byte prefix.
+		("String" | "PodString", [capacity]) | ("PodString", [capacity, "1"]) => {
+			format!("String<{capacity}>")
+		}
+		// `Vec<T, N>` is `PodVec<T, N>` with its default two-byte prefix.
+		("Vec" | "PodVec", [element, capacity]) | ("PodVec", [element, capacity, "2"]) => {
+			format!("Vec<{}, {capacity}>", nested(element))
+		}
+		("PodVec", [element, capacity, prefix]) => {
+			format!("PodVec<{}, {capacity}, {prefix}>", nested(element))
+		}
+		_ => format!("{name}<{}>", arguments.join(", ")),
+	}
+}
 
 /// Exact storage size for Pina's closed fixed-layout type grammar.
 #[must_use]
@@ -3099,31 +3263,194 @@ mod tests {
 		assert_eq!(proof.destination_accounts, 2);
 	}
 
-	#[test]
-	fn publication_ledger_is_hash_chained() {
-		let first = PublicationReceipt {
-			sequence: 0,
+	fn pins(count: usize) -> PublishedContract {
+		PublishedContract {
+			history: (0..count)
+				.map(|version| {
+					PublishedSchema {
+						schema_sha256: "c".repeat(64),
+						transition_sha256: (version > 0).then(|| "d".repeat(64)),
+					}
+				})
+				.collect(),
+		}
+	}
+
+	fn receipt(executable: char, published: PublishedContract) -> PublicationReceipt {
+		PublicationReceipt {
 			rpc_url: "https://api.devnet.solana.com".to_owned(),
-			program_id: "program".to_owned(),
-			executable_sha256: "a".repeat(64),
-			manifest_sha256: "b".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(0))]),
-			previous_receipt_sha256: None,
+			executable_sha256: executable.to_string().repeat(64),
+			versions: BTreeMap::from([("account:1:00".to_owned(), published)]),
 			abandoned: false,
+		}
+	}
+
+	#[test]
+	fn wire_types_collapse_only_true_respellings() {
+		for (spelling, wire) in [
+			("PodU64", "u64"),
+			(" PodBool ", "bool"),
+			("PodI16", "i16"),
+			("PodU16", "u16"),
+			("PodU32", "u32"),
+			("PodI32", "i32"),
+			("PodI64", "i64"),
+			("PodU128", "u128"),
+			("PodI128", "i128"),
+			("Address", "[u8; 32]"),
+			("[PodU64; 4]", "[u64; 4]"),
+			("[Address; 2]", "[[u8; 32]; 2]"),
+			("Option<PodU32>", "Option<u32>"),
+			("PodString<32>", "String<32>"),
+			("PodString<32, 1>", "String<32>"),
+			("PodString<300, 2>", "PodString<300, 2>"),
+			("PodVec<PodU16, 8>", "Vec<u16, 8>"),
+			("PodVec<u8, 512, 2>", "Vec<u8, 512>"),
+			("PodVec<Address, 4, 1>", "PodVec<[u8; 32], 4, 1>"),
+			("I64F64<32>", "I64F64<32>"),
+			("f64", "f64"),
+			("Unknown", "Unknown"),
+		] {
+			assert_eq!(wire_type(spelling), wire, "{spelling}");
+		}
+		// Different readings of the same width never collapse.
+		assert_ne!(wire_type("u64"), wire_type("i64"));
+		assert_ne!(wire_type("u32"), wire_type("f32"));
+		// Hostile nesting stops at the depth bound instead of recursing on.
+		let deep = format!("{}u8{}", "Option<".repeat(40), ">".repeat(40));
+		assert_eq!(wire_type(&deep), deep);
+
+		let schema = |fields: &[(&str, &str)]| fixed_schema(fields);
+		let recorded = schema(&[("owner", "Address"), ("value", "u64")]);
+		assert!(recorded.same_wire(&schema(&[("owner", "[u8; 32]"), ("value", "PodU64")])));
+		assert!(!recorded.same_wire(&schema(&[("owner", "Address"), ("value", "i64")])));
+		assert!(!recorded.same_wire(&schema(&[("owner", "Address"), ("amount", "u64")])));
+		assert!(!recorded.same_wire(&schema(&[("owner", "Address")])));
+		let compact = DataSchema {
+			layout: LayoutKind::Compact,
+			fields: recorded.fields.clone(),
 		};
-		let second = PublicationReceipt {
-			sequence: 1,
-			rpc_url: "https://api.mainnet-beta.solana.com".to_owned(),
-			program_id: "program".to_owned(),
-			executable_sha256: "c".repeat(64),
-			manifest_sha256: "d".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(1))]),
-			previous_receipt_sha256: Some(first.sha256()),
-			abandoned: false,
+		assert!(!recorded.same_wire(&compact));
+	}
+
+	/// An unpinned 0.20 entry is pinned from the manifest, after which the
+	/// ledger converts; anything the manifest cannot back fails closed.
+	#[test]
+	fn legacy_pins_come_from_the_manifest() {
+		let manifest = account_manifest(fixed_schema(&[("value", "u64")]));
+		let legacy = |versions: serde_json::Value| {
+			serde_json::json!({
+				"abiVersion": "0.20",
+				"receipts": [{
+					"sequence": 0,
+					"rpcUrl": "fixture",
+					"programId": "program",
+					"executableSha256": "a".repeat(64),
+					"manifestSha256": "b".repeat(64),
+					"versions": versions,
+					"previousReceiptSha256": null,
+				}],
+				"pending": {
+					"cluster": "devnet",
+					"rpcUrl": "fixture",
+					"programId": "program",
+					"executableSha256": "c".repeat(64),
+					"manifestSha256": "d".repeat(64),
+					"versions": { "account:1:ab": { "version": 0, "history": [] } },
+					"previousReceiptSha256": null,
+				},
+			})
 		};
+
+		let mut ledger = legacy(serde_json::json!({
+			"account:1:ab": { "version": 0, "history": [] },
+		}));
+		let pinned = pin_legacy_publications(&mut ledger, &manifest);
+		assert_eq!(pinned, Ok(2));
+		let decoded = decode_publication_ledger(&serde_json::to_vec(&ledger).unwrap());
+		let decoded = decoded.unwrap_or_else(|error| panic!("pinned ledger: {error}"));
+		let schema_sha256 = manifest.contracts["account:1:ab"].versions[0].schema_sha256();
+		assert_eq!(
+			decoded.receipts[0].versions["account:1:ab"].history[0].schema_sha256,
+			schema_sha256
+		);
+		// A pinned ledger, or any current one, has nothing left to pin.
+		assert_eq!(pin_legacy_publications(&mut ledger, &manifest), Ok(0));
+		let mut current = serde_json::to_value(&decoded).unwrap();
+		assert_eq!(pin_legacy_publications(&mut current, &manifest), Ok(0));
+
+		for (versions, expected) in [
+			(
+				serde_json::json!({ "account:1:cd": { "version": 0, "history": [] } }),
+				"which the manifest does not record",
+			),
+			(
+				serde_json::json!({ "account:1:ab": { "version": 1, "history": [] } }),
+				"`account:1:ab` version 1, which the manifest does not record",
+			),
+			(
+				serde_json::json!({ "account:1:ab": { "version": "one", "history": [] } }),
+				"without a published version",
+			),
+		] {
+			let mut ledger = legacy(versions);
+			let error = pin_legacy_publications(&mut ledger, &manifest).unwrap_err();
+			assert!(
+				error.contains(expected),
+				"expected `{expected}`, got: {error}"
+			);
+		}
+
+		// A record without a `versions` object is left for the reader to reject.
+		let mut shapeless = serde_json::json!({
+			"abiVersion": "0.20",
+			"receipts": [{ "sequence": 0 }],
+		});
+		assert_eq!(pin_legacy_publications(&mut shapeless, &manifest), Ok(0));
+	}
+
+	/// The `create` flags parse exactly the spellings the manifest displays.
+	#[test]
+	fn policies_parse_the_spellings_they_display() {
+		for version_type in [
+			MigrationVersionType::U8,
+			MigrationVersionType::U16,
+			MigrationVersionType::U32,
+		] {
+			assert_eq!(version_type.to_string().parse(), Ok(version_type));
+		}
+		let error = "u64".parse::<MigrationVersionType>().unwrap_err();
+		assert!(error.contains("`u8`, `u16`, or `u32`"), "{error}");
+
+		for text in ["true", "all"] {
+			assert_eq!(text.parse(), Ok(MigrationAuto::all()));
+		}
+		for text in ["false", "none", " none "] {
+			assert_eq!(text.parse(), Ok(MigrationAuto::none()));
+		}
+		let staged = "accounts, events".parse::<MigrationAuto>();
+		let staged = staged.unwrap_or_else(|error| panic!("staged policy: {error}"));
+		assert!(staged.contains(ContractKind::Account) && staged.contains(ContractKind::Event));
+		assert!(!staged.contains(ContractKind::Instruction));
+		assert_eq!(staged.to_string().parse(), Ok(staged));
+
+		let unknown = "accounts,states".parse::<MigrationAuto>().unwrap_err();
+		assert!(
+			unknown.contains("unknown migration kind `states`"),
+			"{unknown}"
+		);
+		let duplicate = "events,events".parse::<MigrationAuto>().unwrap_err();
+		assert!(
+			duplicate.contains("duplicate migration kind"),
+			"{duplicate}"
+		);
+	}
+
+	#[test]
+	fn publication_ledger_tracks_published_versions() {
 		let ledger = PublicationLedger {
 			abi_version: ABI_VERSION.to_owned(),
-			receipts: vec![first, second],
+			receipts: vec![receipt('a', pins(1)), receipt('b', pins(2))],
 			pending: None,
 		};
 
@@ -3131,51 +3458,99 @@ mod tests {
 		assert!(ledger.ever_published("account:1:00", 0));
 		assert!(ledger.ever_published("account:1:00", 1));
 		assert!(!ledger.ever_published("account:1:00", 2));
+		assert!(!ledger.ever_published("account:1:01", 0));
+		assert_eq!(ledger.receipts[1].versions["account:1:00"].version(), 1);
 
 		let mut pending = ledger.clone();
 		pending.pending = Some(PendingPublication {
 			cluster: "devnet".to_owned(),
 			rpc_url: "https://api.devnet.solana.com".to_owned(),
-			program_id: "program".to_owned(),
 			executable_sha256: "e".repeat(64),
-			manifest_sha256: "f".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(2))]),
-			previous_receipt_sha256: pending.receipts.last().map(PublicationReceipt::sha256),
+			versions: BTreeMap::from([("account:1:00".to_owned(), pins(3))]),
 		});
 		assert_eq!(pending.validate(), Ok(()));
 		assert!(pending.version_is_frozen("account:1:00", 2));
+		assert!(!pending.version_is_frozen("account:1:00", 3));
 		assert!(!pending.ever_published("account:1:00", 2));
 	}
 
 	#[test]
 	fn publication_ledger_rejects_version_regression() {
-		let first = PublicationReceipt {
-			sequence: 0,
-			rpc_url: "https://api.devnet.solana.com".to_owned(),
-			program_id: "program".to_owned(),
-			executable_sha256: "a".repeat(64),
-			manifest_sha256: "b".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(1))]),
-			previous_receipt_sha256: None,
-			abandoned: false,
-		};
-		let second = PublicationReceipt {
-			sequence: 1,
-			rpc_url: "https://api.devnet.solana.com".to_owned(),
-			program_id: "program".to_owned(),
-			executable_sha256: "c".repeat(64),
-			manifest_sha256: "d".repeat(64),
-			versions: BTreeMap::from([("account:1:00".to_owned(), PublishedContract::legacy(0))]),
-			previous_receipt_sha256: Some(first.sha256()),
-			abandoned: false,
-		};
 		let ledger = PublicationLedger {
 			abi_version: ABI_VERSION.to_owned(),
-			receipts: vec![first, second],
+			receipts: vec![receipt('a', pins(2)), receipt('b', pins(1))],
 			pending: None,
 		};
 
 		assert!(ledger.validate().unwrap_err().contains("regresses"));
+	}
+
+	#[test]
+	fn publication_records_must_be_well_formed() {
+		let expect = |receipt: PublicationReceipt, expected: &str| {
+			let ledger = PublicationLedger {
+				abi_version: ABI_VERSION.to_owned(),
+				receipts: vec![receipt],
+				pending: None,
+			};
+			let error = ledger.validate().unwrap_err();
+			assert!(
+				error.contains(expected),
+				"expected `{expected}`, got: {error}"
+			);
+		};
+
+		let mut bad_executable = receipt('a', pins(1));
+		bad_executable.executable_sha256 = "not a hash".to_owned();
+		expect(bad_executable, "invalid executable hash");
+
+		let mut bad_rpc = receipt('a', pins(1));
+		bad_rpc.rpc_url = "https://rpc\n".to_owned();
+		expect(bad_rpc, "invalid RPC URL");
+
+		let mut empty = receipt('a', pins(1));
+		empty.versions.clear();
+		expect(empty, "names no contracts");
+
+		let mut bad_key = receipt('a', pins(1));
+		bad_key.versions = BTreeMap::from([(String::new(), pins(1))]);
+		expect(bad_key, "invalid contract identity");
+
+		expect(receipt('a', pins(0)), "pins no versions for `account:1:00`");
+
+		let mut bad_schema = pins(1);
+		bad_schema.history[0].schema_sha256 = "x".to_owned();
+		expect(receipt('a', bad_schema), "invalid schema hash");
+
+		let mut bad_transition = pins(2);
+		bad_transition.history[1].transition_sha256 = Some("x".to_owned());
+		expect(receipt('a', bad_transition), "invalid transition hash");
+
+		let mut entering_zero = pins(1);
+		entering_zero.history[0].transition_sha256 = Some("d".repeat(64));
+		expect(receipt('a', entering_zero), "entering version zero");
+
+		// The pending record is held to the same rules.
+		let ledger = PublicationLedger {
+			abi_version: ABI_VERSION.to_owned(),
+			receipts: Vec::new(),
+			pending: Some(PendingPublication {
+				cluster: "devnet".to_owned(),
+				rpc_url: String::new(),
+				executable_sha256: "a".repeat(64),
+				versions: BTreeMap::from([("account:1:00".to_owned(), pins(1))]),
+			}),
+		};
+		assert!(
+			ledger
+				.validate()
+				.unwrap_err()
+				.contains("pending publication contains an invalid RPC URL")
+		);
+
+		// An empty history reports version zero and pins nothing.
+		assert_eq!(pins(0).version(), 0);
+		assert!(!pins(0).pins(0));
 	}
 
 	#[test]
@@ -3415,28 +3790,9 @@ mod tests {
 			manifest
 		);
 
-		let receipt = PublicationReceipt {
-			sequence: 0,
-			rpc_url: "https://api.devnet.solana.com".to_owned(),
-			program_id: "program".to_owned(),
-			executable_sha256: "a".repeat(64),
-			manifest_sha256: "b".repeat(64),
-			versions: BTreeMap::from([(
-				"account:1:00".to_owned(),
-				PublishedContract {
-					version: 0,
-					history: vec![PublishedSchema {
-						schema_sha256: "c".repeat(64),
-						transition_sha256: None,
-					}],
-				},
-			)]),
-			previous_receipt_sha256: None,
-			abandoned: false,
-		};
 		let ledger = PublicationLedger {
 			abi_version: ABI_VERSION.to_owned(),
-			receipts: vec![receipt],
+			receipts: vec![receipt('a', pins(2))],
 			pending: None,
 		};
 		let ledger_bytes = encode_publication_ledger(&ledger)
@@ -3447,10 +3803,19 @@ mod tests {
 			ledger
 		);
 
-		// An unpinned history stays valid and reports the version it made live.
-		let unpinned = PublishedContract::legacy(3);
-		assert_eq!(unpinned.version(), 3);
-		assert!(unpinned.history().is_empty());
+		// A contract entry serializes as the bare list of its pins.
+		let value = serde_json::from_slice::<serde_json::Value>(&ledger_bytes);
+		let value = value.unwrap_or_else(|error| panic!("ledger JSON: {error}"));
+		assert_eq!(
+			value["receipts"][0]["versions"]["account:1:00"]
+				.as_array()
+				.map(Vec::len),
+			Some(2)
+		);
+		assert_eq!(
+			ledger.receipts[0].versions["account:1:00"].history().len(),
+			2
+		);
 	}
 
 	/// An invalid document is refused at encode time, not written and then
@@ -3887,9 +4252,17 @@ mod tests {
 				manifest.abi_version
 			);
 
+			// A 0.20 ledger may name versions without pinning them; the
+			// documented repair pins those from the manifest before it decodes.
 			let ledger_path = directory.join("publications.json");
 			let bytes = std::fs::read(&ledger_path)
 				.unwrap_or_else(|error| panic!("{}: {error}", ledger_path.display()));
+			let ledger = serde_json::from_slice::<serde_json::Value>(&bytes);
+			let mut ledger =
+				ledger.unwrap_or_else(|error| panic!("{}: {error}", ledger_path.display()));
+			let pinned = pin_legacy_publications(&mut ledger, &manifest);
+			pinned.unwrap_or_else(|error| panic!("{}: {error}", ledger_path.display()));
+			let bytes = serde_json::to_vec(&ledger).unwrap();
 			decode_publication_ledger(&bytes)
 				.unwrap_or_else(|error| panic!("{}: {error}", ledger_path.display()));
 
@@ -4287,7 +4660,16 @@ mod tests {
 		let manifest = encode_manifest(&manifest).unwrap();
 		assert_eq!(value(&manifest), value(&read("0.21", "manifest.json")));
 
-		let ledger = decode_publication_ledger(&read("0.20", "publications.json"));
+		// The frozen 0.20 ledger names its versions without pins, so it
+		// converts only after the documented repair pins them.
+		let raw = decode_publication_ledger(&read("0.20", "publications.json"));
+		assert!(raw.unwrap_err().contains("--pin-legacy"));
+		let mut ledger = value(&read("0.20", "publications.json"));
+		let manifest = decode_manifest(&read("0.20", "manifest.json"));
+		let manifest = manifest.unwrap_or_else(|error| panic!("0.20 manifest: {error}"));
+		let pinned = pin_legacy_publications(&mut ledger, &manifest);
+		assert_eq!(pinned.unwrap_or_else(|error| panic!("pin: {error}")), 5);
+		let ledger = decode_publication_ledger(&serde_json::to_vec(&ledger).unwrap());
 		let ledger = ledger.unwrap_or_else(|error| panic!("0.20 ledger: {error}"));
 		let ledger = encode_publication_ledger(&ledger).unwrap();
 		assert_eq!(value(&ledger), value(&read("0.21", "publications.json")));

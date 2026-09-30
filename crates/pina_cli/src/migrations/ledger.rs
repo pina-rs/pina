@@ -10,6 +10,7 @@ use pina_abi::PublicationLedger;
 use pina_abi::PublicationReceipt;
 use pina_abi::PublishedContract;
 use pina_abi::PublishedSchema;
+use pina_abi::SchemaVersion;
 use serde::Serialize;
 
 use super::MigrationError;
@@ -85,9 +86,11 @@ pub fn begin_publication_attempt(
 				path: artifact.to_path_buf(),
 			});
 		}
-		if existing.cluster == cluster
+		// The ledger belongs to the manifest's program, so a pending record
+		// only ever names that program.
+		if manifest.program_id == program_id
+			&& existing.cluster == cluster
 			&& existing.rpc_url == rpc_url
-			&& existing.program_id == program_id
 			&& existing.executable_sha256 == hex_digest(artifact_digest)
 		{
 			return Ok(Some(PublicationAttempt {
@@ -96,7 +99,7 @@ pub fn begin_publication_attempt(
 			}));
 		}
 		return Err(MigrationError::PublicationPending {
-			program_id: existing.program_id.clone(),
+			program_id: manifest.program_id.clone(),
 			cluster: existing.cluster.clone(),
 		});
 	}
@@ -127,36 +130,19 @@ pub fn begin_publication_attempt(
 				.contracts
 				.get(&status.identity)
 				.unwrap_or_else(|| panic!("migration status must name a manifest contract"));
-			let pinned = history
-				.versions
-				.iter()
-				.map(|version| {
-					PublishedSchema {
-						schema_sha256: version.schema_sha256(),
-						transition_sha256: version
-							.transition
-							.as_ref()
-							.and_then(|transition| transition.implementation_sha256.clone()),
-					}
-				})
-				.collect();
-			(
-				status.identity,
-				PublishedContract {
-					version: status.current_version,
-					history: pinned,
-				},
-			)
+			// The pins cover every recorded version, so the last one is the
+			// version this deployment makes live.
+			let pinned = PublishedContract {
+				history: history.versions.iter().map(pin_version).collect(),
+			};
+			(status.identity, pinned)
 		})
 		.collect();
 	let pending = PendingPublication {
 		cluster: cluster.to_owned(),
 		rpc_url: rpc_url.to_owned(),
-		program_id: program_id.to_owned(),
 		executable_sha256: hex_digest(artifact_digest),
-		manifest_sha256: manifest.sha256(),
 		versions,
-		previous_receipt_sha256: ledger.receipts.last().map(PublicationReceipt::sha256),
 	};
 	ledger.pending = Some(pending.clone());
 	validate_ledger_for_manifest(&ledger, &manifest)?;
@@ -230,21 +216,14 @@ pub fn record_publication(
 		.ok_or(MigrationError::MissingPendingPublication)?;
 	if pending.cluster != cluster
 		|| pending.rpc_url != rpc_url
-		|| pending.program_id != deployed_program_id
 		|| pending.executable_sha256 != hex_digest(artifact_digest)
 	{
 		return Err(MigrationError::MissingPendingPublication);
 	}
-	let sequence = u64::try_from(ledger.receipts.len())
-		.map_err(|_| MigrationError::PublicationSequenceExhausted)?;
 	let receipt = PublicationReceipt {
-		sequence,
 		rpc_url: pending.rpc_url,
-		program_id: pending.program_id,
 		executable_sha256: pending.executable_sha256,
-		manifest_sha256: pending.manifest_sha256,
 		versions: pending.versions,
-		previous_receipt_sha256: pending.previous_receipt_sha256,
 		abandoned: false,
 	};
 	ledger.receipts.push(receipt.clone());
@@ -309,23 +288,17 @@ pub fn reconcile_publication(
 			abandoned: false,
 			cluster: Some(pending.cluster),
 			rpc_url: Some(pending.rpc_url),
-			program_id: Some(pending.program_id),
+			program_id: Some(manifest.program_id),
 			executable_sha256: Some(pending.executable_sha256),
 		});
 	}
 
 	let mut ledger = ledger;
 	let _lock = acquire_migration_lock(&project.program_dir)?;
-	let sequence = u64::try_from(ledger.receipts.len())
-		.map_err(|_| MigrationError::PublicationSequenceExhausted)?;
 	let receipt = PublicationReceipt {
-		sequence,
 		rpc_url: pending.rpc_url,
-		program_id: pending.program_id,
 		executable_sha256: pending.executable_sha256,
-		manifest_sha256: pending.manifest_sha256,
 		versions: pending.versions,
-		previous_receipt_sha256: pending.previous_receipt_sha256,
 		abandoned: true,
 	};
 	ledger.receipts.push(receipt);
@@ -342,41 +315,13 @@ pub fn reconcile_publication(
 	})
 }
 
-pub(super) fn validate_ledger_for_manifest(
-	ledger: &PublicationLedger,
-	manifest: &MigrationManifest,
-) -> Result<(), MigrationError> {
-	validate_ledger_pins(ledger, manifest)?;
-	reject_unpinned_receipts(ledger)
-}
-
-/// Refuse receipts that name published versions without pinning them.
-///
-/// An unpinned receipt proves nothing about the schemas it made live, so a
-/// published schema rewritten in the manifest would pass every other check.
-fn reject_unpinned_receipts(ledger: &PublicationLedger) -> Result<(), MigrationError> {
-	for receipt in &ledger.receipts {
-		if let Some((contract, _)) = receipt
-			.versions
-			.iter()
-			.find(|(_, published)| published.history.is_empty())
-		{
-			return Err(MigrationError::UnpinnedPublication {
-				sequence: receipt.sequence,
-				contract: contract.clone(),
-			});
-		}
-	}
-	Ok(())
-}
-
-/// Pin every unpinned receipt to the schemas the manifest records now.
+/// Pin every receipt a 0.20 ledger records without schema pins.
 ///
 /// This is trust on first use: the operator asserts, from version control,
-/// that the manifest still describes what those receipts made live. Pinning
-/// changes each receipt's hash, so the chain is rebuilt from the first
-/// changed receipt, and a pending record is re-anchored to the new tail.
-/// Returns the number of contract entries pinned.
+/// that the manifest still describes what those receipts made live. The
+/// pinned ledger is written in the current document shape. Returns the number
+/// of contract entries pinned. A ledger with nothing to pin is still verified,
+/// so a current one that fails to pin its history is reported, not passed.
 pub fn pin_legacy_publications(start: &Path) -> Result<usize, MigrationError> {
 	let project = Project::discover(start)?;
 	let _lock = acquire_migration_lock(&project.program_dir)?;
@@ -385,61 +330,49 @@ pub fn pin_legacy_publications(start: &Path) -> Result<usize, MigrationError> {
 		MigrationError::InvalidHistory("no migration manifest to pin receipts against".to_owned())
 	})?;
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
-	let mut ledger = load_publication_ledger_for_manifest(&publication_path, &manifest)?;
-	validate_ledger_pins(&ledger, &manifest)?;
-
-	let mut pinned = 0;
-	let mut previous = None;
-	for receipt in &mut ledger.receipts {
-		receipt.previous_receipt_sha256 = previous;
-		for (key, published) in &mut receipt.versions {
-			if !published.history.is_empty() {
-				continue;
-			}
-			// `validate_ledger_pins` already proved every receipt names a
-			// recorded contract at a version the manifest holds.
-			let history = &manifest.contracts[key];
-			published.history = (0..=published.version)
-				.map(|version| {
-					let entry = &history.versions[version as usize];
-					PublishedSchema {
-						schema_sha256: entry.schema_sha256(),
-						transition_sha256: entry
-							.transition
-							.as_ref()
-							.and_then(|transition| transition.implementation_sha256.clone()),
-					}
-				})
-				.collect();
-			pinned += 1;
+	if !publication_path.exists() {
+		return Ok(0);
+	}
+	let invalid = |reason: String| {
+		MigrationError::InvalidDocument {
+			path: publication_path.clone(),
+			reason,
 		}
-		previous = Some(receipt.sha256());
-	}
-	if let Some(pending) = &mut ledger.pending {
-		pending.previous_receipt_sha256 = previous;
-	}
+	};
+	let mut ledger =
+		serde_json::from_slice::<serde_json::Value>(&read_bytes(&publication_path)?)
+			.map_err(|error| invalid(format!("invalid publication ledger JSON: {error}")))?;
+	let pinned = pina_abi::pin_legacy_publications(&mut ledger, &manifest).map_err(invalid)?;
+	let ledger =
+		pina_abi::decode_publication_ledger(ledger.to_string().as_bytes()).map_err(invalid)?;
+	validate_ledger_for_manifest(&ledger, &manifest)?;
 	if pinned > 0 {
-		validate_ledger_for_manifest(&ledger, &manifest)?;
 		write_json_atomic(&publication_path, &ledger)?;
 	}
 	Ok(pinned)
 }
 
-fn validate_ledger_pins(
+/// Pin one recorded version: its schema and entering transition hashes.
+fn pin_version(version: &SchemaVersion) -> PublishedSchema {
+	PublishedSchema {
+		schema_sha256: version.schema_sha256(),
+		transition_sha256: version
+			.transition
+			.as_ref()
+			.and_then(|transition| transition.implementation_sha256.clone()),
+	}
+}
+
+/// Verify the ledger and every pin it holds against the checked-in manifest.
+pub(super) fn validate_ledger_for_manifest(
 	ledger: &PublicationLedger,
 	manifest: &MigrationManifest,
 ) -> Result<(), MigrationError> {
 	ledger.validate().map_err(MigrationError::InvalidHistory)?;
-	for receipt in &ledger.receipts {
-		if receipt.program_id != manifest.program_id {
-			return Err(MigrationError::InvalidHistory(format!(
-				"publication receipt {} belongs to program {}, expected {}",
-				receipt.sequence, receipt.program_id, manifest.program_id
-			)));
-		}
+	for (index, receipt) in ledger.receipts.iter().enumerate() {
 		for (key, published) in &receipt.versions {
 			validate_published_contract(
-				&format!("publication receipt {}", receipt.sequence),
+				&format!("publication receipt {index}"),
 				key,
 				published,
 				manifest,
@@ -447,12 +380,6 @@ fn validate_ledger_pins(
 		}
 	}
 	if let Some(pending) = &ledger.pending {
-		if pending.program_id != manifest.program_id {
-			return Err(MigrationError::InvalidHistory(format!(
-				"pending publication belongs to program {}, expected {}",
-				pending.program_id, manifest.program_id
-			)));
-		}
 		for (key, candidate) in &pending.versions {
 			validate_published_contract("pending publication", key, candidate, manifest)?;
 		}
@@ -478,14 +405,11 @@ pub(super) fn validate_published_contract(
 	let current_version = history.current_version().ok_or_else(|| {
 		MigrationError::InvalidHistory(format!("contract `{key}` has no versions"))
 	})?;
-	if published.version > current_version {
+	if published.version() > current_version {
 		return Err(MigrationError::InvalidHistory(format!(
 			"{source} claims future version {} for `{key}`",
-			published.version
+			published.version()
 		)));
-	}
-	if published.history.is_empty() {
-		return Ok(());
 	}
 	for (index, pin) in published.history.iter().enumerate() {
 		// A pinned history is positional: entry `index` pins version `index`.

@@ -7,8 +7,8 @@ import {
 	stateNeedsMigration,
 } from "../../clients/js/migrations_program/src/generated/accounts/state.js";
 import {
-	normalizeValueChangedEventEvent,
-	normalizeValueChangedEventV0Event,
+	decodeValueChangedEventEvent,
+	decodeValueChangedEventV0Event,
 	parseMigrationsProgramEventsFromLogs,
 	parseValueChangedEventEventFromLog,
 	parseValueChangedEventV0EventFromLog,
@@ -184,7 +184,7 @@ test("the generated event decoder enforces the current envelope", () => {
 
 test("a log written at an older version decodes with that version's event", () => {
 	// Version zero carried only `value`; it is its own event, not a projection.
-	const historical = normalizeValueChangedEventV0Event(
+	const historical = decodeValueChangedEventV0Event(
 		valueChangedEventBytes(0, 42n, 0),
 	);
 	assert.equal(historical.name, "valueChangedEventV0");
@@ -193,7 +193,7 @@ test("a log written at an older version decodes with that version's event", () =
 	assert.equal(historical.data.discriminator, 4);
 	assert.equal("memo" in historical.data, false);
 
-	const current = normalizeValueChangedEventEvent(
+	const current = decodeValueChangedEventEvent(
 		valueChangedEventBytes(1, 42n, 7),
 	);
 	assert.equal(current.name, "valueChangedEvent");
@@ -203,27 +203,27 @@ test("a log written at an older version decodes with that version's event", () =
 
 test("each event decodes only its own version and fails closed otherwise", () => {
 	assert.throws(
-		() => normalizeValueChangedEventEvent(valueChangedEventBytes(0, 42n, 0)),
+		() => decodeValueChangedEventEvent(valueChangedEventBytes(0, 42n, 0)),
 		/event migration version mismatch: expected 1, received 0/,
 	);
 	assert.throws(
-		() => normalizeValueChangedEventV0Event(valueChangedEventBytes(1, 42n, 7)),
+		() => decodeValueChangedEventV0Event(valueChangedEventBytes(1, 42n, 7)),
 		/event migration version mismatch: expected 0, received 1/,
 	);
 	assert.throws(
-		() => normalizeValueChangedEventEvent(valueChangedEventBytes(2, 42n, 7)),
+		() => decodeValueChangedEventEvent(valueChangedEventBytes(2, 42n, 7)),
 		/regenerate this client/,
 	);
 	const truncated = new Uint8Array([4, 0, 1, 2, 3]);
-	assert.throws(() => normalizeValueChangedEventV0Event(truncated));
+	assert.throws(() => decodeValueChangedEventV0Event(truncated));
 	const foreign = valueChangedEventBytes(0, 42n, 0);
 	foreign[0] = 9;
 	assert.throws(
-		() => normalizeValueChangedEventV0Event(foreign),
+		() => decodeValueChangedEventV0Event(foreign),
 		/does not match the "ValueChangedEventV0Event" event discriminator/,
 	);
 	assert.throws(
-		() => normalizeValueChangedEventEvent(new Uint8Array([4])),
+		() => decodeValueChangedEventEvent(new Uint8Array([4])),
 		/too short for the "ValueChangedEventEvent" event envelope/,
 	);
 });

@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: f657538d7a2f10cf62d6edf8dd29c58b083ad6f4bbdc969b4ab399afb5b1ce83
+// manifest-sha256: a81e55c8bf011d7f224c441e346df48f2714e00251c4cd1123528caab994e18a
 // program-id: Dec1areProgram11111111111111111111111111111
 // version_type: u8
 

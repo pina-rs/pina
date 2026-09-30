@@ -34,6 +34,8 @@ version_type = "u8"
 auto = true # or a staged subset such as ["accounts", "events"]
 ```
 
+> **Amended (ABI 0.21):** neither setting lives in `pina.toml` any more. `pina migrations create --version-type` and `--auto` record them in `migrations/manifest.json`, their only copy, and `pina.toml` refuses the retired keys. See the [Amendment](#amendment-abi-021-2026-09-30).
+
 The developer declares that a contract is migratable, but does not choose or maintain its version. The current Rust source describes the desired state. Pina owns version allocation, ABI snapshots, generated structural transitions, drift checks, and historical dispatch. A developer supplies code only when a schema diff cannot determine the intended value.
 
 ## Decision
@@ -54,6 +56,8 @@ The discriminator remains at offset zero. The version is little-endian and is hi
 
 `[migrations].version_type` is global for the program. Pina initially accepts `u8`, `u16`, and `u32`. It does not accept per-account or per-instruction overrides. The width may change while the program has no published migration-aware release. The first persistent publication freezes the width, byte order, and header offset for that program identity.
 
+> **Amended (ABI 0.21):** the width is recorded only as the manifest's `versionType`. `pina migrations create --version-type` rewrites it while no receipt or pending record exists and fails once one does.
+
 Each account, instruction contract, and event advances independently. An instruction version snapshots both its payload and its process account ABI. Either a payload change or a compatible appended-optional process change advances the instruction version after publication.
 
 > **Amended (ABI 0.21):** only accounts, events, and instructions that opt in with `migrations` use the envelope; an instruction covered by `auto` alone is recorded as a single snapshot without one. An appended-optional process change now extends the published version in place instead of advancing it.
@@ -64,9 +68,11 @@ Existing unversioned data is not silently treated as version zero. Its first pay
 
 A `[migrations].auto` list opts whole contract kinds in without per-item annotations. The vocabulary is exactly `accounts`, `events`, and `instructions`, and `auto = true` is sugar for all three. Unknown names, duplicates, and mixing the boolean with a kind list are configuration errors. Staging a subset is supported because the kinds carry different costs: an instruction envelope changes payload bytes and ripples into CPI call sites.
 
-> **Amended (ABI 0.21):** an `auto` policy no longer envelopes instructions, so covering them does not change a payload byte. This staging rationale applies to instructions opted in individually with `migrations`.
+> **Amended (ABI 0.21):** an `auto` policy no longer envelopes instructions, so covering them does not change a payload byte. This staging rationale applies to instructions opted in individually with `migrations`. The policy is set with `pina migrations create --auto`, which takes `true`, `false`, or a comma-separated kind list, rather than a `pina.toml` list.
 
 The resolved policy is recorded in `migrations/manifest.json`, and the manifest remains the only policy source procedural macros consult. Macros must not read `pina.toml`: the manifest is the checked-in, hash-chained document that keeps builds deterministic and reproducible, and a proc macro does not re-expand when an unrelated toml file changes, so a toml read would leave stale expansions after a policy flip. `pina migrations create` therefore records the policy and snapshots every contract of the listed kinds, and a declaration without a snapshot still fails the build with the existing `pina migrations create` remedy.
+
+> **Amended (ABI 0.21):** the manifest is now the policy's only home, not only the one source macros read: `create --auto` writes it directly, and `pina.toml` keeps no second copy to disagree with it. Neither document is hash-chained; the manifest never was, and the publication ledger dropped its receipt chain.
 
 Per-item `migrations = false` overrides the global policy for one contract. Removing an envelope from a contract the manifest already records is an error rather than a silent opt-out, because stripping an envelope changes the wire format. The same rejection applies when a kind is dropped from `auto`. Recording an envelope removal as a deliberate migration is a future retirement flow; this ADR only fixes the fail-closed behavior.
 
@@ -107,6 +113,8 @@ Local iteration has one replaceable draft head per changed contract. `pina migra
 
 `pina build` never creates or changes migration history. It fails on ABI drift, an unresolved custom transition, a modified published schema or transition, version exhaustion, or a version-width mismatch.
 
+> **Amended (ABI 0.21):** with the width recorded once, in the manifest, there is no second copy for it to mismatch. Drift compares what a field stores rather than how its type is spelled, so a respelling such as `PodU64` for `u64` is not drift.
+
 Developers do not mark versions as published. Before a non-local deployment starts, `pina deploy` atomically records the exact ABI candidate as pending. The pending versions are frozen because they may already be live. After success, Pina rechecks every planned input and converts the pending record into a local receipt. Each receipt records:
 
 - the cluster label and credential-free RPC URL;
@@ -116,6 +124,8 @@ Developers do not mark versions as published. Before a non-local deployment star
 - the preceding receipt digest.
 
 The checked-in, hash-chained publication ledger is the current source of truth for version allocation. Both receipts and a pending deployment freeze versions. Loopback local deployments do not add publication state.
+
+> **Amended (ABI 0.21):** a receipt records only the credential-free RPC URL, the executable digest, the pinned schema and transition hashes of every version it made live, and the `abandoned` flag; the pending record adds the cluster label. The program identity is the manifest's `programId`, the manifest digest and the preceding receipt digest are gone, and a contract's highest published version is the position of its last pin. The checked-in ledger stays the source of truth for version allocation, append-only through version control rather than a hash chain.
 
 The first implementation does not query the deployed program-data account, cluster genesis hash, deployment slot, or transaction signature. A process interruption can therefore leave the remote outcome ambiguous. The pending record preserves and freezes the candidate before the remote command starts. Rerunning the exact deployment resumes it; Pina rejects a different deployment until the pending attempt is reconciled. The local ledger is reviewable release evidence, not an independent on-chain attestation.
 
@@ -250,7 +260,7 @@ An upgrade authority can bypass Pina and deploy arbitrary code. Publication guar
 
 ## Amendment (ABI 0.21, 2026-09-30)
 
-ABI 0.21 narrows where the envelope applies and stops converting events. Accounts are unchanged: they keep the envelope, adjacent transitions, the reserved `Migrate` instruction, and `MigrateAccount`.
+ABI 0.21 narrows where the envelope applies and stops converting events. It also records the migration policy in the manifest alone and compares schemas by what they store. Accounts are unchanged: they keep the envelope, adjacent transitions, the reserved `Migrate` instruction, and `MigrateAccount`.
 
 ### Instructions are snapshots unless they opt in
 
@@ -276,7 +286,19 @@ Projection could only present a field an old event never emitted as zero, and a 
 
 ### Document shape
 
-The ABI 0.21 manifest stores each fact once: the contract key is the identity, the wire codec is implied by `abiVersion`, and instruction histories record `"envelope": false` when they have no envelope. [ADR 0009](./0009-abi-document-versioning.md#amendment-abi-021-2026-09-30) records those changes.
+The ABI 0.21 manifest stores each fact once: the contract key is the identity, the wire codec is implied by `abiVersion`, instruction histories record `"envelope": false` when they have no envelope, and a process slot omits every field left at its default. The publication ledger keeps only what nothing else records. [ADR 0009](./0009-abi-document-versioning.md#amendment-abi-021-2026-09-30) records those changes.
+
+### The policy has one home
+
+The auto policy and the version width are recorded only in `migrations/manifest.json`. `pina migrations create --auto <POLICY>` sets the policy (`true`, `false`, or a comma-separated list of `accounts`, `events`, and `instructions`), and `--version-type <u8|u16|u32>` sets the width; omitting a flag keeps what the manifest records. The width can change only while no receipt or pending record exists. `pina.toml` no longer accepts `[migrations].auto` or `[migrations].version_type`, and every command that reads `pina.toml` names the flag that replaces a retired key. The `VersionTypeChanged` and `AutoPolicyChanged` checks are gone, because there is no second copy to disagree with, and so is the IDL refusal for a `pina.toml` policy without a manifest: without a manifest there is no policy anywhere.
+
+Keeping the policy in two places meant a check that they agreed, and the manifest still had to be regenerated before the `pina.toml` copy meant anything. One copy removes both, and it keeps the property this ADR relies on: macros read only checked-in bytes.
+
+Because a hand edit could still change the manifest's `auto`, the macros refuse to strip a recorded envelope that way. A declaration without a `migrations` token that the recorded policy does not cover, but that the manifest records with an envelope, fails the build, just as an explicit `migrations = false` does.
+
+### Equivalent spellings are one schema
+
+Drift is decided by what a field stores. `pina_abi::wire_type` maps spellings that store the same bytes under the same reading to one form — the `Pod*` integer and boolean wrappers to their native names, `Address` to `[u8; 32]`, `PodString<N>` to `String<N>`, and `PodVec<T, N>` to `Vec<T, N>`, recursively — and `DataSchema::same_wire` compares layouts, field names, and those forms. The macros' snapshot check, `pina migrations create` and `check`, rename pairing, and the automatic transition planner all use it, so a respelling consumes no version and fails no build. Recorded spellings and pinned hashes are never rewritten. Types that only share a width, such as `u64` and `i64`, still need a manual transition, because reading one as the other reinterprets a live value.
 
 ## Rejected alternatives
 

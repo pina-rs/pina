@@ -1,7 +1,7 @@
 //! Build-script scaffolding that keeps auto-policy flips fresh.
 //!
-//! Proc macros do not re-expand when `pina.toml` or the manifest changes, so a
-//! program with an auto policy needs a build script that emits
+//! Proc macros do not re-expand when the manifest changes, so a program with an
+//! auto policy needs a build script that emits
 //! `cargo:rerun-if-changed=migrations/manifest.json`. The CLI scaffolds a
 //! missing script, verifies an existing one, and never rewrites a hand-written
 //! script that is missing the directive: it reports the exact line instead.

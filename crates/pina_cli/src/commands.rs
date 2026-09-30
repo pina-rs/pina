@@ -323,6 +323,8 @@ fn run_migrations(command: MigrationCommands) {
 			manual,
 			no_interactive,
 			envelope_ack,
+			auto,
+			version_type,
 			json,
 		} => {
 			let answers = match build_migration_answers(
@@ -334,6 +336,7 @@ fn run_migrations(command: MigrationCommands) {
 			) {
 				Ok(mut answers) => {
 					answers.set_envelope_ack(envelope_ack);
+					answers.set_policy(auto, version_type);
 					answers
 				}
 				Err(reason) => {
@@ -661,6 +664,13 @@ fn print_migration_notices(output: &pina_cli::migrations::CreateMigrationsOutput
 	}
 	if !output.auto.is_empty() {
 		println!("Auto policy: {}", output.auto.join(", "));
+	}
+	if let Some(previous) = output.previous_version_type {
+		println!(
+			"{} Version type changed from {previous} to {}",
+			"✔".green(),
+			output.version_type
+		);
 	}
 	match &output.build_script {
 		Some(BuildScriptStatus::Created { path }) => {

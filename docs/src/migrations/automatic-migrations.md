@@ -2,7 +2,7 @@
 
 Automatic migrations let a program keep reading the bytes it already wrote. Instead of treating every schema change as a breaking deploy, Pina gives each opted-in account and event a framework-owned version field, snapshots the history into a checked-in manifest, and migrates accounts on demand when a stale one is touched. Instructions are recorded as snapshots that stop a wire-breaking change at build time, and gain a version field only when they opt in.
 
-This guide upgrades a program to that workflow and opts it in wholesale with `[migrations].auto`, so new contracts are versioned without per-declaration annotations. It also lists the compatibility work that the change brings: the envelope is a wire-format change for accounts and events, and the generated clients change shape.
+This guide upgrades a program to that workflow and opts it in wholesale with an `auto` policy, so new contracts are versioned without per-declaration annotations. It also lists the compatibility work that the change brings: the envelope is a wire-format change for accounts and events, and the generated clients change shape.
 
 > **Before you start:** this guide assumes the program is new, or that you are prepared to change the wire format of its accounts, instructions, and events deliberately. If the program is already live and its accounts were written _without_ an envelope, read [Adopting on a live program](#adopting-on-a-live-program) before you start.
 
@@ -23,9 +23,9 @@ after:  [discriminator][schema version][payload]
 
 An instruction covered by `auto` without the token keeps `[discriminator][payload]`. The manifest records one snapshot of it (`"envelope": false`), the build fails when the struct drifts from that snapshot, and after publication its payload is fixed: a new payload needs a new discriminator. [How a migration flows](./flow.md#instructions-a-snapshot-unless-they-opt-in) covers the rules.
 
-The version is little-endian, stored per contract, and hidden from generated accessors, patches, and instruction arguments. Each account, instruction, and event carries its own history starting at version `0`, so a program with one account at version `3` and another still at `0` is normal. Only the width is program-wide: `version_type` in `pina.toml` picks it once for the program: `u8` (255 versions per contract, the default and the recommendation), `u16`, or `u32`. There is deliberately no `u64`; see [Core Concepts](../core-concepts.md).
+The version is little-endian, stored per contract, and hidden from generated accessors, patches, and instruction arguments. Each account, instruction, and event carries its own history starting at version `0`, so a program with one account at version `3` and another still at `0` is normal. Only the width is program-wide: `pina migrations create --version-type` records it once for the program as `versionType` in the manifest: `u8` (255 versions per contract, the default and the recommendation), `u16`, or `u32`. There is deliberately no `u64`; see [Core Concepts](../core-concepts.md).
 
-Because the version is part of the bytes, changing it after publication is a breaking change for every migration-aware contract. That is why the width is chosen once, and why the manifest is checked in.
+Because the version is part of the bytes, changing it after publication is a breaking change for every migration-aware contract. That is why `--version-type` can change the width only while nothing is published, and why the manifest is checked in.
 
 ## Step 1: Upgrade the dependency
 
@@ -38,29 +38,27 @@ Keep whatever feature set your program already uses. The breaking changes in thi
 
 A program that already has a `migrations/manifest.json` at `abiVersion` `0.20` recorded every instruction with an envelope. Read [Upgrading from ABI 0.20](./abi-versioning.md#upgrading-from-abi-020) before running `create`, so a published instruction keeps its wire format.
 
-## Step 2: Turn it on
+## Step 2: Choose the policy
 
-Declare the policy in `pina.toml`:
+The policy is a flag on the command that records the history in the next step:
 
-```toml
-[migrations]
-version_type = "u8"
-auto = true # or ["accounts", "events", "instructions"], or a staged subset
+```sh
+pina migrations create --auto true # or --auto accounts,events,instructions, or a staged subset
 ```
 
-`auto` accepts `true` (every kind), `false` (the default), or a list of `accounts`, `events`, and `instructions`. Any other name is a configuration error.
+`--auto` accepts `true` (or `all`) for every kind, `false` (or `none`) to clear the policy, or a comma-separated list of `accounts`, `events`, and `instructions`. Any other name, or a name listed twice, is rejected. Add `--version-type u16` (or `u32`) to the same run only if one contract may need more than 255 versions.
 
 Staging is a real option because the kinds cost different amounts. Covering instructions does not change their payload bytes: `auto` records each instruction as a snapshot without an envelope. An instruction you opt in with `#[instruction(discriminator = X, migrations)]` does gain the envelope, which changes its payload bytes and ripples into CPI call sites, so opt instructions in one at a time while your callers catch up.
 
-The policy is _declared here but recorded in the manifest_: the macros read the checked-in `migrations/manifest.json`, never `pina.toml`, because a proc macro does not re-expand when an unrelated toml file changes. That is also why the next step is mandatory rather than optional.
+The policy lives only in the manifest: the macros read the checked-in `migrations/manifest.json`, and `pina.toml` holds no copy, because a proc macro does not re-expand when an unrelated toml file changes and a second copy could disagree with the first. A program that still carries the retired `[migrations].auto` or `[migrations].version_type` keys fails every command that reads `pina.toml` until they are removed; the error names the `create` flag and value that record the same setting.
 
 ## Step 3: Snapshot the history
 
 ```sh
-pina migrations create
+pina migrations create --auto true
 ```
 
-This records the resolved policy in `migrations/manifest.json`, snapshots the current schema of every contract of the listed kinds, and generates an adjacent transition for each change it can prove structurally. Commit the manifest with your source: it is the hash-chained source of truth the build consults.
+This records the policy in `migrations/manifest.json`, snapshots the current schema of every contract of the listed kinds, and generates an adjacent transition for each change it can prove structurally. Later runs keep the recorded policy, so they need no flag. Commit the manifest with your source: it is the checked-in source of truth the build consults.
 
 A declaration the manifest does not record yet fails the build with the `pina migrations create` remedy, so you cannot forget a contract by accident.
 
@@ -80,7 +78,7 @@ The scaffold is idempotent and never overwrites a hand-written build script — 
 
 ## Step 5: Answer what the diff cannot
 
-Structural changes generate themselves (added, removed, reordered, or reseated fields). Semantic ones do not: a rename that changes meaning, a type narrowing, a split or merge of a field, or an authority change stops the build until you implement the transition and supply fixtures. That is the intended safety property — Pina will not guess what a value should become.
+Structural changes generate themselves (added, removed, reordered, or reseated fields). Semantic ones do not: a rename that changes meaning, a type narrowing, a split or merge of a field, or an authority change stops the build until you implement the transition and supply fixtures. That is the intended safety property — Pina will not guess what a value should become. A respelling that stores the same bytes, such as `PodU64` as `u64` or `Address` as `[u8; 32]`, is not a change at all: it consumes no version and needs no transition.
 
 Run `pina migrations create` after every schema change; when it reports an unresolved transition, implement it there. Fixed-account transitions are total and infallible once the exact source shape is validated; manual instruction transitions run in scratch space, so they can reject a value before anything is written. An instruction transition that adds an argument is always manual, because a zero-filled default is indistinguishable from a value the client sent. Events have no transitions: a changed event appends a version with its own schema.
 

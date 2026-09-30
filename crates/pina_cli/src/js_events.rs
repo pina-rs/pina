@@ -278,7 +278,7 @@ fn decoder_module(
 		r#"/**
  * Decode one `{name}` record: {version_note}.
  */
-export function normalize{pascal}Event(
+export function decode{pascal}Event(
 	data: ReadonlyUint8Array | Uint8Array,
 ): Decoded{pascal}Event {{
 	const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -320,7 +320,7 @@ export function parse{pascal}EventFromLog(log: string): Decoded{pascal}Event | n
 			return null;
 		}}
 	}}
-{version_filter}	return normalize{pascal}Event(bytes);
+{version_filter}	return decode{pascal}Event(bytes);
 }}
 "#,
 	)
@@ -954,7 +954,7 @@ mod tests {
 		let module = event_log_module("events_program", &root.program);
 		let module = module.unwrap_or_else(|| panic!("events must emit a log module"));
 
-		assert!(module.contains("export function normalizeMyEventEvent("));
+		assert!(module.contains("export function decodeMyEventEvent("));
 		assert!(module.contains("): DecodedMyEventEvent {"));
 		assert!(module.contains(
 			"return { name: \"myEvent\", data: getMyEventEventDecoder().decode(bytes) };"

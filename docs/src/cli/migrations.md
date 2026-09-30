@@ -1,13 +1,6 @@
 # Manage ABI migrations
 
-Migration support is opt-in. Configure one version width for the program:
-
-```toml
-[migrations]
-version_type = "u8"
-```
-
-Add `migrations` to each account, instruction payload, or event that Pina must track:
+Migration support is opt-in. Add `migrations` to each account, instruction payload, or event that Pina must track:
 
 ```rust
 #[account(discriminator = AccountType::Profile, migrations)]
@@ -17,7 +10,7 @@ pub struct Profile {
 }
 ```
 
-Pina inserts the version after the existing discriminator. Version `0` is the first captured shape. The source code never declares a version number.
+Pina inserts the version after the existing discriminator. Version `0` is the first captured shape. The source code never declares a version number, and the version field is one `u8` byte unless the manifest records a wider width; see [Choose the version width](#choose-the-version-width).
 
 Each kind uses the version differently. An account migrates on-chain, one adjacent transition at a time. An instruction with `migrations` has an older payload converted to the current layout before its handler runs. An event is versioned but never converted: the program emits only the current version, and generated clients decode each historical version with its own schema. [How a migration flows](../migrations/flow.md#what-each-contract-kind-carries) compares the three.
 
@@ -25,15 +18,13 @@ Each kind uses the version differently. An account migrates on-chain, one adjace
 
 A program that wants every contract versioned can opt in by kind instead of annotating each declaration:
 
-```toml
-[migrations]
-version_type = "u8"
-auto = ["accounts", "events", "instructions"] # or `auto = true` for every kind
+```bash
+pina migrations create --auto true # or --auto accounts,events,instructions
 ```
 
-`auto` accepts `true` (every kind), `false` (the default), or a list of `accounts`, `events`, and `instructions`; any other name is a configuration error. The policy envelopes accounts and events. It records instructions as snapshots without an envelope, so covering them does not change a payload byte; see [Instructions without an envelope](#instructions-without-an-envelope).
+`--auto` accepts `true` (or `all`) for every kind, `false` (or `none`) to clear the policy, or a comma-separated list of `accounts`, `events`, and `instructions`; any other name, or a name listed twice, is rejected. The policy envelopes accounts and events. It records instructions as snapshots without an envelope, so covering them does not change a payload byte; see [Instructions without an envelope](#instructions-without-an-envelope).
 
-`pina migrations create` records the resolved policy as `auto` in `migrations/manifest.json` and snapshots every contract of the listed kinds. The manifest is the single source of truth for macros: they never read `pina.toml`, because a proc macro does not re-expand when an unrelated toml file changes. A struct that is not yet snapshotted still fails the build with the existing "run `pina migrations create`" error, so the workflow is unchanged.
+`pina migrations create` records the policy as `auto` in `migrations/manifest.json` and snapshots every contract of the listed kinds. A later run without `--auto` keeps the recorded policy, and a first run without it records no policy. The manifest is the only home of the policy and the single source of truth for macros: `pina.toml` holds no copy, because a proc macro does not re-expand when an unrelated toml file changes and a second copy could disagree with the first. The retired `[migrations].auto` and `[migrations].version_type` keys fail every command that reads `pina.toml` with an error naming the flag that replaces them. A struct that is not yet snapshotted still fails the build with the existing "run `pina migrations create`" error, so the workflow is unchanged.
 
 Because the policy lives in the manifest, flipping it re-expands every contract without a source edit. When a policy is recorded, `create` scaffolds a `build.rs` containing:
 
@@ -45,7 +36,7 @@ fn main() {
 
 The scaffold is idempotent and never overwrites an existing hand-written build script; `create` prints the exact line to add instead, and `pina migrations check` fails until it is present.
 
-Per-item `migrations = false` keeps one contract out of an auto policy. Removing the envelope from a contract the manifest already records is an error rather than a silent opt-out: stripping an envelope is a wire-format change, so the build fails with the contract identity and the required remedy, and `create` refuses it with `EnvelopeRemoval`. The one exception is an unpublished instruction, which `create` may turn back into a snapshot. Dropping a kind from `[migrations].auto` is rejected the same way. Enabling auto on an already-launched program inserts an envelope into every account and event of the listed kinds — one recorded history entry per contract through `create`, behind `--envelope-ack` — while a new program simply captures that baseline.
+Per-item `migrations = false` keeps one contract out of an auto policy. Removing the envelope from a contract the manifest already records is an error rather than a silent opt-out: stripping an envelope is a wire-format change, so the build fails with the contract identity and the required remedy, and `create` refuses it with `EnvelopeRemoval`. The one exception is an unpublished instruction, which `create` may turn back into a snapshot. Dropping an enveloped kind with `--auto` is rejected the same way. A hand edit of the manifest's `auto` cannot strip an envelope either: a declaration without a `migrations` token that the recorded policy no longer covers, but that the manifest records with an envelope, fails the build. Enabling auto on an already-launched program inserts an envelope into every account and event of the listed kinds — one recorded history entry per contract through `create`, behind `--envelope-ack` — while a new program simply captures that baseline.
 
 ### Instructions without an envelope
 
@@ -68,10 +59,7 @@ An instruction covered by `auto` without the `migrations` token keeps its `[disc
 							{
 								"name": "authority",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							}
 						]
 					}
@@ -81,6 +69,8 @@ An instruction covered by `auto` without the `migrations` token keeps its `[disc
 	}
 }
 ```
+
+A process slot records only what sets it apart: `writable`, `signer`, and `optional` are written only when true, and `defaultValue` and `pda` only when set. A reader treats an absent field as false or none.
 
 The snapshot stops wire-breaking changes rather than recording them:
 
@@ -92,6 +82,16 @@ The snapshot stops wire-breaking changes rather than recording them:
 - When an instruction stops asking to be recorded (`migrations = false`, or an `auto` policy that no longer covers instructions), `check` fails with `StaleSnapshot` and `create` releases the snapshot. Nothing on the wire changes.
 
 `#[instruction(discriminator = X, migrations)]` opts one instruction into full migrations: a version envelope, adjacent transitions under `migrations/transitions/instruction_<width>_<hex>/`, and a generated dispatcher that normalizes a historical payload before the handler runs. Before publication, removing the token and running `create` turns it back into a snapshot; after publication it fails with `EnvelopeRemoval`. The macro reports the same situation at build time: "removing an envelope is a wire-format change that `pina migrations create` must record deliberately". A program whose instructions were recorded under ABI `0.20` has them enveloped, and must add `migrations` to keep a published instruction's wire format; see [Upgrading from ABI 0.20](../migrations/abi-versioning.md#upgrading-from-abi-020).
+
+## Choose the version width
+
+The width of the version field is program-wide, recorded as `versionType` in `migrations/manifest.json`, and `u8` by default. Versions are counted per contract, so `u8` gives every account, instruction, and event its own 255-version budget. Record a wider width only when one contract may need more:
+
+```bash
+pina migrations create --auto true --version-type u16
+```
+
+`--version-type` accepts `u8`, `u16`, or `u32`; there is no `u64`. A later run without the flag keeps the recorded width. While nothing is published (no receipt and no pending deployment), the flag rewrites the width in place and `create` prints the change; every history is still a single draft, so nothing else in the manifest moves. Rebuild and regenerate clients afterwards so they write the wider field. Once a deployment publishes, the width is frozen and the flag fails: "Migration version encoding is frozen as u8 because a deployment published it, so it cannot become u16".
 
 ## Capture a draft
 
@@ -172,7 +172,7 @@ A figure that cannot be estimated serializes as `{ "status": "unavailable", "rea
 
 ## Disambiguate renames
 
-A field that disappears while another field of the same type appears is ambiguous: a rename preserves the stored bytes, a remove-plus-add discards them and starts the new field zeroed. `pina migrations create` refuses to guess:
+A field that disappears while another field of the same type appears is ambiguous (types are compared on the wire, so `PodU64` and `u64` count as the same type): a rename preserves the stored bytes, a remove-plus-add discards them and starts the new field zeroed. `pina migrations create` refuses to guess:
 
 - On a terminal it prompts field by field and records the answer.
 - With `--no-interactive`, or when no terminal is attached, it fails with one line per question naming the exact flags that answer it:
@@ -191,13 +191,13 @@ A third answer hands one field's conversion to you. `--manual <field>` names an 
 pina migrations create --rename first_name:name --assume-removed last_name --manual name
 ```
 
-`--manual` is also the way to make a rename whose type changed legal: a generated rename copies bytes verbatim and so requires identical types, while `--manual` records that you own the interpretation. The answer is recorded, so repeated `create` runs keep generating the manual draft rather than re-deriving an automatic transition over your body.
+`--manual` is also the way to make a rename whose type changed legal: a generated rename copies bytes verbatim and so requires the same wire type, while `--manual` records that you own the interpretation. The answer is recorded, so repeated `create` runs keep generating the manual draft rather than re-deriving an automatic transition over your body.
 
 Answers that contradict each other fail closed rather than picking a winner, whichever source they came from: a field cannot be both renamed and discarded, and a manual conversion cannot also discard the stored bytes it reads.
 
 ## Resolve a manual transition
 
-Pina generates automatic transitions only for direction-safe fixed-layout changes: copies, insertions and removals that shift later fields, and zero-filled additions. An instruction argument is never zero-filled, because the handler could not tell that default from a value a client sent, so an instruction transition that adds an argument is always manual. A type change (including a widening such as `u64` to `u128`), a reorder of existing fields, a compact layout, an ambiguous field move, or a `--manual` answer creates a manual Rust file with `TODO(pina-manual-migration)`. `--manual <field>` also converts a draft that `create` already recorded as automatic.
+Pina generates automatic transitions only for direction-safe fixed-layout changes: copies, insertions and removals that shift later fields, and zero-filled additions. An instruction argument is never zero-filled, because the handler could not tell that default from a value a client sent, so an instruction transition that adds an argument is always manual. A type change (including a widening such as `u64` to `u128`, but not a [respelling](#respell-a-type) that stores the same bytes), a reorder of existing fields, a compact layout, an ambiguous field move, or a `--manual` answer creates a manual Rust file with `TODO(pina-manual-migration)`. `--manual <field>` also converts a draft that `create` already recorded as automatic.
 
 A finished body belongs to the two layouts it was written for. While the draft's destination schema is unchanged, `create` keeps it. If you change the draft's layout again, `create` moves the finished body to `vN_to_vM.rs.stale`, writes a new stub whose header prints the new offsets, and says so. The new stub's marker blocks the build until you port the old body; delete the `.stale` file once you have. This keeps an old body from compiling against a layout it was not written for and silently misplacing bytes.
 
@@ -216,7 +216,7 @@ pina test --compatibility
 
 `check` rejects a remaining marker. Once publication is pending or complete, it also rejects any change to the transition file or either schema hash. Fix frozen transition code with another migration version.
 
-IDL generation runs the same check. The current IDL keeps each enveloped account, instruction, or event's `migrationVersion` field in place with `defaultValueStrategy: "omitted"` and its default value: generated client inputs omit it, encoders stamp the current value into the envelope automatically, and decoders reject any other version. A snapshot-only instruction has no `migrationVersion` field. Each earlier version of an event is listed as its own event node, `<Event>V<n>`, so clients can decode old log records; historical account and instruction schemas and all transition code remain exclusively in `migrations/manifest.json`. When `pina.toml` enables `auto` but no manifest exists yet, `pina idl` and `pina generate` refuse to run, because the IDL would omit the version byte the program gains once the baseline is recorded.
+IDL generation runs the same check. The current IDL keeps each enveloped account, instruction, or event's `migrationVersion` field in place with `defaultValueStrategy: "omitted"` and its default value: generated client inputs omit it, encoders stamp the current value into the envelope automatically, and decoders reject any other version. A snapshot-only instruction has no `migrationVersion` field. Each earlier version of an event is listed as its own event node, `<Event>V<n>`, so clients can decode old log records; historical account and instruction schemas and all transition code remain exclusively in `migrations/manifest.json`. The IDL follows the recorded policy, the same one the macros expand against. Without a manifest there is no policy, so neither the program nor the IDL carries an envelope, and a declaration with an explicit `migrations` token fails until `create` records it.
 
 ## Change an instruction process
 
@@ -233,6 +233,12 @@ All account properties are part of a slot. A name, signer flag, writable flag, d
 
 The runtime treats an omitted optional suffix as absent. It never creates an account, signature, writable privilege, or PDA for an old client.
 
+## Respell a type
+
+A drift check compares what a field stores, not how its type is spelled. Spellings that store the same bytes under the same reading are one schema: the `PodU16`, `PodI16`, `PodU32`, `PodI32`, `PodU64`, `PodI64`, `PodU128`, `PodI128`, and `PodBool` wrappers and their native names, `Address` and `[u8; 32]`, `PodString<N>` (or `PodString<N, 1>`) and `String<N>`, and `PodVec<T, N>` (or `PodVec<T, N, 2>`) and `Vec<T, N>`, recursively through arrays, `Option`, and vectors. Respelling `PodU64` as `u64` therefore consumes no version and fails no build, and a real change next to a respelling still gets an automatic byte copy for the respelled field. The recorded spelling and every pinned hash stay as they were.
+
+Types that only share a width are different schemas: `u64` to `i64`, `u32` to `f32`, or `u8` to `bool` reinterprets a live value, so each needs a manual transition.
+
 ## Decode historical events
 
 Events are immutable, so Pina versions them instead of migrating them. The program emits only the current version, and nothing converts an older record. Changing a published event's schema appends a version with its own schema and no transition file.
@@ -241,7 +247,27 @@ Generated clients decode each version with its own schema. The IDL lists every e
 
 ## Publish a version
 
-Use `pina deploy` for a persistent cluster. Before the remote command starts, Pina atomically records the exact program ID, RPC target, executable digest, manifest digest, and current contract versions as pending. Receipts and pending records also pin the schema hash and transition-implementation hash of every published version, so rewriting published history — even with consistently recomputed hashes — fails every later check. A pending version is frozen because it may already be live. After deployment succeeds, Pina rechecks the planned files and converts that record into a hash-chained receipt.
+Use `pina deploy` for a persistent cluster. Before the remote command starts, Pina atomically records the cluster, RPC target, executable digest, and the pinned history of every contract it ships as pending. A pending version is frozen because it may already be live. After deployment succeeds, Pina rechecks the planned files and appends that record to `migrations/publications.json` as a receipt:
+
+```json
+{
+	"abiVersion": "0.21",
+	"receipts": [
+		{
+			"rpcUrl": "https://api.devnet.solana.com",
+			"executableSha256": "…",
+			"versions": {
+				"account:1:01": [
+					{ "schemaSha256": "…" },
+					{ "schemaSha256": "…", "transitionSha256": "…" }
+				]
+			}
+		}
+	]
+}
+```
+
+Each contract maps to the list of its pins: entry `n` pins version `n` with its schema hash and, when it has one, the hash of the transition that enters it. The highest version a receipt made live is the position of its last pin, and every receipt pins every version it made live, so rewriting published history — even with consistently recomputed hashes — fails every later check. A receipt names no program: the ledger belongs to the manifest beside it, whose `programId` is the only copy. Receipts are appended in deployment order, and version control is what keeps the file append-only; a hash chain over the receipts could be recomputed by anyone able to edit them, so none is stored.
 
 Local deployments do not publish versions unless you pass `--record-publication`. A published version is immutable even if a later deployment replaces it.
 
@@ -251,7 +277,7 @@ If deployment or receipt recording fails, stop the release. The pending record r
 
 When the exact planned inputs cannot be reproduced (for example a cleaned build directory), inspect the pending deployment with `pina migrations reconcile`. It prints the cluster, RPC endpoint, program, and executable digest that must be resumed. Once you are certain the deployment never went live, `pina migrations reconcile --abandon` converts the pending record into an abandoned receipt that still freezes its pinned versions and unblocks the next deployment. Losing `migrations/publications.json` entirely fails every later check while the manifest still records advanced versions, because published history must stay pinned; restore the ledger from version control instead of regenerating it.
 
-A receipt must pin the schema hash of every version it made live. Ledgers written before pinning existed name only the highest version, and every command refuses them with `UnpinnedPublication`, because such a receipt cannot tell a rewritten published schema from the one that shipped. After confirming from version control that `migrations/manifest.json` still records exactly what those receipts shipped, run `pina migrations reconcile --pin-legacy` once and commit the ledger.
+A contract entry with no pins is invalid, and every command refuses the ledger ("pins no versions"), because such an entry cannot tell a rewritten published schema from the one that shipped; restore the file from version control rather than blanking a history. An ABI `0.20` ledger could name a published version without pinning it, and reading one fails with an error naming `pina migrations reconcile --pin-legacy`. After confirming from version control that `migrations/manifest.json` still records exactly what those receipts shipped, run that command once: it pins every such entry from the manifest (trust on first use), writes the ledger in the current shape, and leaves you to commit it. A `0.21` ledger has nothing to pin.
 
 The manifest records the program ID its history belongs to. Before anything is published, `pina migrations create` rebinds the history to a changed `declare_id!` (for example after `pina keys new`) and says so. After publication, a different `declare_id!` fails every command until the original is restored.
 
@@ -263,7 +289,7 @@ Reads reject a document stamped above the running build, naming the supported ve
 
 The 0.20 reset replaced the integer `formatVersion` counters, and documents from older releases must be converted once before any Pina command can read them — `create` and `sync` included. [Migrate to the reset ABI document](../migrations/abi-document-reset.md) walks the conversion for both deployed and not-yet-deployed programs.
 
-ABI `0.21` stores each fact once: the contract key `kind:width:hex` is the identity, the wire codec is implied by `abiVersion`, and a version without a transition omits the key. It also added `"envelope": false` for instructions recorded without an envelope and removed event transitions. A `0.20` document is converted in memory and rewritten by the next `create`; [Upgrading from ABI 0.20](../migrations/abi-versioning.md#upgrading-from-abi-020) lists the source changes that can follow.
+ABI `0.21` stores each fact once: the contract key `kind:width:hex` is the identity, the wire codec is implied by `abiVersion`, a version without a transition omits the key, and a process slot omits every field left at its default. It also added `"envelope": false` for instructions recorded without an envelope and removed event transitions. The publication ledger keeps only what nothing else records: a receipt is its `rpcUrl`, `executableSha256`, pinned `versions`, and `abandoned` flag. A `0.20` document is converted in memory and rewritten by the next `create`; [Upgrading from ABI 0.20](../migrations/abi-versioning.md#upgrading-from-abi-020) lists the source changes that can follow.
 
 `pina abi schema` prints the JSON Schema for a document, generated from the same types that read and write it:
 
@@ -278,14 +304,16 @@ An ABI document upgrade does not consume an on-chain migration version.
 
 ## Commands
 
-| Command                                  | Result                                                                   |
-| ---------------------------------------- | ------------------------------------------------------------------------ |
-| `pina migrations create`                 | Capture source changes and create or refresh one draft                   |
-| `pina migrations check`                  | Fail on source, schema, process, transition, or version drift            |
-| `pina migrations status`                 | Show each current version, its publication state, and the cost           |
-| `pina migrations sync`                   | Run `create`, `pina build`, and `pina generate` for unambiguous changes  |
-| `pina migrations inspect <ADDRESS>`      | Compare one on-chain account's envelope with the manifest                |
-| `pina migrations reconcile [--abandon]`  | Explain or abandon an ambiguous pending deployment                       |
-| `pina migrations reconcile --pin-legacy` | Pin receipts written before schema pinning, after verifying the manifest |
+| Command                                  | Result                                                                  |
+| ---------------------------------------- | ----------------------------------------------------------------------- |
+| `pina migrations create`                 | Capture source changes and create or refresh one draft                  |
+| `pina migrations create --auto <POLICY>` | Record which contract kinds are tracked without a `migrations` token    |
+| `pina migrations create --version-type`  | Record the version width while nothing is published                     |
+| `pina migrations check`                  | Fail on source, schema, process, transition, or version drift           |
+| `pina migrations status`                 | Show each current version, its publication state, and the cost          |
+| `pina migrations sync`                   | Run `create`, `pina build`, and `pina generate` for unambiguous changes |
+| `pina migrations inspect <ADDRESS>`      | Compare one on-chain account's envelope with the manifest               |
+| `pina migrations reconcile [--abandon]`  | Explain or abandon an ambiguous pending deployment                      |
+| `pina migrations reconcile --pin-legacy` | Pin an ABI `0.20` ledger's unpinned receipts from the verified manifest |
 
 Add `--json` for machine-readable output. Add `--project <DIR>` to select a program from another directory.

@@ -622,11 +622,16 @@ mod tests {
 
 	#[test]
 	fn renders_event_docs_on_the_struct_and_its_fields() {
-		let mut event = envelope_event("valueChanged", U8, Number::UnsignedInteger(1));
+		let mut version = event_number_field("migrationVersion", U8, Number::UnsignedInteger(1));
+		version.docs = vec!["Schema version.".to_owned()].into();
+		let data = StructTypeNode::new(vec![
+			event_number_field("discriminator", U8, Number::UnsignedInteger(4)),
+			version,
+			event_number_field("value", NumberFormat::U64, Number::UnsignedInteger(0)),
+		]);
+		let mut event = EventNode::new("valueChanged", data);
+		event.discriminators = vec![event_constant_discriminator(U8, Number::UnsignedInteger(4))];
 		event.docs = vec!["Tracks value changes.".to_owned()].into();
-		if let TypeNode::Struct(data) = event.data.as_mut() {
-			data.fields[1].docs = vec!["Schema version.".to_owned()].into();
-		}
 		let page = render_event_page(&event);
 		let page = page.unwrap_or_else(|error| panic!("event render: {error}"));
 
