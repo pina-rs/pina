@@ -114,7 +114,7 @@ pub(super) fn acquire_migration_lock(program_dir: &Path) -> Result<MigrationLock
 }
 
 pub(super) fn ensure_safe_path(path: &Path) -> Result<(), MigrationError> {
-	if crate::path_security::has_link_like_component(path).map_err(|source| {
+	if crate::path_security::has_untrusted_link_component(path).map_err(|source| {
 		MigrationError::Read {
 			path: path.to_path_buf(),
 			source,

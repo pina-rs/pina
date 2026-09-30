@@ -1206,7 +1206,7 @@ fn cpi_render_error(path: &Path, source: pina_cpi_renderer::RenderError) -> Coda
 
 pub(crate) fn validate_render_target(path: &Path) -> Result<(), CodamaError> {
 	let absolute = std::path::absolute(path).map_err(|source| create_dir_error(path, source))?;
-	let has_link = crate::path_security::has_user_controlled_link_like_component(&absolute)
+	let has_link = crate::path_security::has_untrusted_link_component(&absolute)
 		.map_err(|source| create_dir_error(path, source))?;
 
 	if absolute.parent().is_none() {

@@ -1,55 +1,49 @@
 //! Link-aware path validation for commands that publish sensitive files.
 
 use std::fs;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
-/// Return whether any existing path component is link-like.
+/// Return whether an existing path component is a link that could redirect a
+/// write.
+///
+/// Every symbolic link and reparse point is untrusted except a system alias: a
+/// root-owned link directly below the filesystem root, such as macOS's `/var`
+/// and `/tmp` or a merged-`/usr` system's `/bin`. Only root can create or
+/// replace an entry there, and no repository or project tree occupies that
+/// depth, so the exception cannot admit a project's own links even when the
+/// command runs as root. Windows reparse points are always untrusted because
+/// their owner is not available through the portable metadata API.
 ///
 /// A path that traverses a non-directory component can never resolve, and the
 /// failure surfaces as different io error kinds per platform (`NotADirectory`
 /// on unix, `NotFound` on Windows), so that case is reported as an error in
 /// both.
-pub(crate) fn has_link_like_component(path: &Path) -> Result<bool, std::io::Error> {
-	has_component_matching(path, is_link_like)
-}
-
-/// Return whether an existing path component is a link controlled by a
-/// non-root user.
-///
-/// Unix platforms can expose stable, root-owned aliases such as macOS's
-/// `/var` link. Those aliases are not replaceable by the invoking user and do
-/// not create the output-boundary escape this check prevents. Windows reparse
-/// points remain rejected because their owner is not available through the
-/// portable metadata API.
-pub(crate) fn has_user_controlled_link_like_component(path: &Path) -> Result<bool, std::io::Error> {
-	has_component_matching(path, is_user_controlled_link_like)
-}
-
-fn has_component_matching(
-	path: &Path,
-	matches: impl Fn(&fs::Metadata) -> bool,
-) -> Result<bool, std::io::Error> {
+pub(crate) fn has_untrusted_link_component(path: &Path) -> Result<bool, std::io::Error> {
 	let absolute = if path.is_absolute() {
 		path.to_path_buf()
 	} else {
 		std::env::current_dir()?.join(path)
 	};
 	let mut current = PathBuf::new();
+	let mut depth = 0_usize;
 	let mut parent_is_directory = true;
 
 	for component in absolute.components() {
 		current.push(component);
 
-		if matches!(
-			component,
-			std::path::Component::Prefix(_) | std::path::Component::RootDir
-		) {
+		if matches!(component, Component::Prefix(_) | Component::RootDir) {
 			continue;
 		}
 
+		depth += 1;
+
 		match fs::symlink_metadata(&current) {
-			Ok(metadata) if matches(&metadata) => return Ok(true),
+			Ok(metadata) if is_untrusted_link(&metadata, depth == 1) => return Ok(true),
+			// A trusted alias is traversed, so its target decides whether a
+			// miss beneath it is an ordinary absent entry.
+			Ok(metadata) if is_link_like(&metadata) => parent_is_directory = current.is_dir(),
 			Ok(metadata) => parent_is_directory = metadata.is_dir(),
 			// Plain misses below an existing directory are not link-like.
 			// Everything else through this lookup is either a real error or a
@@ -72,20 +66,20 @@ fn has_component_matching(
 	Ok(false)
 }
 
-fn is_user_controlled_link_like(metadata: &fs::Metadata) -> bool {
-	if !is_link_like(metadata) {
-		return false;
-	}
+fn is_untrusted_link(metadata: &fs::Metadata, top_level: bool) -> bool {
+	is_link_like(metadata) && !(top_level && is_owned_by_root(metadata))
+}
 
-	#[cfg(unix)]
-	{
-		use std::os::unix::fs::MetadataExt as _;
+#[cfg(unix)]
+fn is_owned_by_root(metadata: &fs::Metadata) -> bool {
+	use std::os::unix::fs::MetadataExt as _;
 
-		metadata.uid() != 0
-	}
+	metadata.uid() == 0
+}
 
-	#[cfg(not(unix))]
-	true
+#[cfg(not(unix))]
+fn is_owned_by_root(_metadata: &fs::Metadata) -> bool {
+	false
 }
 
 pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
@@ -118,20 +112,16 @@ mod tests {
 		fs::create_dir(&ordinary).unwrap_or_else(|error| panic!("create failed: {error}"));
 
 		assert!(
-			!has_link_like_component(&ordinary)
+			!has_untrusted_link_component(&ordinary)
 				.unwrap_or_else(|error| { panic!("ordinary path inspection failed: {error}") })
 		);
 		assert!(
-			!has_link_like_component(&ordinary.join("missing/file"))
+			!has_untrusted_link_component(&ordinary.join("missing/file"))
 				.unwrap_or_else(|error| { panic!("missing path inspection failed: {error}") })
 		);
 		assert!(
-			!has_link_like_component(Path::new("."))
+			!has_untrusted_link_component(Path::new("."))
 				.unwrap_or_else(|error| panic!("relative path inspection failed: {error}"))
-		);
-		assert!(
-			!has_user_controlled_link_like_component(&ordinary)
-				.expect("ordinary path inspection should succeed")
 		);
 	}
 
@@ -139,7 +129,7 @@ mod tests {
 	fn path_inspection_errors_are_propagated() {
 		let invalid = PathBuf::from("x".repeat(32 * 1024));
 
-		assert!(has_link_like_component(&invalid).is_err());
+		assert!(has_untrusted_link_component(&invalid).is_err());
 	}
 
 	#[test]
@@ -151,8 +141,8 @@ mod tests {
 		fs::write(&blocked, b"not a directory")
 			.unwrap_or_else(|error| panic!("write failed: {error}"));
 
-		assert!(has_link_like_component(&blocked.join("migrations")).is_err());
-		assert!(has_link_like_component(&blocked.join("migrations/.lock")).is_err());
+		assert!(has_untrusted_link_component(&blocked.join("migrations")).is_err());
+		assert!(has_untrusted_link_component(&blocked.join("migrations/.lock")).is_err());
 	}
 
 	#[cfg(unix)]
@@ -169,13 +159,70 @@ mod tests {
 		symlink(&target, &link).unwrap_or_else(|error| panic!("symlink failed: {error}"));
 
 		assert!(
-			has_link_like_component(&link.join("secret.json"))
+			has_untrusted_link_component(&link.join("secret.json"))
 				.unwrap_or_else(|error| { panic!("link inspection failed: {error}") })
 		);
-		assert!(
-			has_user_controlled_link_like_component(&link.join("secret.json"))
-				.expect("link inspection should succeed")
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn only_top_level_root_owned_links_are_trusted() {
+		use std::os::unix::fs::symlink;
+
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+		let root = fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let link = root.join("link");
+		symlink(&root, &link).unwrap_or_else(|error| panic!("symlink failed: {error}"));
+		let link_metadata =
+			fs::symlink_metadata(&link).unwrap_or_else(|error| panic!("metadata failed: {error}"));
+		let directory_metadata =
+			fs::symlink_metadata(&root).unwrap_or_else(|error| panic!("metadata failed: {error}"));
+
+		// Below the top level every link is untrusted, whoever owns it, so a
+		// command running as root still rejects a project's own links.
+		assert!(is_untrusted_link(&link_metadata, false));
+		assert_eq!(
+			is_untrusted_link(&link_metadata, true),
+			!is_owned_by_root(&link_metadata)
 		);
+		assert!(!is_untrusted_link(&directory_metadata, true));
+		assert!(!is_untrusted_link(&directory_metadata, false));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn system_aliases_below_the_filesystem_root_are_trusted() {
+		let aliases = fs::read_dir("/")
+			.unwrap_or_else(|error| panic!("read root failed: {error}"))
+			.map(|entry| entry.unwrap_or_else(|error| panic!("root entry failed: {error}")))
+			.map(|entry| entry.path())
+			.filter(|path| {
+				fs::symlink_metadata(path)
+					.is_ok_and(|metadata| is_link_like(&metadata) && is_owned_by_root(&metadata))
+					&& path.is_dir()
+			})
+			.collect::<Vec<_>>();
+
+		// macOS resolves every temporary directory through `/var` or `/tmp`.
+		#[cfg(target_os = "macos")]
+		for expected in ["/var", "/tmp"] {
+			assert!(
+				aliases.iter().any(|alias| alias == Path::new(expected)),
+				"{expected} should be a root-owned system alias"
+			);
+		}
+
+		for alias in aliases {
+			let destination = alias.join("pina-missing-directory/secret.json");
+
+			assert!(
+				!has_untrusted_link_component(&destination)
+					.unwrap_or_else(|error| panic!("alias inspection failed: {error}")),
+				"{} should be trusted",
+				alias.display()
+			);
+		}
 	}
 
 	#[cfg(windows)]
@@ -202,7 +249,7 @@ mod tests {
 		symlink_dir(&target, &link).unwrap_or_else(|error| panic!("reparse point failed: {error}"));
 
 		assert!(
-			has_link_like_component(&link.join("secret.json"))
+			has_untrusted_link_component(&link.join("secret.json"))
 				.unwrap_or_else(|error| { panic!("reparse inspection failed: {error}") })
 		);
 	}

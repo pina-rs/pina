@@ -494,7 +494,10 @@ fn read_bounded_keypair(
 }
 
 fn validate_destination(path: &Path, force: bool) -> Result<(), KeysError> {
-	let has_link = read_result(path, crate::path_security::has_link_like_component(path))?;
+	let has_link = read_result(
+		path,
+		crate::path_security::has_untrusted_link_component(path),
+	)?;
 
 	if has_link {
 		return Err(KeysError::UnsafeDestination {
@@ -584,7 +587,10 @@ fn write_source(
 	contents: &[u8],
 	generated: Option<(&Path, &same_file::Handle)>,
 ) -> Result<(), KeysError> {
-	let has_link = read_result(path, crate::path_security::has_link_like_component(path))?;
+	let has_link = read_result(
+		path,
+		crate::path_security::has_untrusted_link_component(path),
+	)?;
 
 	if has_link {
 		return Err(KeysError::UnsafeDestination {
@@ -838,19 +844,23 @@ mod tests {
 
 	fn project(program_id: &str) -> TempDir {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		fs::create_dir_all(temp.path().join("src"))
+		write_project(temp.path(), program_id);
+		temp
+	}
+
+	fn write_project(root: &Path, program_id: &str) {
+		fs::create_dir_all(root.join("src"))
 			.unwrap_or_else(|error| panic!("create failed: {error}"));
 		fs::write(
-			temp.path().join("Cargo.toml"),
+			root.join("Cargo.toml"),
 			"[package]\nname = \"demo-program\"\n",
 		)
 		.unwrap_or_else(|error| panic!("write failed: {error}"));
 		fs::write(
-			temp.path().join("src/lib.rs"),
+			root.join("src/lib.rs"),
 			format!("// keep me\nuse pina::*;\n\ndeclare_id!(\"{program_id}\");\n"),
 		)
 		.unwrap_or_else(|error| panic!("write failed: {error}"));
-		temp
 	}
 
 	fn keypair(path: &Path, secret: [u8; 32]) -> String {
@@ -1516,6 +1526,53 @@ mod tests {
 
 		assert!(matches!(error, KeysError::UnsafeDestination { .. }));
 		assert!(!real.join("program-keypair.json").exists());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn generation_refuses_a_user_symlinked_ancestor_outside_the_project() {
+		use std::os::unix::fs::symlink;
+
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let root = fs::canonicalize(temp.path())
+			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let real = root.join("real");
+		let alias = root.join("alias");
+		write_project(&real.join("project"), "11111111111111111111111111111111");
+		symlink(&real, &alias).unwrap_or_else(|error| panic!("symlink failed: {error}"));
+		let project = alias.join("project");
+		let keypair_path = project.join("program-keypair.json");
+
+		let error = generate_keys(&project, Some(&keypair_path), false)
+			.expect_err("a user-owned link above the project must fail closed");
+
+		assert!(matches!(error, KeysError::UnsafeDestination { .. }));
+		assert!(!real.join("project/program-keypair.json").exists());
+	}
+
+	/// macOS publishes `/tmp` and `/var` as root-owned links into `/private`, so
+	/// a project reached through either is outside any user's control.
+	#[cfg(target_os = "macos")]
+	#[test]
+	fn generation_accepts_a_system_alias_ancestor_outside_the_project() {
+		let temp =
+			TempDir::new_in("/tmp").unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_project(temp.path(), "11111111111111111111111111111111");
+		let keypair_path = temp.path().join("program-keypair.json");
+		assert!(keypair_path.starts_with("/tmp"));
+
+		let generated = generate_keys(temp.path(), Some(&keypair_path), false)
+			.unwrap_or_else(|error| panic!("generation through /tmp failed: {error}"));
+		let canonical = fs::canonicalize(&keypair_path)
+			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+
+		assert_eq!(generated.keypair, keypair_path);
+		assert!(canonical.starts_with("/private/tmp"));
+		assert_eq!(
+			read_keypair_program_id(&canonical)
+				.unwrap_or_else(|error| panic!("generated keypair read failed: {error}")),
+			generated.program_id
+		);
 	}
 
 	#[cfg(not(windows))]
