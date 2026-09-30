@@ -13,16 +13,30 @@ fn workspace_root() -> &'static Path {
 		.unwrap_or_else(|| Path::new("."))
 }
 
+fn snapshot_temp_root() -> PathBuf {
+	workspace_root()
+		.join("target")
+		.join("pina-cli-snapshot-temp")
+}
+
 fn reset_snapshot_dir(name: &str) -> PathBuf {
 	// Keep snapshot scratch space inside the workspace so recorded argument
 	// paths are the same relative form on every machine and CI runner; a
 	// system temp directory leaks absolute, environment-specific paths into
 	// the snapshots.
-	let path = workspace_root()
-		.join("target")
-		.join("pina-cli-snapshot-temp")
-		.join(name);
-	let _ = fs::remove_dir_all(&path);
+	let path = snapshot_temp_root().join(name);
+	// A stale directory that cannot be removed would otherwise surface later as
+	// a confusing "refusing to overwrite" failure in an unrelated assertion.
+	match fs::remove_dir_all(&path) {
+		Ok(()) => {}
+		Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+		Err(error) => {
+			panic!(
+				"failed to clear snapshot temp directory {}: {error}",
+				path.display()
+			)
+		}
+	}
 	fs::create_dir_all(&path).unwrap_or_else(|error| {
 		panic!(
 			"failed to create snapshot temp directory {}: {error}",
@@ -109,9 +123,32 @@ fn create_executable(path: &Path, contents: &str) {
 		.unwrap_or_else(|error| panic!("failed to make {} executable: {error}", path.display()));
 }
 
+/// A throwaway Pina project wired to fake `cargo` and `surfpool` scripts.
+///
+/// Workflow tests assert on the recorded command log rather than on snapshot
+/// paths, so each fixture lives in its own uniquely named directory. Two test
+/// runs in the same checkout (a pre-push hook next to an editor test runner,
+/// for example) therefore never delete or overwrite each other's fixtures.
+/// The directory is removed when `dir` is dropped.
 #[cfg(unix)]
-fn create_fake_workflow_project(name: &str) -> (PathBuf, PathBuf, PathBuf, PathBuf) {
-	let project = reset_snapshot_dir(name);
+struct FakeWorkflowProject {
+	dir: TempDir,
+	project: PathBuf,
+	manifest: PathBuf,
+	target: PathBuf,
+	log: PathBuf,
+}
+
+#[cfg(unix)]
+fn create_fake_workflow_project(name: &str) -> FakeWorkflowProject {
+	let root = snapshot_temp_root();
+	fs::create_dir_all(&root)
+		.unwrap_or_else(|error| panic!("failed to create {}: {error}", root.display()));
+	let dir = tempfile::Builder::new()
+		.prefix(&format!("{}-", name.replace(' ', "-")))
+		.tempdir_in(&root)
+		.unwrap_or_else(|error| panic!("failed to create the {name} fixture directory: {error}"));
+	let project = dir.path().to_path_buf();
 	let manifest = project.join("Cargo.toml");
 	let target = project.join("target");
 	let cargo = project.join("fake-cargo.sh");
@@ -154,7 +191,13 @@ case "${1:-}" in
 esac
 "#,
 	);
-	(project, manifest, target, log)
+	FakeWorkflowProject {
+		dir,
+		project,
+		manifest,
+		target,
+		log,
+	}
 }
 
 #[test]
@@ -592,7 +635,13 @@ fn idl_success_output_snapshot() {
 #[cfg(unix)]
 #[test]
 fn unit_test_mode_never_builds_or_starts_surfpool() {
-	let (project, manifest, target, log) = create_fake_workflow_project("unit workflow");
+	let FakeWorkflowProject {
+		dir: _dir,
+		project,
+		manifest,
+		target,
+		log,
+	} = create_fake_workflow_project("unit workflow");
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args(["test", "--project"])
 		.arg(&project)
@@ -622,7 +671,13 @@ fn unit_test_mode_never_builds_or_starts_surfpool() {
 #[cfg(unix)]
 #[test]
 fn surfpool_test_mode_builds_and_requires_the_real_artifact() {
-	let (project, manifest, target, log) = create_fake_workflow_project("test workflow");
+	let FakeWorkflowProject {
+		dir: _dir,
+		project,
+		manifest,
+		target,
+		log,
+	} = create_fake_workflow_project("test workflow");
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args(["test", "--project"])
 		.arg(&project)
@@ -656,7 +711,13 @@ fn surfpool_test_mode_builds_and_requires_the_real_artifact() {
 #[cfg(unix)]
 #[test]
 fn compatibility_mode_runs_the_complete_surfpool_suite_with_fixture_signal() {
-	let (project, manifest, target, log) = create_fake_workflow_project("compatibility workflow");
+	let FakeWorkflowProject {
+		dir: _dir,
+		project,
+		manifest,
+		target,
+		log,
+	} = create_fake_workflow_project("compatibility workflow");
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args(["test", "--project"])
 		.arg(&project)
@@ -681,7 +742,13 @@ fn compatibility_mode_runs_the_complete_surfpool_suite_with_fixture_signal() {
 #[cfg(unix)]
 #[test]
 fn dev_delegates_offline_watch_to_surfpool() {
-	let (project, manifest, target, log) = create_fake_workflow_project("dev workflow");
+	let FakeWorkflowProject {
+		dir: _dir,
+		project,
+		manifest,
+		target,
+		log,
+	} = create_fake_workflow_project("dev workflow");
 	let surfpool = project.join("fake-surfpool.sh");
 	create_executable(
 		&surfpool,
@@ -724,7 +791,13 @@ printf '\n' >> "$PINA_FAKE_LOG"
 #[cfg(unix)]
 #[test]
 fn dev_forwards_explicit_upstream_selection() {
-	let (project, manifest, target, log) = create_fake_workflow_project("dev upstream workflow");
+	let FakeWorkflowProject {
+		dir: _dir,
+		project,
+		manifest,
+		target,
+		log,
+	} = create_fake_workflow_project("dev upstream workflow");
 	let surfpool = project.join("fake-surfpool.sh");
 	create_executable(
 		&surfpool,
@@ -746,6 +819,7 @@ printf '\n' >> "$PINA_FAKE_LOG"
 			.arg(&project)
 			.args(["--network", cluster])
 			.env("CARGO", project.join("fake-cargo.sh"))
+			.env("CARGO_TARGET_DIR", &target)
 			.env("PINA_SURFPOOL", &surfpool)
 			.env("PINA_FAKE_LOG", &log)
 			.env("PINA_FAKE_MANIFEST", &manifest)
@@ -760,6 +834,7 @@ printf '\n' >> "$PINA_FAKE_LOG"
 		.arg(&project)
 		.args(["--rpc-url", "http://127.0.0.1:8899"])
 		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &target)
 		.env("PINA_SURFPOOL", &surfpool)
 		.env("PINA_FAKE_LOG", &log)
 		.env("PINA_FAKE_MANIFEST", &manifest)
@@ -780,7 +855,13 @@ printf '\n' >> "$PINA_FAKE_LOG"
 #[cfg(unix)]
 #[test]
 fn dev_rejects_unsafe_rpc_urls_before_running_project_commands() {
-	let (project, manifest, target, log) = create_fake_workflow_project("unsafe RPC workflow");
+	let FakeWorkflowProject {
+		dir: _dir,
+		project,
+		manifest,
+		target,
+		log,
+	} = create_fake_workflow_project("unsafe RPC workflow");
 	let secret = "private-rpc-credential";
 	let endpoint = format!("https://agent:{secret}@rpc.example/?token={secret}#fragment");
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
@@ -788,6 +869,7 @@ fn dev_rejects_unsafe_rpc_urls_before_running_project_commands() {
 		.arg(&project)
 		.args(["--rpc-url", &endpoint])
 		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &target)
 		.env("PINA_SURFPOOL", project.join("surfpool-that-must-not-run"))
 		.env("PINA_FAKE_LOG", &log)
 		.env("PINA_FAKE_MANIFEST", &manifest)
@@ -819,11 +901,18 @@ fn workflow_errors_are_actionable_and_preserve_exit_status() {
 	assert_eq!(test_output.status.code(), Some(1));
 	assert!(String::from_utf8_lossy(&test_output.stderr).contains("Could not inspect"));
 
-	let (project, manifest, target, log) = create_fake_workflow_project("failed dev workflow");
+	let FakeWorkflowProject {
+		dir: _dir,
+		project,
+		manifest,
+		target,
+		log,
+	} = create_fake_workflow_project("failed dev workflow");
 	let missing_runbook = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args(["dev", "--project"])
 		.arg(&project)
 		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &target)
 		.env("PINA_FAKE_LOG", &log)
 		.env("PINA_FAKE_MANIFEST", &manifest)
 		.env("PINA_FAKE_TARGET", &target)
@@ -837,6 +926,7 @@ fn workflow_errors_are_actionable_and_preserve_exit_status() {
 		.args(["dev", "--yes", "--project"])
 		.arg(&project)
 		.env("CARGO", project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &target)
 		.env("PINA_SURFPOOL", surfpool)
 		.env("PINA_FAKE_LOG", &log)
 		.env("PINA_FAKE_MANIFEST", &manifest)
