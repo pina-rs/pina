@@ -175,8 +175,8 @@ mod tests {
 		use std::os::unix::fs::symlink;
 
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
-		let root = fs::canonicalize(temp.path())
-			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let root = fs::canonicalize(temp.path());
+		let root = root.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
 		let link = root.join("link");
 		symlink(&root, &link).unwrap_or_else(|error| panic!("symlink failed: {error}"));
 		let link_metadata =
@@ -198,8 +198,8 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn system_aliases_are_trusted_only_as_ancestors() {
-		let aliases = fs::read_dir("/")
-			.unwrap_or_else(|error| panic!("read root failed: {error}"))
+		let entries = fs::read_dir("/").unwrap_or_else(|error| panic!("read / failed: {error}"));
+		let aliases = entries
 			.map(|entry| entry.unwrap_or_else(|error| panic!("root entry failed: {error}")))
 			.map(|entry| entry.path())
 			.filter(|path| {
@@ -219,19 +219,21 @@ mod tests {
 		}
 
 		for alias in aliases {
-			let destination = alias.join("pina-missing-directory/secret.json");
-
-			assert!(
-				!has_untrusted_link_component(&destination)
-					.unwrap_or_else(|error| panic!("alias inspection failed: {error}")),
-				"{} should be trusted",
-				alias.display()
-			);
+			let ancestor = has_untrusted_link_component(&alias.join("missing/secret.json"));
+			let ancestor = ancestor.unwrap_or_else(|error| panic!("inspection failed: {error}"));
 			// Writing to the alias itself would replace it, so it is never
 			// trusted as the final component.
+			let destination = has_untrusted_link_component(&alias);
+			let destination =
+				destination.unwrap_or_else(|error| panic!("inspection failed: {error}"));
+
 			assert!(
-				has_untrusted_link_component(&alias)
-					.unwrap_or_else(|error| panic!("alias inspection failed: {error}")),
+				!ancestor,
+				"{} should be trusted as an ancestor",
+				alias.display()
+			);
+			assert!(
+				destination,
 				"{} should be refused as a destination",
 				alias.display()
 			);

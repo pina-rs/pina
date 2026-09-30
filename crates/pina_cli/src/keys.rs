@@ -1534,8 +1534,8 @@ mod tests {
 		use std::os::unix::fs::symlink;
 
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		let root = fs::canonicalize(temp.path())
-			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let root = fs::canonicalize(temp.path());
+		let root = root.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
 		let real = root.join("real");
 		let alias = root.join("alias");
 		write_project(&real.join("project"), "11111111111111111111111111111111");
@@ -1561,18 +1561,16 @@ mod tests {
 		let keypair_path = temp.path().join("program-keypair.json");
 		assert!(keypair_path.starts_with("/tmp"));
 
-		let generated = generate_keys(temp.path(), Some(&keypair_path), false)
-			.unwrap_or_else(|error| panic!("generation through /tmp failed: {error}"));
-		let canonical = fs::canonicalize(&keypair_path)
-			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let generated = generate_keys(temp.path(), Some(&keypair_path), false);
+		let generated = generated.unwrap_or_else(|error| panic!("generation failed: {error}"));
+		let canonical = fs::canonicalize(&keypair_path);
+		let canonical = canonical.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let program_id = read_keypair_program_id(&canonical);
+		let program_id = program_id.unwrap_or_else(|error| panic!("keypair read failed: {error}"));
 
 		assert_eq!(generated.keypair, keypair_path);
 		assert!(canonical.starts_with("/private/tmp"));
-		assert_eq!(
-			read_keypair_program_id(&canonical)
-				.unwrap_or_else(|error| panic!("generated keypair read failed: {error}")),
-			generated.program_id
-		);
+		assert_eq!(program_id, generated.program_id);
 	}
 
 	#[cfg(not(windows))]
