@@ -2,7 +2,6 @@
 	"name": "@pina-rs/codama-nodes",
 	"version": "0.22.0",
 	"description": "Helpers for converting Pina IDLs into Codama RootNodes",
-	"license": "Apache-2.0",
 	"homepage": "https://pina.rs",
 	"bugs": {
 		"url": "https://github.com/pina-rs/pina/issues"
@@ -12,24 +11,21 @@
 		"url": "git+https://github.com/pina-rs/pina.git",
 		"directory": "packages/nodes-from-pina"
 	},
-	"type": "commonjs",
+	"license": "Apache-2.0",
 	"sideEffects": false,
-	"main": "./dist/index.js",
-	"module": "./dist/index.mjs",
-	"react-native": "./dist/index.mjs",
-	"types": "./dist/types/index.d.ts",
+	"type": "commonjs",
 	"exports": {
 		"types": "./dist/types/index.d.ts",
 		"import": "./dist/index.mjs",
 		"require": "./dist/index.js"
 	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.mjs",
+	"react-native": "./dist/index.mjs",
+	"types": "./dist/types/index.d.ts",
 	"files": [
 		"./dist"
 	],
-	"publishConfig": {
-		"access": "public",
-		"provenance": true
-	},
 	"scripts": {
 		"build": "rimraf dist && tsup && tsc -p ./tsconfig.declarations.json",
 		"dev": "vitest --project node",
@@ -46,5 +42,9 @@
 		"tsup": "^8.5.1",
 		"typescript": "^7.0.2",
 		"vitest": "^5.0.1"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
 	}
 }

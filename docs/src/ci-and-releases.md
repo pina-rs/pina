@@ -158,5 +158,4 @@ Keep changeset descriptions explicit and user-impact focused.
 
 ### First-time packages
 
-A new crates.io crate or npm package must exist before registry-side trusted publishing can be configured. Before its first real release, a registry owner should run `monochange step placeholder-publish --dry-run --package
-<package-id>`, publish the `0.0.0` placeholder with the same command without `--dry-run`, then configure repository `pina-rs/pina`, workflow `publish.yml`, and environment `publisher` as its trusted publisher. The placeholder both prevents name squatting and lets PR publication preflight validate later versions before the release workflow obtains an OIDC token.
+A new crates.io crate or npm package must exist before registry-side trusted publishing can be configured. Before its first real release, a registry owner should run `monochange step placeholder-publish --dry-run --package <package-id>`, publish the `0.0.0` placeholder with the same command without `--dry-run`, then configure repository `pina-rs/pina`, workflow `publish.yml`, and environment `publisher` as its trusted publisher. The placeholder both prevents name squatting and lets PR publication preflight validate later versions before the release workflow obtains an OIDC token.

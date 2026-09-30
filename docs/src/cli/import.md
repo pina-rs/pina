@@ -82,8 +82,7 @@ An account whose layout has a variable-width field still gets its struct, discri
 
 The digest is the contract a reviewer checks. A CPI crate is a copy of another program's interface, so without a recorded digest a reviewed crate can be regenerated from a different IDL with nothing in the diff to show it.
 
-Re-running the same import against an unchanged IDL reports `already up to
-date` and rewrites nothing, so an import checked into CI produces no drift.
+Re-running the same import against an unchanged IDL reports `already up to date` and rewrites nothing, so an import checked into CI produces no drift.
 
 ## Binding the program ID
 

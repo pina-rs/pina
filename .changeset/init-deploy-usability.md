@@ -1,8 +1,5 @@
 ---
 pina_cli: fix
-# `rustfmt.toml` belongs to `pina_root`, which is unpublished, so its
-# `format_strings` change is recorded without a bump.
-pina_root: none
 ---
 
 # Make fresh `pina init` projects and `pina deploy` work

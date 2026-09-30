@@ -1,7 +1,7 @@
 # ADR 0010: Lean entrypoint strategy for deployed-size parity
 
 - Status: Accepted (decisions 1–2 shipped or measured; the dispatcher is decided against)
-- Date: 2026-09-27 (lean-dispatcher measurement added 2026-09-28)
+- Date: 2026-09-27 (lean-dispatcher measurement added 2026-09-28; decision 1 amended 2026-09-29; decision 2 revisited by ADR 0011 on 2026-09-30)
 - Deciders: Pina maintainers
 - Related: [Framework comparison](../framework-comparison.md), [Program size](../program-size.md)
 
@@ -69,10 +69,14 @@ A second measurement isolated the router lever: outlining the router with `#[inl
 ## Decision
 
 1. **Adopt the account budget now** (no framework change): document the second argument of `nostd_entrypoint!` in the program-size guide, and have `pina init` emit a program-specific bound — the program's widest instruction's account count plus headroom — instead of the 255 default.
+
+   _Amended 2026-09-29._ A bound equal to the widest instruction is not safe: the loader skips accounts past the entrypoint's array instead of rejecting them, so the `budget = 1` and `budget = 3` fixtures measured above no longer rejected an extra trailing account with `TooManyAccountKeys` — `finish_exact` never saw it. The bound must keep one spare slot. `#[discriminator(entrypoint)]` now generates it as `ENTRYPOINT_ACCOUNT_CAPACITY` (the widest routed accounts struct or reserved `Migrate` route, plus one, or 255 when a route accepts unbounded trailing accounts), and the [program-size guide](../program-size.md#bound-the-entrypoint-account-array) documents it. The mechanism is also narrower than this ADR's context states: pinocchio walks accounts five at a time rather than unrolling one body per slot, so a bounded array only removes code when it has five slots or fewer, and a larger bound grows the program by the loop that skips accounts past it. With the spare slot and the seed-capacity change, the fixtures measure hello 4,680 → 2,944 and counter 10,456 → 9,416, at +1 compute unit on `hello` and `initialize` and +4 on `increment`.
 2. **Do not build the lean dispatcher — it was prototyped and measured out.** A working prototype dispatching through pinocchio's public `InstructionContext` (lazy walk, duplicate mapping, exact-count views) measured **10,360 bytes against the budget lever's 9,976** on the counter fixture: `.text` 7,936 vs 7,736 plus 48 more relocations. Two architectural facts close the question. First, the instruction data sits _after_ the account region in the loader's input, so any dispatcher must walk every account before it can read the discriminator — "parse only the matched arm's accounts" is unreachable under the entrypoint ABI. Second, pinocchio's compile-time-unrolled `deserialize::<N>` for a small bound is tighter than any general loop with duplicate handling; the lazy walk duplicates that work in a less specialized shape. The dispatcher layer was never the remaining gap: after the budget and slicing levers, the counter's ~1,030 bytes of `.text` over Anchor v2 sit in pina's semantic surface — the seed-and-signer assembly, the outlined address-comparison asserts, and the envelope plumbing — each individually load-bearing and each CU-cheaper than Anchor's runtime equivalent.
+
+   _Amended 2026-09-30._ [ADR 0011](./0011-dispatch-first-entrypoint.md) proposes reversing this decision. Its first premise no longer holds: since SIMD-0321 the loader passes a pointer to the instruction data at entry, so a dispatcher can read the discriminator before walking any account. The prototype there measured the counter fixture at 7,960 bytes with every check intact.
 3. **Stop here and keep the CU lead.** The counter at 9,976 bytes (−21.6% from stock) with `initialize` at 3,203 CU versus Anchor v2's 8,696 bytes at 3,458 CU is the measured optimum for pina's feature set. Going below Anchor's byte count requires removing checks (an opt-out envelope mode, weaker derivation verification), which is a product decision with security trade-offs, not an engineering lever; this ADR records the measurement so the dispatcher is not re-attempted without new constraints.
 
-The comparison fixtures keep publishing stock numbers; the `pina_lean` fixture remains as the measurement bed documenting the budget and slicing levers.
+The comparison fixtures keep publishing stock numbers; the `pina_lean` fixture remains as the measurement bed documenting the budget and slicing levers. _Amended 2026-09-29:_ the published Pina fixtures now use the generated router with `ENTRYPOINT_ACCOUNT_CAPACITY` — the configuration this ADR recommends — and the `pina_lean` fixtures, which measured the unsafe bound, were removed.
 
 ## Consequences
 

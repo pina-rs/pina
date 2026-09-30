@@ -13,8 +13,7 @@ No exploitable state corruption, aliasing, stale-byte exposure, or validation by
 - **Location**: `examples/compact_accounts_program/src/lib.rs:267`, `:311`, `:349` (`Journal::with_stored_bump_pda` at all three mutation paths); loader generated at `crates/pina_macros/src/pda.rs:311-337`.
 - **Mechanism**: `with_stored_bump_pda` derives the expected address once from the account's own `bump` field (`seeds + stored_bump`) and compares it to the passed account's address. It never checks the bump is canonical. Any account owned by the program whose stored bump self-consistently derives to its own address passes, so one authority can have multiple live Journals — the uniqueness invariant "one PDA per authority" is not enforced by the loader.
 - **Exploit (reproduced)**: fixture battery, `tmp/sweep/edge-attacks` `fixture_battery`:
-  1. Host-encode a valid `Journal` with `JournalPatch::new()
-     .bump(253).authority(payer).revision(0).title("shadow")` — canonical bump for `[b"compact-journal", payer]` is 254, so 253 is non-canonical.
+  1. Host-encode a valid `Journal` with `JournalPatch::new() .bump(253).authority(payer).revision(0).title("shadow")` — canonical bump for `[b"compact-journal", payer]` is 254, so 253 is non-canonical.
   2. Install the 66 encoded bytes at `create_program_address([b"compact-journal", payer, 253])` via `ProgramTest::install_historical_account` (owner = program).
   3. Send `Rename` (discriminator 3, version 0, title "SHADOW") signed by the payer: `authority + journal(shadow) + system`.
   4. Result: **instruction succeeds**; on-chain bytes become `...01000000...534841444f57` ("SHADOW"), revision 1. The shadow journal is a fully live second account for the same authority.

@@ -1,9 +1,9 @@
 {
 	"name": "heap-alloc-program-cli",
 	"version": "0.1.0",
+	"private": true,
 	"description": "Command-line interface for heapAllocProgram",
 	"type": "module",
-	"private": true,
 	"bin": {
 		"heap-alloc-program-cli": "./src/main.ts"
 	},

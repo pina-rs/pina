@@ -128,12 +128,11 @@ impl CounterInstruction {
     /// declares an unbounded trailing slice cannot inflate the cap.
     ///
     /// This is the count a program declares, not a security boundary. Passing
-    /// it to `nostd_entrypoint!` would size the runtime's account array below
-    /// the transaction maximum, and the loader *skips* any account beyond that
-    /// array instead of failing, so `finish_exact` would no longer reject an
-    /// instruction that supplies too many accounts. Keep the entrypoint at its
-    /// default maximum and use this constant as the declaration and test
-    /// contract it is.
+    /// it to `nostd_entrypoint!` would size the runtime's account array to
+    /// exactly the widest instruction, and the loader *skips* any account
+    /// beyond that array instead of failing, so `finish_exact` would no longer
+    /// see — or reject — an extra trailing account. Pass
+    /// [`Self::ENTRYPOINT_ACCOUNT_CAPACITY`] to bound the array safely.
     pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
         const fn maximum(values: [usize; 2]) -> usize {
             let mut index = 0;
@@ -173,9 +172,69 @@ impl CounterInstruction {
             ::pina::pinocchio::MAX_TX_ACCOUNTS,
         )
     };
+    /// The account-array size to pass to `nostd_entrypoint!` as its second
+    /// argument: one slot more than any route reads, or the transaction
+    /// maximum when a route accepts unbounded trailing accounts.
+    ///
+    /// Pinocchio's deserializer walks accounts five at a time, so an array
+    /// of five or fewer slots drops that loop and shrinks the deployed
+    /// program. A larger bounded array keeps the loop and adds one that
+    /// skips accounts past the array, so it grows the program; measure
+    /// before passing a capacity above five.
+    ///
+    /// The loader skips accounts beyond the entrypoint's array rather than
+    /// rejecting them, and the spare slot is what keeps a smaller array
+    /// safe: every instruction whose accounts struct ends with
+    /// `finish_exact` still sees the first extra account and rejects it
+    /// with `TooManyAccountKeys`, exactly as it would with the full array.
+    /// Accounts past the spare slot are never
+    /// materialized, so the one observable difference is precedence: a
+    /// writable account whose duplicate sits past the spare slot fails with
+    /// `TooManyAccountKeys` instead of `DuplicateMutableAccount`.
+    ///
+    /// A program with a hand-written router, or one that reads accounts
+    /// outside its routed accounts structs, must size its array itself.
+    pub const ENTRYPOINT_ACCOUNT_CAPACITY: usize = {
+        const fn maximum(values: [usize; 2]) -> usize {
+            let mut index = 0;
+            let mut highest = 0;
+            while index < values.len() {
+                if values[index] > highest {
+                    highest = values[index];
+                }
+                index += 1;
+            }
+            highest
+        }
+        let highest = maximum([
+            {
+                const fn __pina_account_bound<'a, T>() -> usize
+                where
+                    T: ::pina::ParseAccounts<'a>,
+                {
+                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                }
+                __pina_account_bound::<'static, InitializeAccounts>()
+            },
+            {
+                const fn __pina_account_bound<'a, T>() -> usize
+                where
+                    T: ::pina::ParseAccounts<'a>,
+                {
+                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                }
+                __pina_account_bound::<'static, IncrementAccounts>()
+            },
+        ]);
+        if highest >= ::pina::pinocchio::MAX_TX_ACCOUNTS {
+            ::pina::pinocchio::MAX_TX_ACCOUNTS
+        } else {
+            highest + 1
+        }
+    };
     /**Dispatches one instruction to its accounts struct.
 
-Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::process_instruction)`. Program-specific behavior beyond routing belongs in each accounts struct's `ProcessAccountInfos::process`.*/
+Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::process_instruction, CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY)`. Program-specific behavior beyond routing belongs in each accounts struct's `ProcessAccountInfos::process`.*/
     #[inline(always)]
     pub fn process_instruction(
         program_id: &::pina::Address,
@@ -338,12 +397,11 @@ impl OverrideInstruction {
     /// declares an unbounded trailing slice cannot inflate the cap.
     ///
     /// This is the count a program declares, not a security boundary. Passing
-    /// it to `nostd_entrypoint!` would size the runtime's account array below
-    /// the transaction maximum, and the loader *skips* any account beyond that
-    /// array instead of failing, so `finish_exact` would no longer reject an
-    /// instruction that supplies too many accounts. Keep the entrypoint at its
-    /// default maximum and use this constant as the declaration and test
-    /// contract it is.
+    /// it to `nostd_entrypoint!` would size the runtime's account array to
+    /// exactly the widest instruction, and the loader *skips* any account
+    /// beyond that array instead of failing, so `finish_exact` would no longer
+    /// see — or reject — an extra trailing account. Pass
+    /// [`Self::ENTRYPOINT_ACCOUNT_CAPACITY`] to bound the array safely.
     pub const MAX_INSTRUCTION_ACCOUNTS: usize = {
         const fn maximum(values: [usize; 2]) -> usize {
             let mut index = 0;
@@ -383,9 +441,69 @@ impl OverrideInstruction {
             ::pina::pinocchio::MAX_TX_ACCOUNTS,
         )
     };
+    /// The account-array size to pass to `nostd_entrypoint!` as its second
+    /// argument: one slot more than any route reads, or the transaction
+    /// maximum when a route accepts unbounded trailing accounts.
+    ///
+    /// Pinocchio's deserializer walks accounts five at a time, so an array
+    /// of five or fewer slots drops that loop and shrinks the deployed
+    /// program. A larger bounded array keeps the loop and adds one that
+    /// skips accounts past the array, so it grows the program; measure
+    /// before passing a capacity above five.
+    ///
+    /// The loader skips accounts beyond the entrypoint's array rather than
+    /// rejecting them, and the spare slot is what keeps a smaller array
+    /// safe: every instruction whose accounts struct ends with
+    /// `finish_exact` still sees the first extra account and rejects it
+    /// with `TooManyAccountKeys`, exactly as it would with the full array.
+    /// Accounts past the spare slot are never
+    /// materialized, so the one observable difference is precedence: a
+    /// writable account whose duplicate sits past the spare slot fails with
+    /// `TooManyAccountKeys` instead of `DuplicateMutableAccount`.
+    ///
+    /// A program with a hand-written router, or one that reads accounts
+    /// outside its routed accounts structs, must size its array itself.
+    pub const ENTRYPOINT_ACCOUNT_CAPACITY: usize = {
+        const fn maximum(values: [usize; 2]) -> usize {
+            let mut index = 0;
+            let mut highest = 0;
+            while index < values.len() {
+                if values[index] > highest {
+                    highest = values[index];
+                }
+                index += 1;
+            }
+            highest
+        }
+        let highest = maximum([
+            {
+                const fn __pina_account_bound<'a, T>() -> usize
+                where
+                    T: ::pina::ParseAccounts<'a>,
+                {
+                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                }
+                __pina_account_bound::<'static, IncrementAccounts>()
+            },
+            {
+                const fn __pina_account_bound<'a, T>() -> usize
+                where
+                    T: ::pina::ParseAccounts<'a>,
+                {
+                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                }
+                __pina_account_bound::<'static, UntouchedAccounts>()
+            },
+        ]);
+        if highest >= ::pina::pinocchio::MAX_TX_ACCOUNTS {
+            ::pina::pinocchio::MAX_TX_ACCOUNTS
+        } else {
+            highest + 1
+        }
+    };
     /**Dispatches one instruction to its accounts struct.
 
-Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::process_instruction)`. Program-specific behavior beyond routing belongs in each accounts struct's `ProcessAccountInfos::process`.*/
+Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::process_instruction, OverrideInstruction::ENTRYPOINT_ACCOUNT_CAPACITY)`. Program-specific behavior beyond routing belongs in each accounts struct's `ProcessAccountInfos::process`.*/
     #[inline(always)]
     pub fn process_instruction(
         program_id: &::pina::Address,

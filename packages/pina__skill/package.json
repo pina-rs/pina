@@ -13,12 +13,12 @@
 	"bugs": {
 		"url": "https://github.com/pina-rs/pina/issues"
 	},
-	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/pina-rs/pina.git",
 		"directory": "packages/pina__skill"
 	},
+	"license": "Apache-2.0",
 	"bin": {
 		"pina-skill": "bin/pina-skill.cjs"
 	},
@@ -29,11 +29,11 @@
 		"bin",
 		"references"
 	],
+	"engines": {
+		"node": ">=18"
+	},
 	"publishConfig": {
 		"access": "public",
 		"provenance": true
-	},
-	"engines": {
-		"node": ">=18"
 	}
 }

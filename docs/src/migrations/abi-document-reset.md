@@ -164,9 +164,9 @@ Added: `walk_document` and `AbiStep` for converter tables, `parse_document_versi
 
 | Error                                                                                                       | Cause and remedy                                                                                                |
 | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `missing a string \`abiVersion\` field`                                                                     | a pre-0.20 document — this guide                                                                                |
+| ``missing a string \``abiVersion\` field`                                                                   | a pre-0.20 document — this guide                                                                                |
 | `records ABI version 9.9, but this Pina build supports 0.20; upgrade Pina`                                  | the document is newer than your build — upgrade Pina; the check is a capability marker, like `Cargo.lock`       |
-| `predates the oldest supported version 0.20; regenerate it with \`pina migrations create\``                 | a document older than the reset — [Start fresh](#start-fresh)                                                   |
+| ``predates the oldest supported version 0.20; regenerate it with \``pina migrations create\``               | a document older than the reset — [Start fresh](#start-fresh)                                                   |
 | `publication receipt 1 does not extend the previous hash`                                                   | a converted multi-receipt ledger whose chain was not repaired — [Re-link the receipt chain](#keep-your-history) |
 | `pins ... for ... , which the manifest does not record` or `pinned schema ... but the manifest now records` | a receipt history that was not emptied — [Keep your history](#keep-your-history)                                |
 

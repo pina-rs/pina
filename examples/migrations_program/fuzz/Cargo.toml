@@ -21,4 +21,9 @@ publish = false
 fuzzing = []
 
 [dependencies]
-pina = { path = "../../../crates/pina", default-features = false, features = ["account-resize", "compact", "derive", "validation"] }
+pina = { path = "../../../crates/pina", default-features = false, features = [
+	"account-resize",
+	"compact",
+	"derive",
+	"validation",
+] }
