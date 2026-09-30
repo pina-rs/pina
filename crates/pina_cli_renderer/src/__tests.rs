@@ -262,3 +262,65 @@ fn scaffold_requires_client_configuration() {
 		Err(super::RenderError::MissingClientConfig)
 	));
 }
+
+#[cfg(unix)]
+#[test]
+fn only_top_level_root_owned_links_are_trusted() {
+	use std::os::unix::fs::symlink;
+
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+	let root = fs::canonicalize(temp.path())
+		.unwrap_or_else(|error| panic!("canonicalize temp dir: {error}"));
+	let link = root.join("link");
+	symlink(&root, &link).unwrap_or_else(|error| panic!("symlink failed: {error}"));
+	let link_metadata =
+		fs::symlink_metadata(&link).unwrap_or_else(|error| panic!("metadata failed: {error}"));
+	let directory_metadata =
+		fs::symlink_metadata(&root).unwrap_or_else(|error| panic!("metadata failed: {error}"));
+
+	// Below the top level every link is untrusted, whoever owns it, so a
+	// renderer running as root still rejects a project's own links.
+	assert!(super::is_untrusted_link(&link_metadata, false));
+	assert_eq!(
+		super::is_untrusted_link(&link_metadata, true),
+		!super::is_owned_by_root(&link_metadata)
+	);
+	assert!(!super::is_untrusted_link(&directory_metadata, true));
+	assert!(!super::is_untrusted_link(&directory_metadata, false));
+	assert!(matches!(
+		super::validate_output_path_components(&link.join("generated")),
+		Err(super::RenderError::UnsafeOutputPath { .. })
+	));
+}
+
+#[cfg(unix)]
+#[test]
+fn system_aliases_below_the_filesystem_root_are_trusted() {
+	let aliases = fs::read_dir("/")
+		.unwrap_or_else(|error| panic!("read root failed: {error}"))
+		.map(|entry| entry.unwrap_or_else(|error| panic!("root entry failed: {error}")))
+		.map(|entry| entry.path())
+		.filter(|path| {
+			fs::symlink_metadata(path).is_ok_and(|metadata| {
+				super::is_link_like(&metadata) && super::is_owned_by_root(&metadata)
+			}) && path.is_dir()
+		})
+		.collect::<Vec<_>>();
+
+	// macOS resolves every temporary directory through `/var` or `/tmp`.
+	#[cfg(target_os = "macos")]
+	for expected in ["/var", "/tmp"] {
+		assert!(
+			aliases.iter().any(|alias| alias == Path::new(expected)),
+			"{expected} should be a root-owned system alias"
+		);
+	}
+
+	for alias in aliases {
+		let metadata =
+			fs::symlink_metadata(&alias).unwrap_or_else(|error| panic!("metadata failed: {error}"));
+		assert!(!super::is_untrusted_link(&metadata, true));
+		super::validate_output_path_components(&alias.join("pina-missing-directory/generated"))
+			.unwrap_or_else(|error| panic!("{} should be trusted: {error}", alias.display()));
+	}
+}
