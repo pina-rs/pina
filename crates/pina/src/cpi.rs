@@ -2834,6 +2834,34 @@ mod tests {
 		assert!(stored.data[..state_size].iter().all(|byte| *byte == 0));
 	}
 
+	/// A 33-byte seed hashes like a valid 32-byte seed followed by a 1-byte
+	/// one. The builder must reject it itself, as it did when it checked the
+	/// address with `create_program_address`.
+	#[test]
+	fn unchecked_bump_rejects_a_seed_longer_than_the_limit() {
+		let owner = Address::new_from_array([9; 32]);
+		let bytes = [3_u8; 33];
+		let split: &[&[u8]] = &[&bytes[..32], &bytes[32..]];
+		let (address, bump) = crate::try_find_program_address(split, &owner)
+			.expect("the split seeds derive a program address");
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut view = stored.view();
+		let rejected = CreateProgramAccountWithUncheckedBump {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds: &[&bytes],
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent());
+		assert_eq!(rejected, Err(ProgramError::InvalidSeeds));
+		assert!(stored.data[..state_size].iter().all(|byte| *byte == 0));
+	}
+
 	#[test]
 	fn fixed_pda_creation_requires_complete_valid_initialization() {
 		let owner = Address::new_from_array([9; 32]);

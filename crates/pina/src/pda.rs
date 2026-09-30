@@ -147,6 +147,11 @@ pub fn is_derived_address<const N: usize>(
 /// through `invoke_signed` with the same seeds and bump. The runtime derives
 /// the signer's address with the curve check during that call, so an on-curve
 /// hash is still rejected, just by the runtime instead of by this check.
+///
+/// Like [`is_derived_address`], it rejects a seed longer than
+/// [`MAX_SEED_LEN`](crate::MAX_SEED_LEN) before hashing, so the builder
+/// returns `InvalidSeeds` for it as it did with `create_program_address`,
+/// instead of leaving the rejection to the runtime.
 #[inline(always)]
 pub(crate) fn hashes_to_program_address<'a>(
 	address: &Address,
@@ -155,6 +160,10 @@ pub(crate) fn hashes_to_program_address<'a>(
 	program_id: &'a Address,
 	inputs: &mut [&'a [u8]],
 ) -> bool {
+	if seeds.iter().any(|seed| seed.len() > crate::MAX_SEED_LEN) {
+		return false;
+	}
+
 	let seeds_len = seeds.len();
 	inputs[..seeds_len].copy_from_slice(seeds);
 	inputs[seeds_len] = bump.as_slice();
