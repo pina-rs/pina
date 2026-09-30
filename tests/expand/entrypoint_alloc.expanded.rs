@@ -1,11 +1,13 @@
 use pina::*;
 const _: () = ::pina::ALLOC_FEATURE_REQUIRED_FOR_HEAP_ENTRYPOINT;
 /// Program entrypoint.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
-    ::pinocchio::entrypoint::process_entrypoint::<
-        { ::pina::pinocchio::MAX_TX_ACCOUNTS },
-    >(input, process_instruction)
+    unsafe {
+        ::pina::__process_entrypoint::<
+            { ::pina::pinocchio::MAX_TX_ACCOUNTS },
+        >(input, process_instruction)
+    }
 }
 /// A default allocator for when the program is compiled on a target different
 /// than `"solana"`.

@@ -54,6 +54,9 @@
 #![allow(clippy::inline_always)]
 
 mod cpi;
+// `__process_entrypoint` is public so the entrypoint macros can reach it from
+// the program crate; the module itself is not part of the API.
+mod entry;
 mod error;
 mod event;
 mod impls;
@@ -71,6 +74,8 @@ mod utils;
 #[cfg(kani)]
 mod verification;
 
+#[doc(hidden)]
+pub use entry::__process_entrypoint;
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.
 #[cfg(feature = "derive")]
@@ -229,10 +234,31 @@ pub const VERBOSE_LOGS_ENABLED: bool = true;
 #[cfg(not(feature = "verbose-logs"))]
 pub const VERBOSE_LOGS_ENABLED: bool = false;
 
+/// Declares the `entrypoint` symbol for [`nostd_entrypoint!`] and
+/// [`nostd_entrypoint_alloc!`]. Not part of the API.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __program_entrypoint {
+	($process_instruction:expr, $maximum:expr) => {
+		/// Program entrypoint.
+		#[unsafe(no_mangle)]
+		pub unsafe extern "C" fn entrypoint(input: *mut u8) -> u64 {
+			// SAFETY: the SVM loader calls `entrypoint` with its program input
+			// buffer, which stays valid for the whole instruction. The capacity is
+			// braced so a path such as `Enum::ENTRYPOINT_ACCOUNT_CAPACITY` is a
+			// valid const generic argument.
+			unsafe { $crate::__process_entrypoint::<{ $maximum }>(input, $process_instruction) }
+		}
+	};
+}
+
 /// Sets up a `no_std` Solana program entrypoint.
 ///
 /// This macro wires up the BPF entrypoint, disables the default allocator, and
-/// installs a minimal panic handler. The entry function receives:
+/// installs a minimal panic handler. The entrypoint deserializes accounts with
+/// pinocchio exactly as `pinocchio::program_entrypoint!` does, but converts the
+/// returned `ProgramError` to its status code inline, so errors returned as
+/// constants cost no conversion code. The entry function receives:
 ///
 /// ```ignore
 /// fn process_instruction(
@@ -275,9 +301,7 @@ macro_rules! nostd_entrypoint {
 		$crate::nostd_entrypoint!($process_instruction, $crate::pinocchio::MAX_TX_ACCOUNTS);
 	};
 	($process_instruction:expr, $maximum:expr) => {
-		// Braced so a path such as `Enum::ENTRYPOINT_ACCOUNT_CAPACITY` is a
-		// valid const generic argument.
-		$crate::pinocchio::program_entrypoint!($process_instruction, { $maximum });
+		$crate::__program_entrypoint!($process_instruction, $maximum);
 		$crate::pinocchio::no_allocator!();
 		$crate::pinocchio::nostd_panic_handler!();
 	};
@@ -344,9 +368,7 @@ macro_rules! nostd_entrypoint_alloc {
 		// first makes a missing feature an unresolved symbol that names the
 		// remedy, instead of an error about `default_allocator!`.
 		const _: () = $crate::ALLOC_FEATURE_REQUIRED_FOR_HEAP_ENTRYPOINT;
-		// Braced so a path such as `Enum::ENTRYPOINT_ACCOUNT_CAPACITY` is a
-		// valid const generic argument.
-		$crate::pinocchio::program_entrypoint!($process_instruction, { $maximum });
+		$crate::__program_entrypoint!($process_instruction, $maximum);
 		$crate::pinocchio::default_allocator!();
 		$crate::pinocchio::nostd_panic_handler!();
 	};
