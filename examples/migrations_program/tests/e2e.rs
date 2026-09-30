@@ -133,7 +133,7 @@ fn update_instruction(
 }
 
 /// Update instruction that also carries the appended optional migratable
-/// accounts expected by the v2 process contract.
+/// accounts the current process contract accepts.
 fn update_instruction_with_optional(
 	authority: Pubkey,
 	referrer: Pubkey,
@@ -508,11 +508,10 @@ fn future_account_version_is_rejected_without_trial_decoding() {
 
 /// Compute-unit ceiling for the current-version update hot path.
 ///
-/// Two envelope reads: the handler's own version check plus the dispatch-time
-/// envelope gate that pins the instruction's version byte to the manifest
-/// (fail-closed against unknown version bytes on zero-field and payload
-/// instructions alike). Growth beyond this budget means the hot path started
-/// doing historical work.
+/// Two envelope reads: the generated entrypoint's normalization, which finds
+/// the current version and validates the payload in place, plus the handler's
+/// own version check when it parses the payload. Growth beyond this budget
+/// means the hot path started doing historical work.
 const CURRENT_UPDATE_CU_BUDGET: u64 = 1_250;
 
 /// Compute-unit ceiling for the full on-demand migration path: historical

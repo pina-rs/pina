@@ -94,20 +94,20 @@ pub struct MultisigImportIx<'argument> {
 
 impl<'argument> MultisigImportIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 109;
+	pub const LEN: usize = 108;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 109], ProgramError> {
-		let mut data = [0u8; 109];
-		data[..2].copy_from_slice(&MULTISIG_IMPORT_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
-		data[3..35].copy_from_slice(self.legacy_program.as_ref());
-		data[35..43].copy_from_slice(&self.legacy_discriminator);
-		data[43] = u8::from(self.set_config_authority);
-		data[44..76].copy_from_slice(self.config_authority.as_ref());
-		data[76] = u8::from(self.set_rent_collector);
-		data[77..109].copy_from_slice(self.rent_collector.as_ref());
+	pub fn to_bytes(&self) -> Result<[u8; 108], ProgramError> {
+		let mut data = [0u8; 108];
+		data[..1].copy_from_slice(&MULTISIG_IMPORT_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
+		data[2..34].copy_from_slice(self.legacy_program.as_ref());
+		data[34..42].copy_from_slice(&self.legacy_discriminator);
+		data[42] = u8::from(self.set_config_authority);
+		data[43..75].copy_from_slice(self.config_authority.as_ref());
+		data[75] = u8::from(self.set_rent_collector);
+		data[76..108].copy_from_slice(self.rent_collector.as_ref());
 
 		Ok(data)
 	}
@@ -147,4 +147,4 @@ impl<'account, 'argument> MultisigImport<'account, 'argument> {
 	}
 }
 
-const MULTISIG_IMPORT_DISCRIMINATOR: [u8; 2] = [3, 0];
+const MULTISIG_IMPORT_DISCRIMINATOR: [u8; 1] = [3];

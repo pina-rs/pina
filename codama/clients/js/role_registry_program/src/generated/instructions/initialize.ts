@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findRegistryConfigPda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
 export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
-}
-
-export const INITIALIZE_DISCRIMINATOR2 = 0;
-
-export function getInitializeDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR2);
 }
 
 export type InitializeInstruction<
@@ -83,11 +74,7 @@ export type InitializeInstruction<
 		]
 	>;
 
-export type InitializeInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-	bump: number;
-};
+export type InitializeInstructionData = { discriminator: number; bump: number };
 
 export type InitializeInstructionDataArgs = { bump: number };
 
@@ -96,24 +83,20 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
+			"bump",
 			getU8Encoder(),
-		], ["bump", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
+		]]),
+		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
 
 export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 	InitializeInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["bump", getU8Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
+	], ["bump", getU8Decoder()]]);
 }
 
 export function getInitializeInstructionDataCodec(): FixedSizeCodec<

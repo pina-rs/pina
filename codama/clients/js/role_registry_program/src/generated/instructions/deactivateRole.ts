@@ -37,22 +37,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const DEACTIVATE_ROLE_DISCRIMINATOR = 3;
 
 export function getDeactivateRoleDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(DEACTIVATE_ROLE_DISCRIMINATOR);
-}
-
-export const DEACTIVATE_ROLE_DISCRIMINATOR2 = 0;
-
-export function getDeactivateRoleDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(DEACTIVATE_ROLE_DISCRIMINATOR2);
 }
 
 export type DeactivateRoleInstruction<
@@ -79,10 +70,7 @@ export type DeactivateRoleInstruction<
 		]
 	>;
 
-export type DeactivateRoleInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type DeactivateRoleInstructionData = { discriminator: number };
 
 export type DeactivateRoleInstructionDataArgs = {};
 
@@ -90,11 +78,8 @@ export function getDeactivateRoleInstructionDataEncoder(): FixedSizeEncoder<
 	DeactivateRoleInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
@@ -107,9 +92,6 @@ export function getDeactivateRoleInstructionDataDecoder(): FixedSizeDecoder<
 			DEACTIVATE_ROLE_DISCRIMINATOR,
 			getU8Decoder(),
 		),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

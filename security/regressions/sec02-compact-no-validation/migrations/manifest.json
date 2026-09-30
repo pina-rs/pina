@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
 	"versionType": "u8",
 	"auto": [
@@ -7,11 +7,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "LedgerState",
 			"versions": [
 				{
@@ -26,10 +21,8 @@
 								"name": "codes",
 								"rustType": "Vec<u16, 3>"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				},
 				{
 					"schema": {
@@ -43,12 +36,10 @@
 								"name": "codes",
 								"rustType": "Vec<u16, 3>"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"transition": {
 						"mode": "manual",
-						"renames": [],
 						"implementationSha256": "c9c49dc6c261ffedccbf0ae46de09a9286e48b02d72574d93e5dff9687e77a48"
 					}
 				}

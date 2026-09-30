@@ -292,9 +292,12 @@ impl HistoricalInstruction {
 
 /// Exact event bytes captured from one released program version.
 ///
-/// Keep these bytes as a golden fixture and pass them to the event type's
-/// generated projection API. Encoding the fixture with the current event type
-/// would only test the current schema and can conceal a broken decoder.
+/// Keep these bytes as a golden fixture and decode them with the generated
+/// client event for the version that emitted them (`<Event>V<n>` for an
+/// earlier version). Events are versioned, not migrated, so nothing converts
+/// an old record to the current schema. Encoding the fixture with the current
+/// event type would only test the current schema and can conceal a broken
+/// decoder.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HistoricalEvent {
 	version: u32,

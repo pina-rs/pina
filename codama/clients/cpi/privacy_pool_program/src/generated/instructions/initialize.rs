@@ -93,21 +93,21 @@ pub struct InitializeIx {
 
 impl InitializeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 105;
+	pub const LEN: usize = 104;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 105], ProgramError> {
-		let mut data = [0u8; 105];
-		data[..2].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.config_bump.to_le_bytes());
-		data[3..4].copy_from_slice(&self.vault_bump.to_le_bytes());
-		data[4..5].copy_from_slice(&self.tree_bump.to_le_bytes());
-		data[5..6].copy_from_slice(&self.nullifiers_bump.to_le_bytes());
-		data[6..7].copy_from_slice(&self.custodians_bump.to_le_bytes());
-		data[7..8].copy_from_slice(&self.requesters_bump.to_le_bytes());
-		data[8..9].copy_from_slice(&self.log_bump.to_le_bytes());
-		data[9..105].copy_from_slice(&self.custodians);
+	pub fn to_bytes(&self) -> Result<[u8; 104], ProgramError> {
+		let mut data = [0u8; 104];
+		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.config_bump.to_le_bytes());
+		data[2..3].copy_from_slice(&self.vault_bump.to_le_bytes());
+		data[3..4].copy_from_slice(&self.tree_bump.to_le_bytes());
+		data[4..5].copy_from_slice(&self.nullifiers_bump.to_le_bytes());
+		data[5..6].copy_from_slice(&self.custodians_bump.to_le_bytes());
+		data[6..7].copy_from_slice(&self.requesters_bump.to_le_bytes());
+		data[7..8].copy_from_slice(&self.log_bump.to_le_bytes());
+		data[8..104].copy_from_slice(&self.custodians);
 
 		Ok(data)
 	}
@@ -145,4 +145,4 @@ impl<'account> Initialize<'account> {
 	}
 }
 
-const INITIALIZE_DISCRIMINATOR: [u8; 2] = [0, 0];
+const INITIALIZE_DISCRIMINATOR: [u8; 1] = [0];

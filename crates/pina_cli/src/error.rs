@@ -131,13 +131,6 @@ pub enum CodamaError {
 		source: IdlError,
 	},
 
-	#[error("Event migration facts failed for `{example}` ({path}): {message}")]
-	EventHistories {
-		example: String,
-		path: PathBuf,
-		message: String,
-	},
-
 	#[error("Failed to serialize generated IDL for `{example}`: {source}")]
 	SerializeIdl {
 		example: String,
@@ -211,18 +204,6 @@ mod tests {
 		let msg = err.to_string();
 		assert!(msg.contains("/tmp/test.rs"));
 		assert!(msg.contains("not found"));
-	}
-
-	#[test]
-	fn event_histories_error_names_the_program_and_reason() {
-		let err = CodamaError::EventHistories {
-			example: "migrations_program".to_owned(),
-			path: PathBuf::from("/tmp/migrations_program"),
-			message: "invalid adjacent transition".to_owned(),
-		};
-		let message = err.to_string();
-		assert!(message.contains("migrations_program"));
-		assert!(message.contains("invalid adjacent transition"));
 	}
 
 	#[test]

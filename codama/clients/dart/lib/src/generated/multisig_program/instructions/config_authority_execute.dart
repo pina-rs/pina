@@ -16,11 +16,9 @@ class ConfigAuthorityExecuteInstructionData {
   const ConfigAuthorityExecuteInstructionData({
     required this.actionsLen,
     required this.actions,
-  }) : discriminator = 12,
-       migrationVersion = 0;
+  }) : discriminator = 12;
 
   final int discriminator;
-  final int migrationVersion;
   final int actionsLen;
   final Uint8List actions;
 }
@@ -29,7 +27,6 @@ Encoder<ConfigAuthorityExecuteInstructionData>
 getConfigAuthorityExecuteInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('actionsLen', getU16Encoder()),
     ('actions', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
   ]);
@@ -38,7 +35,6 @@ getConfigAuthorityExecuteInstructionDataEncoder() {
     structEncoder,
     (ConfigAuthorityExecuteInstructionData value) => <String, Object?>{
       'discriminator': 12,
-      'migrationVersion': 0,
       'actionsLen': value.actionsLen,
       'actions': value.actions,
     },
@@ -49,7 +45,6 @@ Decoder<ConfigAuthorityExecuteInstructionData>
 getConfigAuthorityExecuteInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('actionsLen', getU16Decoder()),
     ('actions', fixDecoderSize(getBytesDecoder(), 128)),
   ]);
@@ -67,7 +62,6 @@ getConfigAuthorityExecuteInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(12)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

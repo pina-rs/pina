@@ -25,8 +25,8 @@ fn direct_transfer(
 	signed: bool,
 ) -> pina_test::Instruction {
 	let data = {
-		// discriminator + migration version, then the u64 amount.
-		let mut bytes = vec![DIRECT, 0u8];
+		// discriminator, then the u64 amount.
+		let mut bytes = vec![DIRECT];
 		bytes.extend_from_slice(&amount.to_le_bytes());
 		bytes
 	};
@@ -59,7 +59,7 @@ fn cpi_transfer_moves_lamports() {
 
 		let recipient = Pubkey::new_from_array([3; 32]);
 		let data = {
-			let mut bytes = vec![TRANSFER, 0u8];
+			let mut bytes = vec![TRANSFER];
 			bytes.extend_from_slice(&500_000_000u64.to_le_bytes());
 			bytes
 		};
@@ -110,7 +110,7 @@ fn cpi_transfer_rejects_overdrafts() {
 		let balance = program.balance(&sender.pubkey()).expect("sender balance");
 		let recipient = Pubkey::new_from_array([3; 32]);
 		let data = {
-			let mut bytes = vec![TRANSFER, 0u8];
+			let mut bytes = vec![TRANSFER];
 			bytes.extend_from_slice(&(balance + 1).to_le_bytes());
 			bytes
 		};

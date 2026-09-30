@@ -36,22 +36,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { DECLARE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR = 0;
 
 export function getValidateExternalProgramDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR);
-}
-
-export const VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR2 = 0;
-
-export function getValidateExternalProgramDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR2);
 }
 
 export type ValidateExternalProgramInstruction<
@@ -75,10 +66,7 @@ export type ValidateExternalProgramInstruction<
 		]
 	>;
 
-export type ValidateExternalProgramInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type ValidateExternalProgramInstructionData = { discriminator: number };
 
 export type ValidateExternalProgramInstructionDataArgs = {};
 
@@ -86,11 +74,8 @@ export function getValidateExternalProgramInstructionDataEncoder(): FixedSizeEnc
 	ValidateExternalProgramInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
 
@@ -103,9 +88,6 @@ export function getValidateExternalProgramInstructionDataDecoder(): FixedSizeDec
 			VALIDATE_EXTERNAL_PROGRAM_DISCRIMINATOR,
 			getU8Decoder(),
 		),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

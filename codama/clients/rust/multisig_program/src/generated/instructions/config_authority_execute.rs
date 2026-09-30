@@ -9,7 +9,6 @@
 )]
 
 pub const CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR: u8 = 12u8;
-pub const CONFIG_AUTHORITY_EXECUTE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -108,7 +107,6 @@ impl ConfigAuthorityExecuteInstructionData {
 			|data| {
 				configure(data);
 				data.discriminator = CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR;
-				data.migration_version = CONFIG_AUTHORITY_EXECUTE_MIGRATION_VERSION;
 				Ok(())
 			},
 		)
@@ -123,7 +121,6 @@ impl ConfigAuthorityExecuteInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ConfigAuthorityExecuteInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub actions_len: u16,
 	pub actions: [u8; 128],
 }

@@ -138,8 +138,8 @@ fn initialize_instruction(
 	schedule: (u64, u64, u64),
 ) -> pina_test::Instruction {
 	let (start_ts, cliff_ts, end_ts) = schedule;
-	// discriminator + migration version, then amounts, timestamps, and bump.
-	let mut data = vec![VestingInstruction::Initialize as u8, 0u8];
+	// discriminator, then amounts, timestamps, and bump.
+	let mut data = vec![VestingInstruction::Initialize as u8];
 	data.extend_from_slice(&TOTAL.to_le_bytes());
 	data.extend_from_slice(&start_ts.to_le_bytes());
 	data.extend_from_slice(&cliff_ts.to_le_bytes());
@@ -171,7 +171,7 @@ fn claim_instruction(
 	vault: &Pubkey,
 	amount: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![VestingInstruction::Claim as u8, 0u8];
+	let mut data = vec![VestingInstruction::Claim as u8];
 	data.extend_from_slice(&amount.to_le_bytes());
 
 	program.instruction(
@@ -201,7 +201,7 @@ fn cancel_instruction(
 	beneficiary_ata: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[VestingInstruction::Cancel as u8, 0u8],
+		&[VestingInstruction::Cancel as u8],
 		vec![
 			AccountMeta::new(*admin, true),
 			AccountMeta::new_readonly(*mint, false),

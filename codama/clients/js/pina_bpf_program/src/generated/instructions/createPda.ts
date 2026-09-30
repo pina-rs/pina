@@ -38,22 +38,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findStatePda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PINA_BPF_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CREATE_PDA_DISCRIMINATOR = 3;
 
 export function getCreatePdaDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CREATE_PDA_DISCRIMINATOR);
-}
-
-export const CREATE_PDA_DISCRIMINATOR2 = 0;
-
-export function getCreatePdaDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CREATE_PDA_DISCRIMINATOR2);
 }
 
 export type CreatePdaInstruction<
@@ -81,11 +72,7 @@ export type CreatePdaInstruction<
 		]
 	>;
 
-export type CreatePdaInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-	bump: number;
-};
+export type CreatePdaInstructionData = { discriminator: number; bump: number };
 
 export type CreatePdaInstructionDataArgs = { bump: number };
 
@@ -94,24 +81,20 @@ export function getCreatePdaInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
+			"bump",
 			getU8Encoder(),
-		], ["bump", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+		]]),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
 export function getCreatePdaInstructionDataDecoder(): FixedSizeDecoder<
 	CreatePdaInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(CREATE_PDA_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["bump", getU8Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(CREATE_PDA_DISCRIMINATOR, getU8Decoder()),
+	], ["bump", getU8Decoder()]]);
 }
 
 export function getCreatePdaInstructionDataCodec(): FixedSizeCodec<

@@ -23,12 +23,14 @@ pub const MY_OTHER_EVENT_DISCRIMINATOR: u8 = 2u8;
 pub const MY_OTHER_EVENT_MIGRATION_VERSION: u8 = 0u8;
 
 impl MyOtherEvent {
-	/// Exact size of the current event representation.
+	/// Exact size of this event's representation.
 	pub const LEN: usize = core::mem::size_of::<MyOtherEventZc>();
 
-	/// Read one current-version event record from transaction-log bytes.
+	/// Read one record of this event from transaction-log bytes.
 	///
-	/// Logs carry the record base64-encoded after `Program data: `; pass the decoded bytes here. Historical and future records are rejected; `try_from_bytes` tells them apart, and `project_from_bytes` projects historical records when this client ships their transitions.
+	/// Logs carry the record base64-encoded after `Program data: `; pass the decoded bytes here.
+	///
+	/// Records of another version are rejected; `try_from_bytes` tells them apart, and the event generated for that version decodes them.
 	pub fn from_bytes(data: &[u8]) -> Result<&MyOtherEventZc, solana_program_error::ProgramError> {
 		let event = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidArgument)?;
@@ -47,9 +49,9 @@ impl MyOtherEvent {
 pub enum MyOtherEventVersionError {
 	/// The bytes do not decode as this event's layout at all.
 	InvalidData,
-	/// The envelope names this event but the stored version predates this client.
+	/// The envelope names this event but an earlier version emitted it.
 	Stale { stored: u8 },
-	/// The envelope names this event but the stored version is newer than this client's schema: upgrade this client.
+	/// The envelope names this event but a later version emitted it.
 	Future { stored: u8 },
 }
 
@@ -60,13 +62,13 @@ impl core::fmt::Display for MyOtherEventVersionError {
 			Self::Stale { stored } => {
 				write!(
 					f,
-					"event migration version mismatch: expected 0, received {stored} (the log predates this client; project it with the checked-in event history or decode it with a client generated from the schema that wrote it)"
+					"event migration version mismatch: expected 0, received {stored} (an earlier version emitted it; decode it with the event generated for that version)"
 				)
 			}
 			Self::Future { stored } => {
 				write!(
 					f,
-					"event migration version mismatch: expected 0, received {stored} (the log was written by a newer program; upgrade this client)"
+					"event migration version mismatch: expected 0, received {stored} (a later version emitted it; decode it with the event generated for that version, or regenerate this client)"
 				)
 			}
 		}
@@ -89,195 +91,5 @@ impl MyOtherEvent {
 			});
 		}
 		Ok(event)
-	}
-}
-
-/// Why `MyOtherEvent::project_from_bytes` could not produce current bytes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MyOtherEventProjectionError {
-	/// The bytes do not decode as this event's envelope.
-	InvalidData,
-	/// The record's payload length does not match the schema for its version.
-	InvalidLength { stored: u32 },
-	/// The log names this event but its adjacent transition is manual, so generated clients cannot project it.
-	Manual { from: u32, to: u32 },
-	/// The log names a version this client ships no checked-in projection for.
-	Unknown { stored: u32 },
-}
-
-impl core::fmt::Display for MyOtherEventProjectionError {
-	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		match self {
-			Self::InvalidData => write!(f, "invalid MyOtherEvent event data"),
-			Self::InvalidLength { stored } => {
-				write!(
-					f,
-					"event migration version mismatch: expected 0, received {stored} (the log length does not match the v{stored} schema)"
-				)
-			}
-			Self::Manual { from, to } => {
-				write!(
-					f,
-					"event migration version mismatch: expected 0, received {from} (the v{from} to v{to} transition is manual, so only an on-chain projection or a client generated from that schema can represent it)"
-				)
-			}
-			Self::Unknown { stored } => {
-				write!(
-					f,
-					"event migration version mismatch: expected 0, received {stored} (this client has no checked-in projection for it)"
-				)
-			}
-		}
-	}
-}
-
-impl std::error::Error for MyOtherEventProjectionError {}
-
-/// Current-shape event bytes paired with the version that actually wrote them.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ProjectedMyOtherEvent {
-	bytes: Vec<u8>,
-	source_version: u8,
-	was_migrated: bool,
-}
-
-impl ProjectedMyOtherEvent {
-	/// The exact current-version event bytes.
-	#[must_use]
-	pub fn bytes(&self) -> &[u8] {
-		&self.bytes
-	}
-
-	/// The version carried by the immutable log record, matching the runtime's `CurrentEventData::source_version`.
-	#[must_use]
-	pub const fn source_version(&self) -> u8 {
-		self.source_version
-	}
-
-	/// Whether a historical projection ran.
-	#[must_use]
-	pub const fn was_migrated(&self) -> bool {
-		self.was_migrated
-	}
-
-	/// Decode the projected bytes as the current event shape.
-	pub fn data(&self) -> Result<&MyOtherEventZc, MyOtherEventVersionError> {
-		MyOtherEvent::try_from_bytes(&self.bytes)
-	}
-}
-
-/// Adjacent projections from the checked-in migration manifest: `(from, to, automatic, source payload size, destination payload size, moves)`.
-#[allow(clippy::type_complexity)]
-const MY_OTHER_EVENT_PROJECTION_STEPS: &[(
-	u32,
-	u32,
-	bool,
-	usize,
-	usize,
-	&[(usize, usize, usize)],
-)] = &[];
-
-impl MyOtherEvent {
-	/// Project current or historical event bytes into the current shape, mirroring the runtime's `normalize_event_data`.
-	///
-	/// Unknown, future, non-exact historical lengths, and manual transitions fail closed. The returned bytes always carry the current version and are decoded by [`Self::try_from_bytes`].
-	pub fn project_from_bytes(
-		data: &[u8],
-	) -> Result<ProjectedMyOtherEvent, MyOtherEventProjectionError> {
-		if data.len() < 2 {
-			return Err(MyOtherEventProjectionError::InvalidData);
-		}
-		if data[..1] != [2] {
-			return Err(MyOtherEventProjectionError::InvalidData);
-		}
-		let mut version = u8::from_le_bytes(
-			data[1..2]
-				.try_into()
-				.map_err(|_| MyOtherEventProjectionError::InvalidData)?,
-		);
-		let expected = MY_OTHER_EVENT_MIGRATION_VERSION;
-		if version > expected {
-			return Err(MyOtherEventProjectionError::Unknown {
-				stored: u32::from(version),
-			});
-		}
-		let source_version = version;
-		let mut payload = data[2..].to_vec();
-		while version != expected {
-			let Some((from, to, automatic, source_size, destination_size, moves)) =
-				MY_OTHER_EVENT_PROJECTION_STEPS
-					.iter()
-					.find(|(from, ..)| *from == u32::from(version))
-			else {
-				return Err(MyOtherEventProjectionError::Unknown {
-					stored: u32::from(version),
-				});
-			};
-			if !*automatic {
-				return Err(MyOtherEventProjectionError::Manual {
-					from: *from,
-					to: *to,
-				});
-			}
-			if payload.len() != *source_size {
-				return Err(MyOtherEventProjectionError::InvalidLength {
-					stored: u32::from(version),
-				});
-			}
-			let mut destination = vec![0_u8; *destination_size];
-			for (source_offset, destination_offset, size) in *moves {
-				destination[*destination_offset..*destination_offset + *size]
-					.copy_from_slice(&payload[*source_offset..*source_offset + *size]);
-			}
-			payload = destination;
-			version = u8::try_from(*to)
-				.map_err(|_| MyOtherEventProjectionError::Unknown { stored: *to })?;
-		}
-		let mut bytes = Vec::with_capacity(2 + payload.len());
-		bytes.extend_from_slice(&MY_OTHER_EVENT_DISCRIMINATOR.to_le_bytes()[..1]);
-		bytes.extend_from_slice(&0u8.to_le_bytes()[..1]);
-		bytes.extend_from_slice(&payload);
-		Ok(ProjectedMyOtherEvent {
-			bytes,
-			source_version,
-			was_migrated: source_version != expected,
-		})
-	}
-}
-
-#[cfg(test)]
-mod my_other_event_projection_tests {
-	use super::*;
-
-	fn record(version: u8, payload: &[u8]) -> Vec<u8> {
-		let mut data = vec![0_u8; 2 + payload.len()];
-		data[..1].copy_from_slice(&[2]);
-		data[1..2].copy_from_slice(&version.to_le_bytes()[..1]);
-		data[2..].copy_from_slice(payload);
-		data
-	}
-
-	#[test]
-	fn future_versions_fail_closed() {
-		let future: u8 = 1;
-		let error = MyOtherEvent::project_from_bytes(&record(future, &[]))
-			.err()
-			.expect("a future version must fail");
-		assert_eq!(
-			error,
-			MyOtherEventProjectionError::Unknown {
-				stored: u32::from(future)
-			}
-		);
-	}
-
-	#[test]
-	fn wrong_lengths_and_discriminators_fail_closed() {
-		let mut foreign = record(0, &[]);
-		foreign[0] = foreign[0].wrapping_add(1);
-		assert_eq!(
-			MyOtherEvent::project_from_bytes(&foreign).err(),
-			Some(MyOtherEventProjectionError::InvalidData),
-		);
 	}
 }

@@ -23,22 +23,13 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const REQUIRE_EQ_DISCRIMINATOR = 3;
 
 export function getRequireEqDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REQUIRE_EQ_DISCRIMINATOR);
-}
-
-export const REQUIRE_EQ_DISCRIMINATOR2 = 0;
-
-export function getRequireEqDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REQUIRE_EQ_DISCRIMINATOR2);
 }
 
 export type RequireEqInstruction<
@@ -49,10 +40,7 @@ export type RequireEqInstruction<
 	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<TRemainingAccounts>;
 
-export type RequireEqInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type RequireEqInstructionData = { discriminator: number };
 
 export type RequireEqInstructionDataArgs = {};
 
@@ -60,11 +48,8 @@ export function getRequireEqInstructionDataEncoder(): FixedSizeEncoder<
 	RequireEqInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
@@ -74,9 +59,6 @@ export function getRequireEqInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(REQUIRE_EQ_DISCRIMINATOR, getU8Decoder()),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

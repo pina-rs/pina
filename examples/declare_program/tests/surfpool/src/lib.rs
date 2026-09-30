@@ -34,10 +34,7 @@ fn validates_the_recorded_external_program_id() {
 
 		let error = program
 			.send(
-				&[
-					DeclareProgramInstruction::ValidateExternalProgram as u8,
-					0u8,
-				],
+				&[DeclareProgramInstruction::ValidateExternalProgram as u8],
 				vec![
 					AccountMeta::new_readonly(authority, true),
 					AccountMeta::new_readonly(external, false),
@@ -68,10 +65,7 @@ fn rejects_wrong_external_program_ids() {
 
 		let error = program
 			.send(
-				&[
-					DeclareProgramInstruction::ValidateExternalProgram as u8,
-					0u8,
-				],
+				&[DeclareProgramInstruction::ValidateExternalProgram as u8],
 				vec![
 					AccountMeta::new_readonly(authority, true),
 					AccountMeta::new_readonly(system_program, false),
@@ -100,10 +94,7 @@ fn requires_authority_signature() {
 
 		let error = program
 			.send(
-				&[
-					DeclareProgramInstruction::ValidateExternalProgram as u8,
-					0u8,
-				],
+				&[DeclareProgramInstruction::ValidateExternalProgram as u8],
 				vec![
 					AccountMeta::new_readonly(authority, false),
 					AccountMeta::new_readonly(external, false),

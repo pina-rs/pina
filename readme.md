@@ -398,32 +398,34 @@ The discriminator strategy determines byte layout, parser guarantees, and cross-
 
 ## Discriminators and ABI migrations
 
-| Change                                           | Compatibility impact                                                     |
-| ------------------------------------------------ | ------------------------------------------------------------------------ |
-| Add a new discriminator variant                  | Backward-compatible; existing routes keep their identity                 |
-| Change an existing discriminator value           | **Breaking** for every historical byte slice                             |
-| Change a migration-aware account or payload      | Compatible only when the checked-in history has an adjacent transition   |
-| Append optional accounts to an instruction route | Compatible when the existing positional list remains an identical prefix |
-| Reorder, remove, or escalate an instruction slot | **Breaking**; create a new instruction discriminator                     |
-| Change the migration version width after release | **Breaking** for every migration-aware wire contract                     |
+| Change                                                            | Compatibility impact                                                                      |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Add a new discriminator variant                                   | Backward-compatible; existing routes keep their identity                                  |
+| Change an existing discriminator value                            | **Breaking** for every historical byte slice                                              |
+| Change a migration-aware account or enveloped instruction payload | Compatible only when the checked-in history has an adjacent transition                    |
+| Change a published versioned event schema                         | Compatible; a new version is appended and clients decode each version with its own schema |
+| Change a published snapshot-only instruction payload              | **Breaking**; create a new instruction discriminator                                      |
+| Append optional accounts to an instruction route                  | Compatible when the existing positional list remains an identical prefix                  |
+| Reorder, remove, or escalate an instruction slot                  | **Breaking**; create a new instruction discriminator                                      |
+| Change the migration version width after release                  | **Breaking** for every enveloped wire contract                                            |
 
-Add `migrations` to an account, instruction, or event attribute to opt one contract into a framework-owned version field, or opt whole contract kinds in through `pina.toml`:
+Add `migrations` to an account, instruction, or event attribute to opt one contract into a framework-owned version field, or opt whole contract kinds in when you record the history:
 
-```toml
-[migrations]
-version_type = "u8"
-auto = ["accounts", "events", "instructions"] # or `auto = true` for every kind
+```bash
+pina migrations create --auto true # or --auto accounts,events,instructions
 ```
 
-`auto` accepts `true`, `false`, or a list of `accounts`, `events`, and `instructions`. `pina migrations create` records the resolved policy in `migrations/manifest.json` and snapshots every contract of the listed kinds. Macros read the policy from the manifest rather than `pina.toml`, so a new struct still fails the build with "run `pina migrations create`" until it has a snapshot. Once a policy is recorded, `create` also scaffolds a `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, so flipping the policy re-expands every contract without editing source. Add `migrations = false` to keep one contract out of an auto policy; removing an envelope the manifest already records is an error instead of a silent opt-out, because stripping an envelope is itself a wire-format change.
+`--auto` accepts `true`, `false`, or a comma-separated list of `accounts`, `events`, and `instructions`. `pina migrations create` records the policy in `migrations/manifest.json`, its only home, and snapshots every contract of the listed kinds; a later run without the flag keeps the recorded policy. `pina.toml` holds no migration policy. Macros read the policy from the manifest, so a new struct still fails the build with "run `pina migrations create`" until it has a snapshot. Once a policy is recorded, `create` also scaffolds a `build.rs` emitting `cargo:rerun-if-changed=migrations/manifest.json`, so flipping the policy re-expands every contract without editing source. Add `migrations = false` to keep one contract out of an auto policy; removing an envelope the manifest already records is an error instead of a silent opt-out, because stripping an envelope is itself a wire-format change.
 
-Pina places the version field immediately after the discriminator. The accepted encodings are `u8`, `u16`, and `u32`; `u8` is the default and the recommended choice. Versions are tracked per contract, not per program: each account, instruction, and event owns an independent history that starts at version `0`, so `u8` gives every contract its own 255-version budget. Rewriting one contract 255 times is not a realistic outcome, and the narrower field costs one byte in every enveloped account. Choose a wider encoding before the first release only when you expect a single contract to exceed 255 versions. The width is program-wide and freezes at the first published release, so it cannot be widened afterwards. Any other value, including `u64`, fails configuration parsing with an error naming the supported widths. Discriminator width is a separate setting, and that one does support `u64`.
+The policy gives accounts and events the version field. It records each instruction as a snapshot without one: the payload keeps its `[discriminator][payload]` wire format, and the build fails when the struct drifts from the snapshot. Add `migrations` to an `#[instruction]` to give that instruction the version field and adjacent transitions instead; the `#[discriminator(entrypoint)]` dispatcher then converts an older payload to the current layout before the handler runs.
 
-Run `pina migrations create` before a release. Pina updates the replaceable draft when the current version is unpublished. After `pina deploy` records a non-local publication, the next schema change creates a new version and adjacent transition. Normal builds run `pina migrations check` and fail on drift, incomplete manual transitions, or changed published code.
+Pina places the version field immediately after the discriminator. The accepted encodings are `u8`, `u16`, and `u32`; `u8` is the default and the recommended choice. Versions are tracked per contract, not per program: each account, instruction, and event owns an independent history that starts at version `0`, so `u8` gives every contract its own 255-version budget. Rewriting one contract 255 times is not a realistic outcome, and the narrower field costs one byte in every enveloped account. Choose a wider encoding with `pina migrations create --version-type u16` (or `u32`) before the first release only when you expect a single contract to exceed 255 versions. The width is program-wide, recorded as `versionType` in the manifest, and freezes at the first published release: after that the flag fails instead of widening it. Any other value, including `u64`, is rejected with an error naming the supported widths. Discriminator width is a separate setting, and that one does support `u64`.
+
+Run `pina migrations create` before a release. Pina updates the replaceable draft when the current version is unpublished. After `pina deploy` records a non-local publication, the next schema change creates a new version, with an adjacent transition for an account or an enveloped instruction; the payload of a published snapshot-only instruction cannot change. Normal builds run `pina migrations check` and fail on drift, incomplete manual transitions, or changed published code.
 
 An old instruction can omit only newly appended optional accounts. Pina does not synthesize signers, writable privileges, PDAs, or required accounts. Any change to an existing process slot requires a new discriminator.
 
-Historical events are immutable. Generated event decoders validate their exact released shape, project them into current-shape scratch bytes, and retain the source version so consumers can distinguish an absent historical field from an emitted default value.
+Historical events are immutable, so Pina versions events instead of migrating them. The program emits only the current version. Generated clients decode each earlier version with its own schema, as a separate `<Event>V<n>` event, and a log record whose version no generated event describes fails instead of being misread.
 
 <!-- {/pinaDiscriminatorVersionCompatibility} -->
 

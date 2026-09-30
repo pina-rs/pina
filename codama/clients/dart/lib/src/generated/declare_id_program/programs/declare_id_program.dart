@@ -23,8 +23,7 @@ enum DeclareIdProgramInstruction { initialize }
 DeclareIdProgramInstruction identifyDeclareIdProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return DeclareIdProgramInstruction.initialize;
   }
 

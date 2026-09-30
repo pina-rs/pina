@@ -133,4 +133,4 @@ impl<'account> Update<'account> {
 	}
 }
 
-const UPDATE_DISCRIMINATOR: [u8; 2] = [0, 2];
+const UPDATE_DISCRIMINATOR: [u8; 2] = [0, 1];

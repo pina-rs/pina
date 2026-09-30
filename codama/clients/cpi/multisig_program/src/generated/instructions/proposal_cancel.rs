@@ -47,13 +47,13 @@ pub struct ProposalCancelIx;
 
 impl ProposalCancelIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 2;
+	pub const LEN: usize = 1;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 2], ProgramError> {
-		let mut data = [0u8; 2];
-		data[..2].copy_from_slice(&PROPOSAL_CANCEL_DISCRIMINATOR);
+	pub fn to_bytes(&self) -> Result<[u8; 1], ProgramError> {
+		let mut data = [0u8; 1];
+		data[..1].copy_from_slice(&PROPOSAL_CANCEL_DISCRIMINATOR);
 
 		Ok(data)
 	}
@@ -86,4 +86,4 @@ impl<'account> ProposalCancel<'account> {
 	}
 }
 
-const PROPOSAL_CANCEL_DISCRIMINATOR: [u8; 2] = [9, 0];
+const PROPOSAL_CANCEL_DISCRIMINATOR: [u8; 1] = [9];

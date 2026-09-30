@@ -114,11 +114,11 @@ async function deriveStore(authority: string): Promise<string> {
 	return store;
 }
 
-/** Instruction data is discriminator + migration version, plus `bump` for
- * `init`. */
+/** Instruction data is the discriminator, plus `bump` for `init`. Instructions
+ * carry no version envelope unless they opt into migrations. */
 function instructionData(discriminator: number, bump?: number): Uint8Array {
-	if (bump === undefined) return Uint8Array.of(discriminator, 0);
-	return Uint8Array.of(discriminator, 0, bump);
+	if (bump === undefined) return Uint8Array.of(discriminator);
+	return Uint8Array.of(discriminator, bump);
 }
 
 function touchInstruction(
@@ -154,7 +154,7 @@ test("omitted optional slots keep the account count fixed and parse as None", as
 		});
 		await submit({
 			programAddress: address(PROGRAM_ID),
-			data: Uint8Array.of(0, 0, bump),
+			data: instructionData(0, bump),
 			accounts: [
 				{ address: address(authority), role: AccountRole.WRITABLE_SIGNER },
 				{ address: address(store), role: AccountRole.WRITABLE },
@@ -174,8 +174,9 @@ test("omitted optional slots keep the account count fixed and parse as None", as
 		assert.ok(absent.value, "store account must exist");
 		const [encoded] = absent.value.data;
 		const bytes = new Uint8Array(Buffer.from(encoded, "base64"));
-		// Layout: 1 discriminator + 1 bump + u64 count. Count stays zero when
-		// the optional slot was filled with the program address.
+		// Layout: 1 discriminator + 1 migration version + 1 bump + u64 count.
+		// Count stays zero when the optional slot was filled with the program
+		// address.
 		const view = new DataView(bytes.buffer, bytes.byteOffset);
 		assert.equal(view.getBigUint64(3, true), 0n);
 

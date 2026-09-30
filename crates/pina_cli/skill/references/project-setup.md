@@ -9,7 +9,7 @@ pina init counter_program
 cd counter_program
 pina doctor
 pina keys new               # replace the shared placeholder declare_id!
-pina migrations create      # record the version-0 baseline for the real address
+pina migrations create --auto true  # track every contract; record version 0 for the real address
 pina lint
 pina build
 pina test --unit
@@ -17,7 +17,7 @@ pina test
 pina generate
 ```
 
-The order matters. Every scaffold starts with the same placeholder address, `Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7`, which nobody can deploy (`pina doctor` warns about it). The scaffold enables `[migrations] auto`, so `pina build`, `pina idl`, and `pina generate` refuse to run until `pina migrations create` records a baseline, while `cargo check` and `cargo test` still pass without it. Snapshot after `pina keys new`: an unpublished history rebinds to a new address on the next `create`, but it is cleaner to record it once.
+The order matters. Every scaffold starts with the same placeholder address, `Fg6PaFpoGXkYsidMpWxTWqkZkkM8NufCHCX9ddLKBqd7`, which nobody can deploy (`pina doctor` warns about it). The scaffold records no migration policy: the policy lives only in `migrations/manifest.json`, which `pina migrations create --auto true` writes. Until that run nothing is tracked, so `pina build` and `pina generate` produce a program and clients without version envelopes; record the baseline before generating clients anyone keeps. Snapshot after `pina keys new`: an unpublished history rebinds to a new address on the next `create`, but it is cleaner to record it once. Add `--version-type u16` (or `u32`) to that first run only if one contract may need more than 255 versions.
 
 SBF compilation delegates to the Agave CLI's `cargo-build-sbf`; install the Agave CLI before the first SBF build. `pina lint` downloads the `pina_lint_driver` binary built for the active nightly on first use, below Cargo home; the driver statically links Pina's official lint catalog. The scaffold's `rust-toolchain.toml` pins the nightly the matching Pina release publishes drivers for, so keep that pin unless you are prepared to build the driver with `pina lint --build-driver` (which needs the `rustc-dev` component, and a nightly whose compiler internals the lint source still compiles against). TypeScript and Dart client generation also require Node.js with npm and `npx`. Keep the generated `pina.toml` as the project-local discovery and client-selection contract.
 
@@ -37,19 +37,15 @@ languages = [
 mode = "auto"
 scaffold = true
 
-[migrations]
-version_type = "u8" # u8, u16, or u32; never u64
-auto = true # optional: true, false, or ["accounts", "events", "instructions"]
-
 [migrations.answers]
 rename = ["value:points"]
 assume_removed = []
 ```
 
 - `[clients]` resolves `languages`, `output`, `mode`, and `scaffold`. Each language can override `output`, `mode`, and `scaffold` under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, `[clients.dart]`, `[clients.cli_rust]`, `[clients.cli_ts]`, and `[clients.cli_dart]` (the kebab-case `[clients.cli-rust]` form is a deprecated alias).
-- `pina init` scaffolds `[migrations]` with `version_type = "u8"` and `auto = true`, the `build.rs` rerun directive, and the `account-resize` feature that the reserved `Migrate` route needs, so migrations are on by default. The manifest is not scaffolded: it binds the history to the declared program address, and a new project still carries the placeholder `declare_id!`. Run `pina keys new`, then `pina migrations create` once to record the version-0 baseline.
+- `pina init` scaffolds the `build.rs` rerun directive and the `account-resize` feature that the reserved `Migrate` route needs, but no `[migrations]` table and no manifest. The manifest binds the history to the declared program address, and a new project still carries the placeholder `declare_id!`. Run `pina keys new`, then `pina migrations create --auto true` once to turn migrations on and record the version-0 baseline.
 - The program keypair lives at `target/deploy/<library-name>-keypair.json`, below the git-ignored `target/`, so `cargo clean` deletes it. Back it up (outside the repository) before the first deployment; it is the program's address and, by default, how later upgrades find it.
-- `version_type` chooses the width once and freezes at the first persistent publication; it cannot be widened after release. `auto` opts whole contract kinds in; `[migrations.answers]` persists rename and removal decisions for CI. Prefer `u8`: versions are counted per contract, so its 255-version budget applies to each account, instruction, and event separately.
+- `pina.toml` holds no migration policy. The version width and the `auto` policy live only in the manifest: `pina migrations create --version-type <u8|u16|u32>` and `--auto <POLICY>` record them, a run without either flag keeps what is recorded, and the retired `[migrations].version_type` and `[migrations].auto` keys fail every command that reads `pina.toml`, naming the flag that replaces them. The width can change only while nothing is published and cannot be widened after release. Prefer `u8`: versions are counted per contract, so its 255-version budget applies to each account, instruction, and event separately. `[migrations.answers]` persists rename, removal, and manual-conversion decisions for CI.
 - A program with a recorded `auto` policy needs a `build.rs` that emits `cargo:rerun-if-changed=migrations/manifest.json`. `pina migrations create` scaffolds it or prints the exact line, and `pina migrations check` fails until it is present. Commit `migrations/` with the source.
 
 Before deployment, establish the program identity explicitly. Use `pina keys new` for a fresh local identity or validate a keypair produced by trusted platform tooling with `pina keys sync --keypair <path>`. Never use `--force` unless the intended operation is an identity rotation.

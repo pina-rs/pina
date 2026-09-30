@@ -23,22 +23,13 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { EVENTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const TEST_EVENT_DISCRIMINATOR = 1;
 
 export function getTestEventDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(TEST_EVENT_DISCRIMINATOR);
-}
-
-export const TEST_EVENT_DISCRIMINATOR2 = 0;
-
-export function getTestEventDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(TEST_EVENT_DISCRIMINATOR2);
 }
 
 export type TestEventInstruction<
@@ -49,10 +40,7 @@ export type TestEventInstruction<
 	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<TRemainingAccounts>;
 
-export type TestEventInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type TestEventInstructionData = { discriminator: number };
 
 export type TestEventInstructionDataArgs = {};
 
@@ -60,11 +48,8 @@ export function getTestEventInstructionDataEncoder(): FixedSizeEncoder<
 	TestEventInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -74,9 +59,6 @@ export function getTestEventInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(TEST_EVENT_DISCRIMINATOR, getU8Decoder()),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

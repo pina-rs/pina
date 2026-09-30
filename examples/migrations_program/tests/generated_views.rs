@@ -82,9 +82,11 @@ fn generated_instruction_migration_accepts_version_zero_exactly() {
 	let current = normalize_instruction_data::<UpdateInstruction>(&old, &mut workspace)
 		.unwrap_or_else(|error| panic!("normalize instruction: {error:?}"));
 	assert!(current.was_migrated());
-	// The historical v0 request walks both adjacent instruction
-	// transitions and lands on the current v2 envelope.
-	assert_eq!(current.as_bytes()[0..2], [0, 2]);
+	assert_eq!(current.source_version(), 0);
+	// The historical v0 request walks its adjacent transition and lands on
+	// the current v1 envelope. Appending optional accounts to v1 consumed no
+	// version, because old requests simply omit them.
+	assert_eq!(current.as_bytes()[0..2], [0, 1]);
 	assert_eq!(&current.as_bytes()[2..10], &42_u64.to_le_bytes());
 	assert_eq!(&current.as_bytes()[10..12], &[0, 0]);
 }
@@ -102,42 +104,28 @@ fn generated_instruction_migration_rejects_trailing_bytes() {
 	);
 }
 
+/// Events are versioned, not migrated: the program only reads its current
+/// layout, and a record an older version emitted is refused rather than
+/// converted. Generated clients decode it with that version's own event.
 #[test]
-fn generated_event_projection_preserves_provenance_and_defaults_new_fields() {
-	let mut old = [0_u8; 10];
-	old[0] = MigrationEvent::ValueChanged as u8;
-	old[1] = 0;
-	old[2..].copy_from_slice(&42_u64.to_le_bytes());
-	let mut workspace = [0xaa; 12];
+fn events_decode_only_their_current_version() {
+	let mut current = [0_u8; 12];
+	current[0] = MigrationEvent::ValueChanged as u8;
+	current[1] = 1;
+	current[2..10].copy_from_slice(&42_u64.to_le_bytes());
+	current[10..12].copy_from_slice(&7_u16.to_le_bytes());
+	let event = ValueChangedEvent::try_from_bytes(&current)
+		.unwrap_or_else(|error| panic!("decode current event: {error:?}"));
+	assert_eq!(event.value.get(), 42);
+	assert_eq!(event.memo.get(), 7);
 
-	let current = normalize_event_data::<ValueChangedEvent>(&old, &mut workspace)
-		.unwrap_or_else(|error| panic!("normalize event: {error:?}"));
-	assert!(current.was_migrated());
-	assert_eq!(current.source_version(), 0);
-	assert_eq!(current.as_bytes()[0..2], [4, 1]);
-	assert_eq!(&current.as_bytes()[2..10], &42_u64.to_le_bytes());
-	assert_eq!(&current.as_bytes()[10..12], &[0, 0]);
-
-	ValueChangedEvent::with_current_event_data(&old, |bytes, source_version| {
-		let event = ValueChangedEvent::try_from_bytes(bytes)?;
-		assert_eq!(source_version, 0);
-		assert_eq!(event.value.get(), 42);
-		assert_eq!(event.memo.get(), 0);
-		Ok(())
-	})
-	.unwrap_or_else(|error| panic!("project event: {error:?}"));
-}
-
-#[test]
-fn generated_event_projection_rejects_malleable_historical_bytes() {
-	let mut trailing = [0_u8; 11];
-	trailing[0] = MigrationEvent::ValueChanged as u8;
-	trailing[1] = 0;
+	let mut historical = [0_u8; 10];
+	historical[0] = MigrationEvent::ValueChanged as u8;
+	historical[1] = 0;
+	historical[2..].copy_from_slice(&42_u64.to_le_bytes());
 	let future = [MigrationEvent::ValueChanged as u8, 2, 0, 0];
-
-	for rejected in [&trailing[..], &future[..], &[5, 0, 0][..]] {
-		let mut workspace = [0xaa; 12];
-		assert!(normalize_event_data::<ValueChangedEvent>(rejected, &mut workspace).is_err());
+	for rejected in [&historical[..], &future[..], &[5, 0, 0][..]] {
+		assert!(ValueChangedEvent::try_from_bytes(rejected).is_err());
 	}
 }
 

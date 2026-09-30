@@ -84,20 +84,19 @@ let old_event = HistoricalEvent::new(
 	0,
 	include_bytes!("fixtures/value-changed-v0.bin").to_vec(),
 );
-ValueChangedEvent::with_current_event_data(
-	old_event.data(),
-	|current, source_version| {
-		assert_eq!(source_version, old_event.version());
-		let event = ValueChangedEvent::try_from_bytes(current)?;
-		assert_eq!(event.memo.get(), 0);
-		Ok(())
-	},
-)?;
+// Decode with the generated client event for the version that emitted it.
+let event = ValueChangedEventV0::from_bytes(old_event.data())?;
+assert_eq!(event.value.get(), 42);
+// The current event refuses the record instead of misreading it.
+assert!(matches!(
+	ValueChangedEvent::try_from_bytes(old_event.data()),
+	Err(ValueChangedEventVersionError::Stale { stored: 0 })
+));
 ```
 
 `HistoricalInstruction` preserves the old positional account list. An old request can therefore omit an optional suffix that the current process added. `HistoricalAccount` installs the complete old account state, including the discriminator and migration version.
 
-`HistoricalEvent` preserves immutable log bytes. The generated event projection validates their exact historical shape, returns current-shape bytes in caller-owned scratch space, and reports the source version so a field absent from the old event is not confused with a field that was emitted as its default value.
+`HistoricalEvent` preserves immutable log bytes. Events are versioned, not migrated: nothing converts an old record to the current schema, so decode each fixture with the generated client event for the version that emitted it. An earlier version is generated as its own event, `<Event>V<n>`, and the current event's `try_from_bytes` rejects the record as stale.
 
 For rejection tests, protect every account that the migration can touch:
 

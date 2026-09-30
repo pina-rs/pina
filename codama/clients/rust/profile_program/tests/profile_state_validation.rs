@@ -98,8 +98,7 @@ fn instruction_builder_owns_the_discriminator_and_derives_profile() {
 	let instruction = Initialize::new(authority).instruction(data);
 
 	assert_eq!(instruction.data[0], 0);
-	assert_eq!(instruction.data[1], 0);
-	assert_eq!(instruction.data[2], 42);
-	assert_eq!(&instruction.data[3..5], &[1, b'A']);
+	assert_eq!(instruction.data[1], 42);
+	assert_eq!(&instruction.data[2..4], &[1, b'A']);
 	assert_eq!(instruction.accounts[1].pubkey, expected_profile);
 }

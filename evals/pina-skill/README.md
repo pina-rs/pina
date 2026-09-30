@@ -118,6 +118,6 @@ Prefer a `command` check whenever the CLI can answer the question, and prefer an
 
 ## Fixtures
 
-- `base-counter` — one migration-aware account, two instructions, `auto = true`, and a generated baseline snapshot. Its `Cargo.toml` carries a `${PINA_ROOT}` placeholder that the harness rewrites to the checkout root, so the fixture depends on the local `pina` crates by path and stays portable.
+- `base-counter` — one migration-aware account, two instructions, a manifest recording the `auto` policy for every kind at `u8`, and a generated baseline snapshot. Its `Cargo.toml` carries a `${PINA_ROOT}` placeholder that the harness rewrites to the checkout root, so the fixture depends on the local `pina` crates by path and stays portable.
 - `base-counter-published` — the same program with a publication receipt, so its contracts are live and version-freezing, disambiguation, and process-contract compatibility all apply.
 - `compact-counter-published` — a published compact account with a `String<8>` tail, for the variable-length transition path (`target_size`/`working_size`) that a fixed-layout fixture cannot exercise.

@@ -10,7 +10,6 @@
 
 /// Instruction data for `Allocate`.
 pub const ALLOCATE_DISCRIMINATOR: u8 = 0u8;
-pub const ALLOCATE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -54,7 +53,6 @@ impl AllocateInstructionData {
 		<AllocateInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = ALLOCATE_DISCRIMINATOR;
-			data.migration_version = ALLOCATE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -68,7 +66,6 @@ impl AllocateInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AllocateInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// The value to box. The program boxes it and reads it back.
 	pub value: u64,
 }

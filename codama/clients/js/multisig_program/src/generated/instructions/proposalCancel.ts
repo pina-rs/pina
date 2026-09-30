@@ -37,22 +37,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const PROPOSAL_CANCEL_DISCRIMINATOR = 9;
 
 export function getProposalCancelDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(PROPOSAL_CANCEL_DISCRIMINATOR);
-}
-
-export const PROPOSAL_CANCEL_DISCRIMINATOR2 = 0;
-
-export function getProposalCancelDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(PROPOSAL_CANCEL_DISCRIMINATOR2);
 }
 
 export type ProposalCancelInstruction<
@@ -81,10 +72,7 @@ export type ProposalCancelInstruction<
 		]
 	>;
 
-export type ProposalCancelInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type ProposalCancelInstructionData = { discriminator: number };
 
 export type ProposalCancelInstructionDataArgs = {};
 
@@ -92,11 +80,8 @@ export function getProposalCancelInstructionDataEncoder(): FixedSizeEncoder<
 	ProposalCancelInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 9, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 9 }),
 	);
 }
 
@@ -109,9 +94,6 @@ export function getProposalCancelInstructionDataDecoder(): FixedSizeDecoder<
 			PROPOSAL_CANCEL_DISCRIMINATOR,
 			getU8Decoder(),
 		),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

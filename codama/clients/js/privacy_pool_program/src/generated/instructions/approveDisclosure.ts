@@ -37,22 +37,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const APPROVE_DISCLOSURE_DISCRIMINATOR = 11;
 
 export function getApproveDisclosureDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(APPROVE_DISCLOSURE_DISCRIMINATOR);
-}
-
-export const APPROVE_DISCLOSURE_DISCRIMINATOR2 = 0;
-
-export function getApproveDisclosureDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(APPROVE_DISCLOSURE_DISCRIMINATOR2);
 }
 
 export type ApproveDisclosureInstruction<
@@ -92,7 +83,6 @@ export type ApproveDisclosureInstruction<
 
 export type ApproveDisclosureInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** Reserved; must be zero. */
 	reserved: number;
 };
@@ -107,27 +97,23 @@ export function getApproveDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
+			"reserved",
 			getU8Encoder(),
-		], ["reserved", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 11, migrationVersion: 0 }),
+		]]),
+		(value) => ({ ...value, discriminator: 11 }),
 	);
 }
 
 export function getApproveDisclosureInstructionDataDecoder(): FixedSizeDecoder<
 	ApproveDisclosureInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				APPROVE_DISCLOSURE_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["reserved", getU8Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			APPROVE_DISCLOSURE_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["reserved", getU8Decoder()]]);
 }
 
 export function getApproveDisclosureInstructionDataCodec(): FixedSizeCodec<

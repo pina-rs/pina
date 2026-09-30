@@ -52,7 +52,6 @@ import {
 	fixPinaPodEncoderSize,
 	getPinaPodBooleanDecoder,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -60,12 +59,6 @@ export const MULTISIG_IMPORT_DISCRIMINATOR = 3;
 
 export function getMultisigImportDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MULTISIG_IMPORT_DISCRIMINATOR);
-}
-
-export const MULTISIG_IMPORT_DISCRIMINATOR2 = 0;
-
-export function getMultisigImportDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(MULTISIG_IMPORT_DISCRIMINATOR2);
 }
 
 export type MultisigImportInstruction<
@@ -116,7 +109,6 @@ export type MultisigImportInstruction<
 
 export type MultisigImportInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	bump: number;
 	/** Program expected to own the legacy account. */
 	legacyProgram: Address;
@@ -150,7 +142,6 @@ export function getMultisigImportInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["legacyProgram", getAddressEncoder()],
 			["legacyDiscriminator", fixPinaPodEncoderSize(getBytesEncoder(), 8)],
@@ -159,7 +150,7 @@ export function getMultisigImportInstructionDataEncoder(): FixedSizeEncoder<
 			["setRentCollector", getBooleanEncoder()],
 			["rentCollector", getAddressEncoder()],
 		]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
@@ -174,7 +165,6 @@ export function getMultisigImportInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["legacyProgram", getAddressDecoder()],
 		["legacyDiscriminator", fixDecoderSize(getBytesDecoder(), 8)],

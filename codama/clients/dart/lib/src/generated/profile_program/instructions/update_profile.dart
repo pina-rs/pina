@@ -15,11 +15,9 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class UpdateProfileInstructionData {
   const UpdateProfileInstructionData({required this.name, required this.bio})
-    : discriminator = 1,
-      migrationVersion = 0;
+    : discriminator = 1;
 
   final int discriminator;
-  final int migrationVersion;
   final String name;
   final String bio;
 }
@@ -27,7 +25,6 @@ class UpdateProfileInstructionData {
 Encoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     (
       'name',
       fixEncoderSize(
@@ -50,7 +47,6 @@ Encoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataEncoder() {
     structEncoder,
     (UpdateProfileInstructionData value) => <String, Object?>{
       'discriminator': 1,
-      'migrationVersion': 0,
       'name': value.name,
       'bio': value.bio,
     },
@@ -60,7 +56,6 @@ Encoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataEncoder() {
 Decoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     (
       'name',
       fixDecoderSize(
@@ -90,7 +85,6 @@ Decoder<UpdateProfileInstructionData> getUpdateProfileInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

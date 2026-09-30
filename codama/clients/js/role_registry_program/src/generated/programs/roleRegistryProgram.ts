@@ -106,26 +106,21 @@ export function identifyRoleRegistryProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): RoleRegistryProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return RoleRegistryProgramInstruction.Initialize;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return RoleRegistryProgramInstruction.AddRole;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return RoleRegistryProgramInstruction.UpdateRole;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return RoleRegistryProgramInstruction.DeactivateRole;
-	if (
-		containsBytes(data, getU8Encoder().encode(4), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return RoleRegistryProgramInstruction.RotateAdmin;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return RoleRegistryProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return RoleRegistryProgramInstruction.AddRole;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return RoleRegistryProgramInstruction.UpdateRole;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return RoleRegistryProgramInstruction.DeactivateRole;
+	}
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return RoleRegistryProgramInstruction.RotateAdmin;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "roleRegistryProgram" },

@@ -9,7 +9,6 @@
 )]
 
 pub const SPENDING_LIMIT_USE_DISCRIMINATOR: u8 = 13u8;
-pub const SPENDING_LIMIT_USE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -152,7 +151,6 @@ impl SpendingLimitUseInstructionData {
 		<SpendingLimitUseInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = SPENDING_LIMIT_USE_DISCRIMINATOR;
-			data.migration_version = SPENDING_LIMIT_USE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -166,7 +164,6 @@ impl SpendingLimitUseInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct SpendingLimitUseInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub amount: u64,
 	pub decimals: u8,
 }

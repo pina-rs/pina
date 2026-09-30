@@ -13,31 +13,25 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class RequireEqInstructionData {
-  const RequireEqInstructionData() : discriminator = 3, migrationVersion = 0;
+  const RequireEqInstructionData() : discriminator = 3;
 
   final int discriminator;
-  final int migrationVersion;
 }
 
 Encoder<RequireEqInstructionData> getRequireEqInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
   ]);
 
   return transformEncoder(
     structEncoder,
-    (RequireEqInstructionData value) => <String, Object?>{
-      'discriminator': 3,
-      'migrationVersion': 0,
-    },
+    (RequireEqInstructionData value) => <String, Object?>{'discriminator': 3},
   );
 }
 
 Decoder<RequireEqInstructionData> getRequireEqInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -50,7 +44,6 @@ Decoder<RequireEqInstructionData> getRequireEqInstructionDataDecoder() {
 
   (RequireEqInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

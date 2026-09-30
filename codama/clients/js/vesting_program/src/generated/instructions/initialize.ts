@@ -41,22 +41,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findVestingPda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { VESTING_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INITIALIZE_DISCRIMINATOR = 0;
 
 export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
-}
-
-export const INITIALIZE_DISCRIMINATOR2 = 0;
-
-export function getInitializeDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR2);
 }
 
 export type InitializeInstruction<
@@ -108,7 +99,6 @@ export type InitializeInstruction<
 
 export type InitializeInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	totalAmount: bigint;
 	startTs: bigint;
 	cliffTs: bigint;
@@ -130,14 +120,13 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["totalAmount", getU64Encoder()],
 			["startTs", getU64Encoder()],
 			["cliffTs", getU64Encoder()],
 			["endTs", getU64Encoder()],
 			["bump", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
 
@@ -149,7 +138,6 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["totalAmount", getU64Decoder()],
 		["startTs", getU64Decoder()],
 		["cliffTs", getU64Decoder()],

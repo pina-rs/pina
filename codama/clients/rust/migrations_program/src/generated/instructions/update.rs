@@ -9,7 +9,7 @@
 )]
 
 pub const UPDATE_DISCRIMINATOR: u8 = 0u8;
-pub const UPDATE_MIGRATION_VERSION: u8 = 2u8;
+pub const UPDATE_MIGRATION_VERSION: u8 = 1u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]

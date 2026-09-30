@@ -9,7 +9,6 @@
 )]
 
 pub const INIT_DISCRIMINATOR: u8 = 0u8;
-pub const INIT_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -74,7 +73,6 @@ impl InitInstructionData {
 		<InitInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INIT_DISCRIMINATOR;
-			data.migration_version = INIT_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -88,7 +86,6 @@ impl InitInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct InitInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// The PDA bump seed, computed off-chain.
 	pub bump: u8,
 }

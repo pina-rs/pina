@@ -11,7 +11,6 @@ use heck::ToSnakeCase;
 use serde_json::Value;
 use walkdir::WalkDir;
 
-use crate::client_events::EventClientHistoryIndex;
 use crate::client_migrations::MigratableAccount;
 use crate::client_migrations::MigrationPlan;
 use crate::compact_capacity::CompactCapacity;
@@ -461,7 +460,6 @@ pub fn harden_generated_dart_clients(
 	output_root: &Path,
 	programs: &[String],
 	idl_paths: &[impl AsRef<Path>],
-	histories: &[EventClientHistoryIndex],
 ) -> Result<(), CodamaError> {
 	if programs.len() != idl_paths.len() {
 		return Err(dart_error(
@@ -474,9 +472,7 @@ pub fn harden_generated_dart_clients(
 		));
 	}
 
-	let no_histories = EventClientHistoryIndex::default();
-
-	for (index, (program, idl_path)) in programs.iter().zip(idl_paths).enumerate() {
+	for (program, idl_path) in programs.iter().zip(idl_paths) {
 		let idl_path = idl_path.as_ref();
 		let source = std::fs::read_to_string(idl_path).map_err(|source| {
 			CodamaError::DartClient {
@@ -539,12 +535,7 @@ pub fn harden_generated_dart_clients(
 			harden_dart_file(&path, &[], &layouts)?;
 		}
 
-		needs_helper |= crate::dart_events::emit_dart_event_modules(
-			&generated,
-			program,
-			histories.get(index).unwrap_or(&no_histories),
-			&root,
-		)?;
+		needs_helper |= crate::dart_events::emit_dart_event_modules(&generated, program, &root)?;
 
 		if needs_helper {
 			let helper_path = generated.join("pina_pod_codecs.dart");
@@ -1337,7 +1328,6 @@ mod tests {
 			temporary.path(),
 			&["migrations_program".to_owned()],
 			&[idl],
-			&[],
 		)
 		.expect_err("an envelope-aware account with no version read must fail generation");
 
@@ -1368,13 +1358,9 @@ mod tests {
 		let generated = temporary.path().join("lib/src/generated/events_program");
 		std::fs::create_dir_all(&generated).expect("generated dir");
 
-		let error = harden_generated_dart_clients(
-			temporary.path(),
-			&["events_program".to_owned()],
-			&[idl],
-			&[],
-		)
-		.expect_err("an event without a discriminator must fail");
+		let error =
+			harden_generated_dart_clients(temporary.path(), &["events_program".to_owned()], &[idl])
+				.expect_err("an event without a discriminator must fail");
 		assert!(matches!(error, CodamaError::DartClient { .. }));
 	}
 

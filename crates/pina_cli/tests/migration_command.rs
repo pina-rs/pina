@@ -161,13 +161,8 @@ impl MigrationFixture {
 			 \"2024\"\n[lib]\nname = \"migration_command_fixture\"\npath = \"src/lib.rs\"\n",
 		)
 		.unwrap_or_else(|error| panic!("write fixture manifest: {error}"));
-		// Deliberately the legacy kebab-case key: this fixture keeps the
-		// back-compat alias on the end-to-end `migrations create` path.
-		fs::write(
-			root.join("pina.toml"),
-			"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u8\"\n",
-		)
-		.unwrap_or_else(|error| panic!("write fixture config: {error}"));
+		fs::write(root.join("pina.toml"), "[project]\nprogram = \".\"\n")
+			.unwrap_or_else(|error| panic!("write fixture config: {error}"));
 		let source = if migratable {
 			format!(
 				"use pina::*;\ndeclare_id!(\"{PROGRAM_ID}\");\n#[discriminator]\nenum Kind {{ \
@@ -242,13 +237,11 @@ impl MigrationFixture {
 			.unwrap_or_else(|error| panic!("update fixture source: {error}"));
 	}
 
-	/// Replace `[migrations]` with an explicit auto policy.
-	fn configure_auto(&self, auto: &str) {
-		fs::write(
-			self.root.join("pina.toml"),
-			format!("[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u8\"\n{auto}"),
-		)
-		.unwrap_or_else(|error| panic!("write auto config: {error}"));
+	/// `pina migrations create --auto <policy>`.
+	fn create_with_auto(&self, auto: &str) -> Command {
+		let mut command = self.command("create");
+		command.args(["--auto", auto]);
+		command
 	}
 
 	fn build_script(&self) -> PathBuf {
@@ -538,6 +531,16 @@ fn advanced_cost_fixture() -> (MigrationFixture, PathBuf) {
 		advanced.contains("Advanced instruction:1:02@1"),
 		"stdout: {advanced}"
 	);
+	// An added instruction argument is never zero-filled automatically, so the
+	// fixture reviews the generated body before the status preview.
+	let transition = fixture
+		.root
+		.join("migrations/transitions/instruction_1_02/v0_to_v1.rs");
+	let finished = fs::read_to_string(&transition)
+		.unwrap_or_else(|error| panic!("read stub: {error}"))
+		.replace("TODO(pina-manual-migration)", "reviewed conversion");
+	fs::write(&transition, finished).unwrap_or_else(|error| panic!("finish body: {error}"));
+	run(&mut fixture.command("create"));
 	let artifact = write_sbf_artifact(
 		&fixture.root,
 		&build_sbf_elf(&[
@@ -674,10 +677,9 @@ fn status_reports_an_unreadable_artifact_reason() {
 #[test]
 fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 	let fixture = MigrationFixture::new(false);
-	fixture.configure_auto("auto = [\"accounts\", \"events\"]\n");
 	fixture.write_source(AUTO_SOURCE);
 
-	let made = run(&mut fixture.command("create"));
+	let made = run(&mut fixture.create_with_auto("accounts,events"));
 	assert!(made.contains("Created account:1:01@0"), "stdout: {made}");
 	assert!(made.contains("Created event:1:03@0"), "stdout: {made}");
 	assert!(
@@ -686,8 +688,8 @@ fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 	);
 	assert!(made.contains("Created"), "stdout: {made}");
 
-	// The policy is recorded in the manifest, not just in pina.toml. The
-	// document records the Pina ABI version rather than a format counter.
+	// The manifest is the only home of the policy. The document records the
+	// Pina ABI version rather than a format counter.
 	let manifest = fixture.manifest();
 	assert_eq!(manifest["abiVersion"], pina_abi::ABI_VERSION);
 	assert_eq!(manifest["auto"], serde_json::json!(["accounts", "events"]));
@@ -698,26 +700,22 @@ fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 	let scaffold = fs::read_to_string(fixture.build_script())
 		.unwrap_or_else(|error| panic!("read scaffold: {error}"));
 	assert!(scaffold.contains(&format!("\"{directive}\"")), "{scaffold}");
+	// A run without `--auto` keeps the recorded policy.
 	run(&mut fixture.command("create"));
 	assert_eq!(
 		fs::read_to_string(fixture.build_script())
 			.unwrap_or_else(|error| panic!("read scaffold: {error}")),
 		scaffold,
 	);
+	assert_eq!(
+		fixture.manifest()["auto"],
+		serde_json::json!(["accounts", "events"])
+	);
 	run(&mut fixture.command("check"));
 
-	// Adding instructions to the policy requires `create` and records exactly one
-	// new envelope contract instead of rewriting the recorded ones.
-	fixture.configure_auto("auto = true\n");
-	let stale = run_failure(&mut fixture.command("check"));
-	assert!(
-		stale
-			.1
-			.contains("Run `pina migrations create` to record the policy flip"),
-		"stderr: {}",
-		stale.1
-	);
-	let flipped = run(&mut fixture.command("create"));
+	// Adding instructions to the policy records exactly one new contract
+	// instead of rewriting the recorded ones.
+	let flipped = run(&mut fixture.create_with_auto("true"));
 	assert!(
 		flipped.contains("Created instruction:1:02@0"),
 		"stdout: {flipped}"
@@ -728,17 +726,53 @@ fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 		"only the newly enveloped contract is recorded: {flipped}"
 	);
 	run(&mut fixture.command("check"));
+
+	// An instruction snapshot carries no envelope, so leaving the policy
+	// releases it instead of failing as a wire-format change.
+	let released = run(&mut fixture.create_with_auto("accounts,events"));
+	assert!(
+		released.contains("Released snapshot instruction:1:02"),
+		"stdout: {released}"
+	);
+	assert!(
+		fixture.manifest()["contracts"]
+			.get("instruction:1:02")
+			.is_none()
+	);
+	run(&mut fixture.command("check"));
+}
+
+#[test]
+fn appending_an_optional_account_extends_a_published_instruction_in_place() {
+	let fixture = MigrationFixture::new(true);
+	fixture.write_source(&migratable_program_source("value: u64", "amount: u64"));
+	run(&mut fixture.command("create"));
+	fixture.publish(true);
+
+	// Old requests omit the appended optional slot, so the published version
+	// accepts both account lists and the payload keeps its version.
+	fixture.write_source(
+		&migratable_program_source("value: u64", "amount: u64").replace(
+			"\tsystem_program: Option<&'a AccountView>,\n}",
+			"\tsystem_program: Option<&'a AccountView>,\n\taudit: Option<&'a AccountView>,\n}",
+		),
+	);
+	let extended = run(&mut fixture.command("create"));
+	assert!(
+		extended.contains("Appended optional accounts to instruction:1:02@0"),
+		"stdout: {extended}"
+	);
+	assert!(!extended.contains("Advanced"), "stdout: {extended}");
+	run(&mut fixture.command("check"));
 }
 
 #[test]
 fn dropping_a_recorded_kind_from_the_policy_fails_as_an_envelope_removal() {
 	let fixture = MigrationFixture::new(false);
-	fixture.configure_auto("auto = true\n");
 	fixture.write_source(AUTO_SOURCE);
-	run(&mut fixture.command("create"));
+	run(&mut fixture.create_with_auto("true"));
 
-	fixture.configure_auto("auto = [\"events\"]\n");
-	let dropped = run_failure(&mut fixture.command("create"));
+	let dropped = run_failure(&mut fixture.create_with_auto("events"));
 	assert!(
 		dropped
 			.1
@@ -747,12 +781,45 @@ fn dropping_a_recorded_kind_from_the_policy_fails_as_an_envelope_removal() {
 		dropped.1
 	);
 	assert!(dropped.1.contains("account:1:01"), "stderr: {}", dropped.1);
-	// The check gate reports the same condition without touching the manifest.
-	let checked = run_failure(&mut fixture.command("check"));
+	// The refused run left the recorded policy untouched.
+	assert_eq!(
+		fixture.manifest()["auto"],
+		serde_json::json!(["accounts", "instructions", "events"])
+	);
+	run(&mut fixture.command("check"));
+}
+
+#[test]
+fn retired_pina_toml_policy_keys_name_the_create_flag() {
+	let fixture = MigrationFixture::new(true);
+	fs::write(
+		fixture.root.join("pina.toml"),
+		"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u16\"\n",
+	)
+	.unwrap_or_else(|error| panic!("write retired config: {error}"));
+	let (_, stderr) = run_failure(&mut fixture.command("create"));
 	assert!(
-		checked.1.contains("pina.toml configures"),
-		"stderr: {}",
-		checked.1
+		stderr.contains("pina migrations create --version-type u16"),
+		"stderr: {stderr}"
+	);
+
+	// The flag records the same width in the manifest instead.
+	fs::write(
+		fixture.root.join("pina.toml"),
+		"[project]\nprogram = \".\"\n",
+	)
+	.unwrap_or_else(|error| panic!("restore config: {error}"));
+	run(fixture.command("create").args(["--version-type", "u16"]));
+	assert_eq!(fixture.manifest()["versionType"], "u16");
+	let widened = run(fixture.command("create").args(["--version-type", "u32"]));
+	assert!(
+		widened.contains("Version type changed from u16 to u32"),
+		"stdout: {widened}"
+	);
+	let (_, invalid) = run_failure(fixture.command("create").args(["--version-type", "u64"]));
+	assert!(
+		invalid.contains("`u8`, `u16`, or `u32`"),
+		"stderr: {invalid}"
 	);
 }
 
@@ -796,13 +863,12 @@ fn migrations_false_on_a_recorded_contract_fails_create_and_check() {
 #[test]
 fn auto_policy_reports_an_undeclared_rerun_directive_instead_of_clobbering() {
 	let fixture = MigrationFixture::new(false);
-	fixture.configure_auto("auto = [\"accounts\"]\n");
 	fixture.write_source(AUTO_SOURCE);
 	let handwritten = "fn main() {\n\tprintln!(\"cargo:rustc-cfg=handwritten\");\n}\n";
 	fs::write(fixture.build_script(), handwritten)
 		.unwrap_or_else(|error| panic!("write hand-written build script: {error}"));
 
-	let made = run(&mut fixture.command("create"));
+	let made = run(&mut fixture.create_with_auto("accounts"));
 	assert!(
 		made.contains("cargo:rerun-if-changed=migrations/manifest.json"),
 		"stdout: {made}"
@@ -911,23 +977,32 @@ fn reconcile_pins_legacy_receipts_only_on_request() {
 		"stdout: {already}"
 	);
 
-	// Strip the pins, as a ledger written before pinning has them.
+	// Rewrite the ledger as a 0.20 one that names its versions without pins.
 	let path = fixture.root.join("migrations/publications.json");
-	let mut ledger = pina_abi::decode_publication_ledger(
+	let current: serde_json::Value = serde_json::from_slice(
 		&fs::read(&path).unwrap_or_else(|error| panic!("read ledger: {error}")),
 	)
-	.unwrap_or_else(|error| panic!("decode ledger: {error}"));
-	for receipt in &mut ledger.receipts {
-		for published in receipt.versions.values_mut() {
-			published.history.clear();
-		}
-	}
-	fs::write(
-		&path,
-		pina_abi::encode_publication_ledger(&ledger)
-			.unwrap_or_else(|error| panic!("encode ledger: {error}")),
-	)
-	.unwrap_or_else(|error| panic!("write ledger: {error}"));
+	.unwrap_or_else(|error| panic!("parse ledger: {error}"));
+	let mut receipt = current["receipts"][0].clone();
+	let versions = receipt["versions"]
+		.as_object()
+		.unwrap_or_else(|| panic!("the receipt names its contracts"))
+		.iter()
+		.map(|(key, pins)| {
+			let version = pins.as_array().map_or(0, |pins| pins.len() - 1);
+			(
+				key.clone(),
+				serde_json::json!({ "version": version, "history": [] }),
+			)
+		})
+		.collect::<serde_json::Map<_, _>>();
+	receipt["versions"] = serde_json::Value::Object(versions);
+	receipt["sequence"] = serde_json::json!(0);
+	receipt["programId"] = serde_json::json!(PROGRAM_ID);
+	receipt["manifestSha256"] = serde_json::json!("0".repeat(64));
+	receipt["previousReceiptSha256"] = serde_json::Value::Null;
+	let legacy = serde_json::json!({ "abiVersion": "0.20", "receipts": [receipt] });
+	fs::write(&path, legacy.to_string()).unwrap_or_else(|error| panic!("write ledger: {error}"));
 
 	let (_, stderr) = run_failure(&mut fixture.command("check"));
 	assert!(stderr.contains("--pin-legacy"), "stderr: {stderr}");
@@ -938,6 +1013,12 @@ fn reconcile_pins_legacy_receipts_only_on_request() {
 		"stdout: {pinned}"
 	);
 	run(&mut fixture.command("check"));
+	// The repair writes the current shape, which has nothing left to pin.
+	let repinned: serde_json::Value = serde_json::from_slice(
+		&fs::read(&path).unwrap_or_else(|error| panic!("reread ledger: {error}")),
+	)
+	.unwrap_or_else(|error| panic!("parse repaired ledger: {error}"));
+	assert_eq!(repinned, current);
 	let repeated = run(fixture
 		.command("reconcile")
 		.arg("--pin-legacy")
@@ -956,6 +1037,22 @@ fn reconcile_pins_legacy_receipts_only_on_request() {
 		conflict.contains("cannot be used with"),
 		"stderr: {conflict}"
 	);
+
+	// A current ledger cannot hold an unpinned entry at all.
+	let mut blanked = current;
+	for pins in blanked["receipts"][0]["versions"]
+		.as_object_mut()
+		.unwrap_or_else(|| panic!("the receipt names its contracts"))
+		.values_mut()
+	{
+		*pins = serde_json::json!([]);
+	}
+	fs::write(&path, blanked.to_string()).unwrap_or_else(|error| panic!("write ledger: {error}"));
+	let (_, stderr) = run_failure(&mut fixture.command("check"));
+	assert!(stderr.contains("pins no versions"), "stderr: {stderr}");
+	// The repair has nothing to pin there, and says why instead of passing.
+	let (_, stderr) = run_failure(fixture.command("reconcile").arg("--pin-legacy"));
+	assert!(stderr.contains("pins no versions"), "stderr: {stderr}");
 }
 
 #[test]

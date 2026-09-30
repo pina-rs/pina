@@ -42,7 +42,6 @@ import { findPoolVaultPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -50,12 +49,6 @@ export const WITHDRAW_DISCRIMINATOR = 5;
 
 export function getWithdrawDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(WITHDRAW_DISCRIMINATOR);
-}
-
-export const WITHDRAW_DISCRIMINATOR2 = 0;
-
-export function getWithdrawDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(WITHDRAW_DISCRIMINATOR2);
 }
 
 export type WithdrawInstruction<
@@ -97,7 +90,6 @@ export type WithdrawInstruction<
 
 export type WithdrawInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** Nullifier derived by the circuit from the spent note's secrets. */
 	nullifier: ReadonlyUint8Array;
 	/** Tree root the proof's membership witness was built against. */
@@ -123,14 +115,13 @@ export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["nullifier", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 			["root", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 			["proofA", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 			["proofB", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
 			["proofC", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 		]),
-		(value) => ({ ...value, discriminator: 5, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 5 }),
 	);
 }
 
@@ -142,7 +133,6 @@ export function getWithdrawInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(WITHDRAW_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["nullifier", fixDecoderSize(getBytesDecoder(), 32)],
 		["root", fixDecoderSize(getBytesDecoder(), 32)],
 		["proofA", fixDecoderSize(getBytesDecoder(), 64)],

@@ -76,7 +76,10 @@ pub struct CompactState {
 	pub tags: Vec<u16, 2>,
 }
 
-#[instruction(discriminator = MigrationInstruction::Update)]
+// Opted into instruction migrations: the payload carries a version envelope,
+// and the generated entrypoint converts an older client's request before the
+// handler runs. Other instructions under the `auto` policy are only recorded.
+#[instruction(discriminator = MigrationInstruction::Update, migrations)]
 pub struct UpdateInstruction {
 	pub value: u64,
 	pub memo: u16,
@@ -126,72 +129,72 @@ pub struct RelayAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
-		UpdateInstruction::with_current_instruction_data(data, |current| {
-			let instruction = UpdateInstruction::try_from_bytes(current)?;
-			let _ = self.referrer;
+		// The generated entrypoint already converted a historical request, so
+		// `data` always holds the current layout.
+		let instruction = UpdateInstruction::try_from_bytes(data)?;
+		let _ = self.referrer;
 
-			if self.state.is_none()
-				&& self.migration_payer.is_none()
-				&& self.system_program.is_none()
-				&& self.manual_state.is_none()
-				&& self.compact_state.is_none()
-			{
-				let _ = instruction.memo.get();
-				return Ok(());
-			}
-			let (Some(state), payer, Some(system_program)) =
-				(self.state, self.migration_payer, self.system_program)
-			else {
-				return Err(ProgramError::NotEnoughAccountKeys);
-			};
-			system_program.assert_address(&system::ID)?;
-			let payer = payer.map(|account| &*account);
+		if self.state.is_none()
+			&& self.migration_payer.is_none()
+			&& self.system_program.is_none()
+			&& self.manual_state.is_none()
+			&& self.compact_state.is_none()
+		{
+			let _ = instruction.memo.get();
+			return Ok(());
+		}
+		let (Some(state), payer, Some(system_program)) =
+			(self.state, self.migration_payer, self.system_program)
+		else {
+			return Err(ProgramError::NotEnoughAccountKeys);
+		};
+		system_program.assert_address(&system::ID)?;
+		let payer = payer.map(|account| &*account);
+		MigrateAccount {
+			account: state,
+			payer,
+			program_id: &ID,
+			max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
+		}
+		.invoke::<State>()?;
+
+		// Mixed-version sets: each migratable account advances
+		// independently inside the same instruction.
+		if let Some(manual_state) = self.manual_state {
 			MigrateAccount {
-				account: state,
+				account: manual_state,
 				payer,
 				program_id: &ID,
 				max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 			}
-			.invoke::<State>()?;
-
-			// Mixed-version sets: each migratable account advances
-			// independently inside the same instruction.
-			if let Some(manual_state) = self.manual_state {
-				MigrateAccount {
-					account: manual_state,
-					payer,
-					program_id: &ID,
-					max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
+			.invoke::<ManualState>()?;
+			manual_state.with_compact_account::<ManualState, _>(&ID, |manual| {
+				if manual.code().is_empty() {
+					return Err(ProgramError::InvalidAccountData);
 				}
-				.invoke::<ManualState>()?;
-				manual_state.with_compact_account::<ManualState, _>(&ID, |manual| {
-					if manual.code().is_empty() {
-						return Err(ProgramError::InvalidAccountData);
-					}
-					Ok(())
-				})?;
+				Ok(())
+			})?;
+		}
+		if let Some(compact_state) = self.compact_state {
+			MigrateAccount {
+				account: compact_state,
+				payer,
+				program_id: &ID,
+				max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
 			}
-			if let Some(compact_state) = self.compact_state {
-				MigrateAccount {
-					account: compact_state,
-					payer,
-					program_id: &ID,
-					max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
-				}
-				.invoke::<CompactState>()?;
-			}
+			.invoke::<CompactState>()?;
+		}
 
-			let mut state = state.as_account_mut::<State>(&ID)?;
-			if state.authority != *self.authority.address() {
-				return Err(ProgramError::InvalidAccountData);
-			}
-			state.value.set(instruction.value.get());
-			state.enabled = true.into();
-			state.revision = state.revision.wrapping_add(1);
+		let mut state = state.as_account_mut::<State>(&ID)?;
+		if state.authority != *self.authority.address() {
+			return Err(ProgramError::InvalidAccountData);
+		}
+		state.value.set(instruction.value.get());
+		state.enabled = true.into();
+		state.revision = state.revision.wrapping_add(1);
 
-			let _ = instruction.memo.get();
-			Ok(())
-		})
+		let _ = instruction.memo.get();
+		Ok(())
 	}
 }
 

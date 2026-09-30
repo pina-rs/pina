@@ -211,7 +211,6 @@ describe("vesting JS client contracts", () => {
 		]);
 		expect(Array.from(cancel.data)).toEqual([
 			VESTING_CANCEL_DISCRIMINATOR,
-			0,
 		]);
 		const parsedCancel = parseCancelInstruction(cancel);
 		expect(parsedCancel.accounts.admin.address).toBe(admin);
@@ -223,21 +222,21 @@ describe("vesting JS client contracts", () => {
 	test("vesting discriminators are identified by instruction helpers", () => {
 		expect(
 			identifyVestingProgramInstruction({
-				data: new Uint8Array([VESTING_INITIALIZE_DISCRIMINATOR, 0]),
+				data: new Uint8Array([VESTING_INITIALIZE_DISCRIMINATOR]),
 			}),
 		).toBe(
 			VestingProgramInstruction.Initialize,
 		);
 		expect(
 			identifyVestingProgramInstruction({
-				data: new Uint8Array([VESTING_CLAIM_DISCRIMINATOR, 0]),
+				data: new Uint8Array([VESTING_CLAIM_DISCRIMINATOR]),
 			}),
 		).toBe(
 			VestingProgramInstruction.Claim,
 		);
 		expect(
 			identifyVestingProgramInstruction({
-				data: new Uint8Array([VESTING_CANCEL_DISCRIMINATOR, 0]),
+				data: new Uint8Array([VESTING_CANCEL_DISCRIMINATOR]),
 			}),
 		).toBe(
 			VestingProgramInstruction.Cancel,
@@ -327,7 +326,6 @@ describe("role registry JS client contracts", () => {
 		).toBe(roleEntry);
 		expect(Array.from(deactivateRole.data)).toEqual([
 			ROLE_DEACTIVATE_ROLE_DISCRIMINATOR,
-			0,
 		]);
 
 		const rotateAdmin = getRotateAdminInstruction({
@@ -344,7 +342,6 @@ describe("role registry JS client contracts", () => {
 		expect(parsedRotateAdmin.accounts.newAdmin.address).toBe(newAdmin);
 		expect(Array.from(rotateAdmin.data)).toEqual([
 			ROLE_ROTATE_ADMIN_DISCRIMINATOR,
-			0,
 		]);
 		expect(parsedRotateAdmin.data.discriminator).toBe(
 			ROLE_ROTATE_ADMIN_DISCRIMINATOR,
@@ -354,33 +351,33 @@ describe("role registry JS client contracts", () => {
 	test("role discriminators are identified by instruction helpers", () => {
 		expect(
 			identifyRoleRegistryProgramInstruction({
-				data: new Uint8Array([ROLE_INITIALIZE_DISCRIMINATOR, 0]),
+				data: new Uint8Array([ROLE_INITIALIZE_DISCRIMINATOR]),
 			}),
 		).toBe(
 			RoleRegistryProgramInstruction.Initialize,
 		);
 		expect(
 			identifyRoleRegistryProgramInstruction({
-				data: new Uint8Array([ROLE_ADD_ROLE_DISCRIMINATOR, 0]),
+				data: new Uint8Array([ROLE_ADD_ROLE_DISCRIMINATOR]),
 			}),
 		).toBe(
 			RoleRegistryProgramInstruction.AddRole,
 		);
 		expect(
 			identifyRoleRegistryProgramInstruction({
-				data: new Uint8Array([ROLE_UPDATE_ROLE_DISCRIMINATOR, 0]),
+				data: new Uint8Array([ROLE_UPDATE_ROLE_DISCRIMINATOR]),
 			}),
 		).toBe(
 			RoleRegistryProgramInstruction.UpdateRole,
 		);
 		expect(
 			identifyRoleRegistryProgramInstruction({
-				data: new Uint8Array([ROLE_DEACTIVATE_ROLE_DISCRIMINATOR, 0]),
+				data: new Uint8Array([ROLE_DEACTIVATE_ROLE_DISCRIMINATOR]),
 			}),
 		).toBe(RoleRegistryProgramInstruction.DeactivateRole);
 		expect(
 			identifyRoleRegistryProgramInstruction({
-				data: new Uint8Array([ROLE_ROTATE_ADMIN_DISCRIMINATOR, 0]),
+				data: new Uint8Array([ROLE_ROTATE_ADMIN_DISCRIMINATOR]),
 			}),
 		).toBe(
 			RoleRegistryProgramInstruction.RotateAdmin,
@@ -521,7 +518,7 @@ describe("staking rewards JS client contracts", () => {
 		expect(parseStakingClaimInstruction(claim).accounts.user.address).toBe(
 			admin,
 		);
-		expect(Array.from(claim.data)).toEqual([STAKING_CLAIM_DISCRIMINATOR, 0]);
+		expect(Array.from(claim.data)).toEqual([STAKING_CLAIM_DISCRIMINATOR]);
 		expect(parseStakingClaimInstruction(claim).data.discriminator).toBe(
 			STAKING_CLAIM_DISCRIMINATOR,
 		);
@@ -530,27 +527,27 @@ describe("staking rewards JS client contracts", () => {
 	test("staking discriminators are identified by instruction helpers", () => {
 		expect(
 			identifyStakingRewardsProgramInstruction({
-				data: new Uint8Array([STAKING_INITIALIZE_POOL_DISCRIMINATOR, 0]),
+				data: new Uint8Array([STAKING_INITIALIZE_POOL_DISCRIMINATOR]),
 			}),
 		).toBe(StakingRewardsProgramInstruction.InitializePool);
 		expect(
 			identifyStakingRewardsProgramInstruction({
-				data: new Uint8Array([STAKING_OPEN_POSITION_DISCRIMINATOR, 0]),
+				data: new Uint8Array([STAKING_OPEN_POSITION_DISCRIMINATOR]),
 			}),
 		).toBe(StakingRewardsProgramInstruction.OpenPosition);
 		expect(
 			identifyStakingRewardsProgramInstruction({
-				data: new Uint8Array([STAKING_DEPOSIT_DISCRIMINATOR, 0]),
+				data: new Uint8Array([STAKING_DEPOSIT_DISCRIMINATOR]),
 			}),
 		).toBe(StakingRewardsProgramInstruction.Deposit);
 		expect(
 			identifyStakingRewardsProgramInstruction({
-				data: new Uint8Array([STAKING_WITHDRAW_DISCRIMINATOR, 0]),
+				data: new Uint8Array([STAKING_WITHDRAW_DISCRIMINATOR]),
 			}),
 		).toBe(StakingRewardsProgramInstruction.Withdraw);
 		expect(
 			identifyStakingRewardsProgramInstruction({
-				data: new Uint8Array([STAKING_CLAIM_DISCRIMINATOR, 0]),
+				data: new Uint8Array([STAKING_CLAIM_DISCRIMINATOR]),
 			}),
 		).toBe(StakingRewardsProgramInstruction.Claim);
 	});

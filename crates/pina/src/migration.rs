@@ -22,8 +22,8 @@ mod private {
 
 /// Largest caller-owned migration workspace generated on the SBF stack.
 ///
-/// `with_current_instruction_data` and `with_current_event_data` place the
-/// historical-normalization workspace in their own stack frame, and the
+/// `with_current_instruction_data` places the historical-normalization
+/// workspace in its own stack frame, and the
 /// caller's handler runs inside that frame. Generated code refuses to compile
 /// beyond this bound so a migration-aware payload can never silently exhaust
 /// the 4 KiB SBF stack budget.
@@ -347,11 +347,13 @@ pub trait MigratableInstruction: HasMigrationVersion {
 ///
 /// Unknown and future versions fail without consulting a historical decoder.
 /// The workspace is cleared before any old bytes are copied into it, preventing
-/// caller-controlled residue from becoming a newly added field.
+/// caller-controlled residue from becoming a newly added field. The result
+/// keeps the version the client wrote, so a handler can tell a converted
+/// request from a current one.
 pub fn normalize_instruction_data<'source, 'workspace, T>(
 	data: &'source [u8],
 	workspace: &'workspace mut [u8],
-) -> Result<CurrentInstructionData<'source, 'workspace>, ProgramError>
+) -> Result<NormalizedInstruction<'source, 'workspace, T::Version>, ProgramError>
 where
 	T: MigratableInstruction,
 {
@@ -359,13 +361,15 @@ where
 		return Err(ProgramError::InvalidInstructionData);
 	}
 
-	match T::inspect_migration_version(data)? {
-		StoredVersion::Current(_) => {
+	let (data, source_version) = match T::inspect_migration_version(data)? {
+		StoredVersion::Current(current) => {
 			T::validate_current_instruction(data)?;
-			Ok(CurrentInstructionData::Current(data))
+			(CurrentInstructionData::Current(data), current)
 		}
-		StoredVersion::Future { .. } => Err(PinaProgramError::InvalidMigrationVersion.into()),
-		StoredVersion::Stale { .. } => {
+		StoredVersion::Future { .. } => {
+			return Err(PinaProgramError::InvalidMigrationVersion.into());
+		}
+		StoredVersion::Stale { stored, .. } => {
 			if T::WORKING_SIZE < T::CURRENT_SIZE || workspace.len() < T::WORKING_SIZE {
 				return Err(PinaProgramError::MigrationWorkspaceExceeded.into());
 			}
@@ -373,108 +377,49 @@ where
 			T::migrate_stale_instruction(data, &mut workspace[..T::WORKING_SIZE])?;
 			T::write_current_migration_version(&mut workspace[..T::CURRENT_SIZE])?;
 			T::validate_current_instruction(&workspace[..T::CURRENT_SIZE])?;
-
-			Ok(CurrentInstructionData::Migrated(
-				&workspace[..T::CURRENT_SIZE],
-			))
+			(
+				CurrentInstructionData::Migrated(&workspace[..T::CURRENT_SIZE]),
+				stored,
+			)
 		}
-	}
+	};
+
+	Ok(NormalizedInstruction {
+		data,
+		source_version,
+	})
 }
 
-/// A current event representation paired with the version found in the log.
+/// A current instruction representation paired with the version the client
+/// wrote.
 ///
-/// A field initialized by migration can be distinguished from a field that was
-/// actually emitted by checking [`Self::source_version`]. Event bytes are
-/// immutable, so normalization always writes historical projections into the
-/// caller-owned workspace and never changes the original log record.
+/// The bytes always use the current layout. [`Self::source_version`] tells a
+/// handler whether they arrived that way, so a field a transition filled in
+/// can be told apart from one the client actually sent.
 #[derive(Debug, PartialEq, Eq)]
-pub struct CurrentEventData<'source, 'workspace, V> {
+pub struct NormalizedInstruction<'source, 'workspace, V> {
 	data: CurrentInstructionData<'source, 'workspace>,
 	source_version: V,
 }
 
-impl<V: Copy> CurrentEventData<'_, '_, V> {
-	/// Return the exact current event representation.
+impl<V: Copy> NormalizedInstruction<'_, '_, V> {
+	/// Return the exact current instruction representation.
 	#[must_use]
 	pub const fn as_bytes(&self) -> &[u8] {
 		self.data.as_bytes()
 	}
 
-	/// Return the version carried by the immutable historical event.
+	/// Return the version the client wrote.
 	#[must_use]
 	pub const fn source_version(&self) -> V {
 		self.source_version
 	}
 
-	/// Return whether a historical projection ran.
+	/// Return whether a historical conversion ran.
 	#[must_use]
 	pub const fn was_migrated(&self) -> bool {
 		self.data.was_migrated()
 	}
-}
-
-/// Generated conversion contract for one migratable event payload.
-///
-/// Event transitions are pure historical projections. They never rewrite a
-/// transaction log or account and retain the source version as provenance.
-pub trait MigratableEvent: HasMigrationVersion {
-	/// Exact current event length.
-	const CURRENT_SIZE: usize;
-
-	/// Largest temporary byte region needed by any supported transition path.
-	const WORKING_SIZE: usize;
-
-	/// Maximum adjacent transitions accepted by one projection.
-	const MAX_INLINE_STEPS: u16;
-
-	/// Rewrite one exact historical event into caller-owned workspace.
-	fn migrate_stale_event(data: &[u8], workspace: &mut [u8]) -> ProgramResult;
-
-	/// Validate the current event representation.
-	fn validate_current_event(data: &[u8]) -> ProgramResult;
-}
-
-/// Project current or historical event bytes into the current representation.
-///
-/// Unknown versions, future versions, non-exact historical lengths, and
-/// insufficient workspaces fail closed. The current hot path borrows the source
-/// directly and does not touch the workspace.
-pub fn normalize_event_data<'source, 'workspace, T>(
-	data: &'source [u8],
-	workspace: &'workspace mut [u8],
-) -> Result<CurrentEventData<'source, 'workspace, T::Version>, ProgramError>
-where
-	T: MigratableEvent,
-{
-	if !T::matches_discriminator(data) {
-		return Err(ProgramError::InvalidInstructionData);
-	}
-
-	let source_version = T::read_migration_version(data)?;
-	let normalized = match T::inspect_migration_version(data)? {
-		StoredVersion::Current(_) => {
-			T::validate_current_event(data)?;
-			CurrentInstructionData::Current(data)
-		}
-		StoredVersion::Future { .. } => {
-			return Err(PinaProgramError::InvalidMigrationVersion.into());
-		}
-		StoredVersion::Stale { .. } => {
-			if T::WORKING_SIZE < T::CURRENT_SIZE || workspace.len() < T::WORKING_SIZE {
-				return Err(PinaProgramError::MigrationWorkspaceExceeded.into());
-			}
-			workspace[..T::WORKING_SIZE].fill(0);
-			T::migrate_stale_event(data, &mut workspace[..T::WORKING_SIZE])?;
-			T::write_current_migration_version(&mut workspace[..T::CURRENT_SIZE])?;
-			T::validate_current_event(&workspace[..T::CURRENT_SIZE])?;
-			CurrentInstructionData::Migrated(&workspace[..T::CURRENT_SIZE])
-		}
-	};
-
-	Ok(CurrentEventData {
-		data: normalized,
-		source_version,
-	})
 }
 
 /// Pure plan for one adjacent account migration.
@@ -1447,21 +1392,6 @@ mod tests {
 		}
 	}
 
-	impl MigratableEvent for VersionedInstruction {
-		const CURRENT_SIZE: usize = <VersionedInstruction as MigratableInstruction>::CURRENT_SIZE;
-		const MAX_INLINE_STEPS: u16 =
-			<VersionedInstruction as MigratableInstruction>::MAX_INLINE_STEPS;
-		const WORKING_SIZE: usize = <VersionedInstruction as MigratableInstruction>::WORKING_SIZE;
-
-		fn migrate_stale_event(data: &[u8], workspace: &mut [u8]) -> ProgramResult {
-			<Self as MigratableInstruction>::migrate_stale_instruction(data, workspace)
-		}
-
-		fn validate_current_event(data: &[u8]) -> ProgramResult {
-			<Self as MigratableInstruction>::validate_current_instruction(data)
-		}
-	}
-
 	#[test]
 	fn version_lives_immediately_after_discriminator() {
 		let mut bytes = [0_u8; 5];
@@ -1609,43 +1539,19 @@ mod tests {
 	}
 
 	#[test]
-	fn event_projection_preserves_source_version_as_provenance() {
+	fn instruction_normalization_reports_the_version_the_client_wrote() {
 		let mut workspace = [0xaa; 4];
-		let projected = normalize_event_data::<VersionedInstruction>(&[7, 0, 42], &mut workspace)
-			.unwrap_or_else(|error| panic!("normalize event: {error:?}"));
+		let converted =
+			normalize_instruction_data::<VersionedInstruction>(&[7, 0, 42], &mut workspace);
+		let converted = converted.unwrap_or_else(|error| panic!("normalize: {error:?}"));
+		assert_eq!(converted.source_version(), 0);
 
-		assert!(projected.was_migrated());
-		assert_eq!(projected.source_version(), 0);
-		assert_eq!(projected.as_bytes(), [7, 1, 42, 99]);
-	}
-
-	#[test]
-	fn current_event_projection_is_zero_copy_and_keeps_provenance() {
 		let current = [7, 1, 42, 99];
 		let mut workspace = [0xaa; 4];
-		let projected = normalize_event_data::<VersionedInstruction>(&current, &mut workspace)
-			.unwrap_or_else(|error| panic!("normalize event: {error:?}"));
-
-		assert!(!projected.was_migrated());
-		assert_eq!(projected.source_version(), 1);
-		assert_eq!(projected.as_bytes(), current);
-		assert_eq!(workspace, [0xaa; 4]);
-	}
-
-	#[test]
-	fn event_projection_rejects_wrong_future_and_underfunded_inputs() {
-		for rejected in [&[8, 0, 42][..], &[7, 2, 42, 99][..]] {
-			let mut workspace = [0xaa; 4];
-			assert!(
-				normalize_event_data::<VersionedInstruction>(rejected, &mut workspace).is_err()
-			);
-		}
-
-		let mut workspace = [0xaa; 3];
-		assert_eq!(
-			normalize_event_data::<VersionedInstruction>(&[7, 0, 42], &mut workspace),
-			Err(PinaProgramError::MigrationWorkspaceExceeded.into())
-		);
+		let unchanged =
+			normalize_instruction_data::<VersionedInstruction>(&current, &mut workspace);
+		let unchanged = unchanged.unwrap_or_else(|error| panic!("normalize: {error:?}"));
+		assert_eq!(unchanged.source_version(), 1);
 	}
 
 	#[cfg(feature = "account-resize")]

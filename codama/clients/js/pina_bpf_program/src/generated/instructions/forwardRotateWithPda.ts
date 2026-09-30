@@ -37,22 +37,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findAuthorityPda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PINA_BPF_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR = 2;
 
 export function getForwardRotateWithPdaDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR);
-}
-
-export const FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR2 = 0;
-
-export function getForwardRotateWithPdaDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(FORWARD_ROTATE_WITH_PDA_DISCRIMINATOR2);
 }
 
 export type ForwardRotateWithPdaInstruction<
@@ -79,7 +70,6 @@ export type ForwardRotateWithPdaInstruction<
 
 export type ForwardRotateWithPdaInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	bump: number;
 	newAuthority: Address;
 };
@@ -93,13 +83,11 @@ export function getForwardRotateWithPdaInstructionDataEncoder(): FixedSizeEncode
 	ForwardRotateWithPdaInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["newAuthority", getAddressEncoder()],
-		]),
-		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bump",
+			getU8Encoder(),
+		], ["newAuthority", getAddressEncoder()]]),
+		(value) => ({ ...value, discriminator: 2 }),
 	);
 }
 
@@ -114,7 +102,6 @@ export function getForwardRotateWithPdaInstructionDataDecoder(): FixedSizeDecode
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["newAuthority", getAddressDecoder()],
 	]);

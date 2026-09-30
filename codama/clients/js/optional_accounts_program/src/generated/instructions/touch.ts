@@ -36,22 +36,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const TOUCH_DISCRIMINATOR = 1;
 
 export function getTouchDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(TOUCH_DISCRIMINATOR);
-}
-
-export const TOUCH_DISCRIMINATOR2 = 0;
-
-export function getTouchDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(TOUCH_DISCRIMINATOR2);
 }
 
 export type TouchInstruction<
@@ -74,10 +65,7 @@ export type TouchInstruction<
 		]
 	>;
 
-export type TouchInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type TouchInstructionData = { discriminator: number };
 
 export type TouchInstructionDataArgs = {};
 
@@ -85,11 +73,8 @@ export function getTouchInstructionDataEncoder(): FixedSizeEncoder<
 	TouchInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -99,9 +84,6 @@ export function getTouchInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(TOUCH_DISCRIMINATOR, getU8Decoder()),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

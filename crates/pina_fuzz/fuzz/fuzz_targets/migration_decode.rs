@@ -12,10 +12,8 @@ use migrations_program_fuzz::ValueChangedEvent;
 use pina::HasDiscriminator;
 use pina::HasMigrationVersion;
 use pina::MigratableAccount;
-use pina::MigratableEvent;
 use pina::MigratableInstruction;
 use pina::MigrationVersion;
-use pina::normalize_event_data;
 use pina::normalize_instruction_data;
 
 fn fuzz_instruction(data: &[u8]) {
@@ -35,18 +33,15 @@ fn fuzz_instruction(data: &[u8]) {
 }
 
 fn fuzz_event(data: &[u8]) {
-	let mut workspace = vec![0xa5; <ValueChangedEvent as MigratableEvent>::WORKING_SIZE];
-	if let Ok(current) = normalize_event_data::<ValueChangedEvent>(data, &mut workspace) {
+	// Events are versioned, not migrated: the program decodes only its current
+	// layout, and an older or newer record must be refused rather than
+	// reinterpreted.
+	if ValueChangedEvent::try_from_bytes(data).is_ok() {
+		assert!(ValueChangedEvent::matches_discriminator(data));
 		assert_eq!(
-			current.as_bytes().len(),
-			<ValueChangedEvent as MigratableEvent>::CURRENT_SIZE,
-		);
-		assert!(ValueChangedEvent::matches_discriminator(current.as_bytes()));
-		assert_eq!(
-			ValueChangedEvent::read_migration_version(current.as_bytes()),
+			ValueChangedEvent::read_migration_version(data),
 			Ok(ValueChangedEvent::CURRENT_VERSION),
 		);
-		assert!(ValueChangedEvent::try_from_bytes(current.as_bytes()).is_ok());
 	}
 }
 

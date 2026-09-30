@@ -46,7 +46,6 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -54,12 +53,6 @@ export const REQUEST_DISCLOSURE_DISCRIMINATOR = 7;
 
 export function getRequestDisclosureDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REQUEST_DISCLOSURE_DISCRIMINATOR);
-}
-
-export const REQUEST_DISCLOSURE_DISCRIMINATOR2 = 0;
-
-export function getRequestDisclosureDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REQUEST_DISCLOSURE_DISCRIMINATOR2);
 }
 
 export type RequestDisclosureInstruction<
@@ -103,7 +96,6 @@ export type RequestDisclosureInstruction<
 
 export type RequestDisclosureInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	bump: number;
 	nonce: bigint;
 	/** Tier being invoked; see the `TIER_*` constants. */
@@ -137,7 +129,6 @@ export function getRequestDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["nonce", getU64Encoder()],
 			["tier", getU8Encoder()],
@@ -146,7 +137,7 @@ export function getRequestDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 			["notice", fixPinaPodEncoderSize(getBytesEncoder(), 96)],
 			["legalBasisHash", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 		]),
-		(value) => ({ ...value, discriminator: 7, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 7 }),
 	);
 }
 
@@ -161,7 +152,6 @@ export function getRequestDisclosureInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["nonce", getU64Decoder()],
 		["tier", getU8Decoder()],

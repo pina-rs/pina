@@ -16,11 +16,9 @@ class ForwardRotateWithPdaInstructionData {
   const ForwardRotateWithPdaInstructionData({
     required this.bump,
     required this.newAuthority,
-  }) : discriminator = 2,
-       migrationVersion = 0;
+  }) : discriminator = 2;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
   final Address newAuthority;
 }
@@ -29,7 +27,6 @@ Encoder<ForwardRotateWithPdaInstructionData>
 getForwardRotateWithPdaInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('newAuthority', getAddressEncoder()),
   ]);
@@ -38,7 +35,6 @@ getForwardRotateWithPdaInstructionDataEncoder() {
     structEncoder,
     (ForwardRotateWithPdaInstructionData value) => <String, Object?>{
       'discriminator': 2,
-      'migrationVersion': 0,
       'bump': value.bump,
       'newAuthority': value.newAuthority,
     },
@@ -49,7 +45,6 @@ Decoder<ForwardRotateWithPdaInstructionData>
 getForwardRotateWithPdaInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('newAuthority', getAddressDecoder()),
   ]);
@@ -67,7 +62,6 @@ getForwardRotateWithPdaInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

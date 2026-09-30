@@ -28,12 +28,6 @@ pub(crate) struct MigrationExpansion {
 	manifest_prefix: String,
 }
 
-#[derive(Clone, Copy)]
-enum ImmutableContract {
-	Instruction,
-	Event,
-}
-
 impl MigrationExpansion {
 	/// Load and verify the checked-in contract bound to `item`.
 	pub(crate) fn load(
@@ -47,13 +41,25 @@ impl MigrationExpansion {
 		let history = manifest
 			.contract_for_source(kind, &item.ident.to_string())
 			.map_err(|error| syn::Error::new_spanned(item, error))?;
+		if !history.envelope {
+			return Err(syn::Error::new_spanned(
+				item,
+				format!(
+					"`{}` opts into migrations with the `migrations` token, but the migration \
+					 manifest records it without a version envelope; run `pina migrations create`",
+					item.ident
+				),
+			));
+		}
 		let current = history.current().ok_or_else(|| {
 			syn::Error::new_spanned(item, "migration contract contains no current schema")
 		})?;
 		let source_schema = pina_abi::data_schema(item, layout)
 			.map_err(|error| syn::Error::new_spanned(item, error))?;
 		verify_source_schema(item, &source_schema, &current.schema)?;
-		verify_transition_files(item, program_dir, history)?;
+		if history.is_migrated() {
+			verify_transition_files(item, program_dir, history)?;
+		}
 		let current_version = history
 			.current_version()
 			.ok_or_else(|| syn::Error::new_spanned(item, "migration history has no versions"))?;
@@ -154,28 +160,6 @@ impl MigrationExpansion {
 		crate_path: &syn::Path,
 		struct_name: &syn::Ident,
 	) -> syn::Result<proc_macro2::TokenStream> {
-		self.immutable_implementation(crate_path, struct_name, ImmutableContract::Instruction)
-	}
-
-	/// Generate immutable historical event projection with source provenance.
-	pub(crate) fn event_implementation(
-		&self,
-		crate_path: &syn::Path,
-		struct_name: &syn::Ident,
-	) -> syn::Result<proc_macro2::TokenStream> {
-		self.immutable_implementation(crate_path, struct_name, ImmutableContract::Event)
-	}
-
-	fn immutable_implementation(
-		&self,
-		crate_path: &syn::Path,
-		struct_name: &syn::Ident,
-		contract: ImmutableContract,
-	) -> syn::Result<proc_macro2::TokenStream> {
-		let contract_label = match contract {
-			ImmutableContract::Instruction => "instruction",
-			ImmutableContract::Event => "event",
-		};
 		if self
 			.history
 			.versions
@@ -184,7 +168,7 @@ impl MigrationExpansion {
 		{
 			return Err(syn::Error::new_spanned(
 				struct_name,
-				format!("migration-aware {contract_label} history must use fixed layouts"),
+				"migration-aware instruction history must use fixed layouts",
 			));
 		}
 
@@ -201,25 +185,21 @@ impl MigrationExpansion {
 			})
 			.collect::<Option<Vec<_>>>()
 			.ok_or_else(|| {
-				syn::Error::new_spanned(
-					struct_name,
-					format!("{contract_label} migration size overflowed"),
-				)
+				syn::Error::new_spanned(struct_name, "instruction migration size overflowed")
 			})?;
-		let current_size = *sizes.last().ok_or_else(|| {
-			syn::Error::new_spanned(struct_name, format!("{contract_label} history is empty"))
-		})?;
+		let current_size = *sizes
+			.last()
+			.ok_or_else(|| syn::Error::new_spanned(struct_name, "instruction history is empty"))?;
 		let working_size = sizes.iter().copied().max().unwrap_or(current_size);
 		let module_name = format_ident!(
-			"__pina_{}_{}_migrations",
+			"__pina_{}_instruction_migrations",
 			struct_name.to_string().to_snake_case(),
-			contract_label,
 		);
 		let transition_modules = versions.iter().enumerate().skip(1).map(|(to, version)| {
 			version
 				.transition
 				.as_ref()
-				.expect("validated immutable history has adjacent transitions");
+				.expect("validated instruction history has adjacent transitions");
 			let from = to - 1;
 			let name = format_ident!("v{}_to_v{}", from, to);
 			// `transition_path` keys on the on-chain version numbers, which are
@@ -317,70 +297,41 @@ impl MigrationExpansion {
 				}
 			});
 		let max_inline = current.min(u32::from(MAX_INLINE_STEPS)) as u16;
-		let (trait_name, migrate_method, validate_method, consumer_impl) = match contract {
-			ImmutableContract::Instruction => {
-				let consumer_impl = quote! {
-					impl #struct_name {
-						/// Normalize historical instruction data and run a current-data handler.
-						pub fn with_current_instruction_data<R>(
-							data: &[u8],
-							handler: impl FnOnce(&[u8]) -> Result<R, #crate_path::ProgramError>,
-						) -> Result<R, #crate_path::ProgramError> {
-							let mut workspace = [0_u8; #working_size];
-							let current = #crate_path::normalize_instruction_data::<Self>(
-								data,
-								&mut workspace,
-							)?;
-							handler(current.as_bytes())
-						}
+		let consumer_impl = quote! {
+			impl #struct_name {
+				/// Normalize historical instruction data and run a current-data
+				/// handler with the version the client wrote.
+				pub fn with_current_instruction_data<R>(
+					data: &[u8],
+					handler: impl FnOnce(
+						&[u8],
+						<Self as #crate_path::HasMigrationVersion>::Version,
+					) -> Result<R, #crate_path::ProgramError>,
+				) -> Result<R, #crate_path::ProgramError> {
+					let mut workspace = [0_u8; #working_size];
+					let current = #crate_path::normalize_instruction_data::<Self>(
+						data,
+						&mut workspace,
+					)?;
+					handler(current.as_bytes(), current.source_version())
+				}
 
-						/// Normalize historical data before invoking the current account process.
-						pub fn process_versioned<'accounts, A>(
-							accounts: A,
-							data: &[u8],
-						) -> #crate_path::ProgramResult
-						where
-							A: #crate_path::ProcessAccountInfos<'accounts>,
-						{
-							Self::with_current_instruction_data(data, |current| {
-								accounts.process(current)
-							})
-						}
-					}
-				};
-				(
-					format_ident!("MigratableInstruction"),
-					format_ident!("migrate_stale_instruction"),
-					format_ident!("validate_current_instruction"),
-					consumer_impl,
-				)
-			}
-			ImmutableContract::Event => {
-				let consumer_impl = quote! {
-					impl #struct_name {
-						/// Project historical event bytes and preserve their source version.
-						pub fn with_current_event_data<R>(
-							data: &[u8],
-							handler: impl FnOnce(
-								&[u8],
-								<Self as #crate_path::HasMigrationVersion>::Version,
-							) -> Result<R, #crate_path::ProgramError>,
-						) -> Result<R, #crate_path::ProgramError> {
-							let mut workspace = [0_u8; #working_size];
-							let current = #crate_path::normalize_event_data::<Self>(
-								data,
-								&mut workspace,
-							)?;
-							handler(current.as_bytes(), current.source_version())
-						}
-					}
-				};
-				(
-					format_ident!("MigratableEvent"),
-					format_ident!("migrate_stale_event"),
-					format_ident!("validate_current_event"),
-					consumer_impl,
-				)
+				/// Normalize historical data before invoking the current account
+				/// process through `ProcessAccountInfos::process_from_version`.
+				pub fn process_versioned<'accounts, A>(
+					accounts: A,
+					data: &[u8],
+				) -> #crate_path::ProgramResult
+				where
+					A: #crate_path::ProcessAccountInfos<'accounts>,
+				{
+					Self::with_current_instruction_data(data, |current, source_version| {
+						accounts.process_from_version(
+							current,
+							<<Self as #crate_path::HasMigrationVersion>::Version as #crate_path::MigrationVersion>::into_u32(source_version),
+						)
+					})
+				}
 			}
 		};
 
@@ -401,12 +352,12 @@ impl MigrationExpansion {
 				),
 			);
 
-			impl #crate_path::#trait_name for #struct_name {
+			impl #crate_path::MigratableInstruction for #struct_name {
 				const CURRENT_SIZE: usize = #current_size;
 				const WORKING_SIZE: usize = #working_size;
 				const MAX_INLINE_STEPS: u16 = #max_inline;
 
-				fn #migrate_method(
+				fn migrate_stale_instruction(
 					data: &[u8],
 					workspace: &mut [u8],
 				) -> #crate_path::ProgramResult {
@@ -424,7 +375,7 @@ impl MigrationExpansion {
 					}
 				}
 
-				fn #validate_method(data: &[u8]) -> #crate_path::ProgramResult {
+				fn validate_current_instruction(data: &[u8]) -> #crate_path::ProgramResult {
 					if data.len() != #current_size
 						|| !<Self as #crate_path::HasDiscriminator>::matches_discriminator(data)
 					{
@@ -1251,7 +1202,7 @@ fn instruction_envelope_gate_at(
 	let mut versions = manifest
 		.contracts
 		.values()
-		.filter(|history| history.identity.kind == ContractKind::Instruction)
+		.filter(|history| history.identity.kind == ContractKind::Instruction && history.envelope)
 		.filter(|history| {
 			// Zero-field instructions are the fail-open case: with no payload
 			// to parse, nothing else ever reads the version byte.
@@ -1288,26 +1239,43 @@ fn instruction_envelope_gate_at(
 	}))
 }
 
-/// Resolve whether one schema declaration opts into ABI history.
+/// How a schema declaration takes part in the checked-in ABI history.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Coverage {
+	/// Not recorded: no envelope and no snapshot.
+	None,
+	/// Recorded without an envelope: the build only proves the payload still
+	/// matches its snapshot. Only instructions under an auto policy.
+	Snapshot,
+	/// Recorded with a version envelope and its generated history.
+	Envelope,
+}
+
+/// Resolve how one schema declaration takes part in ABI history.
 ///
 /// The checked-in manifest is the only policy source: an explicit per-item
 /// `migrations = false` wins over the recorded auto policy, and a missing
-/// manifest means no auto policy exists yet. A `migrations = false` on a
-/// contract the manifest already records is rejected because stripping an
+/// manifest means no auto policy exists yet. An auto policy envelopes accounts
+/// and events, but records an instruction without an envelope unless it opts
+/// in with the `migrations` token. A `migrations = false` on a contract the
+/// manifest records with an envelope is rejected because stripping an
 /// envelope is itself a wire-format change.
 pub(crate) fn resolve_opt_in(
 	item: &ItemStruct,
 	kind: ContractKind,
 	declared: Option<bool>,
 	manifest: Option<&MigrationManifest>,
-) -> syn::Result<bool> {
+) -> syn::Result<Coverage> {
+	let records_envelope = || {
+		manifest.is_some_and(|manifest| {
+			manifest
+				.contract_for_source(kind, &item.ident.to_string())
+				.is_ok_and(|history| history.envelope)
+		})
+	};
 	match declared {
 		Some(false) => {
-			if manifest.is_some_and(|manifest| {
-				manifest
-					.contract_for_source(kind, &item.ident.to_string())
-					.is_ok()
-			}) {
+			if records_envelope() {
 				return Err(syn::Error::new_spanned(
 					item,
 					format!(
@@ -1319,10 +1287,31 @@ pub(crate) fn resolve_opt_in(
 					),
 				));
 			}
-			Ok(false)
+			Ok(Coverage::None)
 		}
-		Some(true) => Ok(true),
-		None => Ok(manifest.is_some_and(|manifest| manifest.auto.contains(kind))),
+		None if !manifest.is_some_and(|manifest| manifest.auto.contains(kind)) => {
+			// Neither a token nor the recorded policy covers the declaration,
+			// so expanding it bare would silently drop an envelope the manifest
+			// records, for instance after a hand edit of its `auto` policy.
+			if records_envelope() {
+				return Err(syn::Error::new_spanned(
+					item,
+					format!(
+						"`{}` has no `migrations` token and the recorded auto policy does not \
+						 cover it, but the migration manifest records it with a version \
+						 envelope; removing an envelope is a wire-format change that `pina \
+						 migrations create` must record deliberately. Restore the `migrations` \
+						 token or the policy that covered it",
+						item.ident
+					),
+				));
+			}
+			Ok(Coverage::None)
+		}
+		None if kind == ContractKind::Instruction => Ok(Coverage::Snapshot),
+		// An explicit `migrations` token, or an auto policy covering an account
+		// or event, keeps the version envelope.
+		Some(true) | None => Ok(Coverage::Envelope),
 	}
 }
 
@@ -1413,7 +1402,9 @@ fn read_manifest_at(
 ///
 /// Declarations covered by the manifest's auto policy resolve exactly like an
 /// explicit `migrations` token, so a new contract still fails the build with
-/// the `pina migrations create` remedy until it has a snapshot.
+/// the `pina migrations create` remedy until it has a snapshot. An instruction
+/// recorded without an envelope is verified against its snapshot and expands
+/// with no migration code.
 pub(crate) fn expansion(
 	item: &ItemStruct,
 	kind: ContractKind,
@@ -1421,33 +1412,51 @@ pub(crate) fn expansion(
 	declared: Option<bool>,
 ) -> syn::Result<Option<MigrationExpansion>> {
 	let (manifest, program_dir, manifest_prefix) = read_manifest(item)?;
-	let Some(manifest) = resolve_manifest(item, kind, declared, manifest, &program_dir)? else {
-		return Ok(None);
-	};
-	MigrationExpansion::load(
+	resolve_expansion(
 		item,
 		kind,
 		layout,
-		&manifest,
+		declared,
+		manifest,
 		&program_dir,
 		&manifest_prefix,
 	)
-	.map(Some)
 }
 
-/// Resolve the opt-in and require a manifest when the declaration is enabled.
-fn resolve_manifest(
+/// [`expansion`] with the manifest already read, so every branch is testable
+/// without a program directory on disk.
+fn resolve_expansion(
 	item: &ItemStruct,
 	kind: ContractKind,
+	layout: LayoutKind,
 	declared: Option<bool>,
 	manifest: Option<MigrationManifest>,
 	program_dir: &std::path::Path,
-) -> syn::Result<Option<MigrationManifest>> {
-	if !resolve_opt_in(item, kind, declared, manifest.as_ref())? {
-		return Ok(None);
+	manifest_prefix: &str,
+) -> syn::Result<Option<MigrationExpansion>> {
+	match resolve_opt_in(item, kind, declared, manifest.as_ref())? {
+		Coverage::None => Ok(None),
+		Coverage::Snapshot => {
+			// An auto policy is only ever read from a manifest, so one exists.
+			let manifest = manifest.expect("an auto policy comes from a checked-in manifest");
+			verify_snapshot(item, kind, layout, &manifest)?;
+			Ok(None)
+		}
+		Coverage::Envelope => {
+			let manifest = require_manifest(item, manifest, program_dir)?;
+			MigrationExpansion::load(item, kind, layout, &manifest, program_dir, manifest_prefix)
+				.map(Some)
+		}
 	}
+}
 
-	manifest.map(Some).ok_or_else(|| {
+/// Require a manifest for a declaration that opts into an envelope.
+fn require_manifest(
+	item: &ItemStruct,
+	manifest: Option<MigrationManifest>,
+	program_dir: &std::path::Path,
+) -> syn::Result<MigrationManifest> {
+	manifest.ok_or_else(|| {
 		syn::Error::new_spanned(
 			item,
 			format!(
@@ -1457,6 +1466,39 @@ fn resolve_manifest(
 			),
 		)
 	})
+}
+
+/// Prove an unenveloped declaration still matches its recorded snapshot.
+///
+/// Nothing on the wire names a version for it, so a changed payload would be
+/// misread by every existing client. The build fails until `pina migrations
+/// create` records the change, which it only does while nothing is published.
+fn verify_snapshot(
+	item: &ItemStruct,
+	kind: ContractKind,
+	layout: LayoutKind,
+	manifest: &MigrationManifest,
+) -> syn::Result<()> {
+	let history = manifest
+		.contract_for_source(kind, &item.ident.to_string())
+		.map_err(|error| syn::Error::new_spanned(item, error))?;
+	if history.envelope {
+		return Err(syn::Error::new_spanned(
+			item,
+			format!(
+				"the migration manifest records `{}` with a version envelope, but it no longer \
+				 opts in with the `migrations` token; removing an envelope is a wire-format change \
+				 that `pina migrations create` must record deliberately",
+				item.ident
+			),
+		));
+	}
+	let current = history
+		.current()
+		.expect("a validated migration history has a current version");
+	let source_schema = pina_abi::data_schema(item, layout)
+		.map_err(|error| syn::Error::new_spanned(item, error))?;
+	verify_source_schema(item, &source_schema, &current.schema)
 }
 
 /// Derive the reserved-`Migrate` ladder from the checked-in manifest.
@@ -1514,6 +1556,48 @@ fn read_validated_manifest(
 	})?;
 
 	Ok(Some(manifest))
+}
+
+/// Instruction contracts the manifest records with a version envelope.
+///
+/// Returns each contract's discriminator value and Rust struct ident, in key
+/// order. The generated entrypoint routes those variants through the struct's
+/// `process_versioned`, so historical payloads are normalized before the
+/// handler runs. Like the account ladder, the ident must resolve where the
+/// dispatching enum is declared.
+pub(crate) fn manifest_enveloped_instructions(
+	enum_name: &syn::Ident,
+) -> syn::Result<Vec<(u64, proc_macro2::Ident)>> {
+	let program_dir = discover_program_dir().map(|(program_dir, _prefix)| program_dir);
+	manifest_enveloped_instructions_in(enum_name, program_dir.as_deref())
+}
+
+/// Pure variant for tests: read enveloped instructions from the manifest
+/// under `program_dir`, when a program directory was discovered.
+fn manifest_enveloped_instructions_in(
+	enum_name: &syn::Ident,
+	program_dir: Option<&std::path::Path>,
+) -> syn::Result<Vec<(u64, proc_macro2::Ident)>> {
+	let Some(program_dir) = program_dir else {
+		return Ok(Vec::new());
+	};
+	let Some(manifest) = read_validated_manifest(enum_name, &program_dir.join(MANIFEST_PATH))?
+	else {
+		return Ok(Vec::new());
+	};
+
+	let routed = manifest
+		.contracts
+		.values()
+		.filter(|history| history.identity.kind == ContractKind::Instruction && history.envelope)
+		.map(|history| {
+			// Decoding parsed every key into a canonical identity.
+			let value = history.identity.discriminator_value();
+			let value = value.unwrap_or_else(|error| panic!("decoded manifest key: {error}"));
+			(value, syn::Ident::new(&history.rust_name, enum_name.span()))
+		})
+		.collect();
+	Ok(routed)
 }
 
 /// Pure variant for tests: derive the ladder from the manifest at `path`.
@@ -1906,7 +1990,9 @@ fn verify_source_schema(
 	actual: &DataSchema,
 	expected: &DataSchema,
 ) -> syn::Result<()> {
-	if actual == expected {
+	// A respelling that stores the same bytes (`PodU64` for `u64`) still
+	// matches the recorded snapshot.
+	if actual.same_wire(expected) {
 		return Ok(());
 	}
 
@@ -1950,6 +2036,7 @@ mod tests {
 		let history = ContractHistory {
 			identity,
 			rust_name: item.ident.to_string(),
+			envelope: true,
 			versions: vec![SchemaVersion {
 				schema,
 				process: None,
@@ -1998,6 +2085,7 @@ mod tests {
 		let history = ContractHistory {
 			identity,
 			rust_name: item.ident.to_string(),
+			envelope: true,
 			versions: vec![
 				SchemaVersion {
 					schema: schema.clone(),
@@ -2092,6 +2180,16 @@ mod tests {
 		);
 	}
 
+	/// A respelling that stores the same bytes still matches its snapshot.
+	#[test]
+	fn a_wire_equivalent_respelling_matches_its_snapshot() {
+		let item = item_struct("State");
+		let parsed = syn::parse_str::<ItemStruct>("struct State { value: PodU64 }");
+		let respelled = parsed.unwrap_or_else(|error| panic!("respelled: {error}"));
+		let result = verify_source_schema(&item, &test_schema(&respelled), &test_schema(&item));
+		assert!(result.is_ok(), "a respelling is not drift");
+	}
+
 	fn gate_contract(
 		kind: ContractKind,
 		discriminator: u64,
@@ -2137,6 +2235,7 @@ mod tests {
 		ContractHistory {
 			identity,
 			rust_name: "Placeholder".to_owned(),
+			envelope: true,
 			versions: (0..version_count)
 				.map(|number| {
 					SchemaVersion {
@@ -2186,6 +2285,12 @@ mod tests {
 				// A payload instruction validates its own version byte in the
 				// generated parse, so it is not gated at dispatch.
 				gate_contract(ContractKind::Instruction, 6, 1),
+				// An instruction recorded without an envelope has no version
+				// byte to gate.
+				ContractHistory {
+					envelope: false,
+					..gate_zero_field_contract(ContractKind::Instruction, 8, 1)
+				},
 				// Events and accounts are enveloped too, but they are not
 				// dispatched through the instruction space.
 				gate_contract(ContractKind::Event, 9, 1),
@@ -2264,8 +2369,8 @@ mod tests {
 		let _ = path;
 	}
 
-	/// A manifest whose stored discriminator cannot be resolved must fail the
-	/// build rather than silently leaving a zero-field instruction ungated.
+	/// A manifest key whose width disagrees with its hex must fail the build
+	/// rather than silently leaving a zero-field instruction ungated.
 	#[test]
 	fn envelope_gate_rejects_an_unresolvable_discriminator() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
@@ -2273,26 +2378,14 @@ mod tests {
 		let history = gate_zero_field_contract(ContractKind::Instruction, 1, 1);
 		manifest.contracts.insert(history.identity.key(), history);
 
-		// Rewrite the discriminator width so the stored hex no longer matches
-		// the declared width: the document decodes and the map key still
-		// agrees, but `discriminator_value` cannot resolve it.
-		let mut value: serde_json::Value = serde_json::from_slice(&encode(&manifest))
-			.unwrap_or_else(|error| panic!("re-decode encoded manifest: {error}"));
-		let entry = {
-			let contracts = value["contracts"]
-				.as_object_mut()
-				.unwrap_or_else(|| panic!("contracts is an object"));
-			let entry = contracts
-				.values_mut()
-				.next()
-				.unwrap_or_else(|| panic!("the manifest has one contract"));
-			entry["identity"]["discriminatorBytes"] = serde_json::Value::Number(2.into());
-			entry.clone()
-		};
-		let contracts = value["contracts"]
-			.as_object_mut()
-			.unwrap_or_else(|| panic!("contracts is an object"));
-		contracts.clear();
+		// Re-file the contract under a key claiming two discriminator bytes
+		// for one byte of hex: the key is the identity, so it cannot resolve.
+		let value = serde_json::from_slice::<serde_json::Value>(&encode(&manifest));
+		let mut value = value.unwrap_or_else(|error| panic!("re-decode: {error}"));
+		let contracts = value["contracts"].as_object_mut();
+		let contracts = contracts.unwrap_or_else(|| panic!("contracts is an object"));
+		let entry = contracts.remove("instruction:1:01");
+		let entry = entry.unwrap_or_else(|| panic!("the manifest has one contract"));
 		contracts.insert("instruction:2:01".to_owned(), entry);
 		let path = write_manifest(
 			temp.path(),
@@ -2300,15 +2393,55 @@ mod tests {
 		);
 
 		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
-		let error = instruction_envelope_gate_at(&enum_name, &path)
-			.err()
-			.map(|error| error.to_string());
-		assert!(
-			error
-				.as_deref()
-				.is_some_and(|error| error.contains("discriminator")),
-			"the error must name the discriminator, got: {error:?}"
+		for error in [
+			instruction_envelope_gate_at(&enum_name, &path)
+				.err()
+				.map(|error| error.to_string()),
+			manifest_enveloped_instructions_in(&enum_name, Some(temp.path()))
+				.err()
+				.map(|error| error.to_string()),
+		] {
+			assert!(
+				error
+					.as_deref()
+					.is_some_and(|error| error.contains("invalid migration manifest")),
+				"the error must name the manifest, got: {error:?}"
+			);
+		}
+	}
+
+	/// The entrypoint routes exactly the instructions recorded with an
+	/// envelope, keyed by discriminator value.
+	#[test]
+	fn enveloped_instructions_exclude_snapshot_only_contracts() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let enum_name = syn::Ident::new("Instruction", proc_macro2::Span::call_site());
+		// Neither an undiscovered program nor a missing manifest routes anything.
+		let undiscovered = manifest_enveloped_instructions_in(&enum_name, None);
+		let undiscovered = undiscovered.unwrap_or_else(|error| panic!("no program: {error}"));
+		assert_eq!(undiscovered, Vec::new());
+		let absent = manifest_enveloped_instructions_in(&enum_name, Some(temp.path()));
+		let absent = absent.unwrap_or_else(|error| panic!("absent manifest: {error}"));
+		assert_eq!(absent, Vec::new());
+
+		write_gate_manifest(
+			temp.path(),
+			&[
+				gate_contract(ContractKind::Instruction, 2, 2),
+				ContractHistory {
+					envelope: false,
+					..gate_contract(ContractKind::Instruction, 3, 1)
+				},
+				gate_contract(ContractKind::Account, 4, 1),
+			],
 		);
+		let routed = manifest_enveloped_instructions_in(&enum_name, Some(temp.path()));
+		let routed = routed.unwrap_or_else(|error| panic!("routes: {error}"));
+		let routed = routed
+			.into_iter()
+			.map(|(value, ident)| (value, ident.to_string()))
+			.collect::<Vec<_>>();
+		assert_eq!(routed, vec![(2, "Placeholder".to_owned())]);
 	}
 
 	/// Every instruction contract whose recorded newest version records no
@@ -2385,57 +2518,70 @@ mod tests {
 	#[test]
 	fn explicit_token_opts_in_for_every_kind() {
 		for kind in ContractKind::ALL {
-			assert!(
+			assert_eq!(
 				resolve_opt_in(&item_struct("State"), kind, Some(true), None)
 					.unwrap_or_else(|error| panic!("explicit opt-in: {error}")),
+				Coverage::Envelope
 			);
 		}
 	}
 
 	#[test]
-	fn manifest_auto_policy_opts_in_unannotated_declarations() {
+	fn manifest_auto_policy_records_unannotated_declarations() {
 		for kind in ContractKind::ALL {
 			let item = item_struct("State");
 			let manifest = manifest_for(&item, kind, MigrationAuto::all());
-			assert!(
+			// Auto envelopes accounts and events, but records an instruction
+			// without an envelope.
+			let expected = if kind == ContractKind::Instruction {
+				Coverage::Snapshot
+			} else {
+				Coverage::Envelope
+			};
+			assert_eq!(
 				resolve_opt_in(&item, kind, None, Some(&manifest))
 					.unwrap_or_else(|error| panic!("auto opt-in: {error}")),
+				expected
 			);
 
-			// A policy for another kind leaves this declaration opted out.
+			// A policy for another kind leaves an unrecorded declaration opted
+			// out.
 			let other = ContractKind::ALL
 				.into_iter()
 				.find(|candidate| *candidate != kind)
 				.unwrap_or_else(|| panic!("a second kind exists"));
 			let mut policy = MigrationAuto::none();
 			policy.add(other);
-			let manifest = manifest_for(&item, kind, policy);
-			assert!(
-				!resolve_opt_in(&item, kind, None, Some(&manifest))
+			let manifest = manifest_for(&item_struct("Unrelated"), kind, policy);
+			assert_eq!(
+				resolve_opt_in(&item, kind, None, Some(&manifest))
 					.unwrap_or_else(|error| panic!("uncovered kind: {error}")),
+				Coverage::None
 			);
 		}
 	}
 
 	#[test]
 	fn missing_manifest_has_no_auto_policy() {
-		assert!(
-			!resolve_opt_in(&item_struct("State"), ContractKind::Account, None, None)
+		assert_eq!(
+			resolve_opt_in(&item_struct("State"), ContractKind::Account, None, None)
 				.unwrap_or_else(|error| panic!("absent policy: {error}")),
+			Coverage::None
 		);
 	}
 
 	#[test]
-	fn disabled_override_wins_over_auto_and_is_rejected_once_recorded() {
+	fn disabled_override_wins_over_auto_and_is_rejected_once_enveloped() {
 		for kind in ContractKind::ALL {
 			let item = item_struct("State");
 			let manifest = manifest_for(&item, kind, MigrationAuto::all());
 
 			// Not recorded: the explicit override stands even under auto.
 			let other = item_struct("Other");
-			assert!(
-				!resolve_opt_in(&other, kind, Some(false), Some(&manifest))
+			assert_eq!(
+				resolve_opt_in(&other, kind, Some(false), Some(&manifest))
 					.unwrap_or_else(|error| panic!("explicit opt-out: {error}")),
+				Coverage::None
 			);
 
 			// Recorded: removing the envelope is a deliberate wire-format change.
@@ -2451,6 +2597,38 @@ mod tests {
 				"unexpected message: {message}"
 			);
 		}
+
+		// An instruction recorded without an envelope carries no version byte,
+		// so opting it out of the snapshot changes nothing on the wire.
+		let item = item_struct("State");
+		let mut manifest = manifest_for(&item, ContractKind::Instruction, MigrationAuto::all());
+		for history in manifest.contracts.values_mut() {
+			history.envelope = false;
+		}
+		let coverage = resolve_opt_in(
+			&item,
+			ContractKind::Instruction,
+			Some(false),
+			Some(&manifest),
+		);
+		let coverage = coverage.unwrap_or_else(|error| panic!("snapshot opt-out: {error}"));
+		assert_eq!(coverage, Coverage::None);
+	}
+
+	/// A recorded envelope never disappears silently: a declaration the
+	/// policy stopped covering fails the build instead of expanding bare.
+	#[test]
+	fn an_uncovered_declaration_cannot_drop_a_recorded_envelope() {
+		let item = item_struct("State");
+		let manifest = manifest_for(&item, ContractKind::Account, MigrationAuto::none());
+		let error = resolve_opt_in(&item, ContractKind::Account, None, Some(&manifest)).err();
+		let error = error.map(|error| error.to_string());
+		assert!(
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("records it with a version envelope")),
+			"got: {error:?}"
+		);
 	}
 
 	#[test]
@@ -2459,10 +2637,320 @@ mod tests {
 		let manifest = manifest_for(&item, ContractKind::Instruction, MigrationAuto::none());
 		// Auto does not cover accounts, so an unannotated account stays out even
 		// though the manifest holds another contract.
-		assert!(
-			!resolve_opt_in(&item, ContractKind::Account, None, Some(&manifest))
+		assert_eq!(
+			resolve_opt_in(&item, ContractKind::Account, None, Some(&manifest))
 				.unwrap_or_else(|error| panic!("uncovered account: {error}")),
+			Coverage::None
 		);
+	}
+
+	/// Resolve an unannotated instruction under an auto policy against a
+	/// manifest whose recorded snapshot is `recorded`.
+	fn resolve_snapshot(
+		source: &str,
+		recorded: &str,
+		envelope: bool,
+	) -> syn::Result<Option<MigrationExpansion>> {
+		let item = item_struct(source);
+		let recorded = item_struct(recorded);
+		let mut manifest = manifest_for(&recorded, ContractKind::Instruction, MigrationAuto::all());
+		for history in manifest.contracts.values_mut() {
+			history.envelope = envelope;
+			history.rust_name = source.to_owned();
+		}
+		resolve_expansion(
+			&item,
+			ContractKind::Instruction,
+			LayoutKind::Fixed,
+			None,
+			Some(manifest),
+			Path::new("program-root"),
+			"",
+		)
+	}
+
+	/// A snapshot is compared against the source's own schema, so a source
+	/// field outside the closed grammar fails where it is declared.
+	#[test]
+	fn a_snapshot_rejects_a_source_outside_the_schema_grammar() {
+		let recorded = item_struct("State");
+		let mut manifest = manifest_for(&recorded, ContractKind::Instruction, MigrationAuto::all());
+		for history in manifest.contracts.values_mut() {
+			history.envelope = false;
+		}
+		let item = syn::parse_str::<ItemStruct>("struct State { value: Unknown }");
+		let item = item.unwrap_or_else(|error| panic!("test item: {error}"));
+		let error = verify_snapshot(
+			&item,
+			ContractKind::Instruction,
+			LayoutKind::Fixed,
+			&manifest,
+		);
+		assert!(error.is_err(), "an unsupported source field must fail");
+	}
+
+	#[test]
+	fn a_snapshot_only_instruction_expands_without_migration_code() {
+		let expansion = resolve_snapshot("State", "State", false);
+		let expansion = expansion.unwrap_or_else(|error| panic!("matching snapshot: {error}"));
+		assert!(expansion.is_none());
+	}
+
+	#[test]
+	fn a_snapshot_only_instruction_fails_the_build_when_it_drifts() {
+		let item: ItemStruct = syn::parse_quote!(
+			struct State {
+				value: u64,
+				memo: u16,
+			}
+		);
+		let mut manifest = manifest_for(
+			&item_struct("State"),
+			ContractKind::Instruction,
+			MigrationAuto::all(),
+		);
+		for history in manifest.contracts.values_mut() {
+			history.envelope = false;
+		}
+		let error = resolve_expansion(
+			&item,
+			ContractKind::Instruction,
+			LayoutKind::Fixed,
+			None,
+			Some(manifest),
+			Path::new("program-root"),
+			"",
+		)
+		.err()
+		.map(|error| error.to_string());
+		assert!(
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("differs from its checked-in snapshot")),
+			"got: {error:?}"
+		);
+	}
+
+	#[test]
+	fn a_snapshot_only_instruction_needs_its_snapshot_and_no_envelope() {
+		let item = item_struct("State");
+		let manifest = MigrationManifest {
+			auto: MigrationAuto::all(),
+			..MigrationManifest::new("program".to_owned(), MigrationVersionType::U8)
+		};
+		let missing = resolve_expansion(
+			&item,
+			ContractKind::Instruction,
+			LayoutKind::Fixed,
+			None,
+			Some(manifest),
+			Path::new("program-root"),
+			"",
+		)
+		.err()
+		.map(|error| error.to_string());
+		assert!(
+			missing
+				.as_deref()
+				.is_some_and(|error| error.contains("pina migrations create")),
+			"got: {missing:?}"
+		);
+
+		// Dropping the `migrations` token from an enveloped instruction must
+		// not silently strip its version byte.
+		let error = resolve_snapshot("State", "State", true)
+			.err()
+			.map(|error| error.to_string());
+		assert!(
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("no longer opts in")),
+			"got: {error:?}"
+		);
+	}
+
+	#[test]
+	fn an_explicit_token_needs_an_enveloped_record() {
+		let item = item_struct("State");
+		let mut manifest = manifest_for(&item, ContractKind::Instruction, MigrationAuto::all());
+		for history in manifest.contracts.values_mut() {
+			history.envelope = false;
+		}
+		let error = resolve_expansion(
+			&item,
+			ContractKind::Instruction,
+			LayoutKind::Fixed,
+			Some(true),
+			Some(manifest),
+			Path::new("program-root"),
+			"",
+		)
+		.err()
+		.map(|error| error.to_string());
+		assert!(
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("without a version envelope")),
+			"got: {error:?}"
+		);
+	}
+
+	/// An enveloped instruction built from one `schema` per version, as the
+	/// validated manifest records it: every later version has a transition.
+	fn instruction_expansion(schemas: Vec<DataSchema>) -> MigrationExpansion {
+		let identity = ContractIdentity::try_new(ContractKind::Instruction, 1, 2);
+		let identity = identity.unwrap_or_else(|error| panic!("identity: {error}"));
+		let process = pina_abi::ProcessContract {
+			accounts: Vec::new(),
+		};
+		let versions = schemas
+			.into_iter()
+			.enumerate()
+			.map(|(number, schema)| {
+				SchemaVersion {
+					schema,
+					process: Some(process.clone()),
+					transition: (number > 0).then(|| {
+						Transition {
+							mode: TransitionMode::Manual,
+							renames: Vec::new(),
+							implementation_sha256: None,
+						}
+					}),
+				}
+			})
+			.collect::<Vec<_>>();
+		MigrationExpansion {
+			current_version: u32::try_from(versions.len().saturating_sub(1)).unwrap_or(u32::MAX),
+			version_type: MigrationVersionType::U8,
+			discriminator_bytes: 1,
+			discriminator_value: 2,
+			history: ContractHistory {
+				identity,
+				rust_name: "UpdateInstruction".to_owned(),
+				envelope: true,
+				versions,
+			},
+			manifest_prefix: String::new(),
+		}
+	}
+
+	fn expand_instruction(expansion: &MigrationExpansion) -> syn::Result<proc_macro2::TokenStream> {
+		let crate_path: syn::Path = syn::parse_quote!(::pina);
+		let struct_name = syn::Ident::new("UpdateInstruction", proc_macro2::Span::call_site());
+		expansion.instruction_implementation(&crate_path, &struct_name)
+	}
+
+	/// An enveloped instruction expands the normalizer the generated entrypoint
+	/// calls, which converts a historical payload before handing the current
+	/// bytes and the client's version to `process_from_version`.
+	#[test]
+	fn an_enveloped_instruction_normalizes_before_processing() {
+		let old = test_schema(&item_struct("Old"));
+		let current = test_schema(&item_struct("UpdateInstruction"));
+		let expansion = instruction_expansion(vec![old, current]);
+		let tokens = expand_instruction(&expansion);
+		let tokens = tokens.unwrap_or_else(|error| panic!("expand: {error}"));
+		let tokens = tokens.to_string();
+
+		for expected in [
+			"pub fn with_current_instruction_data",
+			"pub fn process_versioned",
+			"process_from_version",
+			"fn migrate_stale_instruction",
+			"fn validate_current_instruction",
+			"mod v0_to_v1",
+			"migrations/transitions/instruction_1_02/v0_to_v1.rs",
+		] {
+			assert!(
+				tokens.contains(expected),
+				"missing `{expected}` in {tokens}"
+			);
+		}
+	}
+
+	#[test]
+	fn instruction_histories_must_be_fixed_and_sized() {
+		let compact = DataSchema {
+			layout: LayoutKind::Compact,
+			fields: Vec::new(),
+		};
+		let error = expand_instruction(&instruction_expansion(vec![compact])).err();
+		let error = error.map(|error| error.to_string());
+		assert!(
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("must use fixed layouts")),
+			"got: {error:?}"
+		);
+
+		let unsized_field = DataSchema {
+			layout: LayoutKind::Fixed,
+			fields: vec![pina_abi::FieldSchema {
+				name: "value".to_owned(),
+				rust_type: "Unknown".to_owned(),
+			}],
+		};
+		let error = expand_instruction(&instruction_expansion(vec![unsized_field])).err();
+		let error = error.map(|error| error.to_string());
+		assert!(
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("size overflowed")),
+			"got: {error:?}"
+		);
+
+		let error = expand_instruction(&instruction_expansion(Vec::new())).err();
+		let error = error.map(|error| error.to_string());
+		assert!(
+			error
+				.as_deref()
+				.is_some_and(|error| error.contains("history is empty")),
+			"got: {error:?}"
+		);
+	}
+
+	/// An event is versioned, not migrated: its later versions carry no
+	/// transitions, so expanding it reads no transition files.
+	#[test]
+	fn a_multi_version_event_expands_without_transition_files() {
+		let item = item_struct("Changed");
+		let schema = test_schema(&item);
+		let identity = ContractIdentity::try_new(ContractKind::Event, 1, 4);
+		let identity = identity.unwrap_or_else(|error| panic!("identity: {error}"));
+		let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+		manifest.contracts.insert(
+			identity.key(),
+			ContractHistory {
+				identity,
+				rust_name: "Changed".to_owned(),
+				envelope: true,
+				versions: vec![
+					SchemaVersion {
+						schema: test_schema(&item_struct("Old")),
+						process: None,
+						transition: None,
+					},
+					SchemaVersion {
+						schema,
+						process: None,
+						transition: None,
+					},
+				],
+			},
+		);
+		let expansion = resolve_expansion(
+			&item,
+			ContractKind::Event,
+			LayoutKind::Fixed,
+			Some(true),
+			Some(manifest),
+			Path::new("program-root-without-transitions"),
+			"",
+		);
+		let expansion = expansion.unwrap_or_else(|error| panic!("event expansion: {error}"));
+		let expansion = expansion.unwrap_or_else(|| panic!("an enveloped event expands"));
+		assert_eq!(expansion.current_version, 1);
 	}
 
 	fn write_manifest(program_dir: &Path, source: &[u8]) -> PathBuf {
@@ -2506,6 +2994,7 @@ mod tests {
 				ContractHistory {
 					identity,
 					rust_name: name.to_owned(),
+					envelope: true,
 					versions: vec![SchemaVersion {
 						schema,
 						process: None,
@@ -2668,17 +3157,28 @@ mod tests {
 	fn enabled_declarations_require_the_manifest_file() {
 		let item = item_struct("State");
 		let program_dir = std::path::Path::new("program-root");
+		let resolve = |declared, manifest| {
+			resolve_expansion(
+				&item,
+				ContractKind::Account,
+				LayoutKind::Fixed,
+				declared,
+				manifest,
+				program_dir,
+				"",
+			)
+		};
 
 		// An unannotated declaration without a manifest has no policy to resolve.
 		assert!(
-			resolve_manifest(&item, ContractKind::Account, None, None, program_dir)
+			resolve(None, None)
 				.unwrap_or_else(|error| panic!("absent manifest: {error}"))
 				.is_none()
 		);
 
 		// An explicit token still names the missing file and the remedy.
-		let error = resolve_manifest(&item, ContractKind::Account, Some(true), None, program_dir)
-			.expect_err("an enabled declaration requires a manifest");
+		let error = resolve(Some(true), None).err();
+		let error = error.unwrap_or_else(|| panic!("an enabled declaration requires a manifest"));
 		let message = error.to_string();
 		assert!(message.contains("does not exist"), "message: {message}");
 		assert!(
@@ -2690,20 +3190,13 @@ mod tests {
 			"message: {message}"
 		);
 
-		// With a manifest, an auto-covered declaration resolves to it.
+		// With a manifest, an auto-covered declaration expands against it.
 		let manifest = manifest_for(&item, ContractKind::Account, MigrationAuto::all());
-		assert!(
-			resolve_manifest(
-				&item,
-				ContractKind::Account,
-				None,
-				Some(manifest),
-				program_dir
-			)
-			.unwrap_or_else(|error| panic!("auto manifest: {error}"))
-			.is_some()
-		);
+		let expansion = resolve(None, Some(manifest));
+		let expansion = expansion.unwrap_or_else(|error| panic!("auto manifest: {error}"));
+		assert!(expansion.is_some());
 	}
+
 	fn ladder_path(name: &str) -> syn::Path {
 		syn::parse_str(name).unwrap_or_else(|error| panic!("test path: {error}"))
 	}

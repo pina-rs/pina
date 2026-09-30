@@ -650,9 +650,9 @@ fn renders_non_omitted_arguments_only() {
 	let page = render_instruction_page(initialize, &mut TypeIndex::default())
 		.unwrap_or_else(|error| panic!("renders: {error}"));
 
-	// The wire buffer also reserves the migration version byte that the
-	// fixture IDL carries between the discriminator and the payload.
-	assert!(page.contains(&format!("[0u8; {}", 2 + 8 * wire_args - 7)));
+	// The wire buffer is the discriminator, four `u64` amounts, and the `u8`
+	// bump: the fixture's instructions carry no version envelope.
+	assert!(page.contains(&format!("[0u8; {}", 1 + 8 * wire_args - 7)));
 	assert!(!page.contains("discriminator:"));
 }
 

@@ -24,11 +24,9 @@ class ProposalCreateInstructionData {
     required this.message,
     required this.actionsLen,
     required this.actions,
-  }) : discriminator = 4,
-       migrationVersion = 0;
+  }) : discriminator = 4;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
   final int kind;
   final int vaultIndex;
@@ -45,7 +43,6 @@ Encoder<ProposalCreateInstructionData>
 getProposalCreateInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('kind', getU8Encoder()),
     ('vaultIndex', getU8Encoder()),
@@ -65,7 +62,6 @@ getProposalCreateInstructionDataEncoder() {
     structEncoder,
     (ProposalCreateInstructionData value) => <String, Object?>{
       'discriminator': 4,
-      'migrationVersion': 0,
       'bump': value.bump,
       'kind': value.kind,
       'vaultIndex': value.vaultIndex,
@@ -84,7 +80,6 @@ Decoder<ProposalCreateInstructionData>
 getProposalCreateInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('kind', getU8Decoder()),
     ('vaultIndex', getU8Decoder()),
@@ -110,7 +105,6 @@ getProposalCreateInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

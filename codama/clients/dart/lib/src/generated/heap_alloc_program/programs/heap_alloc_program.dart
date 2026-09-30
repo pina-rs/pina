@@ -23,12 +23,10 @@ enum HeapAllocProgramInstruction { allocate, fill }
 HeapAllocProgramInstruction identifyHeapAllocProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return HeapAllocProgramInstruction.allocate;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return HeapAllocProgramInstruction.fill;
   }
 

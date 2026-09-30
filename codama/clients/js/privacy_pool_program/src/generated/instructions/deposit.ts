@@ -45,7 +45,6 @@ import { findPoolVaultPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -53,12 +52,6 @@ export const DEPOSIT_DISCRIMINATOR = 4;
 
 export function getDepositDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR);
-}
-
-export const DEPOSIT_DISCRIMINATOR2 = 0;
-
-export function getDepositDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR2);
 }
 
 export type DepositInstruction<
@@ -98,7 +91,6 @@ export type DepositInstruction<
 
 export type DepositInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	bump: number;
 	/** Client-computed Poseidon commitment of the new note. */
 	commitment: ReadonlyUint8Array;
@@ -130,7 +122,6 @@ export function getDepositInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["commitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 			["viewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
@@ -138,7 +129,7 @@ export function getDepositInstructionDataEncoder(): FixedSizeEncoder<
 			["envelope", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
 			["shares", fixPinaPodEncoderSize(getBytesEncoder(), 144)],
 		]),
-		(value) => ({ ...value, discriminator: 4, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 4 }),
 	);
 }
 
@@ -150,7 +141,6 @@ export function getDepositInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(DEPOSIT_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["commitment", fixDecoderSize(getBytesDecoder(), 32)],
 		["viewPubkey", fixDecoderSize(getBytesDecoder(), 32)],

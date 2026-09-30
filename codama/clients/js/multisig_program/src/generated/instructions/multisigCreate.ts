@@ -53,7 +53,6 @@ import { findMultisigPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -61,12 +60,6 @@ export const MULTISIG_CREATE_DISCRIMINATOR = 2;
 
 export function getMultisigCreateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MULTISIG_CREATE_DISCRIMINATOR);
-}
-
-export const MULTISIG_CREATE_DISCRIMINATOR2 = 0;
-
-export function getMultisigCreateDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(MULTISIG_CREATE_DISCRIMINATOR2);
 }
 
 export type MultisigCreateInstruction<
@@ -112,7 +105,6 @@ export type MultisigCreateInstruction<
 
 export type MultisigCreateInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	bump: number;
 	threshold: number;
 	timelock: number;
@@ -146,7 +138,6 @@ export function getMultisigCreateInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["threshold", getU16Encoder()],
 			["timelock", getU32Encoder()],
@@ -155,7 +146,7 @@ export function getMultisigCreateInstructionDataEncoder(): FixedSizeEncoder<
 			["configAuthority", getAddressEncoder()],
 			["rentCollector", getAddressEncoder()],
 		]),
-		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 2 }),
 	);
 }
 
@@ -170,7 +161,6 @@ export function getMultisigCreateInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["threshold", getU16Decoder()],
 		["timelock", getU32Decoder()],

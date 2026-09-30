@@ -9,7 +9,6 @@
 )]
 
 pub const CONFIG_INITIALIZE_DISCRIMINATOR: u8 = 0u8;
-pub const CONFIG_INITIALIZE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -77,7 +76,6 @@ impl ConfigInitializeInstructionData {
 		<ConfigInitializeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CONFIG_INITIALIZE_DISCRIMINATOR;
-			data.migration_version = CONFIG_INITIALIZE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -91,7 +89,6 @@ impl ConfigInitializeInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ConfigInitializeInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub bump: u8,
 	pub treasury: solana_pubkey::Pubkey,
 	pub creation_fee: u64,

@@ -27,7 +27,7 @@ fn hello_accepts_the_funded_payer_signature() {
 
 		program
 			.send(
-				&[HelloInstruction::Hello as u8, 0u8],
+				&[HelloInstruction::Hello as u8],
 				vec![AccountMeta::new_readonly(user, true)],
 			)
 			.expect("execute Hello");
@@ -35,7 +35,7 @@ fn hello_accepts_the_funded_payer_signature() {
 		// A second invocation is stateless and therefore succeeds again.
 		program
 			.send(
-				&[HelloInstruction::Hello as u8, 0u8],
+				&[HelloInstruction::Hello as u8],
 				vec![AccountMeta::new_readonly(user, true)],
 			)
 			.expect("execute Hello a second time");
@@ -60,7 +60,7 @@ fn hello_rejects_a_user_that_did_not_sign() {
 
 		let error = program
 			.send(
-				&[HelloInstruction::Hello as u8, 0u8],
+				&[HelloInstruction::Hello as u8],
 				vec![AccountMeta::new_readonly(user, false)],
 			)
 			.expect_err("Hello rejects an unsigned user");
@@ -87,7 +87,7 @@ fn hello_accepts_any_funded_signer() {
 			.expect("fund the guest user");
 
 		let instruction = program.instruction(
-			&[HelloInstruction::Hello as u8, 0u8],
+			&[HelloInstruction::Hello as u8],
 			vec![AccountMeta::new_readonly(user.pubkey(), true)],
 		);
 		program
