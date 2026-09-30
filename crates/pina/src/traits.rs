@@ -1295,7 +1295,23 @@ pub trait ParseAccounts<'a>: Sized {
 	/// This is a declaration, not a hard limit: a trailing slice can hold more
 	/// accounts than the single slot counted here. Treat it as the capacity a
 	/// program reserves, which is what `MAX_INSTRUCTION_ACCOUNTS` folds together.
+	/// [`Self::ACCOUNT_LIMIT`] is the hard limit.
 	const ACCOUNT_BOUND: usize = Self::UNBOUNDED;
+
+	/// The most accounts this parser can consume, or [`Self::UNBOUNDED`] when it
+	/// can consume any number.
+	///
+	/// `#[derive(Accounts)]` counts one slot per positional and optional field
+	/// plus each nested struct's limit, and declares [`Self::UNBOUNDED`] for a
+	/// struct with a `#[pina(remaining)]` field or a nested struct that has
+	/// one. A derived parser rejects any account past its limit with
+	/// `TooManyAccountKeys`, so an entrypoint array one slot larger sees every
+	/// account the parser could accept, which is what
+	/// `ENTRYPOINT_ACCOUNT_CAPACITY` relies on.
+	///
+	/// Hand-written parsers keep [`Self::UNBOUNDED`] unless they reject every
+	/// account past a smaller limit.
+	const ACCOUNT_LIMIT: usize = Self::UNBOUNDED;
 
 	/// Sentinel for a parser that declares no capacity.
 	///

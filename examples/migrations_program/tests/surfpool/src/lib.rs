@@ -245,6 +245,66 @@ fn reserved_migrate_instruction_skips_placeholders_and_rejects_foreign_accounts(
 	});
 }
 
+/// The reserved instruction reads at most its declared slots, and an account
+/// after the last one fails it with `TooManyAccountKeys`, so nothing is
+/// migrated. That makes the slot count a true limit, which
+/// `ENTRYPOINT_ACCOUNT_CAPACITY` relies on to bound the entrypoint array.
+#[test]
+#[ignore = "run with pina test"]
+fn reserved_migrate_instruction_rejects_an_account_past_its_slots() {
+	pina_test::run(async {
+		let program_id = Pubkey::new_from_array(ID.to_bytes());
+		let mut program = ProgramTest::start(program_id)
+			.await
+			.expect("start isolated program test");
+		let authority = program.payer();
+		let state = Pubkey::new_from_array([0x26; 32]);
+		program
+			.install_historical_account(&HistoricalAccount::new(
+				0,
+				state,
+				program_id,
+				historical_state_data(&authority, 7),
+			))
+			.expect("install historical state");
+
+		// `[payer, systemProgram, State, ManualState, CompactState, State]`,
+		// with the unused slots holding the placeholder, then one more.
+		let error = program
+			.send(
+				&[MIGRATE_DISCRIMINATOR],
+				vec![
+					AccountMeta::new(authority, true),
+					AccountMeta::new_readonly(system_program(), false),
+					AccountMeta::new(state, false),
+					AccountMeta::new_readonly(program_id, false),
+					AccountMeta::new_readonly(program_id, false),
+					AccountMeta::new_readonly(program_id, false),
+					AccountMeta::new_readonly(program_id, false),
+				],
+			)
+			.expect_err("an account past the last slot must be rejected");
+
+		assert_eq!(error.operation(), "execute program instruction");
+		assert!(
+			error.message().contains("0xfffffffe"),
+			"expected TooManyAccountKeys, got: {}",
+			error.message()
+		);
+		assert_eq!(
+			program
+				.account(&state)
+				.expect("read stale state")
+				.data
+				.len(),
+			42,
+			"the rejected instruction must not migrate the state"
+		);
+
+		program.stop().expect("stop isolated program test");
+	});
+}
+
 /// The reserved instruction charges one shared lamport budget: a cap that
 /// funds one growing account must not fund two in the same invocation.
 #[test]

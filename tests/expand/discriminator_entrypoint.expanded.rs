@@ -173,8 +173,14 @@ impl CounterInstruction {
         )
     };
     /// The account-array size to pass to `nostd_entrypoint!` as its second
-    /// argument: one slot more than any route reads, or the transaction
-    /// maximum when a route accepts unbounded trailing accounts.
+    /// argument: one slot more than any route can accept, or the transaction
+    /// maximum when a route accepts any number of accounts.
+    ///
+    /// Each route contributes its accounts struct's `ACCOUNT_LIMIT`, not its
+    /// declared `ACCOUNT_BOUND`: a `#[pina(remaining)]` slice, directly or in
+    /// a nested account group, and a hand-written parser that declares no
+    /// limit all make it the transaction maximum, so such a route sees every
+    /// account it is sent.
     ///
     /// Pinocchio's deserializer walks accounts five at a time, so an array
     /// of five or fewer slots drops that loop and shrinks the deployed
@@ -208,22 +214,22 @@ impl CounterInstruction {
         }
         let highest = maximum([
             {
-                const fn __pina_account_bound<'a, T>() -> usize
+                const fn __pina_account_limit<'a, T>() -> usize
                 where
                     T: ::pina::ParseAccounts<'a>,
                 {
-                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT
                 }
-                __pina_account_bound::<'static, InitializeAccounts>()
+                __pina_account_limit::<'static, InitializeAccounts>()
             },
             {
-                const fn __pina_account_bound<'a, T>() -> usize
+                const fn __pina_account_limit<'a, T>() -> usize
                 where
                     T: ::pina::ParseAccounts<'a>,
                 {
-                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT
                 }
-                __pina_account_bound::<'static, IncrementAccounts>()
+                __pina_account_limit::<'static, IncrementAccounts>()
             },
         ]);
         if highest >= ::pina::pinocchio::MAX_TX_ACCOUNTS {
@@ -442,8 +448,14 @@ impl OverrideInstruction {
         )
     };
     /// The account-array size to pass to `nostd_entrypoint!` as its second
-    /// argument: one slot more than any route reads, or the transaction
-    /// maximum when a route accepts unbounded trailing accounts.
+    /// argument: one slot more than any route can accept, or the transaction
+    /// maximum when a route accepts any number of accounts.
+    ///
+    /// Each route contributes its accounts struct's `ACCOUNT_LIMIT`, not its
+    /// declared `ACCOUNT_BOUND`: a `#[pina(remaining)]` slice, directly or in
+    /// a nested account group, and a hand-written parser that declares no
+    /// limit all make it the transaction maximum, so such a route sees every
+    /// account it is sent.
     ///
     /// Pinocchio's deserializer walks accounts five at a time, so an array
     /// of five or fewer slots drops that loop and shrinks the deployed
@@ -477,22 +489,22 @@ impl OverrideInstruction {
         }
         let highest = maximum([
             {
-                const fn __pina_account_bound<'a, T>() -> usize
+                const fn __pina_account_limit<'a, T>() -> usize
                 where
                     T: ::pina::ParseAccounts<'a>,
                 {
-                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT
                 }
-                __pina_account_bound::<'static, IncrementAccounts>()
+                __pina_account_limit::<'static, IncrementAccounts>()
             },
             {
-                const fn __pina_account_bound<'a, T>() -> usize
+                const fn __pina_account_limit<'a, T>() -> usize
                 where
                     T: ::pina::ParseAccounts<'a>,
                 {
-                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_BOUND
+                    <T as ::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT
                 }
-                __pina_account_bound::<'static, UntouchedAccounts>()
+                __pina_account_limit::<'static, UntouchedAccounts>()
             },
         ]);
         if highest >= ::pina::pinocchio::MAX_TX_ACCOUNTS {
@@ -545,6 +557,7 @@ pub struct InitializeAccounts<'a> {
 }
 impl<'a> pina::ParseAccounts<'a> for InitializeAccounts<'a> {
     const ACCOUNT_BOUND: usize = 3usize;
+    const ACCOUNT_LIMIT: usize = 3usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -612,6 +625,7 @@ pub struct IncrementAccounts<'a> {
 }
 impl<'a> pina::ParseAccounts<'a> for IncrementAccounts<'a> {
     const ACCOUNT_BOUND: usize = 2usize;
+    const ACCOUNT_LIMIT: usize = 2usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
