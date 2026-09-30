@@ -258,11 +258,18 @@ pub(crate) fn expand(
 	let load_pda = args.bump.as_ref().and_then(|bump_field| {
 		(has_account_representation && !is_compact).then(|| {
 			let load_doc = format!(
-				"Load and validate `{struct_name}` and its stored-bump PDA address in one pass."
+				"Load and validate `{struct_name}` and its stored-bump PDA address in one \
+				 pass.\n\nRe-derives the address from the stored `{bump_field}` with `sha256` and \
+				 compares it, without the ed25519 curve check `create_program_address` adds: the program \
+				 created the account through `invoke_signed`, which only signs for an off-curve \
+				 address. See `pina::is_derived_address`."
 			);
 			let load_mut_doc = format!(
 				"Mutably load and validate `{struct_name}` and its stored-bump PDA address in one \
-				 pass."
+				 pass.\n\nRe-derives the address from the stored `{bump_field}` with `sha256` and \
+				 compares it, without the ed25519 curve check `create_program_address` adds: the program \
+				 created the account through `invoke_signed`, which only signs for an off-curve \
+				 address. See `pina::is_derived_address`."
 			);
 			let checked_doc = format!(
 				"Load and validate `{struct_name}`, its canonical PDA address, and its stored \
@@ -297,14 +304,14 @@ pub(crate) fn expand(
 					#crate_path::Ref<'account, <Self as #crate_path::PinaPodFixed>::Zc>,
 					#crate_path::ProgramError,
 				> {
-					let account_address = *account.address();
+					let account_view = *account;
 					let state = #crate_path::AsAccount::as_account::<Self>(account, program_id)?;
-					let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(state.#bump_field);
-					let expected_address = #crate_path::create_program_address(
-						&seeds.as_slices(),
+					if !#crate_path::is_derived_address(
+						account_view.address(),
+						&Self::seeds(#(#seed_param_names,)*).as_slices(),
+						state.#bump_field,
 						program_id,
-					)?;
-					if account_address != expected_address {
+					) {
 						return Err(#crate_path::ProgramError::InvalidSeeds);
 					}
 
@@ -321,14 +328,14 @@ pub(crate) fn expand(
 					#crate_path::RefMut<'account, <Self as #crate_path::PinaPodFixed>::Zc>,
 					#crate_path::ProgramError,
 				> {
-					let account_address = *account.address();
+					let account_view = *account;
 					let state = #crate_path::AsAccount::as_account_mut::<Self>(account, program_id)?;
-					let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(state.#bump_field);
-					let expected_address = #crate_path::create_program_address(
-						&seeds.as_slices(),
+					if !#crate_path::is_derived_address(
+						account_view.address(),
+						&Self::seeds(#(#seed_param_names,)*).as_slices(),
+						state.#bump_field,
 						program_id,
-					)?;
-					if account_address != expected_address {
+					) {
 						return Err(#crate_path::ProgramError::InvalidSeeds);
 					}
 
@@ -398,8 +405,9 @@ pub(crate) fn expand(
 				"Load and validate `{struct_name}`, its stored-bump PDA address, and its compact \
 				 representation for the duration of `use_account`.\n\nDerives the address once \
 				 from the account's own `{bump_field}` field and rejects a mismatch, so only the \
-				 address that field derives is loadable. This is a single derivation, not a \
-				 canonical bump search.\n\nCanonicality is the creation builder's proof. \
+				 address that field derives is loadable. This is a single `sha256` derivation \
+				 without the curve check, not a canonical bump search; see \
+				 `pina::is_derived_address`.\n\nCanonicality is the creation builder's proof. \
 				 `CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` both \
 				 reject a noncanonical bump, so a compact PDA this program created stores the \
 				 canonical one. That makes this method safe when the address is already \
@@ -432,18 +440,18 @@ pub(crate) fn expand(
 						<Self as #crate_path::PinaCompactAccount>::Ref<'_>,
 					) -> ::core::result::Result<R, #crate_path::ProgramError>,
 				) -> ::core::result::Result<R, #crate_path::ProgramError> {
-					let account_address = *account.address();
+					let account_view = *account;
 
 					#crate_path::AsCompactAccount::with_compact_account::<Self, _>(
 						account,
 						program_id,
 						|state| {
-							let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(state.#bump_field);
-							let expected_address = #crate_path::create_program_address(
-								&seeds.as_slices(),
+							if !#crate_path::is_derived_address(
+								account_view.address(),
+								&Self::seeds(#(#seed_param_names,)*).as_slices(),
+								state.#bump_field,
 								program_id,
-							)?;
-							if account_address != expected_address {
+							) {
 								return Err(#crate_path::ProgramError::InvalidSeeds);
 							}
 
