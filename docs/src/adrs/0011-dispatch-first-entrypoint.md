@@ -41,7 +41,7 @@ A scratch copy of the counter fixture replaced `nostd_entrypoint!` with an entry
 
 1. Reads the instruction data from `r2` and the program ID after it.
 2. Runs the generated router's `parse_instruction`, so the program-ID and discriminator checks are unchanged and still come first.
-3. Parses exactly the routed instruction's account count from the input into a stack array. Fewer accounts fail with `NotEnoughAccountKeys`, more fail with `TooManyAccountKeys`, and duplicate markers copy the earlier view the way pinocchio does.
+3. Parses exactly the routed instruction's account count from the input into a stack array, which is right for the counter because both of its routes are exact (decision 3 covers the other shapes). Fewer accounts fail with `NotEnoughAccountKeys`, more fail with `TooManyAccountKeys`, and duplicate markers copy the earlier view the way pinocchio does.
 4. Runs the unchanged derived `TryFrom` (writable, duplicate-mutable, and exact-count checks) and the unchanged `process`.
 
 | Build                                            | Counter bytes | `initialize` CU | `increment` CU |
@@ -81,10 +81,12 @@ This is a proposal. It is not accepted until the fleet measurements and runtime 
 
 2. **Pina owns the account walk.** A `#[doc(hidden)] unsafe fn` in `pina::entry`, next to `__process_entrypoint`, walks exactly `N` serialized accounts into a `[MaybeUninit<AccountView>; N]`. It uses the same record layout, alignment, and duplicate handling as pinocchio's `deserialize`. It also checks that each duplicate index names an earlier slot before copying it, a cold check that pinocchio leaves to the runtime. The `unsafe` stays in that one function, the way `__process_entrypoint` holds the current entrypoint's ([#558](https://github.com/pina-rs/pina/pull/558)).
 
-3. **Route shapes decide the walk.**
-   - Exact-count structs parse `ACCOUNT_BOUND` accounts and reject any other count before the derived checks run.
-   - Structs with a `#[pina(remaining)]` field or a hand-written parser walk the transaction's actual account count, bounded by `MAX_TX_ACCOUNTS`. Programs whose routes are mostly of this shape gain little and may keep `nostd_entrypoint!`.
-   - The reserved `Migrate` route parses its generated slot count like any other exact route.
+3. **Route shapes decide the walk.** `ACCOUNT_BOUND` is a declared count, not a walk length: it counts a `#[pina(remaining)]` slice as one slot and an `Option` field like a required one. The walk needs the most accounts a struct accepts (`ACCOUNT_LIMIT`) and the fewest (`ACCOUNT_MINIMUM`), which model three shapes:
+   - **Exact.** A struct with only required fields, whose limit equals its minimum, parses exactly that many accounts and rejects any other count before the derived checks run.
+   - **Optional.** A struct whose trailing `Option` fields may be omitted walks the accounts present, rejects more than its limit, and leaves a missing required account to the derived parse. An omitted optional account keeps working: a route with `ACCOUNT_BOUND = 2` whose second field is optional accepts one account today, and must still.
+   - **Unbounded.** A struct with a `#[pina(remaining)]` field, directly or through a nested account group, and a hand-written parser that declares no limit, walk every account `nostd_entrypoint!` would hand them. Programs whose routes are mostly of this shape gain little and may keep `nostd_entrypoint!`.
+   - **The reserved `Migrate` route is optional, not exact.** `run_optional` treats a missing trailing slot as omitted, so a partial migration sends fewer accounts than the slot count. It walks the accounts present, up to its slot count, and rejects an account past its last slot.
+   - Tests through the new entrypoint must cover an omitted optional account and a partial migration.
 
 4. **Error precedence stays deterministic, with one documented change.** The program-ID and discriminator checks still run before any account is read. For an instruction that has both a wrong account count and a failing per-account check, the count error now wins, because the count is checked before the derived parse runs. Today the derived parse may report a per-account error first.
 
