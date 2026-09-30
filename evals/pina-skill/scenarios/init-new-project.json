@@ -3,7 +3,7 @@
 	"title": "Scaffold a brand-new Pina program",
 	"fixture": "empty-project",
 	"prompt": "Start a new Solana program called `escrow_program` in this directory using the Pina toolkit's own scaffolding. I want the standard layout, migrations enabled the way new projects are meant to be set up, and a program identity I can deploy with. Don't deploy anything. Afterwards, tell me exactly what I still have to do before my first real deployment.",
-	"expectation": "The agent uses `pina init` rather than hand-rolling a crate, keeps the scaffolded `[migrations]` defaults (`version_type = \"u8\"`, `auto = true`), the `build.rs` rerun directive, and the `account-resize` feature, and settles the program identity before snapshotting: `init` deliberately does not scaffold `migrations/` because history binds to the declared address, so the correct flow is `pina keys new` (or an explicit address), then `pina migrations create` once \u2014 leaving the manifest bound to the declared identity, not the placeholder.",
+	"expectation": "The agent uses `pina init` rather than hand-rolling a crate, keeps the scaffolded `build.rs` rerun directive and `account-resize` feature, and settles the program identity before snapshotting: `init` deliberately does not scaffold `migrations/` because history binds to the declared address, and it writes no migration policy to `pina.toml` because the policy lives only in the manifest. The correct flow is `pina keys new` (or an explicit address), then `pina migrations create --auto true` once \u2014 leaving the manifest bound to the declared identity, not the placeholder, tracking every contract kind at the default `u8` width.",
 	"checks": [
 		{
 			"id": "used-pina-init",
@@ -21,24 +21,35 @@
 			"why": "The program must be scaffolded as a crate. `pina init escrow_program` creates the subdirectory while `pina init escrow_program --path .` makes the current directory the crate, which is an equally correct reading of \"in this directory\"."
 		},
 		{
-			"id": "migrations-defaults-kept",
+			"id": "default-width-kept",
 			"kind": "file",
 			"paths": [
-				"escrow_program/pina.toml",
-				"pina.toml"
+				"escrow_program/migrations/manifest.json",
+				"migrations/manifest.json"
 			],
-			"match": "version_type\\s*=\\s*\"u8\"",
-			"why": "`init` scaffolds the recommended defaults; changing them without a reason is scope creep."
+			"match": "\"versionType\": \"u8\"",
+			"why": "`u8` is the recommended width; widening it without a reason is scope creep."
 		},
 		{
-			"id": "auto-opt-in-kept",
+			"id": "auto-policy-recorded",
+			"kind": "file",
+			"paths": [
+				"escrow_program/migrations/manifest.json",
+				"migrations/manifest.json"
+			],
+			"match": "\"auto\":\\s*\\[\\s*\"accounts\",\\s*\"instructions\",\\s*\"events\"\\s*\\]",
+			"why": "New projects are meant to track every contract kind, and the request asked for that setup; `pina migrations create --auto true` records the policy in the manifest."
+		},
+		{
+			"id": "pina-toml-holds-no-policy",
 			"kind": "file",
 			"paths": [
 				"escrow_program/pina.toml",
 				"pina.toml"
 			],
-			"match": "auto\\s*=\\s*true",
-			"why": "Migrations are on by default for new projects and the request asked for that setup."
+			"match": "^\\s*(version[_-]type|auto)\\s*=",
+			"absent": true,
+			"why": "The migration policy lives only in the manifest; the retired `pina.toml` keys fail every command that reads the file."
 		},
 		{
 			"id": "history-bound-to-declared-identity",

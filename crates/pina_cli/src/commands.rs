@@ -323,6 +323,8 @@ fn run_migrations(command: MigrationCommands) {
 			manual,
 			no_interactive,
 			envelope_ack,
+			auto,
+			version_type,
 			json,
 		} => {
 			let answers = match build_migration_answers(
@@ -334,6 +336,7 @@ fn run_migrations(command: MigrationCommands) {
 			) {
 				Ok(mut answers) => {
 					answers.set_envelope_ack(envelope_ack);
+					answers.set_policy(auto, version_type);
 					answers
 				}
 				Err(reason) => {
@@ -380,6 +383,12 @@ fn run_migrations(command: MigrationCommands) {
 			}
 			for contract in &output.updated_drafts {
 				println!("Updated draft {contract}");
+			}
+			for contract in &output.extended_processes {
+				println!("Appended optional accounts to {contract}");
+			}
+			for contract in &output.released_snapshots {
+				println!("Released snapshot {contract}");
 			}
 			for path in &output.manual_transitions {
 				println!("Manual migration required: {}", escaped_path(path));
@@ -655,6 +664,13 @@ fn print_migration_notices(output: &pina_cli::migrations::CreateMigrationsOutput
 	}
 	if !output.auto.is_empty() {
 		println!("Auto policy: {}", output.auto.join(", "));
+	}
+	if let Some(previous) = output.previous_version_type {
+		println!(
+			"{} Version type changed from {previous} to {}",
+			"✔".green(),
+			output.version_type
+		);
 	}
 	match &output.build_script {
 		Some(BuildScriptStatus::Created { path }) => {
@@ -2282,10 +2298,17 @@ fn print_migration_statuses(statuses: &[pina_cli::migrations::MigrationStatus]) 
 		} else {
 			"draft"
 		};
-		println!(
-			"{} {} v{} ({publication}, {} version(s) remaining)",
-			status.kind, status.rust_name, status.current_version, status.versions_remaining
-		);
+		if status.envelope {
+			println!(
+				"{} {} v{} ({publication}, {} version(s) remaining)",
+				status.kind, status.rust_name, status.current_version, status.versions_remaining
+			);
+		} else {
+			println!(
+				"{} {} ({publication}, snapshot without envelope)",
+				status.kind, status.rust_name
+			);
+		}
 	}
 }
 

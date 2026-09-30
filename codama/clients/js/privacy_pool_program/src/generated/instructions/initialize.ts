@@ -53,7 +53,6 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -61,12 +60,6 @@ export const INITIALIZE_DISCRIMINATOR = 0;
 
 export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR);
-}
-
-export const INITIALIZE_DISCRIMINATOR2 = 0;
-
-export function getInitializeDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(INITIALIZE_DISCRIMINATOR2);
 }
 
 export type InitializeInstruction<
@@ -118,7 +111,6 @@ export type InitializeInstruction<
 
 export type InitializeInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	configBump: number;
 	vaultBump: number;
 	treeBump: number;
@@ -154,7 +146,6 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["configBump", getU8Encoder()],
 			["vaultBump", getU8Encoder()],
 			["treeBump", getU8Encoder()],
@@ -164,7 +155,7 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 			["logBump", getU8Encoder()],
 			["custodians", fixPinaPodEncoderSize(getBytesEncoder(), 96)],
 		]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
 
@@ -176,7 +167,6 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(INITIALIZE_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["configBump", getU8Decoder()],
 		["vaultBump", getU8Decoder()],
 		["treeBump", getU8Decoder()],

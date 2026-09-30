@@ -733,8 +733,8 @@ mod tests {
 	#[test]
 	fn the_rename_instruction_uses_the_title_bound() {
 		// The instruction's fixed array shares `MAX_TITLE` with the account, so
-		// the two bounds cannot drift apart. `RenameIx` is migratable, so its
-		// size includes the discriminator and version envelope.
-		assert_eq!(RenameIx::SIZE, 2 + 1 + MAX_TITLE);
+		// the two bounds cannot drift apart. Instructions carry no version
+		// envelope, so the size is the discriminator plus the payload.
+		assert_eq!(RenameIx::SIZE, 1 + 1 + MAX_TITLE);
 	}
 }

@@ -48,7 +48,7 @@ fn current_idl_contains_only_omitted_migration_constants() {
 	);
 	assert_eq!(
 		idl.pointer(&format!("{update}/arguments/1/defaultValue/number")),
-		Some(&serde_json::json!(2)),
+		Some(&serde_json::json!(1)),
 	);
 	assert_eq!(
 		idl.pointer(&format!("{update}/discriminators/1/offset")),

@@ -81,24 +81,24 @@ pub struct SetVerificationKeyIx {
 
 impl SetVerificationKeyIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 709;
+	pub const LEN: usize = 708;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 709], ProgramError> {
-		let mut data = [0u8; 709];
-		data[..2].copy_from_slice(&SET_VERIFICATION_KEY_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
-		data[3..4].copy_from_slice(&self.slot.to_le_bytes());
-		data[4..5].copy_from_slice(&self.ic_len.to_le_bytes());
-		data[5..69].copy_from_slice(&self.alpha_g1);
-		data[69..197].copy_from_slice(&self.beta_g2);
-		data[197..325].copy_from_slice(&self.gamma_g2);
-		data[325..453].copy_from_slice(&self.delta_g2);
-		data[453..517].copy_from_slice(&self.ic0);
-		data[517..581].copy_from_slice(&self.ic1);
-		data[581..645].copy_from_slice(&self.ic2);
-		data[645..709].copy_from_slice(&self.ic3);
+	pub fn to_bytes(&self) -> Result<[u8; 708], ProgramError> {
+		let mut data = [0u8; 708];
+		data[..1].copy_from_slice(&SET_VERIFICATION_KEY_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
+		data[2..3].copy_from_slice(&self.slot.to_le_bytes());
+		data[3..4].copy_from_slice(&self.ic_len.to_le_bytes());
+		data[4..68].copy_from_slice(&self.alpha_g1);
+		data[68..196].copy_from_slice(&self.beta_g2);
+		data[196..324].copy_from_slice(&self.gamma_g2);
+		data[324..452].copy_from_slice(&self.delta_g2);
+		data[452..516].copy_from_slice(&self.ic0);
+		data[516..580].copy_from_slice(&self.ic1);
+		data[580..644].copy_from_slice(&self.ic2);
+		data[644..708].copy_from_slice(&self.ic3);
 
 		Ok(data)
 	}
@@ -131,4 +131,4 @@ impl<'account> SetVerificationKey<'account> {
 	}
 }
 
-const SET_VERIFICATION_KEY_DISCRIMINATOR: [u8; 2] = [1, 0];
+const SET_VERIFICATION_KEY_DISCRIMINATOR: [u8; 1] = [1];

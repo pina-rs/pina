@@ -9,5 +9,7 @@
 )]
 
 pub(crate) mod r#value_changed_event;
+pub(crate) mod r#value_changed_event_v0;
 
 pub use self::r#value_changed_event::*;
+pub use self::r#value_changed_event_v0::*;

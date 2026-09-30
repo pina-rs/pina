@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: eb83a1f7be97aa034a1842a0e31d23e172cff610cf32a1915308fee06c01e501
+// manifest-sha256: b5e0910b2bead0fac696eb493872dea3a2ff1fc742f4963a821a8e2583dfcbaa
 // program-id: 2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe
 // version_type: u8
 
@@ -30,7 +30,7 @@ pub mod account_1_01 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
+	/// Width of the migration version field in bytes; zero without an envelope.
 	pub const VERSION_BYTES: usize = 1;
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
@@ -60,10 +60,10 @@ pub mod instruction_1_00 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
-	pub const VERSION_BYTES: usize = 1;
+	/// Width of the migration version field in bytes; zero without an envelope.
+	pub const VERSION_BYTES: usize = 0;
 	/// Bytes occupied by the discriminator and version envelope together.
-	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	pub const MIGRATION_HEADER_SIZE: usize = 1;
 	/// Payload size in bytes, excluding the envelope header.
 	pub const PAYLOAD_SIZE: usize = 0;
 	/// Total encoded size in bytes, including the envelope header.
@@ -89,10 +89,10 @@ pub mod instruction_1_01 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
-	pub const VERSION_BYTES: usize = 1;
+	/// Width of the migration version field in bytes; zero without an envelope.
+	pub const VERSION_BYTES: usize = 0;
 	/// Bytes occupied by the discriminator and version envelope together.
-	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	pub const MIGRATION_HEADER_SIZE: usize = 1;
 	/// Payload size in bytes, excluding the envelope header.
 	pub const PAYLOAD_SIZE: usize = 32;
 	/// Total encoded size in bytes, including the envelope header.
@@ -119,10 +119,10 @@ pub mod instruction_1_02 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
-	pub const VERSION_BYTES: usize = 1;
+	/// Width of the migration version field in bytes; zero without an envelope.
+	pub const VERSION_BYTES: usize = 0;
 	/// Bytes occupied by the discriminator and version envelope together.
-	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	pub const MIGRATION_HEADER_SIZE: usize = 1;
 	/// Payload size in bytes, excluding the envelope header.
 	pub const PAYLOAD_SIZE: usize = 33;
 	/// Total encoded size in bytes, including the envelope header.
@@ -150,10 +150,10 @@ pub mod instruction_1_03 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
-	pub const VERSION_BYTES: usize = 1;
+	/// Width of the migration version field in bytes; zero without an envelope.
+	pub const VERSION_BYTES: usize = 0;
 	/// Bytes occupied by the discriminator and version envelope together.
-	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	pub const MIGRATION_HEADER_SIZE: usize = 1;
 	/// Payload size in bytes, excluding the envelope header.
 	pub const PAYLOAD_SIZE: usize = 1;
 	/// Total encoded size in bytes, including the envelope header.

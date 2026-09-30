@@ -93,22 +93,18 @@ export function identifyProfileProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): ProfileProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return ProfileProgramInstruction.Initialize;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return ProfileProgramInstruction.UpdateProfile;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return ProfileProgramInstruction.AddTag;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return ProfileProgramInstruction.RemoveTag;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return ProfileProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return ProfileProgramInstruction.UpdateProfile;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return ProfileProgramInstruction.AddTag;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return ProfileProgramInstruction.RemoveTag;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "profileProgram" },

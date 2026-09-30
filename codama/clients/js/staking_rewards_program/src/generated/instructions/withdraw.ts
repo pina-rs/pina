@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const WITHDRAW_DISCRIMINATOR = 3;
 
 export function getWithdrawDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(WITHDRAW_DISCRIMINATOR);
-}
-
-export const WITHDRAW_DISCRIMINATOR2 = 0;
-
-export function getWithdrawDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(WITHDRAW_DISCRIMINATOR2);
 }
 
 export type WithdrawInstruction<
@@ -99,11 +90,7 @@ export type WithdrawInstruction<
 		]
 	>;
 
-export type WithdrawInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-	amount: bigint;
-};
+export type WithdrawInstructionData = { discriminator: number; amount: bigint };
 
 export type WithdrawInstructionDataArgs = { amount: number | bigint };
 
@@ -112,24 +99,20 @@ export function getWithdrawInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["amount", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+			"amount",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
 export function getWithdrawInstructionDataDecoder(): FixedSizeDecoder<
 	WithdrawInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(WITHDRAW_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["amount", getU64Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(WITHDRAW_DISCRIMINATOR, getU8Decoder()),
+	], ["amount", getU64Decoder()]]);
 }
 
 export function getWithdrawInstructionDataCodec(): FixedSizeCodec<

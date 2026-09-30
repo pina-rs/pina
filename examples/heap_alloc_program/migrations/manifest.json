@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "BZtBGtYSgERx2zN12aGgQ6sNLh5r7XtcNCafqmsizgqt",
 	"versionType": "u8",
 	"auto": [
@@ -9,12 +9,8 @@
 	],
 	"contracts": {
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "AllocateInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -24,23 +20,17 @@
 								"name": "value",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": []
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "FillInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -54,13 +44,11 @@
 								"name": "fill",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": []
-					},
-					"transition": null
+					}
 				}
 			]
 		}

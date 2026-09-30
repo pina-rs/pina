@@ -179,9 +179,9 @@ fn bounded_tags_reject_length_over_capacity() {
 
 #[test]
 fn initialize_instruction_data_layout() {
-	// 1 (discriminator) + 1 (migration version) + 1 (bump) + 33 (name) +
-	// 129 (bio) = 165 bytes.
-	assert_eq!(InitializeInstruction::SIZE, 165);
+	// 1 (discriminator) + 1 (bump) + 33 (name) + 129 (bio) = 164 bytes.
+	// Instructions carry no version envelope unless they opt into migrations.
+	assert_eq!(InitializeInstruction::SIZE, 164);
 	assert!(InitializeInstruction::matches_discriminator(&[
 		ProfileInstruction::Initialize as u8
 	]));
@@ -189,21 +189,20 @@ fn initialize_instruction_data_layout() {
 
 #[test]
 fn update_profile_instruction_data_layout() {
-	// 1 (discriminator) + 1 (migration version) + 33 (name) + 129 (bio) =
-	// 164 bytes.
-	assert_eq!(UpdateProfileInstruction::SIZE, 164);
+	// 1 (discriminator) + 33 (name) + 129 (bio) = 163 bytes.
+	assert_eq!(UpdateProfileInstruction::SIZE, 163);
 }
 
 #[test]
 fn add_tag_instruction_data_layout() {
-	// 1 (discriminator) + 1 (migration version) + 8 (tag) = 10 bytes.
-	assert_eq!(AddTagInstruction::SIZE, 10);
+	// 1 (discriminator) + 8 (tag) = 9 bytes.
+	assert_eq!(AddTagInstruction::SIZE, 9);
 }
 
 #[test]
 fn remove_tag_instruction_data_layout() {
-	// 1 (discriminator) + 1 (migration version) + 8 (index) = 10 bytes.
-	assert_eq!(RemoveTagInstruction::SIZE, 10);
+	// 1 (discriminator) + 8 (index) = 9 bytes.
+	assert_eq!(RemoveTagInstruction::SIZE, 9);
 }
 
 #[test]

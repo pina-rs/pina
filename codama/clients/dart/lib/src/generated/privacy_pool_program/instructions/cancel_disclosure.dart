@@ -14,11 +14,9 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class CancelDisclosureInstructionData {
   const CancelDisclosureInstructionData({required this.reserved})
-    : discriminator = 12,
-      migrationVersion = 0;
+    : discriminator = 12;
 
   final int discriminator;
-  final int migrationVersion;
   final int reserved;
 }
 
@@ -26,7 +24,6 @@ Encoder<CancelDisclosureInstructionData>
 getCancelDisclosureInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('reserved', getU8Encoder()),
   ]);
 
@@ -34,7 +31,6 @@ getCancelDisclosureInstructionDataEncoder() {
     structEncoder,
     (CancelDisclosureInstructionData value) => <String, Object?>{
       'discriminator': 12,
-      'migrationVersion': 0,
       'reserved': value.reserved,
     },
   );
@@ -44,7 +40,6 @@ Decoder<CancelDisclosureInstructionData>
 getCancelDisclosureInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('reserved', getU8Decoder()),
   ]);
 
@@ -61,7 +56,6 @@ getCancelDisclosureInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(12)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

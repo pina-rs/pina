@@ -1384,6 +1384,19 @@ pub trait ProcessAccountInfos<'a>: TryFromAccountInfos<'a> {
 	/// Execute the instruction logic after accounts have been validated and
 	/// parsed into the implementor type.
 	fn process(self, data: &[u8]) -> ProgramResult;
+
+	/// Execute a migration-aware instruction after its payload was normalized.
+	///
+	/// A generated entrypoint routes an instruction that opts into migrations
+	/// here instead of [`Self::process`]. `data` always holds the current
+	/// representation; `source_version` is the version the client wrote, which
+	/// equals the current version unless an older payload was converted. The
+	/// default ignores it, so only a handler that must tell a converted field
+	/// from one the client sent needs to override this.
+	fn process_from_version(self, data: &[u8], source_version: u32) -> ProgramResult {
+		let _ = source_version;
+		self.process(data)
+	}
 }
 
 #[cfg(test)]
@@ -1964,5 +1977,41 @@ mod tests {
 		// bytes: [0, 7, ...] — the 7 is at offset 1, not 0
 		let data = [0u8, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 		assert!(!TestType::matches_discriminator(&data));
+	}
+
+	struct RecordingAccounts<'a> {
+		seen: &'a core::cell::Cell<Option<u8>>,
+	}
+
+	impl<'a> TryFromAccountInfos<'a> for RecordingAccounts<'a> {
+		fn try_from_account_infos(
+			_program_id: &Address,
+			_accounts: &'a mut [AccountView],
+		) -> Result<Self, ProgramError> {
+			Err(ProgramError::NotEnoughAccountKeys)
+		}
+	}
+
+	impl<'a> ProcessAccountInfos<'a> for RecordingAccounts<'a> {
+		fn process(self, data: &[u8]) -> ProgramResult {
+			self.seen.set(data.first().copied());
+			Ok(())
+		}
+	}
+
+	/// A handler that does not care about the source version keeps working
+	/// unchanged when the entrypoint routes it through the versioned hook.
+	#[test]
+	fn process_from_version_defaults_to_process() {
+		let seen = core::cell::Cell::new(None);
+		let accounts = RecordingAccounts { seen: &seen };
+
+		assert_eq!(accounts.process_from_version(&[9, 1], 0), Ok(()));
+		assert_eq!(seen.get(), Some(9));
+		let mut no_accounts = [];
+		assert!(
+			RecordingAccounts::try_from_account_infos(&Address::default(), &mut no_accounts)
+				.is_err()
+		);
 	}
 }

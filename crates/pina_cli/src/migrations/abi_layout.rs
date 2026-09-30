@@ -65,7 +65,13 @@ pub fn generate(manifest: &MigrationManifest) -> String {
 			&ContractGeometry {
 				kind: &history.identity.kind,
 				discriminator_bytes: history.identity.discriminator_bytes,
-				version_bytes: manifest.version_type.bytes() as u8,
+				// A snapshot without an envelope has no version field, so every
+				// offset below starts right after the discriminator.
+				version_bytes: if history.envelope {
+					manifest.version_type.bytes() as u8
+				} else {
+					0
+				},
 			},
 			current,
 			current_version,
@@ -153,7 +159,7 @@ fn render_contract(
 	);
 	let _ = writeln!(
 		output,
-		"\t/// Width of the migration version field in bytes."
+		"\t/// Width of the migration version field in bytes; zero without an envelope."
 	);
 	let _ = writeln!(
 		output,

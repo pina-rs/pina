@@ -93,22 +93,18 @@ export function identifyOptionalAccountsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): OptionalAccountsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return OptionalAccountsProgramInstruction.Init;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return OptionalAccountsProgramInstruction.Touch;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return OptionalAccountsProgramInstruction.Inspect;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return OptionalAccountsProgramInstruction.Note;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return OptionalAccountsProgramInstruction.Init;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return OptionalAccountsProgramInstruction.Touch;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return OptionalAccountsProgramInstruction.Inspect;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return OptionalAccountsProgramInstruction.Note;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "optionalAccountsProgram" },

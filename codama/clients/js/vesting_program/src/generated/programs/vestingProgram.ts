@@ -88,18 +88,15 @@ export function identifyVestingProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): VestingProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return VestingProgramInstruction.Initialize;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return VestingProgramInstruction.Claim;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return VestingProgramInstruction.Cancel;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return VestingProgramInstruction.Initialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return VestingProgramInstruction.Claim;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return VestingProgramInstruction.Cancel;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "vestingProgram" },

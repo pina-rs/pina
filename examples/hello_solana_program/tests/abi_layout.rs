@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: 5a9793b8c0513ab175c549240b7051d87211f6f31c90a590a1a8cde6cb64e017
+// manifest-sha256: 7bf75fe1deda21fdadc6aedbc1720d523a5235378096a3178c96ae0dc2b71d71
 // program-id: DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A
 // version_type: u8
 
@@ -30,10 +30,10 @@ pub mod instruction_1_00 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
-	pub const VERSION_BYTES: usize = 1;
+	/// Width of the migration version field in bytes; zero without an envelope.
+	pub const VERSION_BYTES: usize = 0;
 	/// Bytes occupied by the discriminator and version envelope together.
-	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	pub const MIGRATION_HEADER_SIZE: usize = 1;
 	/// Payload size in bytes, excluding the envelope header.
 	pub const PAYLOAD_SIZE: usize = 0;
 	/// Total encoded size in bytes, including the envelope header.

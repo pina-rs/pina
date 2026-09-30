@@ -9,7 +9,6 @@
 )]
 
 pub const PROPOSAL_ACTIVATE_DISCRIMINATOR: u8 = 5u8;
-pub const PROPOSAL_ACTIVATE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -83,7 +82,6 @@ impl ProposalActivateInstructionData {
 		<ProposalActivateInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = PROPOSAL_ACTIVATE_DISCRIMINATOR;
-			data.migration_version = PROPOSAL_ACTIVATE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -97,5 +95,4 @@ impl ProposalActivateInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ProposalActivateInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 }

@@ -98,24 +98,24 @@ pub struct TransferIx {
 
 impl TransferIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 660;
+	pub const LEN: usize = 659;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 660], ProgramError> {
-		let mut data = [0u8; 660];
-		data[..2].copy_from_slice(&TRANSFER_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
-		data[3..35].copy_from_slice(&self.nullifier);
-		data[35..67].copy_from_slice(&self.root);
-		data[67..99].copy_from_slice(&self.new_commitment);
-		data[99..131].copy_from_slice(&self.new_view_pubkey);
-		data[131..132].copy_from_slice(&self.envelope_len.to_le_bytes());
-		data[132..260].copy_from_slice(&self.envelope);
-		data[260..404].copy_from_slice(&self.shares);
-		data[404..468].copy_from_slice(&self.proof_a);
-		data[468..596].copy_from_slice(&self.proof_b);
-		data[596..660].copy_from_slice(&self.proof_c);
+	pub fn to_bytes(&self) -> Result<[u8; 659], ProgramError> {
+		let mut data = [0u8; 659];
+		data[..1].copy_from_slice(&TRANSFER_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
+		data[2..34].copy_from_slice(&self.nullifier);
+		data[34..66].copy_from_slice(&self.root);
+		data[66..98].copy_from_slice(&self.new_commitment);
+		data[98..130].copy_from_slice(&self.new_view_pubkey);
+		data[130..131].copy_from_slice(&self.envelope_len.to_le_bytes());
+		data[131..259].copy_from_slice(&self.envelope);
+		data[259..403].copy_from_slice(&self.shares);
+		data[403..467].copy_from_slice(&self.proof_a);
+		data[467..595].copy_from_slice(&self.proof_b);
+		data[595..659].copy_from_slice(&self.proof_c);
 
 		Ok(data)
 	}
@@ -151,4 +151,4 @@ impl<'account> Transfer<'account> {
 	}
 }
 
-const TRANSFER_DISCRIMINATOR: [u8; 2] = [6, 0];
+const TRANSFER_DISCRIMINATOR: [u8; 1] = [6];

@@ -72,6 +72,7 @@ fn manifest() -> MigrationManifest {
 		ContractHistory {
 			identity,
 			rust_name: "State".to_owned(),
+			envelope: true,
 			versions: vec![v0, v1, v2],
 		},
 	);
@@ -121,6 +122,34 @@ fn decode_envelope_classifies_current_stale_future_and_unknown() {
 		decode_envelope(&manifest, &[1]).expect("short data maps to the contract");
 	assert_eq!(state, InspectState::UnknownContract);
 	let _ = history;
+}
+
+/// Account data is matched only against account contracts: an instruction
+/// or event sharing the discriminator value lives in another namespace.
+#[test]
+fn decode_envelope_ignores_non_account_contracts() {
+	let mut manifest = manifest();
+	for kind in [ContractKind::Instruction, ContractKind::Event] {
+		let identity = ContractIdentity::try_new(kind, 1, 9).unwrap();
+		manifest.contracts.insert(
+			identity.key(),
+			ContractHistory {
+				identity,
+				rust_name: "Shadow".to_owned(),
+				envelope: kind == ContractKind::Event,
+				versions: vec![SchemaVersion {
+					schema: schema(&[("value", "u64")]),
+					process: (kind == ContractKind::Instruction)
+						.then(|| pina_abi::ProcessContract { accounts: vec![] }),
+					transition: None,
+				}],
+			},
+		);
+	}
+
+	let mut data = account_bytes(0, 42);
+	data[0] = 9;
+	assert!(decode_envelope(&manifest, &data).is_none());
 }
 
 #[test]

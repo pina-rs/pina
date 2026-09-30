@@ -16,11 +16,9 @@ class RegisterRequesterInstructionData {
   const RegisterRequesterInstructionData({
     required this.requester,
     required this.maxTier,
-  }) : discriminator = 3,
-       migrationVersion = 0;
+  }) : discriminator = 3;
 
   final int discriminator;
-  final int migrationVersion;
   final Address requester;
   final int maxTier;
 }
@@ -29,7 +27,6 @@ Encoder<RegisterRequesterInstructionData>
 getRegisterRequesterInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('requester', getAddressEncoder()),
     ('maxTier', getU8Encoder()),
   ]);
@@ -38,7 +35,6 @@ getRegisterRequesterInstructionDataEncoder() {
     structEncoder,
     (RegisterRequesterInstructionData value) => <String, Object?>{
       'discriminator': 3,
-      'migrationVersion': 0,
       'requester': value.requester,
       'maxTier': value.maxTier,
     },
@@ -49,7 +45,6 @@ Decoder<RegisterRequesterInstructionData>
 getRegisterRequesterInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('requester', getAddressDecoder()),
     ('maxTier', getU8Decoder()),
   ]);
@@ -67,7 +62,6 @@ getRegisterRequesterInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

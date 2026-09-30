@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const REALLOC_DISCRIMINATOR = 0;
 
 export function getReallocDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REALLOC_DISCRIMINATOR);
-}
-
-export const REALLOC_DISCRIMINATOR2 = 0;
-
-export function getReallocDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REALLOC_DISCRIMINATOR2);
 }
 
 export type ReallocInstruction<
@@ -82,11 +73,7 @@ export type ReallocInstruction<
 		]
 	>;
 
-export type ReallocInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-	len: number;
-};
+export type ReallocInstructionData = { discriminator: number; len: number };
 
 export type ReallocInstructionDataArgs = { len: number };
 
@@ -95,24 +82,20 @@ export function getReallocInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["len", getU16Encoder()]]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
+			"len",
+			getU16Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
 
 export function getReallocInstructionDataDecoder(): FixedSizeDecoder<
 	ReallocInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(REALLOC_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["len", getU16Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(REALLOC_DISCRIMINATOR, getU8Decoder()),
+	], ["len", getU16Decoder()]]);
 }
 
 export function getReallocInstructionDataCodec(): FixedSizeCodec<

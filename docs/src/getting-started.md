@@ -15,14 +15,14 @@ pina init my_program
 cd my_program
 pina doctor               # checks every prerequisite above
 pina keys new             # replace the shared placeholder program ID
-pina migrations create    # record the version-0 ABI baseline
+pina migrations create --auto true  # track every contract; record the version-0 ABI baseline
 pina build
 pina test --unit
 pina test
 pina generate
 ```
 
-Run `pina keys new` and `pina migrations create` before anything else. The scaffold enables migrations, so `pina build`, `pina idl`, and `pina generate` refuse to run until the baseline exists, and the baseline records the program ID it belongs to. See the [`pina init` reference](./cli/init.md) for what the scaffold contains.
+Run `pina keys new` and `pina migrations create --auto true` before anything else. The migration policy lives in the manifest that command writes, not in `pina.toml`, so until it runs nothing is tracked and generated clients carry no version envelope; the baseline also records the program ID it belongs to. See the [`pina init` reference](./cli/init.md) for what the scaffold contains.
 
 ## Work on Pina itself
 

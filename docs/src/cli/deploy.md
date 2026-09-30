@@ -79,7 +79,7 @@ Quote the variables inside the command (`"$PINA_DEPLOY_PAYER"`), and treat an ex
 
 ## Migration publication receipts
 
-For a program with checked-in migrations, a deployment to any non-loopback target freezes the ABI versions it ships. Before starting the deploy program, Pina writes a pending record to `migrations/publications.json`; after the program succeeds, it converts that record into a hash-chained receipt. From then on `pina migrations create` advances those contracts to a new version instead of rewriting them. `--record-publication` opts a loopback deployment into the same lifecycle, which is how a Surfpool run exercises it.
+For a program with checked-in migrations, a deployment to any non-loopback target freezes the ABI versions it ships. Before starting the deploy program, Pina writes a pending record to `migrations/publications.json`; after the program succeeds, it appends that record as a receipt pinning the schema of every version it shipped. From then on `pina migrations create` advances those contracts to a new version instead of rewriting them. `--record-publication` opts a loopback deployment into the same lifecycle, which is how a Surfpool run exercises it.
 
 If the deploy program starts and then fails, the pending record stays, because the program may already be live. Rerunning the exact same deployment reconciles it, and `pina migrations reconcile` explains the state. If the deploy program never started, for example because `solana` is not installed, Pina discards the pending record it just wrote and says so, because nothing can have reached the cluster. A pending record left by an earlier attempt is never discarded this way.
 

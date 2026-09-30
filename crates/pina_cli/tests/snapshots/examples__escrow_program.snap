@@ -245,20 +245,6 @@ expression: idl
           },
           {
             "kind": "instructionArgumentNode",
-            "name": "migrationVersion",
-            "defaultValueStrategy": "omitted",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u8",
-              "endian": "le"
-            },
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 0
-            }
-          },
-          {
-            "kind": "instructionArgumentNode",
             "name": "seed",
             "docs": [
               "An ID of the transaction."
@@ -317,22 +303,6 @@ expression: idl
               "value": {
                 "kind": "numberValueNode",
                 "number": 1
-              }
-            }
-          },
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 1,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 0
               }
             }
           }
@@ -449,20 +419,6 @@ expression: idl
               "kind": "numberValueNode",
               "number": 2
             }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "migrationVersion",
-            "defaultValueStrategy": "omitted",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u8",
-              "endian": "le"
-            },
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 0
-            }
           }
         ],
         "discriminators": [
@@ -479,22 +435,6 @@ expression: idl
               "value": {
                 "kind": "numberValueNode",
                 "number": 2
-              }
-            }
-          },
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 1,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 0
               }
             }
           }
@@ -583,20 +523,6 @@ expression: idl
               "kind": "numberValueNode",
               "number": 3
             }
-          },
-          {
-            "kind": "instructionArgumentNode",
-            "name": "migrationVersion",
-            "defaultValueStrategy": "omitted",
-            "type": {
-              "kind": "numberTypeNode",
-              "format": "u8",
-              "endian": "le"
-            },
-            "defaultValue": {
-              "kind": "numberValueNode",
-              "number": 0
-            }
           }
         ],
         "discriminators": [
@@ -613,22 +539,6 @@ expression: idl
               "value": {
                 "kind": "numberValueNode",
                 "number": 3
-              }
-            }
-          },
-          {
-            "kind": "constantDiscriminatorNode",
-            "offset": 1,
-            "constant": {
-              "kind": "constantValueNode",
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u8",
-                "endian": "le"
-              },
-              "value": {
-                "kind": "numberValueNode",
-                "number": 0
               }
             }
           }

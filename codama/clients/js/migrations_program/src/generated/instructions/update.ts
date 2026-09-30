@@ -54,7 +54,7 @@ export function getUpdateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DISCRIMINATOR);
 }
 
-export const UPDATE_DISCRIMINATOR2 = 2;
+export const UPDATE_DISCRIMINATOR2 = 1;
 
 export function getUpdateDiscriminator2Bytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DISCRIMINATOR2);
@@ -121,7 +121,7 @@ export function getUpdateInstructionDataEncoder(): FixedSizeEncoder<
 			["value", getU64Encoder()],
 			["memo", getU16Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 2 }),
+		(value) => ({ ...value, discriminator: 0, migrationVersion: 1 }),
 	);
 }
 
@@ -133,7 +133,7 @@ export function getUpdateInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(UPDATE_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(2, getU8Decoder())],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(1, getU8Decoder())],
 		["value", getU64Decoder()],
 		["memo", getU16Decoder()],
 	]);

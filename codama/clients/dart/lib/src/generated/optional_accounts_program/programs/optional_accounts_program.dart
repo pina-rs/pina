@@ -26,20 +26,16 @@ enum OptionalAccountsProgramInstruction { init, touch, inspect, note }
 OptionalAccountsProgramInstruction identifyOptionalAccountsProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return OptionalAccountsProgramInstruction.init;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return OptionalAccountsProgramInstruction.touch;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return OptionalAccountsProgramInstruction.inspect;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
     return OptionalAccountsProgramInstruction.note;
   }
 

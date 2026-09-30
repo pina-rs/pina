@@ -9,7 +9,6 @@
 )]
 
 pub const REGISTER_REQUESTER_DISCRIMINATOR: u8 = 3u8;
-pub const REGISTER_REQUESTER_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -80,7 +79,6 @@ impl RegisterRequesterInstructionData {
 		<RegisterRequesterInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REGISTER_REQUESTER_DISCRIMINATOR;
-			data.migration_version = REGISTER_REQUESTER_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -94,7 +92,6 @@ impl RegisterRequesterInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RegisterRequesterInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub requester: solana_pubkey::Pubkey,
 	/// Highest tier the entity may file at.
 	pub max_tier: u8,

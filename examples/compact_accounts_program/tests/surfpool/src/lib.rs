@@ -32,10 +32,9 @@ fn initialize_instruction(
 	marker_count: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		// discriminator + migration version + bump + tail lengths.
+		// discriminator + bump + tail lengths.
 		&[
 			CompactInstruction::Initialize as u8,
-			0u8,
 			bump,
 			entry_count,
 			marker_count,
@@ -56,12 +55,7 @@ fn resize_instruction(
 	marker_count: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[
-			CompactInstruction::Resize as u8,
-			0u8,
-			entry_count,
-			marker_count,
-		],
+		&[CompactInstruction::Resize as u8, entry_count, marker_count],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*journal, false),
@@ -77,8 +71,8 @@ fn write_instruction(
 	index: u8,
 	value: u64,
 ) -> pina_test::Instruction {
-	// discriminator + migration version + index, then the u64 value.
-	let mut data = vec![CompactInstruction::Write as u8, 0u8, index];
+	// discriminator + index, then the u64 value.
+	let mut data = vec![CompactInstruction::Write as u8, index];
 	data.extend_from_slice(&value.to_le_bytes());
 	program.instruction(
 		&data,
@@ -95,8 +89,8 @@ fn rename_instruction(
 	journal: &Pubkey,
 	title: &str,
 ) -> pina_test::Instruction {
-	// discriminator + migration version + bounded title length.
-	let mut data = vec![CompactInstruction::Rename as u8, 0u8, title.len() as u8];
+	// discriminator + bounded title length.
+	let mut data = vec![CompactInstruction::Rename as u8, title.len() as u8];
 	let mut title_bytes = [0; Journal::TITLE_CAPACITY];
 	title_bytes[..title.len()].copy_from_slice(title.as_bytes());
 	data.extend_from_slice(&title_bytes);
@@ -552,8 +546,8 @@ fn rejected_invalid_titles_preserve_data_and_lamports() {
 		let before = program.account(&journal).expect("journal before rejection");
 
 		for (title_len, first_byte) in [((Journal::TITLE_CAPACITY + 1) as u8, b'x'), (1, 0xff)] {
-			// discriminator + migration version + bounded title length.
-			let mut data = vec![CompactInstruction::Rename as u8, 0u8, title_len];
+			// discriminator + bounded title length.
+			let mut data = vec![CompactInstruction::Rename as u8, title_len];
 			let mut title = [0; Journal::TITLE_CAPACITY];
 			title[0] = first_byte;
 			data.extend_from_slice(&title);
@@ -682,7 +676,7 @@ fn signer_and_system_program_constraints_are_enforced() {
 		let (journal, bump) = journal_pda(&program_id, &unsigned_authority);
 
 		let unsigned = program.instruction(
-			&[CompactInstruction::Initialize as u8, 0u8, bump, 0, 0],
+			&[CompactInstruction::Initialize as u8, bump, 0, 0],
 			vec![
 				AccountMeta::new(unsigned_authority, false),
 				AccountMeta::new(journal, false),
@@ -696,7 +690,7 @@ fn signer_and_system_program_constraints_are_enforced() {
 		let authority = program.payer();
 		let (journal, bump) = journal_pda(&program_id, &authority);
 		let wrong_system = program.instruction(
-			&[CompactInstruction::Initialize as u8, 0u8, bump, 0, 0],
+			&[CompactInstruction::Initialize as u8, bump, 0, 0],
 			vec![
 				AccountMeta::new(authority, true),
 				AccountMeta::new(journal, false),

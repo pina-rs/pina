@@ -40,22 +40,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findProfilePda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PROFILE_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ADD_TAG_DISCRIMINATOR = 2;
 
 export function getAddTagDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ADD_TAG_DISCRIMINATOR);
-}
-
-export const ADD_TAG_DISCRIMINATOR2 = 0;
-
-export function getAddTagDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(ADD_TAG_DISCRIMINATOR2);
 }
 
 export type AddTagInstruction<
@@ -80,7 +71,6 @@ export type AddTagInstruction<
 
 export type AddTagInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** The tag value to append. */
 	tag: bigint;
 };
@@ -95,24 +85,20 @@ export function getAddTagInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["tag", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
+			"tag",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 2 }),
 	);
 }
 
 export function getAddTagInstructionDataDecoder(): FixedSizeDecoder<
 	AddTagInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(ADD_TAG_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["tag", getU64Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(ADD_TAG_DISCRIMINATOR, getU8Decoder()),
+	], ["tag", getU64Decoder()]]);
 }
 
 export function getAddTagInstructionDataCodec(): FixedSizeCodec<

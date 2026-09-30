@@ -14,11 +14,9 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class InitializeInstructionData {
   const InitializeInstructionData({required this.bump, required this.digest})
-    : discriminator = 0,
-      migrationVersion = 0;
+    : discriminator = 0;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
   final Uint8List digest;
 }
@@ -26,7 +24,6 @@ class InitializeInstructionData {
 Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('digest', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
   ]);
@@ -35,7 +32,6 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
     structEncoder,
     (InitializeInstructionData value) => <String, Object?>{
       'discriminator': 0,
-      'migrationVersion': 0,
       'bump': value.bump,
       'digest': value.digest,
     },
@@ -45,7 +41,6 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
 Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('digest', fixDecoderSize(getBytesDecoder(), 32)),
   ]);
@@ -60,7 +55,6 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
 
   (InitializeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

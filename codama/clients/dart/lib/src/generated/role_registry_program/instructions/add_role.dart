@@ -17,11 +17,9 @@ class AddRoleInstructionData {
     required this.roleId,
     required this.permissions,
     required this.bump,
-  }) : discriminator = 1,
-       migrationVersion = 0;
+  }) : discriminator = 1;
 
   final int discriminator;
-  final int migrationVersion;
   final BigInt roleId;
   final BigInt permissions;
   final int bump;
@@ -30,7 +28,6 @@ class AddRoleInstructionData {
 Encoder<AddRoleInstructionData> getAddRoleInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('roleId', getU64Encoder()),
     ('permissions', getU64Encoder()),
     ('bump', getU8Encoder()),
@@ -40,7 +37,6 @@ Encoder<AddRoleInstructionData> getAddRoleInstructionDataEncoder() {
     structEncoder,
     (AddRoleInstructionData value) => <String, Object?>{
       'discriminator': 1,
-      'migrationVersion': 0,
       'roleId': value.roleId,
       'permissions': value.permissions,
       'bump': value.bump,
@@ -51,7 +47,6 @@ Encoder<AddRoleInstructionData> getAddRoleInstructionDataEncoder() {
 Decoder<AddRoleInstructionData> getAddRoleInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('roleId', getU64Decoder()),
     ('permissions', getU64Decoder()),
     ('bump', getU8Decoder()),
@@ -67,7 +62,6 @@ Decoder<AddRoleInstructionData> getAddRoleInstructionDataDecoder() {
 
   (AddRoleInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

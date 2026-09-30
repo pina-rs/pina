@@ -69,12 +69,12 @@ function instructionData(
 		? getAddressEncoder().encode(address(newAuthority))
 		: new Uint8Array();
 	const bumpBytes = bump === undefined ? new Uint8Array() : Uint8Array.of(bump);
-	// The envelope inserts the migration version byte after the discriminator.
-	const data = new Uint8Array(2 + bumpBytes.length + addressBytes.length);
+	// Instructions carry no version envelope unless they opt into migrations,
+	// so the payload follows the discriminator directly.
+	const data = new Uint8Array(1 + bumpBytes.length + addressBytes.length);
 	data[0] = discriminator;
-	data[1] = 0;
-	data.set(bumpBytes, 2);
-	data.set(addressBytes, 2 + bumpBytes.length);
+	data.set(bumpBytes, 1);
+	data.set(addressBytes, 1 + bumpBytes.length);
 
 	return data;
 }

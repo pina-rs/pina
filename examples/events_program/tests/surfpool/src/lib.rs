@@ -61,7 +61,7 @@ fn event_instructions_emit_decodable_log_records() {
 
 		for (index, (instruction, discriminator)) in expected.into_iter().enumerate() {
 			let logs = program
-				.simulate_logs(&[instruction as u8, 0u8], Vec::new())
+				.simulate_logs(&[instruction as u8], Vec::new())
 				.expect("simulate event instruction");
 			let records = decoded_event_records(&logs);
 			assert_eq!(
@@ -94,7 +94,7 @@ fn generated_client_decodes_the_emitted_record() {
 			.expect("start isolated program test");
 
 		let logs = program
-			.simulate_logs(&[EventsInstruction::Initialize as u8, 0u8], Vec::new())
+			.simulate_logs(&[EventsInstruction::Initialize as u8], Vec::new())
 			.expect("simulate event instruction");
 		let records = decoded_event_records(&logs);
 		let record = records
@@ -127,7 +127,7 @@ fn event_emitting_instructions_confirm() {
 			EventsInstruction::TestEventCpi,
 		] {
 			program
-				.send(&[instruction as u8, 0u8], Vec::new())
+				.send(&[instruction as u8], Vec::new())
 				.expect("event instruction confirms");
 		}
 
@@ -160,41 +160,35 @@ fn rejects_unparseable_instruction_data() {
 	});
 }
 
-/// A zero-field instruction is still version-gated: only the current envelope
-/// dispatches against the deployed artifact (sweep finding F-2).
-///
-/// These instructions carry no payload, so without the discriminator-space
-/// envelope gate nothing else would check the version byte on the wire.
+/// Instructions carry no version envelope unless they opt into migrations, so
+/// a zero-field event instruction is exactly its discriminator on the wire.
+/// The event it emits is still enveloped: the logged record keeps its version
+/// byte between the event discriminator and the payload.
 #[test]
 #[ignore = "run with pina test"]
-fn instruction_envelope_pins_the_version_byte() {
+fn bare_discriminator_dispatches_and_emits_a_versioned_record() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
 			.await
 			.expect("start isolated program test");
 
-		// The current envelope confirms and emits its record.
 		let logs = program
-			.simulate_logs(&[EventsInstruction::Initialize as u8, 0u8], Vec::new())
-			.expect("current envelope simulates");
+			.simulate_logs(&[EventsInstruction::Initialize as u8], Vec::new())
+			.expect("a bare discriminator simulates");
+		let records = decoded_event_records(&logs);
 		assert_eq!(
-			decoded_event_records(&logs).len(),
+			records.len(),
 			1,
-			"the current envelope must dispatch; logs: {logs:#?}"
+			"the bare discriminator must dispatch; logs: {logs:#?}"
 		);
 
-		// An unknown version byte fails at dispatch.
-		let error = program
-			.send(&[EventsInstruction::Initialize as u8, 7u8], Vec::new())
-			.expect_err("an unknown version byte cannot dispatch");
-		assert_eq!(error.operation(), "execute program instruction");
-
-		// So does a missing version byte.
-		let error = program
-			.send(&[EventsInstruction::Initialize as u8], Vec::new())
-			.expect_err("a missing version byte cannot dispatch");
-		assert_eq!(error.operation(), "execute program instruction");
+		// Event envelope: discriminator, migration version, then the u64 data
+		// and the 8-byte label.
+		let record = &records[0];
+		assert_eq!(record.len(), 18, "MyEvent record is 18 bytes");
+		assert_eq!(record[0], EventDiscriminator::MyEvent as u8);
+		assert_eq!(record[1], 0, "the event record keeps its current version");
 
 		program.stop().expect("stop isolated program test");
 	});

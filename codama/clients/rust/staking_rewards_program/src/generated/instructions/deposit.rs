@@ -9,7 +9,6 @@
 )]
 
 pub const DEPOSIT_DISCRIMINATOR: u8 = 2u8;
-pub const DEPOSIT_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -113,7 +112,6 @@ impl DepositInstructionData {
 		<DepositInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = DEPOSIT_DISCRIMINATOR;
-			data.migration_version = DEPOSIT_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -127,6 +125,5 @@ impl DepositInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DepositInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub amount: u64,
 }

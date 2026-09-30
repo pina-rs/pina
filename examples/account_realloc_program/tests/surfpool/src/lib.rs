@@ -37,8 +37,8 @@ fn initialize_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		// discriminator + migration version + bump.
-		&[ReallocInstruction::Initialize as u8, 0u8, bump],
+		// discriminator + bump.
+		&[ReallocInstruction::Initialize as u8, bump],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*sample, false),
@@ -53,8 +53,8 @@ fn realloc_instruction(
 	sample: &Pubkey,
 	len: u16,
 ) -> pina_test::Instruction {
-	// discriminator + migration version, then the u16 length.
-	let mut data = vec![ReallocInstruction::Realloc as u8, 0u8];
+	// discriminator, then the u16 length.
+	let mut data = vec![ReallocInstruction::Realloc as u8];
 	data.extend_from_slice(&len.to_le_bytes());
 
 	program.instruction(
@@ -74,8 +74,8 @@ fn realloc2_instruction(
 	second: &Pubkey,
 ) -> pina_test::Instruction {
 	// Realloc2 carries a legacy ignored `len` field in its wire format.
-	// discriminator + migration version + the ignored u16 length.
-	let mut data = vec![ReallocInstruction::Realloc2 as u8, 0u8];
+	// discriminator + the ignored u16 length.
+	let mut data = vec![ReallocInstruction::Realloc2 as u8];
 	data.extend_from_slice(&0u16.to_le_bytes());
 
 	program.instruction(

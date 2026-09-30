@@ -9,7 +9,6 @@
 )]
 
 pub const MULTISIG_IMPORT_DISCRIMINATOR: u8 = 3u8;
-pub const MULTISIG_IMPORT_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -118,7 +117,6 @@ impl MultisigImportInstructionData {
 		<MultisigImportInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = MULTISIG_IMPORT_DISCRIMINATOR;
-			data.migration_version = MULTISIG_IMPORT_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -132,7 +130,6 @@ impl MultisigImportInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct MultisigImportInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub bump: u8,
 	/// Program expected to own the legacy account.
 	pub legacy_program: solana_pubkey::Pubkey,

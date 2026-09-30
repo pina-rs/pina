@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use pina_abi::ContractHistory;
+use pina_abi::ContractKind;
 use pina_abi::MANIFEST_PATH;
 use pina_abi::MigrationManifest;
 use serde::Serialize;
@@ -200,7 +201,13 @@ pub fn decode_envelope<'manifest>(
 	manifest: &'manifest MigrationManifest,
 	data: &[u8],
 ) -> Option<(&'manifest ContractHistory, u32, InspectState)> {
-	for history in manifest.contracts.values() {
+	// Only accounts live in account data. Instruction and event discriminators
+	// are separate namespaces that can reuse the same values.
+	for history in manifest
+		.contracts
+		.values()
+		.filter(|history| history.identity.kind == ContractKind::Account)
+	{
 		let identity = &history.identity;
 		let disc_bytes = usize::from(identity.discriminator_bytes);
 		if data.len() < disc_bytes {

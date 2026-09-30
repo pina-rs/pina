@@ -46,14 +46,14 @@ pub struct SetCustodiansIx {
 
 impl SetCustodiansIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 98;
+	pub const LEN: usize = 97;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 98], ProgramError> {
-		let mut data = [0u8; 98];
-		data[..2].copy_from_slice(&SET_CUSTODIANS_DISCRIMINATOR);
-		data[2..98].copy_from_slice(&self.custodians);
+	pub fn to_bytes(&self) -> Result<[u8; 97], ProgramError> {
+		let mut data = [0u8; 97];
+		data[..1].copy_from_slice(&SET_CUSTODIANS_DISCRIMINATOR);
+		data[1..97].copy_from_slice(&self.custodians);
 
 		Ok(data)
 	}
@@ -85,4 +85,4 @@ impl<'account> SetCustodians<'account> {
 	}
 }
 
-const SET_CUSTODIANS_DISCRIMINATOR: [u8; 2] = [2, 0];
+const SET_CUSTODIANS_DISCRIMINATOR: [u8; 1] = [2];

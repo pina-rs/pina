@@ -71,7 +71,7 @@ pina generate --project ./programs/counter --output ./generated
 pina generate --mode update --no-scaffold
 ```
 
-`pina generate` refreshes the project's IDL first, so a program whose `pina.toml` enables migrations needs its `pina migrations create` baseline before the first run. CPI-only and Rust-only generation do not require Node.js. A freshly scaffolded Rust, CPI, or `cli-rust` crate outside a workspace that declares `pina` in `[workspace.dependencies]` names concrete dependency versions and its own `[workspace]`, so it builds standalone.
+`pina generate` refreshes the project's IDL first, and the IDL follows the migration policy recorded in `migrations/manifest.json`, so run `pina migrations create --auto true` (or with the policy you want) before generating clients you intend to keep. CPI-only and Rust-only generation do not require Node.js. A freshly scaffolded Rust, CPI, or `cli-rust` crate outside a workspace that declares `pina` in `[workspace.dependencies]` names concrete dependency versions and its own `[workspace]`, so it builds standalone.
 
 Generation keeps Codama's ergonomic JavaScript string and array types, then adds Pina-specific runtime validation at the generated client's wire boundary. Over-capacity values fail instead of being truncated; discriminators, booleans, and UTF-8 are checked during decoding. Decoders do not check which program owns an account, so verify the owner before trusting decoded state. The TypeScript and Dart `parse<Program>EventsFromLogs` helpers attribute each event to the program that emitted it by following the transaction's invocation frames. Generating a whole repository means running the command once per project; `scripts/generate-pina-clients.sh` does that for this repository's examples.
 

@@ -26,17 +26,16 @@ pub enum PinaProgramError {
 	///
 	/// Returned when a generated transition's `WORKING_SIZE` is smaller than
 	/// its `CURRENT_SIZE`, or when the workspace passed to
-	/// [`crate::normalize_instruction_data`] or [`crate::normalize_event_data`]
-	/// is shorter than `WORKING_SIZE`.
+	/// [`crate::normalize_instruction_data`] is shorter than `WORKING_SIZE`.
 	///
 	/// # Remedy
 	///
 	/// Pass a workspace of at least the generated `WORKING_SIZE` bytes, and
 	/// keep the generated workspace at or below
-	/// [`crate::MAX_MIGRATION_WORKSPACE`] (1,024 bytes). Generated
-	/// `with_current_instruction_data` and `with_current_event_data` helpers
-	/// already size their stack workspace at the compile-time maximum, so a
-	/// manual caller only needs this when it supplies its own buffer.
+	/// [`crate::MAX_MIGRATION_WORKSPACE`] (1,024 bytes). The generated
+	/// `with_current_instruction_data` helper already sizes its stack
+	/// workspace at the compile-time maximum, so a manual caller only needs
+	/// this when it supplies its own buffer.
 	MigrationWorkspaceExceeded = 0xFFFF_FFF4,
 	/// One inline migration step would grow the account past the runtime
 	/// realloc limit.

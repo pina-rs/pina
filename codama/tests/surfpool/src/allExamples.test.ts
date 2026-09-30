@@ -272,9 +272,10 @@ function encodeInstruction(instruction: InstructionNode): Uint8Array {
 		(size, part) => Math.max(size, part.offset + part.bytes.length),
 		0,
 	);
-	// Omitted arguments (the framework discriminator and migration version)
-	// are already carried by the constant discriminator prefix; encoding them
-	// again would double-count their bytes and shift every later field.
+	// Omitted arguments (the framework discriminator and, for instructions that
+	// opt into migrations, the migration version) are already carried by the
+	// constant discriminator prefix; encoding them again would double-count
+	// their bytes and shift every later field.
 	const args = (instruction.arguments ?? [])
 		.filter(
 			(argument) =>
@@ -811,7 +812,8 @@ async function runSpecificGuards(
 
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 // 1 (discriminator) + 1 (migration version) + 1 (bump) + 32 (authority) +
-// 2 (count). Migrations are on, so the envelope adds the version byte.
+// 2 (count). The account envelope adds the version byte; instruction data
+// for this program carries none.
 const SAMPLE_HEADER_SIZE = 37;
 
 function reallocInstructionData(
@@ -819,9 +821,9 @@ function reallocInstructionData(
 	len: number,
 ): Uint8Array {
 	assert.ok(Number.isInteger(len) && len >= 0 && len <= 0xffff);
-	// The middle byte is the migration version; the program rejects payloads
-	// that omit it.
-	return Uint8Array.of(discriminator, 0, len & 0xff, len >>> 8);
+	// discriminator, then the little-endian u16 length. Instructions carry no
+	// version envelope unless they opt into migrations.
+	return Uint8Array.of(discriminator, len & 0xff, len >>> 8);
 }
 
 async function deriveSampleAddress(
@@ -891,8 +893,8 @@ async function runAnchorReallocGuards(
 
 	await submit(rawInstruction(
 		descriptor.programId,
-		// discriminator + migration version + bump.
-		Uint8Array.of(2, 0, bump),
+		// discriminator + bump.
+		Uint8Array.of(2, bump),
 		[
 			payerWritableSigner,
 			sampleWritable,

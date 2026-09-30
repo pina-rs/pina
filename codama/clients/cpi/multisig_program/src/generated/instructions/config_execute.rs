@@ -69,13 +69,13 @@ pub struct ConfigExecuteIx;
 
 impl ConfigExecuteIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 2;
+	pub const LEN: usize = 1;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 2], ProgramError> {
-		let mut data = [0u8; 2];
-		data[..2].copy_from_slice(&CONFIG_EXECUTE_DISCRIMINATOR);
+	pub fn to_bytes(&self) -> Result<[u8; 1], ProgramError> {
+		let mut data = [0u8; 1];
+		data[..1].copy_from_slice(&CONFIG_EXECUTE_DISCRIMINATOR);
 
 		Ok(data)
 	}
@@ -112,4 +112,4 @@ impl<'account> ConfigExecute<'account> {
 	}
 }
 
-const CONFIG_EXECUTE_DISCRIMINATOR: [u8; 2] = [11, 0];
+const CONFIG_EXECUTE_DISCRIMINATOR: [u8; 1] = [11];

@@ -21,11 +21,9 @@ class RequestDisclosureInstructionData {
     required this.noticeLen,
     required this.notice,
     required this.legalBasisHash,
-  }) : discriminator = 7,
-       migrationVersion = 0;
+  }) : discriminator = 7;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
   final BigInt nonce;
   final int tier;
@@ -39,7 +37,6 @@ Encoder<RequestDisclosureInstructionData>
 getRequestDisclosureInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('nonce', getU64Encoder()),
     ('tier', getU8Encoder()),
@@ -59,7 +56,6 @@ getRequestDisclosureInstructionDataEncoder() {
     structEncoder,
     (RequestDisclosureInstructionData value) => <String, Object?>{
       'discriminator': 7,
-      'migrationVersion': 0,
       'bump': value.bump,
       'nonce': value.nonce,
       'tier': value.tier,
@@ -75,7 +71,6 @@ Decoder<RequestDisclosureInstructionData>
 getRequestDisclosureInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('nonce', getU64Decoder()),
     ('tier', getU8Decoder()),
@@ -98,7 +93,6 @@ getRequestDisclosureInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(7)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

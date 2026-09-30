@@ -90,20 +90,20 @@ pub struct MultisigCreateIx<'argument> {
 
 impl<'argument> MultisigCreateIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 93;
+	pub const LEN: usize = 92;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 93], ProgramError> {
-		let mut data = [0u8; 93];
-		data[..2].copy_from_slice(&MULTISIG_CREATE_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
-		data[3..5].copy_from_slice(&self.threshold.to_le_bytes());
-		data[5..9].copy_from_slice(&self.timelock.to_le_bytes());
-		data[9..13].copy_from_slice(&self.ttl.to_le_bytes());
-		data[13..29].copy_from_slice(&self.member_permissions);
-		data[29..61].copy_from_slice(self.config_authority.as_ref());
-		data[61..93].copy_from_slice(self.rent_collector.as_ref());
+	pub fn to_bytes(&self) -> Result<[u8; 92], ProgramError> {
+		let mut data = [0u8; 92];
+		data[..1].copy_from_slice(&MULTISIG_CREATE_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
+		data[2..4].copy_from_slice(&self.threshold.to_le_bytes());
+		data[4..8].copy_from_slice(&self.timelock.to_le_bytes());
+		data[8..12].copy_from_slice(&self.ttl.to_le_bytes());
+		data[12..28].copy_from_slice(&self.member_permissions);
+		data[28..60].copy_from_slice(self.config_authority.as_ref());
+		data[60..92].copy_from_slice(self.rent_collector.as_ref());
 
 		Ok(data)
 	}
@@ -142,4 +142,4 @@ impl<'account, 'argument> MultisigCreate<'account, 'argument> {
 	}
 }
 
-const MULTISIG_CREATE_DISCRIMINATOR: [u8; 2] = [2, 0];
+const MULTISIG_CREATE_DISCRIMINATOR: [u8; 1] = [2];

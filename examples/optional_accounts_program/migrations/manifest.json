@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "StoreState",
 			"versions": [
 				{
@@ -28,20 +23,14 @@
 								"name": "count",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "InitInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -51,160 +40,106 @@
 								"name": "bump",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
 							{
 								"name": "authority",
 								"writable": true,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "store",
 								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
 								"pda": "store"
 							},
 							{
 								"name": "system_program",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": "publicKey:11111111111111111111111111111111",
-								"pda": null
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "TouchInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "store",
 								"writable": true,
-								"signer": false,
 								"optional": true,
-								"defaultValue": null,
 								"pda": "store"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:02": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "InspectInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "store",
-								"writable": false,
-								"signer": false,
 								"optional": true,
-								"defaultValue": null,
 								"pda": "store"
 							},
 							{
 								"name": "witness",
-								"writable": false,
 								"signer": true,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:03": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "03"
-			},
 			"rustName": "NoteInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
 							{
 								"name": "authority",
-								"writable": false,
-								"signer": true,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"signer": true
 							},
 							{
 								"name": "note",
-								"writable": false,
-								"signer": false,
-								"optional": true,
-								"defaultValue": null,
-								"pda": null
+								"optional": true
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

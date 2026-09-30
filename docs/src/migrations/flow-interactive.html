@@ -246,7 +246,7 @@
 	<h1>How Pina Migrations Work</h1>
 	<p class="sub">A step-by-step guide to versioned, automatic ABI migrations: what you run, what the framework does for you, and what happens on-chain when old data meets a new program.</p>
 	<div class="tldr">
-		<strong>The short version:</strong> you never write a migration by hand for ordinary changes. You change your structs like always and run one CLI command when the build asks. If a field was renamed or removed, you answer one question. The program then carries every old account, instruction, and event forward to the current shape inside whichever transaction touches it. Clients keep working unchanged.
+		<strong>The short version:</strong> you never write a migration by hand for ordinary changes. You change your structs like always and run one CLI command when the build asks. If a field was renamed or removed, you answer one question. The program then carries every old account forward to the current shape inside whichever transaction touches it. Instructions are snapshots that stop the build before a wire-breaking change ships, unless one opts into migrations, and events are versioned rather than migrated: clients decode each historical version with its own schema. Clients keep working unchanged.
 	</div>
 </header>
 
@@ -259,23 +259,21 @@
 		<div class="step-num">1</div>
 		<div>
 			<div class="step-title">Turn migrations on once</div>
-			<div class="step-what">One line in <code class="inline">pina.toml</code>, then you can stop thinking about it.</div>
+			<div class="step-what">One command records the policy, then you can stop thinking about it.</div>
 		</div>
 		<div class="step-caret">▶</div>
 	</button>
 	<div class="step-body">
-		<p>Add a <code class="inline">[migrations]</code> section to your program's <code class="inline">pina.toml</code> and pick how wide the version counter should be. <code class="inline">u8</code> is fine for almost every program, and distinguishes 256 versions per contract.</p>
-		<div class="cmd"><span class="prompt">$ </span>cat pina.toml
-<span class="comment">[project]
-program = "."
-
-[migrations]
-version_type = "u8"</span></div>
+		<p>Run <code class="inline">pina migrations create --auto true</code> once the program address is final. It records the policy in <code class="inline">migrations/manifest.json</code>, the only place it lives, and snapshots every contract as version 0. The version counter is <code class="inline">u8</code> unless you add <code class="inline">--version-type u16</code> to that first run. <code class="inline">u8</code> is fine for almost every program, and distinguishes 256 versions per contract.</p>
+		<div class="cmd"><span class="prompt">$ </span>pina migrations create --auto true
+<span class="comment">Auto policy: accounts, instructions, events</span></div>
 		<details class="under">
 			<summary>What happens under the hood</summary>
 			<div class="under-body">
-				<p>Accounts, instruction payloads, and events all gain a <strong>version envelope</strong>. The version number sits immediately after the existing discriminator. The framework owns these bytes, so your code never reads or writes them by hand.</p>
-				<p>The encoding (<code>u8</code>, <code>u16</code>, or <code>u32</code>) is program-wide, so every contract shares one envelope size. Generated code picks the matching implementation, not you.</p>
+				<p>Accounts and events gain a <strong>version envelope</strong>. The version number sits immediately after the existing discriminator. The framework owns these bytes, so your code never reads or writes them by hand.</p>
+				<p>Instructions keep their plain <code>[discriminator][payload]</code> format. The manifest records one snapshot of each (<code>"envelope": false</code>), and the build fails if the struct drifts from it. An instruction that must accept older payloads under the same discriminator opts in with <code>#[instruction(discriminator = X, migrations)]</code> and gains the envelope too.</p>
+				<p>The encoding (<code>u8</code>, <code>u16</code>, or <code>u32</code>) is program-wide, so every contract shares one envelope size. Generated code picks the matching implementation, not you. The width can change only while nothing is published; the first deployment freezes it.</p>
+				<p>Nothing about migrations goes in <code>pina.toml</code>. The manifest is the one copy the macros read, so a second copy could only disagree with it, and the retired <code>[migrations]</code> keys fail every command that reads <code>pina.toml</code>, naming the flag that replaces them.</p>
 			</div>
 		</details>
 	</div>
@@ -356,12 +354,11 @@ stderr: error: ambiguous field changes need an explicit answer
 				<p>Two files change. <code>migrations/manifest.json</code> records the new version and its full schema snapshot. <code>migrations/transitions/account_1_03/…</code> holds a generated Rust transition that copies overlapping bytes field by field and zero-fills anything new.</p>
 				<div class="tree"><span class="d">migrations/</span>
 ├── <span class="f">manifest.json</span>        <span class="c">← every version's schema, per contract</span>
-├── <span class="f">publications.json</span>    <span class="c">← hash-chained release ledger (step 6)</span>
+├── <span class="f">publications.json</span>    <span class="c">← append-only release ledger (step 6)</span>
 └── <span class="d">transitions/</span>
     ├── <span class="d">account_1_02/</span>   <span class="c">← v1 → v2 for the State account</span>
-    ├── <span class="d">instruction_1_00/</span>
-    └── <span class="d">event_1_04/</span></div>
-				<p>Renames are recorded as byte-preserving moves. If a new answer ever contradicts recorded history, the CLI rejects it instead of guessing.</p>
+    └── <span class="d">instruction_1_00/</span> <span class="c">← only for an instruction with <code>migrations</code></span></div>
+				<p>Renames are recorded as byte-preserving moves. If a new answer ever contradicts recorded history, the CLI rejects it instead of guessing. Events never get a transition directory: a changed event appends a version with its own schema, and clients decode each version with that schema. An instruction transition that would zero-fill an added argument is always manual, because the handler could not tell that default from a value a client sent.</p>
 			</div>
 		</details>
 	</div>
@@ -405,7 +402,7 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 		<details class="under">
 			<summary>What happens under the hood</summary>
 			<div class="under-body">
-				<p>Deploy appends a receipt to <code>publications.json</code> recording which ELF bytes went on-chain, which manifest versions they carried, and the hash of the previous receipt. Each receipt is hash-chained to the last, so the history cannot be edited or reordered later.</p>
+				<p>Deploy appends a receipt to <code>publications.json</code> recording which ELF bytes went on-chain and pinning the schema hash of every version they carried. Receipts are appended in deployment order and the file lives in version control, which is what keeps the history from being edited or reordered later.</p>
 				<p>Once a version is published it becomes <strong>immutable</strong>. Its schema snapshot and transition files are frozen, and any later edit to them fails <code>pina migrations check</code>. Shipped migrations are history, not drafts. If a deploy dies halfway, <code>pina migrations reconcile</code> inspects the pending receipt and either completes it or abandons it explicitly. An abandoned receipt still freezes whatever shipped.</p>
 			</div>
 		</details>
@@ -427,13 +424,13 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 ✓ rust       → clients/rust
 ✓ cpi        → clients/cpi</span></div>
 		<p>Every generated encoder stamps the current version into the envelope automatically. Your client code constructs instructions and decodes accounts exactly as before.</p>
-		<div class="box info"><b>Old clients keep working.</b> A client built before the migration still writes version 1. The program accepts it and normalizes it on-chain (Part 2). You upgrade clients on your own schedule, not in lockstep with deploys.</div>
+		<div class="box info"><b>Old clients keep working.</b> A client built before the migration still writes version 1. The program accepts it and migrates the accounts it touches on-chain, and it normalizes the payload of an instruction that opts into migrations (Part 2). You upgrade clients on your own schedule, not in lockstep with deploys.</div>
 	</div>
 </div>
 
 <!-- ============ PART 2: RUNTIME ============ -->
 <h2>Part 2: what happens on-chain</h2>
-<p class="lead">Every wire format carries the framework-owned envelope. When a transaction arrives, the program routes on the version byte. This diagram is the entire decision tree.</p>
+<p class="lead">Every enveloped wire format carries the framework-owned version after its discriminator: accounts, and the payload of an instruction that opts into migrations. When those bytes arrive, the program routes on the version. This diagram is the entire decision tree.</p>
 
 <div class="diagram">
 <svg viewBox="0 0 900 430" width="900" height="430" xmlns="http://www.w3.org/2000/svg" font-family="ui-sans-serif, system-ui, sans-serif">
@@ -450,7 +447,7 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 	</defs>
 
 	<!-- envelope -->
-	<text x="60" y="34" font-size="13" fill="#78716c">incoming bytes (instruction, account, or event)</text>
+	<text x="60" y="34" font-size="13" fill="#78716c">incoming bytes (an account, or an instruction that opts into migrations)</text>
 	<rect x="60" y="46" width="130" height="40" rx="7" fill="#6d28d9"/>
 	<text x="125" y="71" font-size="13.5" fill="#fff" text-anchor="middle" font-weight="600">discriminator</text>
 	<rect x="190" y="46" width="90" height="40" rx="0" fill="#0f766e"/>
@@ -504,6 +501,8 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 	<text x="435" y="402" font-size="12.5" text-anchor="middle" fill="#78716c">Wrong discriminator? Rejected before the version is even read, so one contract can never be misread as another.</text>
 </svg>
 </div>
+
+<div class="box info"><b>Instructions and events take a different path.</b> An instruction recorded as a snapshot has no version byte, so it skips this tree: once published its payload cannot change (<code class="inline">PublishedPayloadChanged</code>; declare a new discriminator), appending optional accounts is recorded in place, and it cannot gain an envelope (<code class="inline">EnvelopeAddition</code>). An instruction with <code class="inline">migrations</code> takes the stale branch: <code class="inline">#[discriminator(entrypoint)]</code> routes it through the generated <code class="inline">process_versioned</code>, which converts the payload and then calls <code class="inline">ProcessAccountInfos::process_from_version(self, data, source_version)</code>; the default forwards to <code class="inline">process(data)</code>, so the handler sees the current layout. Removing an envelope after publication fails with <code class="inline">EnvelopeRemoval</code>. Events never enter the program: it emits only the current version, and clients decode older log records with the schema of the version that wrote them.</div>
 
 <h3 style="font-size:18px; margin-top: 32px;">An old account meeting a new program, step by step</h3>
 <p class="lead">Account migrations are the interesting case because they can change the account's size, and size changes rent. This is what one instruction does when the account is two versions behind.</p>
@@ -574,7 +573,7 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 	<div class="card">
 		<h3>Old client → new program</h3>
 		<div class="vs">client writes v0 · program knows v2</div>
-		<p>The program normalizes the request, and any accounts it touches, inline in the same transaction. The old client just sees the transaction succeed.</p>
+		<p>The program migrates any accounts the request touches inline in the same transaction, and normalizes the request itself when its instruction opts into migrations. The old client just sees the transaction succeed.</p>
 		<span class="verdict v-magic">JUST WORKS</span>
 	</div>
 	<div class="card">
@@ -595,7 +594,8 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 <table>
 	<tr><th>Responsibility</th><th>Client</th><th>Program</th></tr>
 	<tr><td>Stamp the current version into anything it sends</td><td class="yes">Yes, automatic in generated encoders</td><td>n/a</td></tr>
-	<tr><td>Rewrite stale accounts, instructions, or events</td><td class="no">Never</td><td class="yes">Always, inline in the touching transaction</td></tr>
+	<tr><td>Rewrite stale accounts or migration-aware instruction payloads</td><td class="no">Never</td><td class="yes">Always, inline in the touching transaction</td></tr>
+	<tr><td>Decode historical events</td><td class="yes">Yes, each version with its own generated decoder</td><td>Emits only the current version; never rewrites a log</td></tr>
 	<tr><td>Know the migration history</td><td class="no">Never. It lives in <code>migrations/</code> and in the program</td><td class="yes">Owns it</td></tr>
 	<tr><td>Fund a rent deficit when an account grows</td><td class="part">Passes the payer account (old clients omit it)</td><td class="yes">Charges within a developer-set cap</td></tr>
 	<tr><td>Reject data from the future</td><td class="part">Generated decoders enforce the envelope in TypeScript, Dart, and Rust, with an error that names the version it found and what to do</td><td class="yes">Always fails closed</td></tr>
@@ -667,19 +667,19 @@ if let Some(state) = state {
 <p class="lead">Everything a developer or an agent needs, in one table.</p>
 <table>
 	<tr><th>Command</th><th>When</th><th>What it does</th></tr>
-	<tr><td><code>pina migrations create</code></td><td>After changing a struct</td><td>Records the new version and generates transitions. Asks questions on a terminal; add <code>--rename from:to</code>, <code>--assume-removed field</code>, <code>--no-interactive</code>, or <code>--json</code> to answer without one.</td></tr>
+	<tr><td><code>pina migrations create</code></td><td>After changing a struct</td><td>Records the new version and generates transitions. <code>--auto</code> and <code>--version-type</code> record the policy, usually once on the first run. Asks questions on a terminal; add <code>--rename from:to</code>, <code>--assume-removed field</code>, <code>--no-interactive</code>, or <code>--json</code> to answer without one.</td></tr>
 	<tr><td><code>pina migrations check</code></td><td>CI, pre-commit</td><td>Non-mutating gate. Catches drift, unfinished TODO transitions, and any edit to frozen published files. Exits 1 with a readable reason.</td></tr>
 	<tr><td><code>pina migrations status</code></td><td>Curiosity, support</td><td>Reports each contract's local version and publication state. <code>--json</code> for tooling.</td></tr>
 	<tr><td><code>pina migrations reconcile</code></td><td>A deploy died halfway</td><td>Inspects the pending publication receipt, then completes it or abandons it with <code>--abandon</code>.</td></tr>
 	<tr><td><code>pina build</code></td><td>Always</td><td>The drift gate. Fails until every schema change is recorded and every TODO transition is filled.</td></tr>
-	<tr><td><code>pina deploy --cluster &lt;CLUSTER&gt;</code></td><td>Shipping</td><td>Deploys and appends a hash-chained receipt, freezing the shipped versions. Loopback targets record one only with <code>--record-publication</code>.</td></tr>
-	<tr><td><code>pina generate</code></td><td>After <code>make</code></td><td>Regenerates the TypeScript, Dart, Rust, and CPI clients with the new shape and current version constants.</td></tr>
+	<tr><td><code>pina deploy --cluster &lt;CLUSTER&gt;</code></td><td>Shipping</td><td>Deploys and appends a receipt pinning the shipped versions, which freezes them. Loopback targets record one only with <code>--record-publication</code>.</td></tr>
+	<tr><td><code>pina generate</code></td><td>After <code>create</code></td><td>Regenerates the TypeScript, Dart, Rust, and CPI clients with the new shape and current version constants.</td></tr>
 </table>
 
 <!-- ============ GUARANTEES ============ -->
 <h2>Limits and guarantees</h2>
 <div class="box warn"><b>Hard limits, and all of them fail cleanly.</b> At most <code>MAX_INLINE_STEPS</code> adjacent versions are walked in one instruction; an account further behind fails with <code>MigrationUnavailable</code>, so publish smaller, more frequent versions. The normalization workspace is capped at 1 KiB of stack (<code>MigrationWorkspaceExceeded</code> past that, and generated code does not compile past it). Growth is capped by <code>MAX_PERMITTED_DATA_INCREASE</code> per instruction (<code>MigrationAccountGrowthExceeded</code>), measured from the size captured before the whole inline ladder and not per hop, and by the payer's <code>max_lamports</code> budget overall (<code>MigrationLamportBudgetExceeded</code>). Exceeding any of these fails the transaction. It never silently skips a migration. Older builds reported the workspace, growth, and lamport-budget failures as the legacy aggregate <code>MigrationBudgetExceeded</code>; <code>MigrationUnavailable</code> was already its own code and was not part of that split.</div>
-<div class="box info"><b>The ledger proves history, not identity.</b> <code>publications.json</code> is SHA-256-chained and freezes on publish, so accidental drift cannot slip through. It is not a signature scheme: anyone with write access to the repo can regenerate it. Treat it as a build-time integrity check, not as proof of what happened on-chain.</div>
+<div class="box info"><b>The ledger proves history, not identity.</b> <code>publications.json</code> pins the SHA-256 of every published schema and transition and freezes on publish, so accidental drift cannot slip through. It is not a signature scheme: anyone with write access to the repo can rewrite it, which is why it carries no hash chain and relies on version control to stay append-only. Treat it as a build-time integrity check, not as proof of what happened on-chain.</div>
 
 <h3 style="font-size:18px; margin-top: 28px;">The reserved Migrate instruction</h3>
 <p>Pina reserves the all-ones value of every instruction discriminator width for a framework migration instruction, and <code class="inline">#[discriminator]</code> rejects user variants that claim it at compile time. A program with migratable accounts routes it before parsing its own enum:</p>
@@ -692,7 +692,7 @@ if is_migrate_instruction(data) {
 <p>That is the client flow the sweep section above describes, now with a framework-owned entry point: prepend <code class="inline">[Migrate { payer }, …real instructions]</code> and the payer authorizes exactly the migration cost.</p>
 
 <h3 style="font-size:18px; margin-top: 28px;">Generated client helpers</h3>
-<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer that always sends the payer and system program slots (the system program is the default for slot 1) and whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs. Migratable <strong>events</strong> use the same envelope on the read path: each client emits a log entry point (<code class="inline">parse&lt;Program&gt;EventsFromLogs</code> in TypeScript and Dart, <code class="inline">project_from_bytes</code> in Rust) that enforces the version and projects historical bytes into the current shape when the checked-in manifest proves the transition is automatic, reporting <code class="inline">sourceVersion</code> and <code class="inline">wasMigrated</code>. The program-level parser decodes a line only while this program is the innermost invocation in the transaction's logs, so another program cannot forge its events. Manual transitions fail closed with a message naming the transition.</p>
+<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer that always sends the payer and system program slots (the system program is the default for slot 1) and whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs. Versioned <strong>events</strong> are decoded, never converted: the IDL lists each earlier version as its own event, <code class="inline">&lt;Event&gt;V&lt;n&gt;</code> (for example <code class="inline">ValueChangedEventV0</code>), with that version's own codec. The program-level log parser (<code class="inline">parse&lt;Program&gt;EventsFromLogs</code> in TypeScript and Dart) dispatches each record by discriminator and version and throws on a version no generated event describes, naming the version and telling you to regenerate the client. Nothing is projected into the current shape or zero-filled. In Rust, each version's <code class="inline">try_from_bytes</code> tells a stale record from a future one and points at the event generated for the other version. The program-level parser decodes a line only while this program is the innermost invocation in the transaction's logs, so another program cannot forge its events.</p>
 <div class="code"><span class="k">const</span> account = <span class="k">await</span> fetchEncodedAccount(rpc, address);
 <span class="k">if</span> (account.exists &amp;&amp; stateNeedsMigration(account.data)) {
 	<span class="k">await</span> send(getMigrateInstruction({ state: address, payer }));

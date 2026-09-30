@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH",
 	"versionType": "u8",
 	"auto": [
@@ -9,99 +9,63 @@
 	],
 	"contracts": {
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "FailsDuplicateMutableInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
 							{
 								"name": "account1",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							},
 							{
 								"name": "account2",
-								"writable": true,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"writable": true
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "AllowsDuplicateMutableInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": []
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:02": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "AllowsDuplicateReadonlyInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
 							{
-								"name": "account1",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "account1"
 							},
 							{
-								"name": "account2",
-								"writable": false,
-								"signer": false,
-								"optional": false,
-								"defaultValue": null,
-								"pda": null
+								"name": "account2"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

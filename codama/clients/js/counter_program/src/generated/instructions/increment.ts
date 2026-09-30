@@ -38,22 +38,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findCounterPda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { COUNTER_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const INCREMENT_DISCRIMINATOR = 1;
 
 export function getIncrementDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(INCREMENT_DISCRIMINATOR);
-}
-
-export const INCREMENT_DISCRIMINATOR2 = 0;
-
-export function getIncrementDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(INCREMENT_DISCRIMINATOR2);
 }
 
 export type IncrementInstruction<
@@ -76,10 +67,7 @@ export type IncrementInstruction<
 		]
 	>;
 
-export type IncrementInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type IncrementInstructionData = { discriminator: number };
 
 export type IncrementInstructionDataArgs = {};
 
@@ -87,11 +75,8 @@ export function getIncrementInstructionDataEncoder(): FixedSizeEncoder<
 	IncrementInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -101,9 +86,6 @@ export function getIncrementInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(INCREMENT_DISCRIMINATOR, getU8Decoder()),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

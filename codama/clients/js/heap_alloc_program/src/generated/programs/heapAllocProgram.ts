@@ -50,14 +50,12 @@ export function identifyHeapAllocProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): HeapAllocProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return HeapAllocProgramInstruction.Allocate;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return HeapAllocProgramInstruction.Fill;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return HeapAllocProgramInstruction.Allocate;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return HeapAllocProgramInstruction.Fill;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "heapAllocProgram" },

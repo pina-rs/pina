@@ -94,23 +94,23 @@ pub struct ProposalCreateIx {
 
 impl ProposalCreateIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 783;
+	pub const LEN: usize = 782;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 783], ProgramError> {
-		let mut data = [0u8; 783];
-		data[..2].copy_from_slice(&PROPOSAL_CREATE_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
-		data[3..4].copy_from_slice(&self.kind.to_le_bytes());
-		data[4..5].copy_from_slice(&self.vault_index.to_le_bytes());
-		data[5..6].copy_from_slice(&self.vault_bump.to_le_bytes());
-		data[6..7].copy_from_slice(&self.ephemeral_signers.to_le_bytes());
-		data[7..11].copy_from_slice(&self.ephemeral_bumps);
-		data[11..13].copy_from_slice(&self.message_len.to_le_bytes());
-		data[13..653].copy_from_slice(&self.message);
-		data[653..655].copy_from_slice(&self.actions_len.to_le_bytes());
-		data[655..783].copy_from_slice(&self.actions);
+	pub fn to_bytes(&self) -> Result<[u8; 782], ProgramError> {
+		let mut data = [0u8; 782];
+		data[..1].copy_from_slice(&PROPOSAL_CREATE_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
+		data[2..3].copy_from_slice(&self.kind.to_le_bytes());
+		data[3..4].copy_from_slice(&self.vault_index.to_le_bytes());
+		data[4..5].copy_from_slice(&self.vault_bump.to_le_bytes());
+		data[5..6].copy_from_slice(&self.ephemeral_signers.to_le_bytes());
+		data[6..10].copy_from_slice(&self.ephemeral_bumps);
+		data[10..12].copy_from_slice(&self.message_len.to_le_bytes());
+		data[12..652].copy_from_slice(&self.message);
+		data[652..654].copy_from_slice(&self.actions_len.to_le_bytes());
+		data[654..782].copy_from_slice(&self.actions);
 
 		Ok(data)
 	}
@@ -145,4 +145,4 @@ impl<'account> ProposalCreate<'account> {
 	}
 }
 
-const PROPOSAL_CREATE_DISCRIMINATOR: [u8; 2] = [4, 0];
+const PROPOSAL_CREATE_DISCRIMINATOR: [u8; 1] = [4];

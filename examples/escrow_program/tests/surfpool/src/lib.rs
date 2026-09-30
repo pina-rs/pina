@@ -198,8 +198,8 @@ fn make_instruction(
 	amount_a: u64,
 	amount_b: u64,
 ) -> pina_test::Instruction {
-	// discriminator + migration version, then seed, amounts, and bump.
-	let mut data = vec![EscrowInstruction::Make as u8, 0u8];
+	// discriminator, then seed, amounts, and bump.
+	let mut data = vec![EscrowInstruction::Make as u8];
 	data.extend_from_slice(&seed.to_le_bytes());
 	data.extend_from_slice(&amount_a.to_le_bytes());
 	data.extend_from_slice(&amount_b.to_le_bytes());
@@ -241,7 +241,7 @@ fn take_instruction(
 	};
 
 	program.instruction(
-		&[EscrowInstruction::Take as u8, 0u8],
+		&[EscrowInstruction::Take as u8],
 		vec![
 			AccountMeta::new(*taker, true),
 			AccountMeta::new_readonly(*mint_a, false),
@@ -277,7 +277,7 @@ fn cancel_instruction(
 	};
 
 	program.instruction(
-		&[EscrowInstruction::Cancel as u8, 0u8],
+		&[EscrowInstruction::Cancel as u8],
 		vec![
 			maker_meta,
 			AccountMeta::new_readonly(*mint_a, false),

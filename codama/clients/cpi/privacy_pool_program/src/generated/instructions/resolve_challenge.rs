@@ -48,14 +48,14 @@ pub struct ResolveChallengeIx {
 
 impl ResolveChallengeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 3;
+	pub const LEN: usize = 2;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 3], ProgramError> {
-		let mut data = [0u8; 3];
-		data[..2].copy_from_slice(&RESOLVE_CHALLENGE_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.approve.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 2], ProgramError> {
+		let mut data = [0u8; 2];
+		data[..1].copy_from_slice(&RESOLVE_CHALLENGE_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.approve.to_le_bytes());
 
 		Ok(data)
 	}
@@ -87,4 +87,4 @@ impl<'account> ResolveChallenge<'account> {
 	}
 }
 
-const RESOLVE_CHALLENGE_DISCRIMINATOR: [u8; 2] = [10, 0];
+const RESOLVE_CHALLENGE_DISCRIMINATOR: [u8; 1] = [10];

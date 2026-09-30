@@ -54,7 +54,6 @@ import { findPolicyPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 	getPinaPodStringDecoder,
 } from "../pinaPodCodecs";
 import { VALIDATION_PROGRAM_PROGRAM_ADDRESS } from "../programs";
@@ -63,12 +62,6 @@ export const CHECK_POLICY_DISCRIMINATOR = 1;
 
 export function getCheckPolicyDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CHECK_POLICY_DISCRIMINATOR);
-}
-
-export const CHECK_POLICY_DISCRIMINATOR2 = 0;
-
-export function getCheckPolicyDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CHECK_POLICY_DISCRIMINATOR2);
 }
 
 export type CheckPolicyInstruction<
@@ -101,7 +94,6 @@ export type CheckPolicyInstruction<
 
 export type CheckPolicyInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	amount: bigint;
 	memo: string;
 	approvals: Array<number>;
@@ -117,26 +109,23 @@ export function getCheckPolicyInstructionDataEncoder(): FixedSizeEncoder<
 	CheckPolicyInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["amount", getU64Encoder()],
-			[
-				"memo",
-				fixPinaPodEncoderSize(
-					addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
-					65,
-				),
-			],
-			[
-				"approvals",
-				fixPinaPodEncoderSize(
-					getArrayEncoder(getU8Encoder(), { size: getU16Encoder() }),
-					6,
-				),
-			],
-		]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"amount",
+			getU64Encoder(),
+		], [
+			"memo",
+			fixPinaPodEncoderSize(
+				addEncoderSizePrefix(getUtf8Encoder(), getU8Encoder()),
+				65,
+			),
+		], [
+			"approvals",
+			fixPinaPodEncoderSize(
+				getArrayEncoder(getU8Encoder(), { size: getU16Encoder() }),
+				6,
+			),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -151,7 +140,6 @@ export function getCheckPolicyInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["amount", getU64Decoder()],
 		["memo", getPinaPodStringDecoder(getU8Decoder(), 65)],
 		[

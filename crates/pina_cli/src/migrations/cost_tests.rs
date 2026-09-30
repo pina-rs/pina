@@ -64,6 +64,7 @@ fn account_history(
 		identity: ContractIdentity::try_new(ContractKind::Account, 1, discriminator)
 			.unwrap_or_else(|error| panic!("valid account identity: {error}")),
 		rust_name: rust_name.to_owned(),
+		envelope: true,
 		versions: schemas.into_iter().map(version).collect(),
 	}
 }
@@ -120,6 +121,7 @@ fn instruction_history_with_slots(
 		identity: ContractIdentity::try_new(ContractKind::Instruction, 1, discriminator)
 			.unwrap_or_else(|error| panic!("valid instruction identity: {error}")),
 		rust_name: rust_name.to_owned(),
+		envelope: true,
 		versions: vec![current],
 	}
 }
@@ -135,6 +137,7 @@ fn instruction_without_process(
 		identity: ContractIdentity::try_new(ContractKind::Instruction, 1, discriminator)
 			.unwrap_or_else(|error| panic!("valid instruction identity: {error}")),
 		rust_name: rust_name.to_owned(),
+		envelope: true,
 		versions: vec![version(fixed_schema(payload_bytes))],
 	}
 }

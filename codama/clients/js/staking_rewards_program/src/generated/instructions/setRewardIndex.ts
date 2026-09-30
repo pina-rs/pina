@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const SET_REWARD_INDEX_DISCRIMINATOR = 5;
 
 export function getSetRewardIndexDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(SET_REWARD_INDEX_DISCRIMINATOR);
-}
-
-export const SET_REWARD_INDEX_DISCRIMINATOR2 = 0;
-
-export function getSetRewardIndexDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(SET_REWARD_INDEX_DISCRIMINATOR2);
 }
 
 export type SetRewardIndexInstruction<
@@ -89,7 +80,6 @@ export type SetRewardIndexInstruction<
 
 export type SetRewardIndexInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** The new rewards-per-token index, scaled by [`REWARD_INDEX_SCALE`]. */
 	newIndex: bigint;
 };
@@ -104,27 +94,23 @@ export function getSetRewardIndexInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["newIndex", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 5, migrationVersion: 0 }),
+			"newIndex",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 5 }),
 	);
 }
 
 export function getSetRewardIndexInstructionDataDecoder(): FixedSizeDecoder<
 	SetRewardIndexInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				SET_REWARD_INDEX_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["newIndex", getU64Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			SET_REWARD_INDEX_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["newIndex", getU64Decoder()]]);
 }
 
 export function getSetRewardIndexInstructionDataCodec(): FixedSizeCodec<

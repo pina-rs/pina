@@ -35,7 +35,7 @@ fn initialize_instruction(
 	oracle: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[PropAmmInstruction::Initialize as u8, 0u8],
+		&[PropAmmInstruction::Initialize as u8],
 		vec![
 			AccountMeta::new(*payer, true),
 			AccountMeta::new(*oracle, true),
@@ -50,7 +50,7 @@ fn update_instruction(
 	authority: &Pubkey,
 	new_price: u64,
 ) -> pina_test::Instruction {
-	let mut data = vec![PropAmmInstruction::Update as u8, 0u8];
+	let mut data = vec![PropAmmInstruction::Update as u8];
 	data.extend_from_slice(&new_price.to_le_bytes());
 
 	program.instruction(
@@ -68,7 +68,7 @@ fn rotate_instruction(
 	authority: &Pubkey,
 	new_authority: &Pubkey,
 ) -> pina_test::Instruction {
-	let mut data = vec![PropAmmInstruction::RotateAuthority as u8, 0u8];
+	let mut data = vec![PropAmmInstruction::RotateAuthority as u8];
 	data.extend_from_slice(new_authority.as_ref());
 
 	program.instruction(

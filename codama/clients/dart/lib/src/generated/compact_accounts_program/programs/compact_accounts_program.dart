@@ -26,20 +26,16 @@ enum CompactAccountsProgramInstruction { initialize, resize, write, rename }
 CompactAccountsProgramInstruction identifyCompactAccountsProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return CompactAccountsProgramInstruction.initialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return CompactAccountsProgramInstruction.resize;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return CompactAccountsProgramInstruction.write;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
     return CompactAccountsProgramInstruction.rename;
   }
 

@@ -9,7 +9,6 @@
 )]
 
 pub const OPEN_POSITION_DISCRIMINATOR: u8 = 1u8;
-pub const OPEN_POSITION_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -83,7 +82,6 @@ impl OpenPositionInstructionData {
 		<OpenPositionInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = OPEN_POSITION_DISCRIMINATOR;
-			data.migration_version = OPEN_POSITION_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -97,6 +95,5 @@ impl OpenPositionInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct OpenPositionInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	pub bump: u8,
 }

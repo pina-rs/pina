@@ -25,22 +25,13 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { HEAP_ALLOC_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ALLOCATE_DISCRIMINATOR = 0;
 
 export function getAllocateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ALLOCATE_DISCRIMINATOR);
-}
-
-export const ALLOCATE_DISCRIMINATOR2 = 0;
-
-export function getAllocateDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(ALLOCATE_DISCRIMINATOR2);
 }
 
 export type AllocateInstruction<
@@ -53,7 +44,6 @@ export type AllocateInstruction<
 
 export type AllocateInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** The value to box. The program boxes it and reads it back. */
 	value: bigint;
 };
@@ -68,24 +58,20 @@ export function getAllocateInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["value", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 0, migrationVersion: 0 }),
+			"value",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 0 }),
 	);
 }
 
 export function getAllocateInstructionDataDecoder(): FixedSizeDecoder<
 	AllocateInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(ALLOCATE_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["value", getU64Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(ALLOCATE_DISCRIMINATOR, getU8Decoder()),
+	], ["value", getU64Decoder()]]);
 }
 
 export function getAllocateInstructionDataCodec(): FixedSizeCodec<

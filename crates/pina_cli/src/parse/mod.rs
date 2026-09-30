@@ -404,6 +404,24 @@ fn assemble_from_extracted(
 	Ok(ir)
 }
 
+/// The IR marker recording how an instruction takes part in ABI history.
+///
+/// Only an explicit `migrations` token envelopes an instruction. An auto
+/// policy that covers instructions records the rest without an envelope, so
+/// their snapshot gates wire-breaking changes while their bytes stay unchanged.
+fn instruction_marker(
+	migrations: MigrationOptIn,
+	auto: &pina_abi::MigrationAuto,
+) -> Option<String> {
+	match migrations {
+		MigrationOptIn::Explicit => Some(crate::ir::MIGRATABLE_DOC_MARKER.to_owned()),
+		MigrationOptIn::Unspecified if auto.contains(pina_abi::ContractKind::Instruction) => {
+			Some(crate::ir::RECORDED_DOC_MARKER.to_owned())
+		}
+		MigrationOptIn::Unspecified | MigrationOptIn::Disabled => None,
+	}
+}
+
 fn build_accountless_instructions_from_structs(
 	instruction_structs: &[instruction_data::InstructionStruct],
 	discriminator_map: &HashMap<(String, String), DiscriminatorIr>,
@@ -420,12 +438,7 @@ fn build_accountless_instructions_from_structs(
 			)
 			.map(|discriminator| {
 				let mut docs = ix_struct.docs.clone();
-				if ix_struct
-					.migrations
-					.is_enabled(auto.contains(pina_abi::ContractKind::Instruction))
-				{
-					docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
-				}
+				docs.extend(instruction_marker(ix_struct.migrations, auto));
 				InstructionIr {
 					name: ix_struct.variant.to_snake_case(),
 					rust_name: ix_struct.name.clone(),
@@ -602,12 +615,7 @@ fn build_instructions_from_dispatch(
 		)?;
 
 		let mut docs = ix_struct.docs.clone();
-		if ix_struct
-			.migrations
-			.is_enabled(auto.contains(pina_abi::ContractKind::Instruction))
-		{
-			docs.push(crate::ir::MIGRATABLE_DOC_MARKER.to_owned());
-		}
+		docs.extend(instruction_marker(ix_struct.migrations, auto));
 		instructions.push(InstructionIr {
 			name: entry.variant.to_snake_case(),
 			rust_name: ix_struct.name.clone(),

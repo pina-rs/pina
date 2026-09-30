@@ -9,7 +9,6 @@
 )]
 
 pub const NOTE_DISCRIMINATOR: u8 = 3u8;
-pub const NOTE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -73,7 +72,6 @@ impl NoteInstructionData {
 		<NoteInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = NOTE_DISCRIMINATOR;
-			data.migration_version = NOTE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -87,5 +85,4 @@ impl NoteInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct NoteInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 }

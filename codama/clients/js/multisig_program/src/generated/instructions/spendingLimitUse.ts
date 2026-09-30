@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const SPENDING_LIMIT_USE_DISCRIMINATOR = 13;
 
 export function getSpendingLimitUseDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(SPENDING_LIMIT_USE_DISCRIMINATOR);
-}
-
-export const SPENDING_LIMIT_USE_DISCRIMINATOR2 = 0;
-
-export function getSpendingLimitUseDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(SPENDING_LIMIT_USE_DISCRIMINATOR2);
 }
 
 export type SpendingLimitUseInstruction<
@@ -107,7 +98,6 @@ export type SpendingLimitUseInstruction<
 
 export type SpendingLimitUseInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	amount: bigint;
 	decimals: number;
 };
@@ -121,13 +111,11 @@ export function getSpendingLimitUseInstructionDataEncoder(): FixedSizeEncoder<
 	SpendingLimitUseInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["amount", getU64Encoder()],
-			["decimals", getU8Encoder()],
-		]),
-		(value) => ({ ...value, discriminator: 13, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"amount",
+			getU64Encoder(),
+		], ["decimals", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 13 }),
 	);
 }
 
@@ -142,7 +130,6 @@ export function getSpendingLimitUseInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["amount", getU64Decoder()],
 		["decimals", getU8Decoder()],
 	]);

@@ -37,22 +37,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const RESOLVE_CHALLENGE_DISCRIMINATOR = 10;
 
 export function getResolveChallengeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(RESOLVE_CHALLENGE_DISCRIMINATOR);
-}
-
-export const RESOLVE_CHALLENGE_DISCRIMINATOR2 = 0;
-
-export function getResolveChallengeDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(RESOLVE_CHALLENGE_DISCRIMINATOR2);
 }
 
 export type ResolveChallengeInstruction<
@@ -81,7 +72,6 @@ export type ResolveChallengeInstruction<
 
 export type ResolveChallengeInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/**
 	 * Nonzero resolves in the requester's favor (execution may proceed);
 	 * zero rejects the request outright.
@@ -102,27 +92,23 @@ export function getResolveChallengeInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
+			"approve",
 			getU8Encoder(),
-		], ["approve", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 10, migrationVersion: 0 }),
+		]]),
+		(value) => ({ ...value, discriminator: 10 }),
 	);
 }
 
 export function getResolveChallengeInstructionDataDecoder(): FixedSizeDecoder<
 	ResolveChallengeInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				RESOLVE_CHALLENGE_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["approve", getU8Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			RESOLVE_CHALLENGE_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["approve", getU8Decoder()]]);
 }
 
 export function getResolveChallengeInstructionDataCodec(): FixedSizeCodec<
