@@ -2,9 +2,12 @@
 pina_cli_renderer: fix
 pina_cpi_renderer: fix
 pina_codama_renderer: fix
+# `pina_root` owns every workspace path, is unpublished, and records the
+# coverage without a bump.
+pina_root: none
 ---
 
-# Stop trusting root-owned project symlinks in renderer output paths
+# Distrust root-owned project symlinks in renderers
 
 The CLI, CPI, and Codama renderers trusted any root-owned symbolic link while validating output path components. When a renderer runs as root (Docker containers, many CI images) every file a checkout creates is root-owned, so a symlink committed to the project, such as `clients -> /elsewhere`, passed the check and redirected generated output.
 
