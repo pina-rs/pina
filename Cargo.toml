@@ -313,6 +313,7 @@ solana-rpc-client = { version = "^4", default-features = false }
 # when Surfpool's train does rather than on its own.
 solana-sdk = { version = "^4", default-features = false }
 solana-sdk-ids = { version = "^3", default-features = false }
+solana-sha256-hasher = { version = "^3", default-features = false }
 solana-system-interface = { version = "^3", default-features = false }
 syn = { default-features = false, version = "^3", features = ["full"] }
 tempfile = { default-features = false, version = "^3" }

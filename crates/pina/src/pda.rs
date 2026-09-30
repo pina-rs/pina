@@ -137,6 +137,42 @@ pub fn is_derived_address<const N: usize>(
 		&& Address::derive_address(seeds, Some(bump), program_id) == *address
 }
 
+/// Returns whether `address` is the program address `seeds` and `bump`
+/// derive for `program_id`, for a seed list whose length is only known at
+/// run time, without checking that the address is off the ed25519 curve.
+///
+/// `inputs` is scratch space for the hash inputs: it must hold at least
+/// `seeds.len() + 3` slices. This is the creation builders' counterpart of
+/// [`is_derived_address`], used where the account is about to be created
+/// through `invoke_signed` with the same seeds and bump. The runtime derives
+/// the signer's address with the curve check during that call, so an on-curve
+/// hash is still rejected, just by the runtime instead of by this check.
+///
+/// Like [`is_derived_address`], it rejects a seed longer than
+/// [`MAX_SEED_LEN`](crate::MAX_SEED_LEN) before hashing, so the builder
+/// returns `InvalidSeeds` for it as it did with `create_program_address`,
+/// instead of leaving the rejection to the runtime.
+#[inline(always)]
+pub(crate) fn hashes_to_program_address<'a>(
+	address: &Address,
+	seeds: &[&'a [u8]],
+	bump: &'a [u8; 1],
+	program_id: &'a Address,
+	inputs: &mut [&'a [u8]],
+) -> bool {
+	if seeds.iter().any(|seed| seed.len() > crate::MAX_SEED_LEN) {
+		return false;
+	}
+
+	let seeds_len = seeds.len();
+	inputs[..seeds_len].copy_from_slice(seeds);
+	inputs[seeds_len] = bump.as_slice();
+	inputs[seeds_len + 1] = program_id.as_ref();
+	inputs[seeds_len + 2] = solana_address::PDA_MARKER.as_slice();
+
+	solana_sha256_hasher::hashv(&inputs[..seeds_len + 3]).to_bytes() == *address.as_array()
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;

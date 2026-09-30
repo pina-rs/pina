@@ -6317,6 +6317,7 @@ dependencies = [
  "proptest",
  "solana-address 2.6.1",
  "solana-program-log",
+ "solana-sha256-hasher 3.1.0",
  "trybuild",
 ]
 

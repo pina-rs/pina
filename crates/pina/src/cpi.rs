@@ -1363,38 +1363,44 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		}
 
 		if self.seeds.len() < SMALL_SEED_CAPACITY {
-			self.derive_and_allocate::<SMALL_SEED_CAPACITY>(signers, rent)
+			self.derive_and_allocate::<SMALL_SEED_CAPACITY, { SMALL_SEED_CAPACITY + 2 }>(
+				signers, rent,
+			)
 		} else if self.seeds.len() < MEDIUM_SEED_CAPACITY {
-			self.derive_and_allocate::<MEDIUM_SEED_CAPACITY>(signers, rent)
+			self.derive_and_allocate::<MEDIUM_SEED_CAPACITY, { MEDIUM_SEED_CAPACITY + 2 }>(
+				signers, rent,
+			)
 		} else {
-			self.derive_and_allocate::<MAX_SEEDS>(signers, rent)
+			self.derive_and_allocate::<MAX_SEEDS, { MAX_SEEDS + 2 }>(signers, rent)
 		}
 	}
 
 	/// Checks that `seeds` and `bump` derive the target address, then
-	/// allocates it. The caller guarantees `seeds.len() < CAPACITY` and
-	/// `signers.len() < MAX_CPI_SIGNERS`.
+	/// allocates it. The caller guarantees `seeds.len() < CAPACITY`,
+	/// `HASH_INPUTS == CAPACITY + 2`, and `signers.len() < MAX_CPI_SIGNERS`.
+	///
+	/// The check hashes the seeds, bump, owner, and PDA marker with `sha256`
+	/// instead of calling `sol_create_program_address`, about 1,350 compute
+	/// units cheaper. It skips only the ed25519 curve check, which the runtime
+	/// repeats: the allocation signs for this address through `invoke_signed`
+	/// with the same seeds and bump, and the runtime refuses to sign for an
+	/// on-curve address.
 	#[inline(always)]
-	// The seed slices below use `[..len + 1]` rather than the more readable
-	// `[..=len]` clippy prefers: the inclusive form monomorphizes a 216-byte
-	// `RangeInclusive<usize>::index` copy per element type (~1.3 KB per
-	// PDA-creating program across this spine) while the exclusive form
-	// inlines. `len + 1` cannot overflow because `len < CAPACITY`.
-	#[allow(clippy::range_plus_one)]
-	fn derive_and_allocate<const CAPACITY: usize>(
+	fn derive_and_allocate<const CAPACITY: usize, const HASH_INPUTS: usize>(
 		&self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
 	) -> ProgramResult {
-		let seeds_len = self.seeds.len();
 		let bump_array = [self.bump];
-		let mut derivation_seeds: [&[u8]; CAPACITY] = [&[]; CAPACITY];
-		derivation_seeds[..seeds_len].copy_from_slice(self.seeds);
-		derivation_seeds[seeds_len] = bump_array.as_slice();
-		let expected_address =
-			crate::create_program_address(&derivation_seeds[..seeds_len + 1], self.owner)?;
+		let mut hash_inputs: [&[u8]; HASH_INPUTS] = [&[]; HASH_INPUTS];
 
-		if self.account.address() != &expected_address {
+		if !crate::pda::hashes_to_program_address(
+			self.account.address(),
+			self.seeds,
+			&bump_array,
+			self.owner,
+			&mut hash_inputs,
+		) {
 			return Err(ProgramError::InvalidSeeds);
 		}
 
@@ -2822,6 +2828,34 @@ mod tests {
 			owner: &owner,
 			seeds,
 			bump: bump ^ 1,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent());
+		assert_eq!(rejected, Err(ProgramError::InvalidSeeds));
+		assert!(stored.data[..state_size].iter().all(|byte| *byte == 0));
+	}
+
+	/// A 33-byte seed hashes like a valid 32-byte seed followed by a 1-byte
+	/// one. The builder must reject it itself, as it did when it checked the
+	/// address with `create_program_address`.
+	#[test]
+	fn unchecked_bump_rejects_a_seed_longer_than_the_limit() {
+		let owner = Address::new_from_array([9; 32]);
+		let bytes = [3_u8; 33];
+		let split: &[&[u8]] = &[&bytes[..32], &bytes[32..]];
+		let (address, bump) = crate::try_find_program_address(split, &owner)
+			.expect("the split seeds derive a program address");
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut view = stored.view();
+		let rejected = CreateProgramAccountWithUncheckedBump {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds: &[&bytes],
+			bump,
 		}
 		.invoke_signed_with_rent::<TestState>(&[], test_rent());
 		assert_eq!(rejected, Err(ProgramError::InvalidSeeds));
