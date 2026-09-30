@@ -1,6 +1,7 @@
 {
 	"name": "@pina-rs/skill",
 	"version": "0.21.0",
+	"private": true,
 	"description": "Agent skill for creating and maintaining secure Pina Solana programs",
 	"keywords": [
 		"agent",
@@ -13,12 +14,12 @@
 	"bugs": {
 		"url": "https://github.com/pina-rs/pina/issues"
 	},
-	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/pina-rs/pina.git",
 		"directory": "packages/pina__skill"
 	},
+	"license": "Apache-2.0",
 	"bin": {
 		"pina-skill": "bin/pina-skill.cjs"
 	},
@@ -29,12 +30,11 @@
 		"bin",
 		"references"
 	],
-	"publishConfig": {
-		"access": "public",
-		"provenance": true
-	},
 	"engines": {
 		"node": ">=18"
 	},
-	"private": true
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	}
 }

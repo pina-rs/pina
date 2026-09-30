@@ -23,13 +23,11 @@ One new Medium finding: the AccountsCursor duplicate-writable-alias guard has a 
 **(2) Mechanism.** The anti-aliasing check runs at the moment a _mutable_ slot is parsed and scans only `self.remaining` — the slots **not yet consumed** — and only flags futures that are themselves **writable**. Two consequences:
 
 - An alias already **consumed** by an earlier `next()`/`next_opt()` binding is invisible to the check. When the earlier slot was marked **writable** in the instruction (nothing forbids passing a writable slot to an immutable field — `next()` never calls `validate_writable`), the pair "writable slot bound immutably, then the same address bound mutably" parses without any error, even though both instruction entries are writable.
-- `remaining_mut_distinct` checks distinctness **within** the trailing slice only; it never sees slots consumed earlier, so `[x: &AccountView,
-  #[pina(remaining)] rest: &mut [AccountView]]` accepts `rest[0] == x` when both entries are writable.
+- `remaining_mut_distinct` checks distinctness **within** the trailing slice only; it never sees slots consumed earlier, so `[x: &AccountView, #[pina(remaining)] rest: &mut [AccountView]]` accepts `rest[0] == x` when both entries are writable.
 
 This is exactly the sealevel-attacks class 06 shape the framework claims to close ("rejects writable aliases for mutable accounts parsed individually", `traits.rs:1029-1034`; prior audit's class table: "06 Duplicate mutable accounts — Covered (pairwise rejection … runtime-tested)"). The coverage claim is only true for mutable-binding-first orderings.
 
-**(3) Exploit scenario.** Program schema `#[derive(Accounts)] struct SetState<'a> { pub config: &'a AccountView, pub
-vault: &'a mut AccountView }` with handler logic `config.assert_address(&CONFIG_PDA)?;` followed by writes through `vault` (e.g. setting an attacker-supplied `owner`/`limit` field), where the program never re-derives `vault`'s address because it trusts the framework's duplicate-mutable rejection to make `config` and `vault` distinct.
+**(3) Exploit scenario.** Program schema `#[derive(Accounts)] struct SetState<'a> { pub config: &'a AccountView, pub vault: &'a mut AccountView }` with handler logic `config.assert_address(&CONFIG_PDA)?;` followed by writes through `vault` (e.g. setting an attacker-supplied `owner`/`limit` field), where the program never re-derives `vault`'s address because it trusts the framework's duplicate-mutable rejection to make `config` and `vault` distinct.
 
 1. Attacker builds the instruction with account list `[CONFIG_PDA, CONFIG_PDA]` and marks **both** entries writable.
 2. `next()` binds slot 0 (`config`) with no alias tracking; `next_mut` binds slot 1 (`vault`) and `track_mutable_account` finds nothing in the (now empty) remaining slice → parsing succeeds.
