@@ -2,7 +2,6 @@
 	"name": "@pina-rs/workspace",
 	"private": true,
 	"type": "module",
-	"packageManager": "pnpm@11.25.0",
 	"scripts": {
 		"generate": "bash scripts/generate-pina-clients.sh",
 		"check:js": "tsc --noEmit -p codama/tsconfig.json && tsc --noEmit -p codama/tsconfig.cli.json",
@@ -25,9 +24,9 @@
 	},
 	"dependencies": {
 		"@codama/renderers-js": "^2.5.0",
+		"@pina-rs/codama-renderer-cli": "workspace:*",
 		"codama": "^1.11.0",
-		"codama-renderers-dart": "0.5.6",
-		"@pina-rs/codama-renderer-cli": "workspace:*"
+		"codama-renderers-dart": "0.5.6"
 	},
 	"devDependencies": {
 		"@codama/nodes-from-anchor": "1.5.6",
@@ -38,5 +37,6 @@
 		"commander": "^15.0.0",
 		"tsx": "^4.23.15",
 		"typescript": "^7.0.2"
-	}
+	},
+	"packageManager": "pnpm@11.25.0"
 }

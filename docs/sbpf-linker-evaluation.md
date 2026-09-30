@@ -19,12 +19,10 @@ This is the important finding, and it is not obvious from the README.
 | `bpfel-unknown-none` (what the repo's `build-bpf` alias uses) | Builds, loads, and passes the loader — but is **functionally broken** |
 | `sbpf-solana-solana` (Agave's target)                         | Correct programs, verified in the VM                                  |
 
-On `bpfel-unknown-none`, `target_os` is `none`, so the `cfg(target_os =
-"solana")` paths inside Pinocchio and the Solana SDK crates compile differently. The visible symptoms:
+On `bpfel-unknown-none`, `target_os` is `none`, so the `cfg(target_os = "solana")` paths inside Pinocchio and the Solana SDK crates compile differently. The visible symptoms:
 
 - **Hello world**: executes and returns success, but logs an empty string. The message constant is absent from the ELF. Dumping the post-link module shows `sol_log_` declared with zero arguments and the string deleted, so the syscall reads garbage registers. This is silent corruption — the program reports success.
-- **Counter**: faults with `Access violation in unknown section at address 0x1
-  of size 32`; the 32-byte program-id constant is missing.
+- **Counter**: faults with `Access violation in unknown section at address 0x1 of size 32`; the 32-byte program-id constant is missing.
 
 Reproducible across blueshift 0.2.1 and stock 0.1.8, with pina's rustflags and with the published template flags. Any size measured on this target is meaningless, because the binaries are small partly _because required data is missing_ — early measurements showed an 80% reduction that was an artifact of the defect.
 

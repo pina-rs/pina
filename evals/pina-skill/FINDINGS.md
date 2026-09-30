@@ -26,8 +26,7 @@ Run with `pnpm exec tsx evals/pina-skill/run.ts --all`; see `README.md`.
 
 ## Gaps that cost the agent work but not the task
 
-- **The transition ABI was undocumented.** The skill explained that a manual transition must "fully initialize every active destination byte" without saying what `data` contains or where the offsets in the generated comment point. One run grepped the CLI's own Rust source (`crates/pina_cli/src/
-  migrations/`) to learn that the printed offsets are payload-relative while `data` includes the discriminator and version header. The fix documents the ABI: `data` includes the header, the printed `32..40` is therefore `data[34..42]`, and `FROM_VERSION`/`TO_VERSION` appear in automatic transitions only.
+- **The transition ABI was undocumented.** The skill explained that a manual transition must "fully initialize every active destination byte" without saying what `data` contains or where the offsets in the generated comment point. One run grepped the CLI's own Rust source (`crates/pina_cli/src/ migrations/`) to learn that the printed offsets are payload-relative while `data` includes the discriminator and version header. The fix documents the ABI: `data` includes the header, the printed `32..40` is therefore `data[34..42]`, and `FROM_VERSION`/`TO_VERSION` appear in automatic transitions only.
 
 - **The compact transition shape was undersold.** Compact contracts get a different stub (`target_size`, `working_size`, `migrate`) because the destination length depends on stored values. The skill described this in one clause. It now documents all three functions, that `target_size` must not mutate, and that returning worst-case capacity allocates every stale account at maximum size.
 

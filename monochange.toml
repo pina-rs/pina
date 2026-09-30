@@ -58,7 +58,17 @@ inputs = [
 	{ name = "output", type = "string" },
 ]
 steps = [
-	{ name = "create change file", type = "CreateChangeFile", inputs = ["interactive", "package", "bump", "version", "type", "caused_by", "reason", "details", "output"] },
+	{ name = "create change file", type = "CreateChangeFile", inputs = [
+		"interactive",
+		"package",
+		"bump",
+		"version",
+		"type",
+		"caused_by",
+		"reason",
+		"details",
+		"output",
+	] },
 ]
 
 [cli.release]
@@ -73,11 +83,6 @@ steps = [
 	{ name = "commit release", type = "CommitRelease", inputs = { stage_all = true, no_verify = true }, when = "{{ number_of_changesets > 0 }}" },
 	{ name = "open release request", type = "OpenReleaseRequest", inputs = { stage_all = true, no_verify = true }, when = "{{ number_of_changesets > 0 && inputs.create_pr }}" },
 ]
-
-[package.pina_root]
-path = "."
-type = "cargo"
-publish = { enabled = false }
 
 [package.pina]
 path = "crates/pina"

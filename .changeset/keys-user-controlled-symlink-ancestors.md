@@ -1,9 +1,5 @@
 ---
 pina_cli: fix
-# The source change belongs to `pina_cli`; `pina_root` covers it only because
-# the unpublished root harness owns the repository path, so it is recorded
-# without a bump.
-pina_root: none
 ---
 
 # Accept root-owned symlinked ancestors in keypair paths

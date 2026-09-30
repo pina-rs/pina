@@ -1,9 +1,9 @@
 {
 	"name": "sysvar-checks-program-cli",
 	"version": "0.1.0",
+	"private": true,
 	"description": "Command-line interface for sysvarChecksProgram",
 	"type": "module",
-	"private": true,
 	"bin": {
 		"sysvar-checks-program-cli": "./src/main.ts"
 	},

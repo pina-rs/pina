@@ -1,9 +1,5 @@
 ---
 pina: fix
-# The workspace manifest and lock files the dependency bump edits belong to
-# `pina_root`, which is unpublished, so the coverage is recorded without a
-# bump.
-pina_root: none
 ---
 
 # Upgrade pinapod to 0.4.5

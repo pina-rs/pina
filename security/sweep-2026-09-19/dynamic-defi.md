@@ -1,7 +1,6 @@
 # Dynamic DeFi red-team sweep — escrow_program + prop_amm_program (2026-09-19)
 
-Authorized owner-run sweep. Both targets were deployed as **real SBF artifacts** (`target/surfpool/examples/{escrow_program,prop_amm_program}.so`) onto an offline Surfnet via `pina_test::ProgramTest::start_with_artifact`, and attacked through raw instructions built byte-for-byte (discriminator + migration version byte + payload). Scratch attack crate retained at `tmp/sweep/defi-attacks/` (25 probes, all green: `cargo test --manifest-path
-tmp/sweep/defi-attacks/Cargo.toml -- --ignored --test-threads=1`).
+Authorized owner-run sweep. Both targets were deployed as **real SBF artifacts** (`target/surfpool/examples/{escrow_program,prop_amm_program}.so`) onto an offline Surfnet via `pina_test::ProgramTest::start_with_artifact`, and attacked through raw instructions built byte-for-byte (discriminator + migration version byte + payload). Scratch attack crate retained at `tmp/sweep/defi-attacks/` (25 probes, all green: `cargo test --manifest-path tmp/sweep/defi-attacks/Cargo.toml -- --ignored --test-threads=1`).
 
 - Scope: `examples/escrow_program/src/lib.rs`, `examples/prop_amm_program/src/lib.rs` on branch `security-sweep-2026-09-19` (cut at `feat/abi-version-reset` @ `3f7d38f9`).
 - Wire formats used: Make `[01 00 | seed u64 | amount_a u64 | amount_b u64 | bump u8]`, Take `[02 00]`, Initialize `[00 00]`, Update `[01 00 | price u64]`, RotateAuthority `[02 00 | new_authority 32]`. Escrow state layout 123 bytes: `[01 00 | maker 32 | mint_a 32 | mint_b 32 | amount_a 8 | amount_b 8 | seed 8 | bump 1]`.
@@ -79,6 +78,5 @@ Not applicable to this codebase (prop_amm is an oracle port, not a pool AMM): in
 ## Artifacts
 
 - Attack crate (retained): `tmp/sweep/defi-attacks/` — 25 `#[ignore]` probes, all passing (627 s wall, sequential, one offline Surfnet per probe).
-- Raw run log with per-probe program logs: `tmp/sweep/defi-attacks/run.log` (regenerate with `devenv shell -- cargo test --manifest-path tmp/sweep/defi-attacks/Cargo.toml -- --ignored
-  --nocapture --test-threads=1`).
+- Raw run log with per-probe program logs: `tmp/sweep/defi-attacks/run.log` (regenerate with `devenv shell -- cargo test --manifest-path tmp/sweep/defi-attacks/Cargo.toml -- --ignored --nocapture --test-threads=1`).
 - Programs under attack (unmodified): `examples/escrow_program/src/lib.rs`, `examples/prop_amm_program/src/lib.rs`.

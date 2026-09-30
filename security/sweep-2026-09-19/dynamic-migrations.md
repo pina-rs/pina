@@ -8,8 +8,7 @@ Headline: **no exploit against the shipped program.** All 20 matrix scenarios re
 
 ## Results table
 
-Verdicts: SAFE-BLOCKED (rejected with the named error, zero byte/lamport change), SAFE-BY-DESIGN (succeeds, and the post-state proves the purity invariant), INCONCLUSIVE (not run). Byte offsets refer to the `State` layout `[disc:1, ver:1, authority:32,
-value:8, enabled:1, revision:1]` (44 B current; 42 B at v0).
+Verdicts: SAFE-BLOCKED (rejected with the named error, zero byte/lamport change), SAFE-BY-DESIGN (succeeds, and the post-state proves the purity invariant), INCONCLUSIVE (not run). Byte offsets refer to the `State` layout `[disc:1, ver:1, authority:32, value:8, enabled:1, revision:1]` (44 B current; 42 B at v0).
 
 | ID  | Scenario                                                                     | Verdict                                 | Evidence                                                                                                                                                                                                                                                                                                                                             |
 | --- | ---------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
