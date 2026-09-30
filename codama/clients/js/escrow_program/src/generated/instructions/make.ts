@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ESCROW_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const MAKE_DISCRIMINATOR = 1;
 
 export function getMakeDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(MAKE_DISCRIMINATOR);
-}
-
-export const MAKE_DISCRIMINATOR2 = 0;
-
-export function getMakeDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(MAKE_DISCRIMINATOR2);
 }
 
 export type MakeInstruction<
@@ -105,7 +96,6 @@ export type MakeInstruction<
 
 export type MakeInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** An ID of the transaction. */
 	seed: bigint;
 	/** The amount of token A to be sent. */
@@ -131,13 +121,12 @@ export function getMakeInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["seed", getU64Encoder()],
 			["amountA", getU64Encoder()],
 			["amountB", getU64Encoder()],
 			["bump", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -149,7 +138,6 @@ export function getMakeInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(MAKE_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["seed", getU64Decoder()],
 		["amountA", getU64Decoder()],
 		["amountB", getU64Decoder()],

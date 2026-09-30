@@ -10,7 +10,6 @@
 
 /// Instruction data for `Fill`.
 pub const FILL_DISCRIMINATOR: u8 = 1u8;
-pub const FILL_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -54,7 +53,6 @@ impl FillInstructionData {
 		<FillInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = FILL_DISCRIMINATOR;
-			data.migration_version = FILL_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -68,7 +66,6 @@ impl FillInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct FillInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// Bytes to allocate.
 	///
 	/// The runtime grants a 32 KiB heap frame by default, so a larger value

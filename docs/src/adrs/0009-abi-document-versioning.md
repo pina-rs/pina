@@ -1,6 +1,6 @@
 # ADR 0009: Version the ABI document on `pina_abi`'s own release line, reset its shape, and publish generated schemas
 
-- Status: Accepted
+- Status: Accepted; amended 2026-09-30 for ABI 0.21 (see [Amendment](#amendment-abi-021-2026-09-30))
 - Date: 2026-09-19
 - Owners: Pina maintainers
 - Related: [ADR 0007](./0007-first-class-versioned-abi.md), [ADR 0008](./0008-migration-ux-and-legacy-adoption.md), [ABI document versioning](../migrations/abi-versioning.md), [Migrate to the reset ABI document](../migrations/abi-document-reset.md)
@@ -93,6 +93,8 @@ The 0.20 baseline stores facts and derives everything else at load:
 - Receipts drop the `cluster` label and keep the credential-free `rpc_url`.
 - `rust_name`, the `auto` policy, identity validation (including the path-traversal proofs), the receipt hash chain, the pending record, and the `abandoned` flag all stay.
 
+> **Amended (ABI 0.21):** `codec` and the per-history `identity` object have since left the document as well. See the [Amendment](#amendment-abi-021-2026-09-30).
+
 Because `deny_unknown_fields` applies, any document field change is breaking for older readers, and every document change therefore advances the ABI version through a `breaking` changeset. The converse does not hold — a breaking crate change with an unchanged document is the no-op edge.
 
 ### Generated, published JSON Schemas
@@ -112,6 +114,20 @@ Because no program is live and no consumer depends on the current shapes, the in
 - `MANIFEST_FORMAT_VERSION`, `PUBLICATION_FORMAT_VERSION`, the format 1–3 readers, and both downgrade ladders are deleted, along with the private `DataSchemaV2`, `PublicationLedgerV1/V2`, and `PublicationReceiptV1/V2` shims — roughly 700 lines and their tests;
 - all 24 checked-in example manifests and ledgers are regenerated at `abiVersion` `0.20` by `pina migrations create`;
 - a hypothetical pre-0.20 ledger that pinned a real deployment would have no upgrade path. None exists — the only non-empty receipt records the `fixture` cluster — and accepting that stranding is the price of the reset, paid once, now.
+
+## Amendment (ABI 0.21, 2026-09-30)
+
+ABI 0.21 is the first real step in the converter table: `ABI_STEPS` holds one `AbiStep { from: "0.20", to: "0.21", manifest, publications }`, and each step now carries a converter per document because both documents share one `abiVersion`. `walk_document` takes an `AbiDocument` and applies the matching converter. The step continues the lean baseline by removing the facts 0.20 still stored twice:
+
+- **The contract key is the identity.** Each history's `identity` object (`kind`, `discriminatorBytes`, `discriminatorHex`) repeated its `kind:width:hex` key. It is dropped; `ContractIdentity::from_key` parses and validates the key, and `ContractHistory::identity` is filled from it when a manifest is read. Identity validation, including the path-traversal proofs, is unchanged.
+- **The wire codec moves into `abiVersion`.** Every schema stored `"codec": "pinaPodV2"`, a value no reader could vary. It is now implied by the document version (`pina_abi::SCHEMA_CODEC`) and kept only in the schema hash preimage, so every published `schemaSha256` keeps its value. The earlier rationale for storing `codec` — a loud version event for a layout change — now holds through the version itself: a `PinaPod` release that changes wire bytes becomes a breaking `pina_abi` release, and its converter records the old format on the historical schemas it carries forward. `DataCodec` is removed.
+- **Absent transitions are absent.** A version with no transition no longer writes `"transition": null`.
+- **Events carry no transitions.** An event history keeps one schema per version, because an old log record is decoded with the schema that emitted it. The manifest converter drops recorded event transitions.
+- **Instructions may omit the envelope.** `ContractHistory` gains `envelope`, written only as `"envelope": false`. Such an instruction has exactly one version and no transitions. Every 0.20 instruction history was enveloped, so the converter carries instructions forward unchanged.
+
+The publication ledger converter proves the receipt hash chain as written, drops the pinned `transitionSha256` of every `event:*` contract from each receipt and from the pending record, and then seals the chain again over the converted receipts. Removing a pin changes the receipt's own hash, so re-sealing is required; proving the chain first means a ledger that was already broken fails instead of being re-sealed into a valid one.
+
+The manifest converter checks each stored copy it drops against the fact it duplicates — an `identity` must spell its key and a `codec` must be `pinaPodV2` — so an inconsistent 0.20 document fails the walk rather than normalizing into a valid 0.21 one. Readers convert 0.20 documents in memory; the next `pina migrations create` writes the 0.21 shape. The frozen `fixtures/0.21/` directory and the hosted `abi/schemas/0.21/` schemas record it.
 
 ## Consequences
 

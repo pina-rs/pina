@@ -282,34 +282,34 @@ pub struct UpdateAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
-		UpdateInstruction::with_current_instruction_data(data, |current| {
-			let instruction = UpdateInstruction::try_from_bytes(current)?;
-			let _ = instruction;
-			if self.profile.is_none()
-				&& self.journal.is_none()
-				&& self.migration_payer.is_none()
-				&& self.system_program.is_none()
-			{
-				return Ok(());
-			}
-			let (Some(profile), payer, Some(system_program)) =
-				(self.profile, self.migration_payer, self.system_program)
-			else {
-				return Err(ProgramError::NotEnoughAccountKeys);
-			};
-			system_program.assert_address(&system::ID)?;
-			let payer = payer.map(|account| &*account);
-			MigrateAccount {
-				account: profile,
-				payer,
-				program_id: &ID,
-				max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
-			}
-			.invoke::<Profile>()?;
-			let mut profile = profile.as_account_mut::<Profile>(&ID)?;
-			profile.score.set(instruction.score.get());
-			Ok(())
-		})
+		// The entrypoint routes through \`process_versioned\`, which already
+		// converted a historical request, so \`data\` holds the current layout.
+		let instruction = UpdateInstruction::try_from_bytes(data)?;
+		let _ = instruction;
+		if self.profile.is_none()
+			&& self.journal.is_none()
+			&& self.migration_payer.is_none()
+			&& self.system_program.is_none()
+		{
+			return Ok(());
+		}
+		let (Some(profile), payer, Some(system_program)) =
+			(self.profile, self.migration_payer, self.system_program)
+		else {
+			return Err(ProgramError::NotEnoughAccountKeys);
+		};
+		system_program.assert_address(&system::ID)?;
+		let payer = payer.map(|account| &*account);
+		MigrateAccount {
+			account: profile,
+			payer,
+			program_id: &ID,
+			max_lamports: Some(MAX_INLINE_MIGRATION_LAMPORTS),
+		}
+		.invoke::<Profile>()?;
+		let mut profile = profile.as_account_mut::<Profile>(&ID)?;
+		profile.score.set(instruction.score.get());
+		Ok(())
 	}
 }
 
@@ -333,9 +333,10 @@ pub mod entrypoint {
 	) -> ProgramResult {
 		let instruction: WalkInstruction = parse_instruction(program_id, &ID, data)?;
 		match instruction {
-			WalkInstruction::Update => {
-				UpdateAccounts::try_from((program_id, accounts))?.process(data)
-			}
+			WalkInstruction::Update => UpdateInstruction::process_versioned(
+				UpdateAccounts::try_from((program_id, accounts))?,
+				data,
+			),
 		}
 	}
 }
@@ -843,8 +844,8 @@ async function step4_type_change(context: StepContext): Promise<void> {
 				"profile.points.set(instruction.score.get());",
 				[
 					"profile.points.set(",
-					"				u32::try_from(instruction.score.get()).unwrap_or(u32::MAX),",
-					"			);",
+					"			u32::try_from(instruction.score.get()).unwrap_or(u32::MAX),",
+					"		);",
 				].join("\n"),
 			),
 	);
@@ -1018,8 +1019,56 @@ async function step6_instruction_payload(context: StepContext): Promise<void> {
 		"create after payload growth",
 	);
 	expect(
-		output.includes("Advanced instruction:1:00@1"),
-		"adding `memo` advances the instruction to version 1",
+		output.includes("Advanced instruction:1:00@1") &&
+			output.includes("Manual migration required") &&
+			output.includes("instruction_1_00/v0_to_v1.rs"),
+		"adding `memo` advances the instruction to version 1 with a manual transition",
+	);
+	const checked = pina([
+		"migrations",
+		"check",
+		"--project",
+		PROGRAM_DIR,
+	]);
+	expect(
+		checked.status !== 0,
+		"check refuses the unfinished instruction transition",
+	);
+	// A zero-filled argument would be indistinguishable from a client's zero,
+	// so an added argument is never converted automatically. The walkthrough
+	// decides that old clients mean "no memo".
+	// v0: discriminator (1) + version (1) + score (8) = 10 bytes.
+	// v1: the same prefix plus memo (2) = 12 bytes.
+	const transitionPath = resolve(
+		PROGRAM_DIR,
+		"migrations/transitions/instruction_1_00/v0_to_v1.rs",
+	);
+	const filled = readFileSync(transitionPath, "utf8")
+		.replace(
+			"// TODO(pina-manual-migration): validate the exact historical bytes, then fully initialize destination.\n",
+			"// Old clients sent no memo, so the converted request records zero.\n",
+		)
+		.replace(
+			"pub(crate) fn migrate(data: &mut [u8]) -> bool {\n\tlet _ = data;\n\tfalse\n}",
+			[
+				"pub(crate) fn migrate(data: &mut [u8]) -> bool {",
+				"\tif data.len() < WORKING_SIZE {",
+				"\t\treturn false;",
+				"\t}",
+				"\tdata[SOURCE_SIZE..DESTINATION_SIZE].fill(0);",
+				"\ttrue",
+				"}",
+			].join("\n"),
+		);
+	writeFileSync(transitionPath, filled);
+	const finalized = mustPina(
+		["migrations", "create", "--project", PROGRAM_DIR, "--no-interactive"],
+		PROGRAM_DIR,
+		"create records the implemented instruction transition",
+	);
+	expect(
+		finalized.includes("Updated draft instruction:1:00@1"),
+		"re-running create refreshes the draft with the manual body's recorded hash",
 	);
 	const artifact = buildSbf();
 	await deploy(context, artifact);
@@ -1041,7 +1090,7 @@ async function step6_instruction_payload(context: StepContext): Promise<void> {
 	expect(
 		data?.[1] === 3 &&
 			profileView(data).getUint32(34, true) === 90,
-		"the v0 instruction payload normalizes and the handler still runs",
+		"the entrypoint converts the v0 payload and the handler still runs",
 	);
 }
 
@@ -1057,7 +1106,7 @@ async function step7_optional_accounts(context: StepContext): Promise<void> {
 			"pub system_program: Option<&'a AccountView>,\n\tpub referrer: Option<&'a AccountView>,\n}",
 		).replace(
 			"system_program.assert_address(&system::ID)?;",
-			"system_program.assert_address(&system::ID)?;\n\t\t\tlet _ = self.referrer;",
+			"system_program.assert_address(&system::ID)?;\n\t\tlet _ = self.referrer;",
 		),
 	);
 	const output = mustPina(
@@ -1066,8 +1115,8 @@ async function step7_optional_accounts(context: StepContext): Promise<void> {
 		"create after process growth",
 	);
 	expect(
-		output.includes("Advanced instruction:1:00@2"),
-		"appending an optional account advances the instruction to version 2",
+		output.includes("Appended optional accounts to instruction:1:00@1"),
+		"appending an optional account extends the published version in place",
 	);
 	const artifact = buildSbf();
 	await deploy(context, artifact);
@@ -1117,20 +1166,33 @@ async function step8_event(context: StepContext): Promise<void> {
 	await deploy(context, artifact);
 	recordDeployment(artifact, context.network.rpcUrl);
 	generateClients(8);
-	// The Codama IDL intentionally renders only accounts, instructions, and
-	// defined types; event history stays in the migration manifest. The
-	// appended field is proven by the generated transition, which re-encodes
-	// old log bytes into the new shape off-chain.
-	const transition = readFileSync(
-		resolve(
-			PROGRAM_DIR,
-			"migrations/transitions/event_1_03/v0_to_v1.rs",
-		),
-		"utf8",
-	);
 	expect(
-		transition.includes("@generated"),
-		"appending an event field generates an automatic projection transition",
+		!existsSync(resolve(PROGRAM_DIR, "migrations/transitions/event_1_03")),
+		"events are versioned, not migrated: no transition is written",
+	);
+	// Every earlier version is its own generated event, so a log written by
+	// the step-1 program decodes with the schema that emitted it.
+	const logs = await import(
+		`${resolve(CLIENTS, "js", PROGRAM_NAME)}/src/generated/events/logs.ts`
+	);
+	// v0: discriminator (3) + version (0) + score (8).
+	const historical = new Uint8Array(10);
+	historical[0] = 3;
+	new DataView(historical.buffer).setBigUint64(2, 64n, true);
+	const decoded = logs.normalizeProfileChangedV0Event(historical);
+	expect(
+		decoded.name === "profileChangedV0" && decoded.data.score === 64n,
+		"a version-0 log decodes with the version-0 event",
+	);
+	let rejected = false;
+	try {
+		logs.normalizeProfileChangedEvent(historical);
+	} catch {
+		rejected = true;
+	}
+	expect(
+		rejected,
+		"the current event refuses a version-0 log instead of misreading it",
 	);
 }
 

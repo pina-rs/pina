@@ -9,7 +9,6 @@
 )]
 
 pub const WITHDRAW_DISCRIMINATOR: u8 = 5u8;
-pub const WITHDRAW_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -101,7 +100,6 @@ impl WithdrawInstructionData {
 		<WithdrawInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = WITHDRAW_DISCRIMINATOR;
-			data.migration_version = WITHDRAW_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -115,7 +113,6 @@ impl WithdrawInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct WithdrawInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// Nullifier derived by the circuit from the spent note's secrets.
 	pub nullifier: [u8; 32],
 	/// Tree root the proof's membership witness was built against.

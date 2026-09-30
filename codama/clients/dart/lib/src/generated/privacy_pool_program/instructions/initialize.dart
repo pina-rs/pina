@@ -22,11 +22,9 @@ class InitializeInstructionData {
     required this.requestersBump,
     required this.logBump,
     required this.custodians,
-  }) : discriminator = 0,
-       migrationVersion = 0;
+  }) : discriminator = 0;
 
   final int discriminator;
-  final int migrationVersion;
   final int configBump;
   final int vaultBump;
   final int treeBump;
@@ -40,7 +38,6 @@ class InitializeInstructionData {
 Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('configBump', getU8Encoder()),
     ('vaultBump', getU8Encoder()),
     ('treeBump', getU8Encoder()),
@@ -58,7 +55,6 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
     structEncoder,
     (InitializeInstructionData value) => <String, Object?>{
       'discriminator': 0,
-      'migrationVersion': 0,
       'configBump': value.configBump,
       'vaultBump': value.vaultBump,
       'treeBump': value.treeBump,
@@ -74,7 +70,6 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
 Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('configBump', getU8Decoder()),
     ('vaultBump', getU8Decoder()),
     ('treeBump', getU8Decoder()),
@@ -95,7 +90,6 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
 
   (InitializeInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

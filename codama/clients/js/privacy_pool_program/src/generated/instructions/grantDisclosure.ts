@@ -34,22 +34,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const GRANT_DISCLOSURE_DISCRIMINATOR = 8;
 
 export function getGrantDisclosureDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(GRANT_DISCLOSURE_DISCRIMINATOR);
-}
-
-export const GRANT_DISCLOSURE_DISCRIMINATOR2 = 0;
-
-export function getGrantDisclosureDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(GRANT_DISCLOSURE_DISCRIMINATOR2);
 }
 
 export type GrantDisclosureInstruction<
@@ -77,7 +68,6 @@ export type GrantDisclosureInstruction<
 
 export type GrantDisclosureInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/** Reserved; must be zero. */
 	reserved: number;
 };
@@ -92,27 +82,23 @@ export function getGrantDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
+			"reserved",
 			getU8Encoder(),
-		], ["reserved", getU8Encoder()]]),
-		(value) => ({ ...value, discriminator: 8, migrationVersion: 0 }),
+		]]),
+		(value) => ({ ...value, discriminator: 8 }),
 	);
 }
 
 export function getGrantDisclosureInstructionDataDecoder(): FixedSizeDecoder<
 	GrantDisclosureInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				GRANT_DISCLOSURE_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["reserved", getU8Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			GRANT_DISCLOSURE_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["reserved", getU8Decoder()]]);
 }
 
 export function getGrantDisclosureInstructionDataCodec(): FixedSizeCodec<

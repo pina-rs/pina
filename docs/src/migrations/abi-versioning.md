@@ -10,9 +10,9 @@ A Pina program carries three unrelated kinds of version, and confusing them is t
 
 | Axis                       | Example value                 | Who owns it                   | Changes when                                     |
 | -------------------------- | ----------------------------- | ----------------------------- | ------------------------------------------------ |
-| On-chain contract version  | `3` (integer in the envelope) | Pina, allocated by `create`   | an account, instruction, or event schema changes |
-| ABI document `abiVersion`  | `"0.20"`                      | `pina_abi`'s own release line | a breaking `pina_abi` release — and nothing else |
-| `pina_abi` package version | `0.20.3`                      | the release planner           | any `pina_abi` release, including patches        |
+| On-chain contract version  | `3` (integer in the envelope) | Pina, allocated by `create`   | an enveloped contract's published schema changes |
+| ABI document `abiVersion`  | `"0.21"`                      | `pina_abi`'s own release line | a breaking `pina_abi` release — and nothing else |
+| `pina_abi` package version | `0.21.3`                      | the release planner           | any `pina_abi` release, including patches        |
 
 Only the first one is written into account bytes. An ABI document upgrade never consumes an on-chain migration version, and an on-chain migration never changes `abiVersion`.
 
@@ -56,16 +56,15 @@ Conversions run in memory only. No command rewrites a checked-in document as a s
 
 ## The converter contract
 
-The reader carries an ordered table of adjacent converters — one edge per ABI version step — keyed by the version itself. There is no separate epoch table: the version advances exactly at contract changes, so it is the only axis.
+The reader carries an ordered table of adjacent converters — one edge per ABI version step — keyed by the version itself. There is no separate epoch table: the version advances exactly at contract changes, so it is the only axis. Both documents share one `abiVersion`, so each step carries a converter for each document, and `walk_document(AbiDocument::Manifest | AbiDocument::Publications, from, value)` applies the matching one and stamps the step's `to` version on the result:
 
 ```rust,ignore
-fn upgrade_document(version: &str, value: serde_json::Value) -> Result<serde_json::Value, String> {
-	match version {
-		"0.20" => migrate_0_20_to_0_21(value),
-		"0.21" => migrate_0_21_to_0_22(value),
-		_ => Err(format!("no Pina ABI migration is available from {version}")),
-	}
-}
+pub const ABI_STEPS: &[AbiStep] = &[AbiStep {
+	from: "0.20",
+	to: "0.21",
+	manifest: convert::manifest_0_20_to_0_21,
+	publications: convert::publications_0_20_to_0_21,
+}];
 ```
 
 Four rules make the chain trustworthy.
@@ -80,10 +79,14 @@ Four rules make the chain trustworthy.
 
 ## Stored versus derived
 
-The 0.20 baseline stores facts and re-derives everything else at load. What the document used to carry, and where it comes from now:
+The 0.20 baseline stored facts and re-derived everything else at load, and 0.21 removed the remaining stored copies. What the document used to carry, and where it comes from now:
 
 | Removed field                      | Where it comes from now                                           |
 | ---------------------------------- | ----------------------------------------------------------------- |
+| `ContractHistory.identity` (0.21)  | the `contracts` key `kind:width:hex`, parsed on load              |
+| `DataSchema.codec` (0.21)          | implied by `abiVersion` (`pina_abi::SCHEMA_CODEC`)                |
+| event `Transition` entries (0.21)  | none — events are decoded per version, never converted            |
+| `"transition": null` (0.21)        | an absent `transition` key                                        |
 | `DataSchema.physical`              | derived from `layout` and `fields` by the frozen grammar          |
 | `SchemaVersion.version`            | the version's position in the `versions` array                    |
 | `SchemaVersion.schemaSha256`       | computed from the decoded schema                                  |
@@ -94,7 +97,9 @@ The 0.20 baseline stores facts and re-derives everything else at load. What the 
 | `ProcessAccount.constraints`       | not recorded — validation rules live in the IDL clients use       |
 | receipt `cluster`                  | not recorded — `rpc_url` keeps the credential-free endpoint       |
 
-What stays is what cannot be derived: `codec` (the semantic pin for layout derivation), `rust_name` (macro lookup), the `auto` policy, identity validation including the path-traversal proofs, `mode`, `renames`, `implementation_sha256` (the hash of an external transition file), and the receipt hash chain with its pending and `abandoned` records. Publication receipts pin schema hashes by computing them from the decoded manifest at pin time.
+What stays is what cannot be derived: `rust_name` (macro lookup), the `auto` policy, `envelope` (written only as `"envelope": false`, on an instruction recorded without one), identity validation including the path-traversal proofs, `mode`, `renames`, `implementation_sha256` (the hash of an external transition file), and the receipt hash chain with its pending and `abandoned` records. Publication receipts pin schema hashes by computing them from the decoded manifest at pin time.
+
+The wire codec left the stored schema but not the schema hash. `schemaSha256` still hashes `layout`, `fields`, and `"codec": "pinaPodV2"` in the order 0.20 serialized them, so every published pin keeps its value. A `PinaPod` release that changes wire bytes changes `SCHEMA_CODEC` through a breaking `pina_abi` release, and the converter for that release records the old format on every historical schema it carries forward.
 
 Because `deny_unknown_fields` applies, any field change is a breaking change for older readers, and every document change therefore advances the ABI version through a `breaking` changeset. The converse does not hold — a breaking crate change with an unchanged document is the no-op edge above.
 
@@ -105,6 +110,7 @@ crates/pina_abi/fixtures/0.20/manifest.json
 crates/pina_abi/fixtures/0.20/publications.json
 crates/pina_abi/fixtures/0.20/manifest.schema.json
 crates/pina_abi/fixtures/0.20/publications.schema.json
+crates/pina_abi/fixtures/0.21/…
 crates/pina_abi/fixtures/current/…
 ```
 
@@ -127,6 +133,23 @@ The document types derive `schemars::JsonSchema`, so the schema is generated fro
 ```sh
 pina abi schema --document manifest > manifest.schema.json
 ```
+
+## Upgrading from ABI 0.20
+
+A `0.20` document still opens: the reader converts it in memory, and the next `pina migrations create` writes it at `0.21`. The manifest step:
+
+- drops each history's `identity` object after proving that its kind, width, and hex spell the contract key;
+- drops each schema's `"codec": "pinaPodV2"` after proving it is that codec;
+- drops every event transition, because an event is decoded with the schema of the version that emitted it;
+- keeps every instruction enveloped, because every `0.20` instruction history was.
+
+The publication ledger step proves the receipt hash chain as written, drops the pinned `transitionSha256` of every `event:*` contract from each receipt and from the pending record, and seals the chain again over the converted receipts. A ledger whose chain was already broken fails instead of being re-sealed. Every `schemaSha256` pin keeps its value.
+
+Three source changes can follow the conversion:
+
+1. **Instructions recorded through `auto`.** An instruction that `0.20` recorded only because `auto` covered instructions stays enveloped after conversion, but under `0.21` an `auto` policy alone records an instruction without one, so the build fails: "the migration manifest records `UpdateInstruction` with a version envelope, but it no longer opts in with the `migrations` token". If the instruction is published, add `migrations` to its `#[instruction]` attribute to keep its wire format; `pina migrations create` rejects the other direction with `EnvelopeRemoval`. If nothing is published, you may instead run `pina migrations create`, which records the instruction as a snapshot without a version byte; delete its `migrations/transitions/instruction_*` directory afterwards, because nothing reads it.
+2. **Event transitions.** `migrations/transitions/event_*` directories are no longer read or verified. Delete them. Code that called `normalize_event_data`, `with_current_event_data`, `MigratableEvent`, or `CurrentEventData` must decode a historical record with the generated client's `<Event>V<n>` event instead.
+3. **Instruction handlers.** `#[discriminator(entrypoint)]` now normalizes an enveloped instruction's payload before the handler runs, through the generated `process_versioned` and `ProcessAccountInfos::process_from_version`. Remove handler-side calls to `with_current_instruction_data`: the payload is already current, and the helper's closure now takes the source version as a second argument, so existing calls no longer compile.
 
 ## Upgrading from pre-0.20 integer formats
 

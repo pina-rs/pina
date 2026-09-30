@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ADD_ROLE_DISCRIMINATOR = 1;
 
 export function getAddRoleDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ADD_ROLE_DISCRIMINATOR);
-}
-
-export const ADD_ROLE_DISCRIMINATOR2 = 0;
-
-export function getAddRoleDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(ADD_ROLE_DISCRIMINATOR2);
 }
 
 export type AddRoleInstruction<
@@ -91,7 +82,6 @@ export type AddRoleInstruction<
 
 export type AddRoleInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	roleId: bigint;
 	permissions: bigint;
 	bump: number;
@@ -109,12 +99,11 @@ export function getAddRoleInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["roleId", getU64Encoder()],
 			["permissions", getU64Encoder()],
 			["bump", getU8Encoder()],
 		]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -126,7 +115,6 @@ export function getAddRoleInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(ADD_ROLE_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["roleId", getU64Decoder()],
 		["permissions", getU64Decoder()],
 		["bump", getU8Decoder()],

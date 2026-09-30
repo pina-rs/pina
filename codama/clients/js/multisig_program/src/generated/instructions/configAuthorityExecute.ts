@@ -47,7 +47,6 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -55,12 +54,6 @@ export const CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR = 12;
 
 export function getConfigAuthorityExecuteDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR);
-}
-
-export const CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR2 = 0;
-
-export function getConfigAuthorityExecuteDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CONFIG_AUTHORITY_EXECUTE_DISCRIMINATOR2);
 }
 
 export type ConfigAuthorityExecuteInstruction<
@@ -106,7 +99,6 @@ export type ConfigAuthorityExecuteInstruction<
 
 export type ConfigAuthorityExecuteInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	actionsLen: number;
 	actions: ReadonlyUint8Array;
 };
@@ -120,13 +112,11 @@ export function getConfigAuthorityExecuteInstructionDataEncoder(): FixedSizeEnco
 	ConfigAuthorityExecuteInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["actionsLen", getU16Encoder()],
-			["actions", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-		]),
-		(value) => ({ ...value, discriminator: 12, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"actionsLen",
+			getU16Encoder(),
+		], ["actions", fixPinaPodEncoderSize(getBytesEncoder(), 128)]]),
+		(value) => ({ ...value, discriminator: 12 }),
 	);
 }
 
@@ -141,7 +131,6 @@ export function getConfigAuthorityExecuteInstructionDataDecoder(): FixedSizeDeco
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["actionsLen", getU16Decoder()],
 		["actions", fixDecoderSize(getBytesDecoder(), 128)],
 	]);

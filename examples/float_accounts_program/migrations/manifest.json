@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "FloatDataAccount",
 			"versions": [
 				{
@@ -32,20 +27,14 @@
 								"name": "authority",
 								"rustType": "Address"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "CreateInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -59,8 +48,7 @@
 								"name": "data_f64",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -89,18 +77,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "UpdateInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -114,8 +97,7 @@
 								"name": "data_f64",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -136,8 +118,7 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

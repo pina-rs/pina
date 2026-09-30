@@ -52,15 +52,15 @@ pub struct RenameIx {
 
 impl RenameIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 27;
+	pub const LEN: usize = 26;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 27], ProgramError> {
-		let mut data = [0u8; 27];
-		data[..2].copy_from_slice(&RENAME_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.title_len.to_le_bytes());
-		data[3..27].copy_from_slice(&self.title);
+	pub fn to_bytes(&self) -> Result<[u8; 26], ProgramError> {
+		let mut data = [0u8; 26];
+		data[..1].copy_from_slice(&RENAME_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.title_len.to_le_bytes());
+		data[2..26].copy_from_slice(&self.title);
 
 		Ok(data)
 	}
@@ -92,4 +92,4 @@ impl<'account> Rename<'account> {
 	}
 }
 
-const RENAME_DISCRIMINATOR: [u8; 2] = [3, 0];
+const RENAME_DISCRIMINATOR: [u8; 1] = [3];

@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "PoolConfig",
 			"versions": [
 				{
@@ -44,19 +39,12 @@
 								"name": "total_deposits",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:02": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "PoolVault",
 			"versions": [
 				{
@@ -67,19 +55,12 @@
 								"name": "bump",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:03": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "03"
-			},
 			"rustName": "MerkleTree",
 			"versions": [
 				{
@@ -106,19 +87,12 @@
 								"name": "roots",
 								"rustType": "[u8; 256]"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:04": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "04"
-			},
 			"rustName": "NullifierSet",
 			"versions": [
 				{
@@ -137,19 +111,12 @@
 								"name": "nullifiers",
 								"rustType": "[u8; 4096]"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:05": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "05"
-			},
 			"rustName": "CustodianRegistry",
 			"versions": [
 				{
@@ -164,19 +131,12 @@
 								"name": "custodians",
 								"rustType": "[u8; 96]"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:06": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "06"
-			},
 			"rustName": "RequesterRegistry",
 			"versions": [
 				{
@@ -199,19 +159,12 @@
 								"name": "max_tiers",
 								"rustType": "[u8; 16]"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:07": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "07"
-			},
 			"rustName": "DisclosureLog",
 			"versions": [
 				{
@@ -230,19 +183,12 @@
 								"name": "entries",
 								"rustType": "[u8; 3072]"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:08": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "08"
-			},
 			"rustName": "NoteCommitment",
 			"versions": [
 				{
@@ -273,19 +219,12 @@
 								"name": "shares",
 								"rustType": "[u8; 144]"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:09": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "09"
-			},
 			"rustName": "DisclosureRequest",
 			"versions": [
 				{
@@ -344,19 +283,12 @@
 								"name": "approvals",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:0a": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0a"
-			},
 			"rustName": "VerifyingKeyAccount",
 			"versions": [
 				{
@@ -407,20 +339,14 @@
 								"name": "ic3",
 								"rustType": "[u8; 64]"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "InitializeIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -458,8 +384,7 @@
 								"name": "custodians",
 								"rustType": "[u8; 96]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -536,18 +461,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "SetVerificationKeyIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -597,8 +517,7 @@
 								"name": "ic3",
 								"rustType": "[u8; 64]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -635,18 +554,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:02": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "SetCustodiansIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -656,8 +570,7 @@
 								"name": "custodians",
 								"rustType": "[u8; 96]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -686,18 +599,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:03": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "03"
-			},
 			"rustName": "RegisterRequesterIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -711,8 +619,7 @@
 								"name": "max_tier",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -741,18 +648,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:04": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "04"
-			},
 			"rustName": "DepositIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -782,8 +684,7 @@
 								"name": "shares",
 								"rustType": "[u8; 144]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -836,18 +737,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:05": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "05"
-			},
 			"rustName": "WithdrawIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -873,8 +769,7 @@
 								"name": "proof_c",
 								"rustType": "[u8; 64]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -935,18 +830,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:06": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "06"
-			},
 			"rustName": "TransferIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -996,8 +886,7 @@
 								"name": "proof_c",
 								"rustType": "[u8; 64]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1058,18 +947,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:07": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "07"
-			},
 			"rustName": "RequestDisclosureIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -1103,8 +987,7 @@
 								"name": "legal_basis_hash",
 								"rustType": "[u8; 32]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1165,18 +1048,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:08": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "08"
-			},
 			"rustName": "GrantDisclosureIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -1186,8 +1064,7 @@
 								"name": "reserved",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1216,18 +1093,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:09": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "09"
-			},
 			"rustName": "ChallengeDisclosureIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -1237,8 +1109,7 @@
 								"name": "reserved",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1275,18 +1146,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:0a": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0a"
-			},
 			"rustName": "ResolveChallengeIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -1296,8 +1162,7 @@
 								"name": "approve",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1326,18 +1191,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:0b": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0b"
-			},
 			"rustName": "ApproveDisclosureIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -1347,8 +1207,7 @@
 								"name": "reserved",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1401,18 +1260,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:0c": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0c"
-			},
 			"rustName": "CancelDisclosureIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -1422,8 +1276,7 @@
 								"name": "reserved",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1444,8 +1297,7 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

@@ -108,7 +108,7 @@ fn migration_measurements(elf_dir: &Path) -> BTreeMap<String, Measurement> {
 	current_state[42] = 1;
 	let mut current_data = [0_u8; 12];
 	current_data[0] = MigrationInstruction::Update as u8;
-	current_data[1] = 2;
+	current_data[1] = 1;
 	current_data[2..10].copy_from_slice(&42_u64.to_le_bytes());
 	let update_metas = |state: Pubkey, payer: Pubkey| {
 		vec![

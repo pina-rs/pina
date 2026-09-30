@@ -9,7 +9,6 @@
 )]
 
 pub const MAKE_DISCRIMINATOR: u8 = 1u8;
-pub const MAKE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -110,7 +109,6 @@ impl MakeInstructionData {
 		<MakeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = MAKE_DISCRIMINATOR;
-			data.migration_version = MAKE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -124,7 +122,6 @@ impl MakeInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct MakeInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// An ID of the transaction.
 	pub seed: u64,
 	/// The amount of token A to be sent.

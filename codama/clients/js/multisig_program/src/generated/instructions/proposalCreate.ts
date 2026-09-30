@@ -47,7 +47,6 @@ import {
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -55,12 +54,6 @@ export const PROPOSAL_CREATE_DISCRIMINATOR = 4;
 
 export function getProposalCreateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(PROPOSAL_CREATE_DISCRIMINATOR);
-}
-
-export const PROPOSAL_CREATE_DISCRIMINATOR2 = 0;
-
-export function getProposalCreateDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(PROPOSAL_CREATE_DISCRIMINATOR2);
 }
 
 export type ProposalCreateInstruction<
@@ -101,7 +94,6 @@ export type ProposalCreateInstruction<
 
 export type ProposalCreateInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	bump: number;
 	/** [`KIND_VAULT`] or [`KIND_CONFIG`]. */
 	kind: number;
@@ -159,7 +151,6 @@ export function getProposalCreateInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["kind", getU8Encoder()],
 			["vaultIndex", getU8Encoder()],
@@ -171,7 +162,7 @@ export function getProposalCreateInstructionDataEncoder(): FixedSizeEncoder<
 			["actionsLen", getU16Encoder()],
 			["actions", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
 		]),
-		(value) => ({ ...value, discriminator: 4, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 4 }),
 	);
 }
 
@@ -186,7 +177,6 @@ export function getProposalCreateInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["kind", getU8Decoder()],
 		["vaultIndex", getU8Decoder()],

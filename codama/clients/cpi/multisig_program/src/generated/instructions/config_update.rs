@@ -54,17 +54,17 @@ pub struct ConfigUpdateIx<'argument> {
 
 impl<'argument> ConfigUpdateIx<'argument> {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 44;
+	pub const LEN: usize = 43;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 44], ProgramError> {
-		let mut data = [0u8; 44];
-		data[..2].copy_from_slice(&CONFIG_UPDATE_DISCRIMINATOR);
-		data[2] = u8::from(self.set_treasury);
-		data[3..35].copy_from_slice(self.treasury.as_ref());
-		data[35] = u8::from(self.set_creation_fee);
-		data[36..44].copy_from_slice(&self.creation_fee.to_le_bytes());
+	pub fn to_bytes(&self) -> Result<[u8; 43], ProgramError> {
+		let mut data = [0u8; 43];
+		data[..1].copy_from_slice(&CONFIG_UPDATE_DISCRIMINATOR);
+		data[1] = u8::from(self.set_treasury);
+		data[2..34].copy_from_slice(self.treasury.as_ref());
+		data[34] = u8::from(self.set_creation_fee);
+		data[35..43].copy_from_slice(&self.creation_fee.to_le_bytes());
 
 		Ok(data)
 	}
@@ -95,4 +95,4 @@ impl<'account, 'argument> ConfigUpdate<'account, 'argument> {
 	}
 }
 
-const CONFIG_UPDATE_DISCRIMINATOR: [u8; 2] = [1, 0];
+const CONFIG_UPDATE_DISCRIMINATOR: [u8; 1] = [1];

@@ -82,7 +82,11 @@ pub(super) fn create_transition(
 	// transition can never be labelled automatic while writing movement its own
 	// plan never justified. The proof already refuses developer-owned
 	// conversions, so its verdict is the mode.
-	let plan = automatic_move_plan(&source.schema, &intent, destination);
+	let plan = automatic_move_plan(&source.schema, &intent, destination).filter(|plan| {
+		// A zero-filled instruction argument is a default the handler cannot
+		// tell from a value the client sent, so the developer chooses it.
+		identity.kind != ContractKind::Instruction || plan.zero_fills.is_empty()
+	});
 	let mode = if plan.is_some() {
 		TransitionMode::Automatic
 	} else {
@@ -730,16 +734,17 @@ pub(super) fn manual_transition_source(
 				migrate,
 			)
 		}
+		// Events carry no transitions; only instructions reach this arm.
 		ContractKind::Instruction | ContractKind::Event => {
 			let source_size = source_size.ok_or_else(|| {
 				MigrationError::InvalidHistory(format!(
-					"instruction and event histories must use fixed layouts; `{}` does not",
+					"instruction histories must use fixed layouts; `{}` does not",
 					identity.key()
 				))
 			})?;
 			let destination_size = destination_size.ok_or_else(|| {
 				MigrationError::InvalidHistory(format!(
-					"instruction and event histories must use fixed layouts; `{}` does not",
+					"instruction histories must use fixed layouts; `{}` does not",
 					identity.key()
 				))
 			})?;
@@ -794,6 +799,10 @@ pub(super) fn verify_transition_files(
 	key: &str,
 	history: &ContractHistory,
 ) -> Result<(), MigrationError> {
+	// Events and snapshot-only instructions record no transitions.
+	if !history.is_migrated() {
+		return Ok(());
+	}
 	// A transition sits on the version it converts into, so the entering
 	// transition of version `number` is the step from `number - 1`.
 	for (number, version) in history.versions.iter().enumerate().skip(1) {

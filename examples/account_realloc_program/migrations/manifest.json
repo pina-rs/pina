@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "Sample",
 			"versions": [
 				{
@@ -32,20 +27,14 @@
 								"name": "values",
 								"rustType": "Vec<u64, 64>"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "ReallocIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -55,8 +44,7 @@
 								"name": "len",
 								"rustType": "u16"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -85,18 +73,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "Realloc2Ix",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -106,8 +89,7 @@
 								"name": "len",
 								"rustType": "u16"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -144,18 +126,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:02": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "InitializeIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -165,8 +142,7 @@
 								"name": "bump",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -195,8 +171,7 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

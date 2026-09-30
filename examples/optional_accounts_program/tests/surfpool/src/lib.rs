@@ -30,8 +30,8 @@ fn init_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		// discriminator + migration version + bump.
-		&[OptionalInstruction::Init as u8, 0u8, bump],
+		// discriminator + bump.
+		&[OptionalInstruction::Init as u8, bump],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*store, false),
@@ -96,7 +96,7 @@ fn touch_increments_only_when_the_store_is_present() {
 
 		let present = |program: &ProgramTest| {
 			program.instruction(
-				&[OptionalInstruction::Touch as u8, 0u8],
+				&[OptionalInstruction::Touch as u8],
 				vec![
 					AccountMeta::new_readonly(authority, true),
 					AccountMeta::new(store, false),
@@ -115,7 +115,7 @@ fn touch_increments_only_when_the_store_is_present() {
 		);
 
 		let omitted = program.instruction(
-			&[OptionalInstruction::Touch as u8, 0u8],
+			&[OptionalInstruction::Touch as u8],
 			vec![
 				AccountMeta::new_readonly(authority, true),
 				AccountMeta::new_readonly(program_id, false),
@@ -171,7 +171,7 @@ fn touch_rejects_a_wrong_type_store() {
 			.expect("fund impostor");
 
 		let instruction = program.instruction(
-			&[OptionalInstruction::Touch as u8, 0u8],
+			&[OptionalInstruction::Touch as u8],
 			vec![
 				AccountMeta::new_readonly(authority, true),
 				AccountMeta::new(impostor, false),
@@ -211,7 +211,7 @@ fn inspect_enforces_the_witness_signer_when_provided() {
 		program.fund(&witness, 1_000_000_000).expect("fund witness");
 
 		let instruction = program.instruction(
-			&[OptionalInstruction::Inspect as u8, 0u8],
+			&[OptionalInstruction::Inspect as u8],
 			vec![
 				AccountMeta::new_readonly(authority, true),
 				AccountMeta::new_readonly(store, false),
@@ -226,7 +226,7 @@ fn inspect_enforces_the_witness_signer_when_provided() {
 		eprintln!("unsigned witness error: {}", error.message());
 
 		let note = program.instruction(
-			&[OptionalInstruction::Note as u8, 0u8],
+			&[OptionalInstruction::Note as u8],
 			vec![
 				AccountMeta::new_readonly(authority, true),
 				AccountMeta::new_readonly(program_id, false),

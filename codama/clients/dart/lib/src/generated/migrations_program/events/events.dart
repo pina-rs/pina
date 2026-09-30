@@ -3,9 +3,11 @@
 
 export 'event_log.dart';
 export 'value_changed_event.dart';
+export 'value_changed_event_v0.dart';
 
 import 'event_log.dart';
 import 'value_changed_event.dart';
+import 'value_changed_event_v0.dart';
 
 /// The program whose invocation frames emit the events decoded here.
 const migrationsProgramEventSourceAddress =
@@ -26,8 +28,8 @@ final _programExitLog = RegExp(r'^Program (\S+) (?:success|failed: .*)$');
 /// and lines outside any frame are skipped rather than trusted.
 ///
 /// Unrelated lines are skipped. A line this program emitted that names an event
-/// but carries an unknown, future, or non-projectable version throws instead of
-/// being silently dropped. The per-event `parse*FromLog` helpers decode one line
+/// but carries a version no generated event describes throws instead of being
+/// silently dropped. The per-event `parse*FromLog` helpers decode one line
 /// without this attribution and are only safe for data already known to come
 /// from this program.
 List<MigrationsProgramEvent> parseMigrationsProgramEventsFromLogs(
@@ -56,6 +58,30 @@ List<MigrationsProgramEvent> parseMigrationsProgramEventsFromLogs(
       discovered.add(valueChangedEvent);
       continue;
     }
+    final valueChangedEventV0 = parseValueChangedEventV0EventFromLog(log);
+    if (valueChangedEventV0 != null) {
+      discovered.add(valueChangedEventV0);
+      continue;
+    }
+    final unknownVersion = _unrecognizedEventVersion(log);
+    if (unknownVersion != null) {
+      throw RangeError(unknownVersion);
+    }
   }
   return discovered;
+}
+
+/// Explain a `Program data:` line that names a migration-aware event but that
+/// no generated event claimed, or return null for an unrelated line.
+String? _unrecognizedEventVersion(String log) {
+  final bytes = decodeProgramDataLog(log);
+  if (bytes == null) {
+    return null;
+  }
+  if (bytes.length >= 1 && bytes[0] == 4) {
+    return bytes.length < 2
+        ? 'event "valueChangedEvent" log is too short for its version envelope'
+        : 'event "valueChangedEvent" log carries migration version ${bytes[1]}, which this client cannot decode; regenerate it';
+  }
+  return null;
 }

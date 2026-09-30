@@ -9,7 +9,6 @@
 )]
 
 pub const CANCEL_DISCRIMINATOR: u8 = 2u8;
-pub const CANCEL_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -120,7 +119,6 @@ impl CancelInstructionData {
 		<CancelInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CANCEL_DISCRIMINATOR;
-			data.migration_version = CANCEL_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -134,5 +132,4 @@ impl CancelInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct CancelInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 }

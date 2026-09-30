@@ -127,6 +127,45 @@ fn resolve_routes(item_enum: &ItemEnum) -> syn::Result<Vec<Route>> {
 	Ok(routes)
 }
 
+/// One dispatch arm: parse the variant's accounts and run its process.
+///
+/// A variant whose instruction the manifest records with a version envelope
+/// is routed through that instruction's `process_versioned`, which normalizes
+/// a historical payload first. The discriminator comparison is a constant, so
+/// only the matching route survives compilation.
+fn dispatch_arm(
+	crate_path: &Path,
+	enum_name: &Ident,
+	route: &Route,
+	enveloped: &[(u64, Ident)],
+) -> proc_macro2::TokenStream {
+	let Route {
+		variant, accounts, ..
+	} = route;
+	let versioned = enveloped.iter().map(|(value, instruction)| {
+		let value = Literal::u64_unsuffixed(*value);
+		quote_spanned! {variant.span()=>
+			if #enum_name::#variant as u64 == #value {
+				return #instruction::process_versioned(__pina_accounts, data);
+			}
+		}
+	});
+
+	quote_spanned! {variant.span()=>
+		#enum_name::#variant => {
+			// Trait-qualified so programs with explicit imports compile
+			// without relying on `ProcessAccountInfos` being in scope.
+			let __pina_accounts = <#accounts as ::core::convert::TryFrom<(
+				& #crate_path::Address,
+				&mut [#crate_path::AccountView],
+			)>>::try_from((program_id, accounts))?;
+
+			#(#versioned)*
+			<#accounts as #crate_path::ProcessAccountInfos>::process(__pina_accounts, data)
+		}
+	}
+}
+
 /// Everything the entrypoint expansion emits besides the enum itself.
 #[derive(Debug)]
 pub(crate) struct EntrypointExpansion {
@@ -159,28 +198,14 @@ pub(crate) fn expand(
 	}
 
 	let migration_ladder = resolve_migrations(args, &enum_name)?;
+	let enveloped = crate::migration::manifest_enveloped_instructions(&enum_name)?;
 
 	// The generated arms and bounds both name the accounts type. Building those
 	// tokens with the variant's span keeps a missing accounts struct pointing at
 	// the variant the caller wrote, instead of at the attribute.
-	let dispatch_arms = routes.iter().map(|route| {
-		let Route {
-			variant, accounts, ..
-		} = route;
-
-		quote_spanned! {variant.span()=>
-			#enum_name::#variant => {
-				// Trait-qualified so programs with explicit imports compile
-				// without relying on `ProcessAccountInfos` being in scope.
-				let __pina_accounts = <#accounts as ::core::convert::TryFrom<(
-					& #crate_path::Address,
-					&mut [#crate_path::AccountView],
-				)>>::try_from((program_id, accounts))?;
-
-				<#accounts as #crate_path::ProcessAccountInfos>::process(__pina_accounts, data)
-			}
-		}
-	});
+	let dispatch_arms = routes
+		.iter()
+		.map(|route| dispatch_arm(crate_path, &enum_name, route, &enveloped));
 
 	let route_bound = |route: &Route| {
 		let accounts = &route.accounts;
@@ -557,6 +582,36 @@ mod tests {
 		assert!(expanded.contains("InitializeAccounts"));
 		assert!(expanded.contains("IncrementAccounts"));
 		assert!(expanded.contains("#[inline(always)]"));
+	}
+
+	/// A variant whose instruction the manifest records with an envelope is
+	/// normalized through `process_versioned`; every other route is unchanged.
+	#[test]
+	fn enveloped_instructions_dispatch_through_their_versioned_process() {
+		let route = Route {
+			variant: syn::parse_quote!(Update),
+			accounts: syn::parse_quote!(UpdateAccounts),
+			accounts_name: syn::parse_quote!(UpdateAccounts),
+		};
+		let crate_path: Path = syn::parse_quote!(::pina);
+		let enum_name: Ident = syn::parse_quote!(MigrationInstruction);
+		let enveloped = [(0, syn::parse_quote!(UpdateInstruction))];
+
+		let routed =
+			squeezed(&dispatch_arm(&crate_path, &enum_name, &route, &enveloped).to_string());
+		assert!(
+			routed.contains("ifMigrationInstruction::Updateasu64==0{"),
+			"routed: {routed}"
+		);
+		assert!(
+			routed.contains("returnUpdateInstruction::process_versioned(__pina_accounts,data);"),
+			"routed: {routed}"
+		);
+		// The ordinary process remains the fallthrough for other variants.
+		assert!(routed.contains("ProcessAccountInfos>::process(__pina_accounts,data)"));
+
+		let plain = squeezed(&dispatch_arm(&crate_path, &enum_name, &route, &[]).to_string());
+		assert!(!plain.contains("process_versioned"), "plain: {plain}");
 	}
 
 	#[test]

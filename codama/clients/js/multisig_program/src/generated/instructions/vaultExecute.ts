@@ -37,22 +37,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const VAULT_EXECUTE_DISCRIMINATOR = 10;
 
 export function getVaultExecuteDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(VAULT_EXECUTE_DISCRIMINATOR);
-}
-
-export const VAULT_EXECUTE_DISCRIMINATOR2 = 0;
-
-export function getVaultExecuteDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(VAULT_EXECUTE_DISCRIMINATOR2);
 }
 
 export type VaultExecuteInstruction<
@@ -85,10 +76,7 @@ export type VaultExecuteInstruction<
 		]
 	>;
 
-export type VaultExecuteInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type VaultExecuteInstructionData = { discriminator: number };
 
 export type VaultExecuteInstructionDataArgs = {};
 
@@ -96,11 +84,8 @@ export function getVaultExecuteInstructionDataEncoder(): FixedSizeEncoder<
 	VaultExecuteInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 10, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 10 }),
 	);
 }
 
@@ -110,9 +95,6 @@ export function getVaultExecuteInstructionDataDecoder(): FixedSizeDecoder<
 	return getStructDecoder([[
 		"discriminator",
 		getPinaPodDiscriminatorDecoder(VAULT_EXECUTE_DISCRIMINATOR, getU8Decoder()),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

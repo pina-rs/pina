@@ -31,20 +31,6 @@
 					},
 					{
 						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
 						"name": "value",
 						"docs": [
 							"The value to box. The program boxes it and reads it back."
@@ -60,22 +46,6 @@
 					{
 						"kind": "constantDiscriminatorNode",
 						"offset": 0,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
 						"constant": {
 							"kind": "constantValueNode",
 							"type": {
@@ -110,20 +80,6 @@
 						"defaultValue": {
 							"kind": "numberValueNode",
 							"number": 1
-						}
-					},
-					{
-						"kind": "instructionArgumentNode",
-						"name": "migrationVersion",
-						"defaultValueStrategy": "omitted",
-						"type": {
-							"kind": "numberTypeNode",
-							"format": "u8",
-							"endian": "le"
-						},
-						"defaultValue": {
-							"kind": "numberValueNode",
-							"number": 0
 						}
 					},
 					{
@@ -169,22 +125,6 @@
 							"value": {
 								"kind": "numberValueNode",
 								"number": 1
-							}
-						}
-					},
-					{
-						"kind": "constantDiscriminatorNode",
-						"offset": 1,
-						"constant": {
-							"kind": "constantValueNode",
-							"type": {
-								"kind": "numberTypeNode",
-								"format": "u8",
-								"endian": "le"
-							},
-							"value": {
-								"kind": "numberValueNode",
-								"number": 0
 							}
 						}
 					}

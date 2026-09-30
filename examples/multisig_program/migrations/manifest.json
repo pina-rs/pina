@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "ProgramConfig",
 			"versions": [
 				{
@@ -36,19 +31,12 @@
 								"name": "creation_fee",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:02": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "Multisig",
 			"versions": [
 				{
@@ -99,19 +87,12 @@
 								"name": "member_permissions",
 								"rustType": "PodVec<u8, 16, 1>"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:03": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "03"
-			},
 			"rustName": "Proposal",
 			"versions": [
 				{
@@ -178,19 +159,12 @@
 								"name": "actions",
 								"rustType": "PodVec<u8, 128, 2>"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"account:1:04": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "04"
-			},
 			"rustName": "SpendingLimit",
 			"versions": [
 				{
@@ -245,19 +219,12 @@
 								"name": "destinations",
 								"rustType": "PodVec<u8, 256, 2>"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"event:1:01": {
-			"identity": {
-				"kind": "event",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "ProposalStatusEvent",
 			"versions": [
 				{
@@ -280,20 +247,14 @@
 								"name": "timestamp",
 								"rustType": "i64"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "ConfigInitializeIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -311,8 +272,7 @@
 								"name": "creation_fee",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -341,18 +301,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "ConfigUpdateIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -374,8 +329,7 @@
 								"name": "creation_fee",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -396,18 +350,13 @@
 								"pda": "program_config"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:02": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "MultisigCreateIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -441,8 +390,7 @@
 								"name": "rent_collector",
 								"rustType": "Address"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -503,18 +451,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:03": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "03"
-			},
 			"rustName": "MultisigImportIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -548,8 +491,7 @@
 								"name": "rent_collector",
 								"rustType": "Address"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -618,18 +560,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:04": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "04"
-			},
 			"rustName": "ProposalCreateIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -675,8 +612,7 @@
 								"name": "actions",
 								"rustType": "[u8; 128]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -729,24 +665,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:05": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "05"
-			},
 			"rustName": "ProposalActivateIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -783,24 +713,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:06": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "06"
-			},
 			"rustName": "ProposalApproveIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -837,24 +761,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:07": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "07"
-			},
 			"rustName": "ProposalRejectIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -891,24 +809,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:08": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "08"
-			},
 			"rustName": "ProposalRevokeIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -945,24 +857,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:09": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "09"
-			},
 			"rustName": "ProposalCancelIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -999,24 +905,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:0a": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0a"
-			},
 			"rustName": "VaultExecuteIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -1061,24 +961,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:0b": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0b"
-			},
 			"rustName": "ConfigExecuteIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -1147,18 +1041,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:0c": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0c"
-			},
 			"rustName": "ConfigAuthorityExecuteIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -1172,8 +1061,7 @@
 								"name": "actions",
 								"rustType": "[u8; 128]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1234,18 +1122,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:0d": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0d"
-			},
 			"rustName": "SpendingLimitUseIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -1259,8 +1142,7 @@
 								"name": "decimals",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -1345,24 +1227,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:0e": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "0e"
-			},
 			"rustName": "ProposalCloseIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -1399,8 +1275,7 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

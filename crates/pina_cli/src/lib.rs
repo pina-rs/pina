@@ -1,7 +1,6 @@
 #![allow(missing_docs)]
 pub mod abi;
 pub mod build;
-mod client_events;
 mod client_manifest;
 mod client_migrations;
 pub mod codama;

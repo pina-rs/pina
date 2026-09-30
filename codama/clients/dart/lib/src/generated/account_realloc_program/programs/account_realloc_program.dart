@@ -26,16 +26,13 @@ enum AccountReallocProgramInstruction { initialize, realloc, realloc2 }
 AccountReallocProgramInstruction identifyAccountReallocProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return AccountReallocProgramInstruction.initialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return AccountReallocProgramInstruction.realloc;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return AccountReallocProgramInstruction.realloc2;
   }
 

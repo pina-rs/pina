@@ -538,6 +538,16 @@ fn advanced_cost_fixture() -> (MigrationFixture, PathBuf) {
 		advanced.contains("Advanced instruction:1:02@1"),
 		"stdout: {advanced}"
 	);
+	// An added instruction argument is never zero-filled automatically, so the
+	// fixture reviews the generated body before the status preview.
+	let transition = fixture
+		.root
+		.join("migrations/transitions/instruction_1_02/v0_to_v1.rs");
+	let finished = fs::read_to_string(&transition)
+		.unwrap_or_else(|error| panic!("read stub: {error}"))
+		.replace("TODO(pina-manual-migration)", "reviewed conversion");
+	fs::write(&transition, finished).unwrap_or_else(|error| panic!("finish body: {error}"));
+	run(&mut fixture.command("create"));
 	let artifact = write_sbf_artifact(
 		&fixture.root,
 		&build_sbf_elf(&[
@@ -727,6 +737,45 @@ fn auto_policy_snapshots_listed_kinds_and_scaffolds_the_manifest_rerun() {
 		1,
 		"only the newly enveloped contract is recorded: {flipped}"
 	);
+	run(&mut fixture.command("check"));
+
+	// An instruction snapshot carries no envelope, so leaving the policy
+	// releases it instead of failing as a wire-format change.
+	fixture.configure_auto("auto = [\"accounts\", \"events\"]\n");
+	let released = run(&mut fixture.command("create"));
+	assert!(
+		released.contains("Released snapshot instruction:1:02"),
+		"stdout: {released}"
+	);
+	assert!(
+		fixture.manifest()["contracts"]
+			.get("instruction:1:02")
+			.is_none()
+	);
+	run(&mut fixture.command("check"));
+}
+
+#[test]
+fn appending_an_optional_account_extends_a_published_instruction_in_place() {
+	let fixture = MigrationFixture::new(true);
+	fixture.write_source(&migratable_program_source("value: u64", "amount: u64"));
+	run(&mut fixture.command("create"));
+	fixture.publish(true);
+
+	// Old requests omit the appended optional slot, so the published version
+	// accepts both account lists and the payload keeps its version.
+	fixture.write_source(
+		&migratable_program_source("value: u64", "amount: u64").replace(
+			"\tsystem_program: Option<&'a AccountView>,\n}",
+			"\tsystem_program: Option<&'a AccountView>,\n\taudit: Option<&'a AccountView>,\n}",
+		),
+	);
+	let extended = run(&mut fixture.command("create"));
+	assert!(
+		extended.contains("Appended optional accounts to instruction:1:02@0"),
+		"stdout: {extended}"
+	);
+	assert!(!extended.contains("Advanced"), "stdout: {extended}");
 	run(&mut fixture.command("check"));
 }
 

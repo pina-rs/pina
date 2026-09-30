@@ -26,8 +26,8 @@ final _programExitLog = RegExp(r'^Program (\S+) (?:success|failed: .*)$');
 /// and lines outside any frame are skipped rather than trusted.
 ///
 /// Unrelated lines are skipped. A line this program emitted that names an event
-/// but carries an unknown, future, or non-projectable version throws instead of
-/// being silently dropped. The per-event `parse*FromLog` helpers decode one line
+/// but carries a version no generated event describes throws instead of being
+/// silently dropped. The per-event `parse*FromLog` helpers decode one line
 /// without this attribution and are only safe for data already known to come
 /// from this program.
 List<MultisigProgramEvent> parseMultisigProgramEventsFromLogs(
@@ -56,6 +56,25 @@ List<MultisigProgramEvent> parseMultisigProgramEventsFromLogs(
       discovered.add(proposalStatusEvent);
       continue;
     }
+    final unknownVersion = _unrecognizedEventVersion(log);
+    if (unknownVersion != null) {
+      throw RangeError(unknownVersion);
+    }
   }
   return discovered;
+}
+
+/// Explain a `Program data:` line that names a migration-aware event but that
+/// no generated event claimed, or return null for an unrelated line.
+String? _unrecognizedEventVersion(String log) {
+  final bytes = decodeProgramDataLog(log);
+  if (bytes == null) {
+    return null;
+  }
+  if (bytes.length >= 1 && bytes[0] == 1) {
+    return bytes.length < 2
+        ? 'event "proposalStatusEvent" log is too short for its version envelope'
+        : 'event "proposalStatusEvent" log carries migration version ${bytes[1]}, which this client cannot decode; regenerate it';
+  }
+  return null;
 }

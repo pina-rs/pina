@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"receipts": [
 		{
 			"sequence": 0,
@@ -51,8 +51,7 @@
 							"schemaSha256": "f84fea2ce909521189b04f6ccc69f8bc191098770d9d7a08220ae6d3e34e43e6"
 						},
 						{
-							"schemaSha256": "b16746feb2ea35413fcc06f392d263dbbe11febcd227806b70d1885f95c86df6",
-							"transitionSha256": "3826a92c03ddcda22d78ac51cce2d71fe21bffc5effc13dc6656f2864b466336"
+							"schemaSha256": "b16746feb2ea35413fcc06f392d263dbbe11febcd227806b70d1885f95c86df6"
 						}
 					]
 				},

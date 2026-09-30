@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "PolicyState",
 			"versions": [
 				{
@@ -36,19 +31,12 @@
 								"name": "required_approvals",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"event:1:01": {
-			"identity": {
-				"kind": "event",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "PolicyChecked",
 			"versions": [
 				{
@@ -71,20 +59,14 @@
 								"name": "required_approvals",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "InitializePolicyInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -106,8 +88,7 @@
 								"name": "required_approvals",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -136,18 +117,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "CheckPolicyInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -165,8 +141,7 @@
 								"name": "approvals",
 								"rustType": "Vec<u8, 4>"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -203,8 +178,7 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "Journal",
 			"versions": [
 				{
@@ -52,20 +47,14 @@
 								"name": "note",
 								"rustType": "Option<String<64>>"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "InitializeIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -83,8 +72,7 @@
 								"name": "marker_count",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -113,18 +101,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "ResizeIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -138,8 +121,7 @@
 								"name": "marker_count",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -168,18 +150,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:02": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "WriteIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -193,8 +170,7 @@
 								"name": "value",
 								"rustType": "u64"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -215,18 +191,13 @@
 								"pda": "journal"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:03": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "03"
-			},
 			"rustName": "RenameIx",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -240,8 +211,7 @@
 								"name": "title",
 								"rustType": "[u8; 24]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -270,8 +240,7 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

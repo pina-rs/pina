@@ -381,6 +381,12 @@ fn run_migrations(command: MigrationCommands) {
 			for contract in &output.updated_drafts {
 				println!("Updated draft {contract}");
 			}
+			for contract in &output.extended_processes {
+				println!("Appended optional accounts to {contract}");
+			}
+			for contract in &output.released_snapshots {
+				println!("Released snapshot {contract}");
+			}
 			for path in &output.manual_transitions {
 				println!("Manual migration required: {}", escaped_path(path));
 			}
@@ -2282,10 +2288,17 @@ fn print_migration_statuses(statuses: &[pina_cli::migrations::MigrationStatus]) 
 		} else {
 			"draft"
 		};
-		println!(
-			"{} {} v{} ({publication}, {} version(s) remaining)",
-			status.kind, status.rust_name, status.current_version, status.versions_remaining
-		);
+		if status.envelope {
+			println!(
+				"{} {} v{} ({publication}, {} version(s) remaining)",
+				status.kind, status.rust_name, status.current_version, status.versions_remaining
+			);
+		} else {
+			println!(
+				"{} {} ({publication}, snapshot without envelope)",
+				status.kind, status.rust_name
+			);
+		}
 	}
 }
 

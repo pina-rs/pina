@@ -38,22 +38,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const UPDATE_DISCRIMINATOR = 1;
 
 export function getUpdateDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(UPDATE_DISCRIMINATOR);
-}
-
-export const UPDATE_DISCRIMINATOR2 = 0;
-
-export function getUpdateDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(UPDATE_DISCRIMINATOR2);
 }
 
 export type UpdateInstruction<
@@ -76,11 +67,7 @@ export type UpdateInstruction<
 		]
 	>;
 
-export type UpdateInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-	newPrice: bigint;
-};
+export type UpdateInstructionData = { discriminator: number; newPrice: bigint };
 
 export type UpdateInstructionDataArgs = { newPrice: number | bigint };
 
@@ -89,24 +76,20 @@ export function getUpdateInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["newPrice", getU64Encoder()]]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+			"newPrice",
+			getU64Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
 export function getUpdateInstructionDataDecoder(): FixedSizeDecoder<
 	UpdateInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(UPDATE_DISCRIMINATOR, getU8Decoder()),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["newPrice", getU64Decoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(UPDATE_DISCRIMINATOR, getU8Decoder()),
+	], ["newPrice", getU64Decoder()]]);
 }
 
 export function getUpdateInstructionDataCodec(): FixedSizeCodec<

@@ -32,24 +32,19 @@ enum RoleRegistryProgramInstruction {
 RoleRegistryProgramInstruction identifyRoleRegistryProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return RoleRegistryProgramInstruction.initialize;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return RoleRegistryProgramInstruction.addRole;
   }
-  if (containsBytes(data, getU8Encoder().encode(2), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(2), 0)) {
     return RoleRegistryProgramInstruction.updateRole;
   }
-  if (containsBytes(data, getU8Encoder().encode(3), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(3), 0)) {
     return RoleRegistryProgramInstruction.deactivateRole;
   }
-  if (containsBytes(data, getU8Encoder().encode(4), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(4), 0)) {
     return RoleRegistryProgramInstruction.rotateAdmin;
   }
 

@@ -25,11 +25,9 @@ class TransferInstructionData {
     required this.proofA,
     required this.proofB,
     required this.proofC,
-  }) : discriminator = 6,
-       migrationVersion = 0;
+  }) : discriminator = 6;
 
   final int discriminator;
-  final int migrationVersion;
   final int bump;
   final Uint8List nullifier;
   final Uint8List root;
@@ -46,7 +44,6 @@ class TransferInstructionData {
 Encoder<TransferInstructionData> getTransferInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     (
       'nullifier',
@@ -76,7 +73,6 @@ Encoder<TransferInstructionData> getTransferInstructionDataEncoder() {
     structEncoder,
     (TransferInstructionData value) => <String, Object?>{
       'discriminator': 6,
-      'migrationVersion': 0,
       'bump': value.bump,
       'nullifier': value.nullifier,
       'root': value.root,
@@ -95,7 +91,6 @@ Encoder<TransferInstructionData> getTransferInstructionDataEncoder() {
 Decoder<TransferInstructionData> getTransferInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('nullifier', fixDecoderSize(getBytesDecoder(), 32)),
     ('root', fixDecoderSize(getBytesDecoder(), 32)),
@@ -119,7 +114,6 @@ Decoder<TransferInstructionData> getTransferInstructionDataDecoder() {
 
   (TransferInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
     getConstantDecoder(getU8Encoder().encode(6)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

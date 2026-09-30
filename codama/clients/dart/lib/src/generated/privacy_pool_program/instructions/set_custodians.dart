@@ -14,18 +14,15 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class SetCustodiansInstructionData {
   const SetCustodiansInstructionData({required this.custodians})
-    : discriminator = 2,
-      migrationVersion = 0;
+    : discriminator = 2;
 
   final int discriminator;
-  final int migrationVersion;
   final Uint8List custodians;
 }
 
 Encoder<SetCustodiansInstructionData> getSetCustodiansInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
     (
       'custodians',
       fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false),
@@ -36,7 +33,6 @@ Encoder<SetCustodiansInstructionData> getSetCustodiansInstructionDataEncoder() {
     structEncoder,
     (SetCustodiansInstructionData value) => <String, Object?>{
       'discriminator': 2,
-      'migrationVersion': 0,
       'custodians': value.custodians,
     },
   );
@@ -45,7 +41,6 @@ Encoder<SetCustodiansInstructionData> getSetCustodiansInstructionDataEncoder() {
 Decoder<SetCustodiansInstructionData> getSetCustodiansInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
     ('custodians', fixDecoderSize(getBytesDecoder(), 96)),
   ]);
 
@@ -62,7 +57,6 @@ Decoder<SetCustodiansInstructionData> getSetCustodiansInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(2)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

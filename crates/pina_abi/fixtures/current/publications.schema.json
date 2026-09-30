@@ -141,7 +141,7 @@
       "type": "object"
     }
   },
-  "$id": "https://pina-rs.github.io/pina/abi/schemas/0.20/publications.schema.json",
+  "$id": "https://pina-rs.github.io/pina/abi/schemas/0.21/publications.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Local, hash-chained record of versions that have been made persistent.",

@@ -77,19 +77,19 @@ pub struct DepositIx {
 
 impl DepositIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 340;
+	pub const LEN: usize = 339;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 340], ProgramError> {
-		let mut data = [0u8; 340];
-		data[..2].copy_from_slice(&DEPOSIT_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
-		data[3..35].copy_from_slice(&self.commitment);
-		data[35..67].copy_from_slice(&self.view_pubkey);
-		data[67..68].copy_from_slice(&self.envelope_len.to_le_bytes());
-		data[68..196].copy_from_slice(&self.envelope);
-		data[196..340].copy_from_slice(&self.shares);
+	pub fn to_bytes(&self) -> Result<[u8; 339], ProgramError> {
+		let mut data = [0u8; 339];
+		data[..1].copy_from_slice(&DEPOSIT_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
+		data[2..34].copy_from_slice(&self.commitment);
+		data[34..66].copy_from_slice(&self.view_pubkey);
+		data[66..67].copy_from_slice(&self.envelope_len.to_le_bytes());
+		data[67..195].copy_from_slice(&self.envelope);
+		data[195..339].copy_from_slice(&self.shares);
 
 		Ok(data)
 	}
@@ -124,4 +124,4 @@ impl<'account> Deposit<'account> {
 	}
 }
 
-const DEPOSIT_DISCRIMINATOR: [u8; 2] = [4, 0];
+const DEPOSIT_DISCRIMINATOR: [u8; 1] = [4];

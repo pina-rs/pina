@@ -89,22 +89,18 @@ export function identifyPinaBpfProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): PinaBpfProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PinaBpfProgramInstruction.Hello;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PinaBpfProgramInstruction.ForwardRotateWithSigner;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PinaBpfProgramInstruction.ForwardRotateWithPda;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PinaBpfProgramInstruction.CreatePda;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return PinaBpfProgramInstruction.Hello;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return PinaBpfProgramInstruction.ForwardRotateWithSigner;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return PinaBpfProgramInstruction.ForwardRotateWithPda;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return PinaBpfProgramInstruction.CreatePda;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "pinaBpfProgram" },

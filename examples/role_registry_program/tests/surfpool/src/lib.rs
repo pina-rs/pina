@@ -33,8 +33,8 @@ fn initialize_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		// discriminator + migration version + bump.
-		&[RegistryInstruction::Initialize as u8, 0u8, bump],
+		// discriminator + bump.
+		&[RegistryInstruction::Initialize as u8, bump],
 		vec![
 			AccountMeta::new(*admin, true),
 			AccountMeta::new(*registry, false),
@@ -54,8 +54,8 @@ fn add_role_instruction(
 	permissions: u64,
 	bump: u8,
 ) -> pina_test::Instruction {
-	// discriminator + migration version, then role id, permissions, and bump.
-	let mut data = vec![RegistryInstruction::AddRole as u8, 0u8];
+	// discriminator, then role id, permissions, and bump.
+	let mut data = vec![RegistryInstruction::AddRole as u8];
 	data.extend_from_slice(&role_id.to_le_bytes());
 	data.extend_from_slice(&permissions.to_le_bytes());
 	data.push(bump);
@@ -157,7 +157,7 @@ fn add_update_deactivate_role_lifecycle() {
 		);
 
 		// UpdateRole: new permissions for an existing active role.
-		let mut data = vec![RegistryInstruction::UpdateRole as u8, 0u8];
+		let mut data = vec![RegistryInstruction::UpdateRole as u8];
 		data.extend_from_slice(&0b1001u64.to_le_bytes());
 		let update = program.instruction(
 			&data,
@@ -175,7 +175,7 @@ fn add_update_deactivate_role_lifecycle() {
 
 		// DeactivateRole clears the active flag.
 		let deactivate = program.instruction(
-			&[RegistryInstruction::DeactivateRole as u8, 0u8],
+			&[RegistryInstruction::DeactivateRole as u8],
 			vec![
 				AccountMeta::new_readonly(admin, true),
 				AccountMeta::new_readonly(registry, false),
@@ -189,7 +189,7 @@ fn add_update_deactivate_role_lifecycle() {
 		assert_eq!(entry.data[82], 0);
 
 		// Updating an inactive role must fail with RoleInactive (custom 2).
-		let mut data = vec![RegistryInstruction::UpdateRole as u8, 0u8];
+		let mut data = vec![RegistryInstruction::UpdateRole as u8];
 		data.extend_from_slice(&0b1111u64.to_le_bytes());
 		let update = program.instruction(
 			&data,
@@ -296,7 +296,7 @@ fn rotate_admin_rejects_the_zero_address() {
 			.expect("execute Initialize");
 
 		let rotate = program.instruction(
-			&[RegistryInstruction::RotateAdmin as u8, 0u8],
+			&[RegistryInstruction::RotateAdmin as u8],
 			vec![
 				AccountMeta::new_readonly(admin, true),
 				AccountMeta::new_readonly(Pubkey::default(), false),
@@ -362,7 +362,7 @@ fn rotate_admin_and_verify_the_new_admin() {
 			.expect("fund new admin");
 
 		let rotate = program.instruction(
-			&[RegistryInstruction::RotateAdmin as u8, 0u8],
+			&[RegistryInstruction::RotateAdmin as u8],
 			vec![
 				AccountMeta::new_readonly(admin, true),
 				AccountMeta::new_readonly(new_admin, false),

@@ -9,7 +9,6 @@
 )]
 
 pub const SYSVARS_DISCRIMINATOR: u8 = 0u8;
-pub const SYSVARS_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -75,7 +74,6 @@ impl SysvarsInstructionData {
 		<SysvarsInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = SYSVARS_DISCRIMINATOR;
-			data.migration_version = SYSVARS_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -89,5 +87,4 @@ impl SysvarsInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct SysvarsInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 }

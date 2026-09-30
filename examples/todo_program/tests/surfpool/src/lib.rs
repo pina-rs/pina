@@ -32,8 +32,8 @@ fn initialize_instruction(
 	bump: u8,
 	digest: [u8; 32],
 ) -> pina_test::Instruction {
-	// discriminator + migration version + bump, then the 32-byte digest.
-	let mut data = vec![TodoInstruction::Initialize as u8, 0u8, bump];
+	// discriminator + bump, then the 32-byte digest.
+	let mut data = vec![TodoInstruction::Initialize as u8, bump];
 	data.extend_from_slice(&digest);
 
 	program.instruction(
@@ -132,7 +132,7 @@ fn toggle_instruction(
 	todo: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		&[TodoInstruction::ToggleCompleted as u8, 0u8],
+		&[TodoInstruction::ToggleCompleted as u8],
 		vec![
 			AccountMeta::new_readonly(*owner, true),
 			AccountMeta::new(*todo, false),
@@ -160,7 +160,7 @@ fn digest_updates_replace_the_stored_value() {
 			.expect("execute Initialize");
 
 		let next_digest = [9u8; 32];
-		let mut data = vec![TodoInstruction::UpdateDigest as u8, 0u8];
+		let mut data = vec![TodoInstruction::UpdateDigest as u8];
 		data.extend_from_slice(&next_digest);
 
 		program
@@ -288,7 +288,7 @@ fn rejects_a_signer_who_is_not_the_stored_owner() {
 			.fund(&impostor.pubkey(), 1_000_000_000)
 			.expect("fund impostor");
 
-		let mut payload = vec![TodoInstruction::UpdateDigest as u8, 0u8];
+		let mut payload = vec![TodoInstruction::UpdateDigest as u8];
 		payload.extend_from_slice(&[9u8; 32]);
 
 		let instruction = program.instruction(

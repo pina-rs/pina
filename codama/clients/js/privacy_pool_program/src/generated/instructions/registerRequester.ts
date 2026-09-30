@@ -39,22 +39,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const REGISTER_REQUESTER_DISCRIMINATOR = 3;
 
 export function getRegisterRequesterDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(REGISTER_REQUESTER_DISCRIMINATOR);
-}
-
-export const REGISTER_REQUESTER_DISCRIMINATOR2 = 0;
-
-export function getRegisterRequesterDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REGISTER_REQUESTER_DISCRIMINATOR2);
 }
 
 export type RegisterRequesterInstruction<
@@ -83,7 +74,6 @@ export type RegisterRequesterInstruction<
 
 export type RegisterRequesterInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	requester: Address;
 	/** Highest tier the entity may file at. */
 	maxTier: number;
@@ -99,13 +89,11 @@ export function getRegisterRequesterInstructionDataEncoder(): FixedSizeEncoder<
 	RegisterRequesterInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["requester", getAddressEncoder()],
-			["maxTier", getU8Encoder()],
-		]),
-		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"requester",
+			getAddressEncoder(),
+		], ["maxTier", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 3 }),
 	);
 }
 
@@ -120,7 +108,6 @@ export function getRegisterRequesterInstructionDataDecoder(): FixedSizeDecoder<
 				getU8Decoder(),
 			),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["requester", getAddressDecoder()],
 		["maxTier", getU8Decoder()],
 	]);

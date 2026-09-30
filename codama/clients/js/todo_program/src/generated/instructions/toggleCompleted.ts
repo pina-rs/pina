@@ -38,22 +38,13 @@ import {
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
 import { findTodoPda } from "../pdas";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { TODO_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const TOGGLE_COMPLETED_DISCRIMINATOR = 1;
 
 export function getToggleCompletedDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(TOGGLE_COMPLETED_DISCRIMINATOR);
-}
-
-export const TOGGLE_COMPLETED_DISCRIMINATOR2 = 0;
-
-export function getToggleCompletedDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(TOGGLE_COMPLETED_DISCRIMINATOR2);
 }
 
 export type ToggleCompletedInstruction<
@@ -76,10 +67,7 @@ export type ToggleCompletedInstruction<
 		]
 	>;
 
-export type ToggleCompletedInstructionData = {
-	discriminator: number;
-	migrationVersion: number;
-};
+export type ToggleCompletedInstructionData = { discriminator: number };
 
 export type ToggleCompletedInstructionDataArgs = {};
 
@@ -87,11 +75,8 @@ export function getToggleCompletedInstructionDataEncoder(): FixedSizeEncoder<
 	ToggleCompletedInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -104,9 +89,6 @@ export function getToggleCompletedInstructionDataDecoder(): FixedSizeDecoder<
 			TOGGLE_COMPLETED_DISCRIMINATOR,
 			getU8Decoder(),
 		),
-	], [
-		"migrationVersion",
-		getPinaPodMigrationVersionDecoder(0, getU8Decoder()),
 	]]);
 }
 

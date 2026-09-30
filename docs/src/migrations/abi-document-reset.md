@@ -6,6 +6,8 @@ Pina `0.20` replaced the ABI document's two integer counters with one `abiVersio
 
 The design is recorded in [ADR 0009](../adrs/0009-abi-document-versioning.md), and the versioning rules it introduced are in [ABI document versioning](./abi-versioning.md).
 
+The current release writes `abiVersion` `0.21`. The conversion below still produces a `0.20` document, which every later reader converts in memory; the next `pina migrations create` writes it at the current version. `0.21` also changed how instructions and events are recorded, so read [Upgrading from ABI 0.20](./abi-versioning.md#upgrading-from-abi-020) once this guide is done.
+
 ## The symptom
 
 After upgrading, the first Pina command that reads a migration document fails:
@@ -37,7 +39,7 @@ pina migrations create --no-interactive
 pina migrations check
 ```
 
-`create` rebuilds the manifest from source at `abiVersion` `"0.20"`, regenerates `tests/abi_layout.rs`, and recreates the publication ledger on your next deploy. Draft version history collapses to version zero — which is exactly why this path is for programs nothing has been deployed to yet.
+`create` rebuilds the manifest from source at the current `abiVersion`, regenerates `tests/abi_layout.rs`, and recreates the publication ledger on your next deploy. Draft version history collapses to version zero — which is exactly why this path is for programs nothing has been deployed to yet.
 
 ## Keep your history
 
@@ -160,12 +162,14 @@ If you import `pina_abi` directly — a custom indexer, a verification tool — 
 
 Added: `walk_document` and `AbiStep` for converter tables, `parse_document_version` and `current_abi_version` for comparisons, and `document_schema` / `render_document_schema` / `schema_url` behind the new `pina abi schema` command.
 
+`0.21` changed the API again. `DataCodec` and `DataSchema::codec` are removed: the wire codec is `SCHEMA_CODEC`, implied by `abiVersion`. `ContractHistory::identity` is no longer serialized and is filled from the contract key when a manifest is read (`ContractIdentity::from_key` parses one). `ContractHistory` gains `envelope` and `is_migrated()`. `AbiStep` carries one converter per document (`manifest` and `publications`), and `walk_document` takes an `AbiDocument` instead of a label.
+
 ## Troubleshooting
 
 | Error                                                                                                       | Cause and remedy                                                                                                |
 | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `missing a string \`abiVersion\` field`                                                                     | a pre-0.20 document — this guide                                                                                |
-| `records ABI version 9.9, but this Pina build supports 0.20; upgrade Pina`                                  | the document is newer than your build — upgrade Pina; the check is a capability marker, like `Cargo.lock`       |
+| `records ABI version 9.9, but this Pina build supports 0.21; upgrade Pina`                                  | the document is newer than your build — upgrade Pina; the check is a capability marker, like `Cargo.lock`       |
 | `predates the oldest supported version 0.20; regenerate it with \`pina migrations create\``                 | a document older than the reset — [Start fresh](#start-fresh)                                                   |
 | `publication receipt 1 does not extend the previous hash`                                                   | a converted multi-receipt ledger whose chain was not repaired — [Re-link the receipt chain](#keep-your-history) |
 | `pins ... for ... , which the manifest does not record` or `pinned schema ... but the manifest now records` | a receipt history that was not emptied — [Keep your history](#keep-your-history)                                |

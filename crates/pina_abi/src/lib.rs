@@ -12,6 +12,11 @@
 //! release line: it advances with a breaking release of this crate and with
 //! nothing else, so the document version moves if and only if the document
 //! contract moved. See `docs/src/migrations/abi-versioning.md`.
+//!
+//! The ABI version also fixes the wire format every recorded schema is derived
+//! under. Every version this crate reads implies [`SCHEMA_CODEC`], so no schema
+//! stores it; a `PinaPod` release that changes wire bytes is a breaking release
+//! of this crate, never a per-schema tag.
 
 #![allow(missing_docs)]
 use std::collections::BTreeMap;
@@ -29,6 +34,7 @@ use sha2::Digest as _;
 use sha2::Sha256;
 
 mod consts;
+mod convert;
 
 pub use consts::SchemaConsts;
 
@@ -53,6 +59,17 @@ pub const ABI_VERSION_KEY: &str = "abiVersion";
 /// Versions at or above this one are normalized through [`ABI_STEPS`]; nothing
 /// below it has ever shipped.
 pub const ABI_OLDEST_SUPPORTED: &str = "0.20";
+
+/// Wire format every schema in a supported ABI document is derived under.
+///
+/// `PinaPod` 0.2 fixed and compact semantics, which every later `PinaPod`
+/// release has preserved byte for byte. It is implied by the document's
+/// `abiVersion` rather than stored per schema, and it stays in the schema hash
+/// preimage so every published pin keeps its value. A `PinaPod` release that
+/// changes wire bytes changes this constant through a breaking release of this
+/// crate, and the converter for that release records the old format on every
+/// historical schema it carries forward.
+pub const SCHEMA_CODEC: &str = "pinaPodV2";
 
 /// Parse a document version into a comparable semver value.
 ///
@@ -211,12 +228,23 @@ impl ContractKind {
 			Self::Event => "event",
 		}
 	}
+
+	/// Resolve the singular manifest spelling produced by [`Self::as_str`].
+	#[must_use]
+	pub fn from_name(name: &str) -> Option<Self> {
+		Self::ALL.into_iter().find(|kind| kind.as_str() == name)
+	}
 }
 
 /// Valid `[migrations].auto` kind names, rendered for error messages.
 pub const AUTO_KIND_NAMES: &str = "`accounts`, `events`, or `instructions`";
 
-/// Program-wide opt-in policy that envelopes whole contract kinds.
+/// Program-wide opt-in policy that records whole contract kinds.
+///
+/// Accounts and events covered by the policy carry the version envelope.
+/// Instructions covered by the policy are recorded without one: their single
+/// snapshot gates wire-breaking changes, and an instruction carries the
+/// envelope only when its declaration opts in with the `migrations` token.
 ///
 /// The policy is recorded in the migration manifest, which is the only source
 /// procedural macros consult. It serializes as a sorted array of the same
@@ -233,7 +261,7 @@ impl MigrationAuto {
 		Self::default()
 	}
 
-	/// A policy that envelopes accounts, instructions, and events.
+	/// A policy that records accounts, instructions, and events.
 	#[must_use]
 	pub fn all() -> Self {
 		Self {
@@ -241,13 +269,13 @@ impl MigrationAuto {
 		}
 	}
 
-	/// Whether the policy envelopes no kind.
+	/// Whether the policy records no kind.
 	#[must_use]
 	pub fn is_empty(&self) -> bool {
 		self.kinds.is_empty()
 	}
 
-	/// Whether the policy envelopes `kind`.
+	/// Whether the policy records `kind`.
 	#[must_use]
 	pub fn contains(&self, kind: ContractKind) -> bool {
 		self.kinds.contains(&kind)
@@ -368,7 +396,7 @@ impl schemars::JsonSchema for MigrationAuto {
 		let items = serde_json::json!({ "enum": names });
 		schemars::json_schema!({
 			"type": "array",
-			"description": "Contract kinds enveloped without a per-item token, in stable order.",
+			"description": "Contract kinds recorded without a per-item token, in stable order. Accounts and events are enveloped; instructions are recorded without an envelope unless they opt in.",
 			"items": items,
 			"uniqueItems": true,
 		})
@@ -459,20 +487,12 @@ pub enum CompactTailKind {
 	Vector,
 }
 
-/// Versioned byte codec whose invariants define a schema snapshot.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum DataCodec {
-	/// `PinaPod` 0.2 fixed and compact wire semantics.
-	PinaPodV2,
-}
-
 /// Identity of a wire contract, independent of its Rust name.
-#[derive(
-	Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, schemars::JsonSchema,
-)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
+///
+/// A manifest stores an identity only as its [`Self::key`]: the key is the
+/// identity, so a document cannot record one identity and file it under
+/// another. [`Self::from_key`] is the only way a document produces one.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ContractIdentity {
 	/// Contract namespace.
 	pub kind: ContractKind,
@@ -483,6 +503,39 @@ pub struct ContractIdentity {
 }
 
 impl ContractIdentity {
+	/// Parse and validate a `kind:width:hex` history key.
+	///
+	/// The key is interpolated into transition paths, so every component is
+	/// checked against the closed grammar before an identity exists: an unknown
+	/// kind, an unsupported width, or non-canonical hex is rejected rather than
+	/// normalized.
+	pub fn from_key(key: &str) -> Result<Self, String> {
+		let mut parts = key.split(':');
+		let (Some(kind), Some(width), Some(hex), None) =
+			(parts.next(), parts.next(), parts.next(), parts.next())
+		else {
+			return Err(format!(
+				"contract key `{key}` must have the form `kind:width:hex`"
+			));
+		};
+		let kind = ContractKind::from_name(kind)
+			.ok_or_else(|| format!("contract key `{key}` names unknown kind `{kind}`"))?;
+		// Only the canonical decimal spelling is accepted, so `01` or `+1`
+		// cannot alias the width `1` under a second key.
+		let discriminator_bytes = width
+			.parse::<u8>()
+			.ok()
+			.filter(|bytes| bytes.to_string() == width)
+			.ok_or_else(|| format!("contract key `{key}` has an invalid width `{width}`"))?;
+		let identity = Self {
+			kind,
+			discriminator_bytes,
+			discriminator_hex: hex.to_owned(),
+		};
+		identity.validate()?;
+		Ok(identity)
+	}
+
 	/// Construct and validate one identity.
 	pub fn try_new(
 		kind: ContractKind,
@@ -577,11 +630,12 @@ impl ContractIdentity {
 
 /// Canonical source schema for one version.
 ///
-/// A version stores the facts a reader cannot recompute — the layout family, the
-/// fields in physical order, and the codec that defines their wire semantics.
-/// The byte-level descriptor is derived on load rather than stored, so a
-/// document cannot disagree with its own derivation and a layout change is a
-/// deliberate, visible version event instead of a silently reinterpreted cache.
+/// A version stores the facts a reader cannot recompute — the layout family and
+/// the fields in physical order. The wire format they are derived under is
+/// implied by the document's `abiVersion` ([`SCHEMA_CODEC`]), and the
+/// byte-level descriptor is derived on load rather than stored, so a document
+/// cannot disagree with its own derivation and a layout change is a deliberate,
+/// visible version event instead of a silently reinterpreted cache.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -590,18 +644,26 @@ pub struct DataSchema {
 	pub layout: LayoutKind,
 	/// User fields in physical declaration order. Framework envelope fields are omitted.
 	pub fields: Vec<FieldSchema>,
-	/// Versioned codec used to validate and reconstruct these bytes.
-	pub codec: DataCodec,
+}
+
+/// The exact bytes a schema hash covers.
+///
+/// The wire format is part of a schema's identity even though no document
+/// stores it: the same fields under a different format are a different schema.
+/// Field order and spelling match what earlier documents serialized, so every
+/// hash pinned before the format left the stored schema is unchanged.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SchemaHashPreimage<'a> {
+	layout: LayoutKind,
+	fields: &'a [FieldSchema],
+	codec: &'static str,
 }
 
 impl DataSchema {
 	/// Construct a schema, deriving its physical descriptor.
 	pub fn try_new(layout: LayoutKind, fields: Vec<FieldSchema>) -> Result<Self, String> {
-		let schema = Self {
-			layout,
-			fields,
-			codec: DataCodec::PinaPodV2,
-		};
+		let schema = Self { layout, fields };
 		// Prove the grammar accepts the schema at construction time, so an
 		// unsupported field type fails where it was built rather than on the
 		// first reader that asks for a descriptor.
@@ -611,9 +673,6 @@ impl DataSchema {
 
 	/// Verify that the schema is well formed under Pina's current closed grammar.
 	pub fn validate(&self) -> Result<(), String> {
-		if self.codec != DataCodec::PinaPodV2 {
-			return Err("unsupported data codec".to_owned());
-		}
 		let mut seen = BTreeSet::new();
 		for field in &self.fields {
 			if !seen.insert(field.name.as_str()) {
@@ -635,10 +694,14 @@ impl DataSchema {
 		physical_layout(self.layout, &self.fields)
 	}
 
-	/// SHA-256 of the canonical JSON representation.
+	/// SHA-256 of the canonical schema under [`SCHEMA_CODEC`].
 	#[must_use]
 	pub fn sha256(&self) -> String {
-		hash_json(self)
+		hash_json(&SchemaHashPreimage {
+			layout: self.layout,
+			fields: &self.fields,
+			codec: SCHEMA_CODEC,
+		})
 	}
 
 	/// Worst-case payload size, excluding discriminator and version.
@@ -860,7 +923,11 @@ pub struct SchemaVersion {
 	/// Instruction account ABI for this version. Absent for accounts and events.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub process: Option<ProcessContract>,
-	/// Absent only for version zero.
+	/// The conversion from the previous version. Present on every later version
+	/// of a migrated contract; absent on version zero, on every event version
+	/// (events are decoded per version, never converted), and on an instruction
+	/// recorded without an envelope.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub transition: Option<Transition>,
 }
 
@@ -883,10 +950,47 @@ impl SchemaVersion {
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct ContractHistory {
+	/// Identity parsed from this history's `contracts` key.
+	///
+	/// Never stored: the key already is the identity. A manifest's contracts
+	/// deserializer fills it from the key, and a history deserialized on its
+	/// own carries an invalid placeholder that fails validation.
+	#[serde(skip, default = "ContractIdentity::placeholder")]
 	pub identity: ContractIdentity,
 	/// Current Rust source name. It is not part of stable identity.
 	pub rust_name: String,
+	/// Whether the version envelope follows the discriminator on the wire.
+	///
+	/// Accounts and events are always enveloped. An instruction is recorded
+	/// without one unless its declaration opts in with the `migrations` token:
+	/// its single snapshot then gates wire-breaking changes, and it carries no
+	/// version byte and no transitions.
+	#[serde(default = "envelope_default", skip_serializing_if = "is_enveloped")]
+	pub envelope: bool,
 	pub versions: Vec<SchemaVersion>,
+}
+
+const fn envelope_default() -> bool {
+	true
+}
+
+#[allow(
+	clippy::trivially_copy_pass_by_ref,
+	reason = "serde's `skip_serializing_if` passes the field by reference"
+)]
+const fn is_enveloped(envelope: &bool) -> bool {
+	*envelope
+}
+
+impl ContractIdentity {
+	/// An identity no key can produce, held by a history until its key is read.
+	fn placeholder() -> Self {
+		Self {
+			kind: ContractKind::Account,
+			discriminator_bytes: 0,
+			discriminator_hex: String::new(),
+		}
+	}
 }
 
 impl ContractHistory {
@@ -980,6 +1084,27 @@ impl ContractHistory {
 				self.rust_name
 			));
 		}
+		if !self.envelope {
+			if self.identity.kind != ContractKind::Instruction {
+				return Err(format!(
+					"{} contract `{}` cannot omit the version envelope; only an instruction may",
+					self.identity.kind,
+					self.identity.key()
+				));
+			}
+			// Nothing on the wire names a version, so a second one could never
+			// be selected: the snapshot is replaced in place or the change needs
+			// a new discriminator.
+			if self.versions.len() != 1 {
+				return Err(format!(
+					"instruction contract `{}` has no version envelope, so it must record exactly \
+					 one version, found {}",
+					self.identity.key(),
+					self.versions.len()
+				));
+			}
+		}
+		let migrated = self.is_migrated();
 		for (index, version) in self.versions.iter().enumerate() {
 			let number = u32::try_from(index).map_err(|_| {
 				format!(
@@ -1034,6 +1159,22 @@ impl ContractHistory {
 					}
 				}
 			}
+			if number > 0 && self.identity.kind == ContractKind::Instruction {
+				let source = self.versions[index - 1]
+					.process
+					.as_ref()
+					.expect("validated above: instruction source process");
+				let destination = version
+					.process
+					.as_ref()
+					.expect("validated above: instruction destination process");
+				classify_process_transition(source, destination).map_err(|reason| {
+					format!(
+						"instruction contract `{}` version {number} process is breaking: {reason}",
+						self.identity.key()
+					)
+				})?;
+			}
 			match (number, &version.transition) {
 				(0, None) => {}
 				(0, Some(_)) => {
@@ -1042,9 +1183,20 @@ impl ContractHistory {
 						self.identity.key()
 					));
 				}
-				(_, None) => {
+				(_, None) if migrated => {
 					return Err(format!(
 						"contract `{}` version {number} has no adjacent transition",
+						self.identity.key()
+					));
+				}
+				(_, None) => {}
+				(_, Some(_)) if !migrated => {
+					// Only reachable for events: an unenveloped instruction has
+					// exactly one version. Old event bytes are decoded with their
+					// own schema, so a conversion would describe nothing.
+					return Err(format!(
+						"event contract `{}` version {number} cannot have a transition; events are \
+						 decoded per version, never converted",
 						self.identity.key()
 					));
 				}
@@ -1079,27 +1231,21 @@ impl ContractHistory {
 							));
 						}
 					}
-
-					if self.identity.kind == ContractKind::Instruction {
-						let source = previous.process.as_ref().unwrap_or_else(|| {
-							panic!("validated above: instruction source process")
-						});
-						let destination = version.process.as_ref().unwrap_or_else(|| {
-							panic!("validated above: instruction destination process")
-						});
-						classify_process_transition(source, destination).map_err(|reason| {
-							format!(
-								"instruction contract `{}` version {number} process is breaking: \
-								 {reason}",
-								self.identity.key()
-							)
-						})?;
-					}
 				}
 			}
 		}
 
 		Ok(())
+	}
+
+	/// Whether adjacent versions are joined by recorded transitions.
+	///
+	/// Enveloped accounts and instructions are converted forward one step at a
+	/// time. Events are decoded with each version's own schema, and an
+	/// instruction without an envelope has a single version.
+	#[must_use]
+	pub fn is_migrated(&self) -> bool {
+		self.envelope && self.identity.kind != ContractKind::Event
 	}
 }
 
@@ -1112,10 +1258,32 @@ pub struct MigrationManifest {
 	pub abi_version: String,
 	pub program_id: String,
 	pub version_type: MigrationVersionType,
-	/// Kinds whose declarations are enveloped without a per-item token.
+	/// Kinds whose declarations are recorded without a per-item token.
 	#[serde(default, skip_serializing_if = "MigrationAuto::is_empty")]
 	pub auto: MigrationAuto,
+	/// Every recorded history, keyed by its identity's [`ContractIdentity::key`].
+	#[serde(deserialize_with = "deserialize_contracts")]
+	#[schemars(extend("propertyNames" = {
+		"pattern": "^(account|instruction|event):(1|2|4|8):([0-9a-f]{2})+$"
+	}))]
 	pub contracts: BTreeMap<String, ContractHistory>,
+}
+
+/// Read the contract map, deriving each history's identity from its key.
+///
+/// A key that does not parse is a decode error, so no history ever holds the
+/// placeholder identity after a manifest is read.
+fn deserialize_contracts<'de, D>(
+	deserializer: D,
+) -> Result<BTreeMap<String, ContractHistory>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	let mut contracts = BTreeMap::<String, ContractHistory>::deserialize(deserializer)?;
+	for (key, history) in &mut contracts {
+		history.identity = ContractIdentity::from_key(key).map_err(serde::de::Error::custom)?;
+	}
+	Ok(contracts)
 }
 
 impl MigrationManifest {
@@ -1202,24 +1370,43 @@ pub type AbiConverter = fn(serde_json::Value) -> Result<serde_json::Value, Strin
 ///
 /// The table is ordered oldest-first and is walked forward one step at a time.
 /// Edges are never deleted once shipped; fixing a defective converter means a
-/// new version, never editing published history.
+/// new version, never editing published history. Each step converts both
+/// documents, because both carry the same `abiVersion`; the walk stamps `to`
+/// on the result, so a converter only reshapes the body.
 pub struct AbiStep {
 	/// The version this step converts away from.
 	pub from: &'static str,
 	/// The version this step produces.
 	pub to: &'static str,
-	/// Convert a document body between the two versions.
-	pub convert: AbiConverter,
+	/// Convert a manifest body between the two versions.
+	pub manifest: AbiConverter,
+	/// Convert a publication ledger body between the two versions.
+	pub publications: AbiConverter,
+}
+
+impl AbiStep {
+	/// The converter this step applies to `document`.
+	#[must_use]
+	pub const fn converter(&self, document: AbiDocument) -> AbiConverter {
+		match document {
+			AbiDocument::Manifest => self.manifest,
+			AbiDocument::Publications => self.publications,
+		}
+	}
 }
 
 /// Every adjacent ABI document step, oldest first.
 ///
-/// A step exists only between two *distinct* delivered shapes: the reset
-/// baseline is [`ABI_OLDEST_SUPPORTED`], so the table is empty until a later
-/// release changes the document shape. The `abi_version_guards` tests require
-/// each step to advance the version and to continue from the previous one, so
-/// the walk can never reach a version it cannot traverse.
-pub const ABI_STEPS: &[AbiStep] = &[];
+/// A step exists only between two *distinct* delivered shapes. The
+/// `abi_version_guards` tests require each step to advance the version and to
+/// continue from the previous one, so the walk can never reach a version it
+/// cannot traverse.
+pub const ABI_STEPS: &[AbiStep] = &[AbiStep {
+	from: "0.20",
+	to: "0.21",
+	manifest: convert::manifest_0_20_to_0_21,
+	publications: convert::publications_0_20_to_0_21,
+}];
 
 /// A step that validates the document and returns it unchanged.
 ///
@@ -1235,12 +1422,12 @@ pub fn identity_step(value: serde_json::Value) -> Result<serde_json::Value, Stri
 /// The caller supplies the document's own version and the value as decoded; the
 /// returned value is ready for the current typed model.
 pub fn walk_document(
-	kind: &str,
+	document: AbiDocument,
 	from: &str,
 	value: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
 	walk_document_to(
-		kind,
+		document,
 		from,
 		value,
 		ABI_STEPS,
@@ -1255,13 +1442,14 @@ pub fn walk_document(
 /// behaves when the table has a hole — a state the shipped table must never
 /// reach, and one that cannot be constructed against a single shipped version.
 fn walk_document_to(
-	kind: &str,
+	document: AbiDocument,
 	from: &str,
 	mut value: serde_json::Value,
 	steps: &[AbiStep],
 	oldest_version: &str,
 	target_version: &str,
 ) -> Result<serde_json::Value, String> {
+	let kind = document.label();
 	let start = parse_document_version(from)?;
 	let oldest = parse_document_version(oldest_version)?;
 	let current = parse_document_version(target_version)?;
@@ -1286,7 +1474,15 @@ fn walk_document_to(
 		let step_from = parse_document_version(step.from)?;
 		let step_to = parse_document_version(step.to)?;
 		if position == step_from {
-			value = (step.convert)(value)?;
+			value = (step.converter(document))(value)
+				.map_err(|reason| format!("{kind} {} cannot be upgraded: {reason}", step.from))?;
+			let Some(object) = value.as_object_mut() else {
+				return Err(format!(
+					"{kind} {} upgrade did not produce a JSON object",
+					step.from
+				));
+			};
+			object.insert(ABI_VERSION_KEY.to_owned(), serde_json::Value::from(step.to));
 			position = step_to;
 			if position >= current {
 				return Ok(value);
@@ -1321,7 +1517,7 @@ pub fn decode_manifest(source: &[u8]) -> Result<MigrationManifest, String> {
 	let value: serde_json::Value = serde_json::from_slice(source)
 		.map_err(|error| format!("invalid migration manifest JSON: {error}"))?;
 	let version = document_abi_version("migration manifest", &value)?;
-	let normalized = walk_document("migration manifest", &version, value)?;
+	let normalized = walk_document(AbiDocument::Manifest, &version, value)?;
 	let manifest: MigrationManifest = serde_json::from_value(normalized)
 		.map_err(|error| format!("invalid migration manifest {version}: {error}"))?;
 	manifest.validate()?;
@@ -1333,7 +1529,7 @@ pub fn decode_publication_ledger(source: &[u8]) -> Result<PublicationLedger, Str
 	let value: serde_json::Value = serde_json::from_slice(source)
 		.map_err(|error| format!("invalid publication ledger JSON: {error}"))?;
 	let version = document_abi_version("publication ledger", &value)?;
-	let normalized = walk_document("publication ledger", &version, value)?;
+	let normalized = walk_document(AbiDocument::Publications, &version, value)?;
 	let ledger: PublicationLedger = serde_json::from_value(normalized)
 		.map_err(|error| format!("invalid publication ledger {version}: {error}"))?;
 	ledger.validate()?;
@@ -2256,6 +2452,15 @@ impl AbiDocument {
 		}
 	}
 
+	/// Human-readable name used in diagnostics.
+	#[must_use]
+	pub const fn label(self) -> &'static str {
+		match self {
+			Self::Manifest => "migration manifest",
+			Self::Publications => "publication ledger",
+		}
+	}
+
 	/// Parse the `--document` spelling.
 	#[must_use]
 	pub fn parse(value: &str) -> Option<Self> {
@@ -2353,6 +2558,7 @@ mod tests {
 			ContractHistory {
 				identity,
 				rust_name: "Profile".to_owned(),
+				envelope: true,
 				versions: vec![version(schema, None)],
 			},
 		);
@@ -2567,6 +2773,13 @@ mod tests {
 		assert!(!text.contains("physical"));
 		assert!(!text.contains("schemaSha256"));
 		assert!(!text.contains("processSha256"));
+		// The wire format is implied by `abiVersion`, the identity is the key,
+		// an enveloped history does not spell out its default, and version
+		// zero has no transition to record.
+		assert!(!text.contains("codec"));
+		assert!(!text.contains("identity"));
+		assert!(!text.contains("envelope"));
+		assert!(!text.contains("transition"));
 		assert_eq!(
 			decode_manifest(&encoded).unwrap_or_else(|error| panic!("decode: {error}")),
 			manifest
@@ -2607,6 +2820,7 @@ mod tests {
 				ContractHistory {
 					identity,
 					rust_name: "Profile".to_owned(),
+					envelope: true,
 					versions: vec![version(schema.clone(), None), version(schema, None)],
 				},
 			)]),
@@ -2626,6 +2840,7 @@ mod tests {
 		let history = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Account, 1, 0xAB).unwrap(),
 			rust_name: "Profile".to_owned(),
+			envelope: true,
 			versions: vec![version(schema.clone(), None)],
 		};
 
@@ -2656,6 +2871,7 @@ mod tests {
 			let history = ContractHistory {
 				identity,
 				rust_name: "Payload".to_owned(),
+				envelope: true,
 				versions: vec![entry],
 			};
 
@@ -2671,6 +2887,7 @@ mod tests {
 		let history = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Instruction, 1, 1).unwrap(),
 			rust_name: "Transfer".to_owned(),
+			envelope: true,
 			versions: vec![version(fixed_schema(&[("amount", "u64")]), None)],
 		};
 
@@ -2682,66 +2899,95 @@ mod tests {
 		);
 	}
 
-	#[test]
-	fn manifest_rejects_path_traversal_in_contract_identities() {
-		// Before identity validation, this document decoded and validated,
-		// and `transition_path` interpolated the unvalidated hex into
-		// `migrations/transitions/account_1_ab/../../../evil/v0_to_v1.rs`,
-		// giving a tampered manifest a file-write primitive outside the
-		// migrations directory.
+	/// Re-file the manifest's only contract under `key` and try to decode it.
+	fn decode_with_key(key: &str) -> Result<MigrationManifest, String> {
 		let mut value =
 			serde_json::to_value(account_manifest(fixed_schema(&[("value", "u64")]))).unwrap();
 		let contracts = value
 			.get_mut("contracts")
 			.and_then(|contracts| contracts.as_object_mut())
 			.unwrap();
-		let (_, contract) = contracts.iter_mut().next().unwrap();
-		contract["identity"]["discriminatorHex"] =
-			serde_json::Value::String("ab/../../../evil".into());
 		let (_, history) = contracts.remove_entry("account:1:ab").unwrap();
-		contracts.insert("account:1:ab/../../../evil".to_owned(), history);
-
-		assert!(decode_manifest(&serde_json::to_vec(&value).unwrap()).is_err());
+		contracts.insert(key.to_owned(), history);
+		decode_manifest(&serde_json::to_vec(&value).unwrap())
 	}
 
 	#[test]
-	fn manifest_rejects_noncanonical_identity_hex() {
-		let mut value =
-			serde_json::to_value(account_manifest(fixed_schema(&[("value", "u64")]))).unwrap();
-		let contracts = value
-			.get_mut("contracts")
-			.and_then(|contracts| contracts.as_object_mut())
-			.unwrap();
-		let (_, contract) = contracts.iter_mut().next().unwrap();
-		contract["identity"]["discriminatorHex"] = serde_json::Value::String("AB".to_owned());
-		let (_, history) = contracts.remove_entry("account:1:ab").unwrap();
-		contracts.insert("account:1:AB".to_owned(), history);
-
-		assert!(decode_manifest(&serde_json::to_vec(&value).unwrap()).is_err());
+	fn manifest_rejects_path_traversal_in_contract_keys() {
+		// The key is interpolated into
+		// `migrations/transitions/account_1_ab/../../../evil/v0_to_v1.rs`, so a
+		// tampered key would otherwise give the manifest a file-write primitive
+		// outside the migrations directory.
+		let error = decode_with_key("account:1:ab/../../../evil").unwrap_err();
+		assert!(error.contains("invalid hex value"), "{error}");
 	}
 
 	#[test]
-	fn manifest_rejects_identity_width_mismatches() {
-		for (hex, bytes) in [("a", 1_u8), ("ab", 2), ("", 0)] {
-			let mut value =
-				serde_json::to_value(account_manifest(fixed_schema(&[("value", "u64")]))).unwrap();
-			let contracts = value
-				.get_mut("contracts")
-				.and_then(|contracts| contracts.as_object_mut())
-				.unwrap();
-			let key = format!("account:{bytes}:{hex}");
-			let (_, contract) = contracts.iter_mut().next().unwrap();
-			contract["identity"]["discriminatorHex"] = serde_json::Value::String(hex.to_owned());
-			contract["identity"]["discriminatorBytes"] = serde_json::Value::from(bytes);
-			let (_, history) = contracts.remove_entry("account:1:ab").unwrap();
-			contracts.insert(key, history);
-
-			let encoded = serde_json::to_vec(&value).unwrap();
-			assert!(
-				decode_manifest(&encoded).is_err(),
-				"identity width {bytes} with hex `{hex}` must be rejected"
-			);
+	fn manifest_rejects_noncanonical_contract_keys() {
+		for key in [
+			"account:1:AB",
+			"account:01:ab",
+			"account:+1:ab",
+			"accounts:1:ab",
+			"account:1",
+			"account:1:ab:extra",
+		] {
+			assert!(decode_with_key(key).is_err(), "`{key}` must be rejected");
 		}
+	}
+
+	#[test]
+	fn manifest_rejects_contract_key_width_mismatches() {
+		for key in [
+			"account:1:a",
+			"account:2:ab",
+			"account:0:",
+			"account:3:abcdef",
+		] {
+			assert!(decode_with_key(key).is_err(), "`{key}` must be rejected");
+		}
+	}
+
+	#[test]
+	fn contract_keys_round_trip_through_identities() {
+		for (kind, bytes, value) in [
+			(ContractKind::Account, 1, 0x02),
+			(ContractKind::Instruction, 2, 0x1234),
+			(ContractKind::Event, 8, u64::MAX),
+		] {
+			let identity = ContractIdentity::try_new(kind, bytes, value).unwrap();
+			assert_eq!(
+				ContractIdentity::from_key(&identity.key()),
+				Ok(identity.clone())
+			);
+			assert_eq!(identity.discriminator_value(), Ok(value));
+		}
+		for kind in ContractKind::ALL {
+			assert_eq!(ContractKind::from_name(kind.as_str()), Some(kind));
+		}
+		assert_eq!(ContractKind::from_name("accounts"), None);
+	}
+
+	#[test]
+	fn a_decoded_manifest_derives_every_identity_from_its_key() {
+		let manifest = account_manifest(fixed_schema(&[("value", "u64")]));
+		let encoded = encode_manifest(&manifest).unwrap();
+		let text = String::from_utf8(encoded.clone()).unwrap();
+
+		// The identity is stored once, as the key.
+		assert!(!text.contains("identity"));
+		assert!(!text.contains("discriminatorHex"));
+		let decoded = decode_manifest(&encoded).unwrap();
+		assert_eq!(
+			decoded.contracts["account:1:ab"].identity,
+			ContractIdentity::try_new(ContractKind::Account, 1, 0xAB).unwrap()
+		);
+
+		// A history read on its own has no key, so it holds a placeholder that
+		// can never validate.
+		let history = serde_json::to_value(&manifest.contracts["account:1:ab"]).unwrap();
+		let orphan: ContractHistory = serde_json::from_value(history).unwrap();
+		assert!(orphan.validate(MigrationVersionType::U8).is_err());
 	}
 
 	#[test]
@@ -2768,6 +3014,7 @@ mod tests {
 				ContractHistory {
 					identity,
 					rust_name: "Profile".to_owned(),
+					envelope: true,
 					versions: vec![version(schema, None), second],
 				},
 			)]),
@@ -2807,6 +3054,7 @@ mod tests {
 				ContractHistory {
 					identity,
 					rust_name: "Transfer".to_owned(),
+					envelope: true,
 					versions: vec![version(schema, Some(original)), second],
 				},
 			)]),
@@ -2837,6 +3085,7 @@ mod tests {
 		let history = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Instruction, 1, 4).unwrap(),
 			rust_name: "Transfer".to_owned(),
+			envelope: true,
 			versions: vec![version(schema, Some(original)), second],
 		};
 
@@ -2970,7 +3219,7 @@ mod tests {
 		let value =
 			serde_json::to_value(account_manifest(fixed_schema(&[("value", "u64")]))).unwrap();
 
-		let error = walk_document("migration manifest", "99.0", value).unwrap_err();
+		let error = walk_document(AbiDocument::Manifest, "99.0", value).unwrap_err();
 		assert!(error.contains("upgrade Pina"));
 	}
 
@@ -2979,7 +3228,7 @@ mod tests {
 		let manifest = account_manifest(fixed_schema(&[("value", "u64")]));
 		let value = serde_json::to_value(&manifest).unwrap();
 
-		let walked = walk_document("migration manifest", ABI_VERSION, value.clone())
+		let walked = walk_document(AbiDocument::Manifest, ABI_VERSION, value.clone())
 			.unwrap_or_else(|error| panic!("walk: {error}"));
 		assert_eq!(walked, value);
 	}
@@ -2987,7 +3236,7 @@ mod tests {
 	#[test]
 	fn walk_cannot_reach_a_version_below_the_baseline() {
 		let value = serde_json::Value::Object(serde_json::Map::new());
-		let error = walk_document("migration manifest", "0.1", value).unwrap_err();
+		let error = walk_document(AbiDocument::Manifest, "0.1", value).unwrap_err();
 		assert!(error.contains("predates the oldest supported version"));
 	}
 
@@ -3236,7 +3485,7 @@ mod tests {
 		);
 
 		let value = serde_json::Value::Object(serde_json::Map::new());
-		let walked = walk_document("migration manifest", "0.1", value).unwrap_err();
+		let walked = walk_document(AbiDocument::Manifest, "0.1", value).unwrap_err();
 		assert!(walked.contains("regenerate it with `pina migrations create`"));
 	}
 
@@ -3270,18 +3519,20 @@ mod tests {
 			AbiStep {
 				from: "0.20",
 				to: "0.21",
-				convert: rename_from_v1,
+				manifest: rename_from_v1,
+				publications: identity_step,
 			},
 			AbiStep {
 				from: "0.21",
 				to: "0.22",
-				convert: rename_from_v2,
+				manifest: rename_from_v2,
+				publications: identity_step,
 			},
 		];
 
 		// Reading 0.20 toward 0.22 applies both steps in order.
 		let walked = walk_document_to(
-			"migration manifest",
+			AbiDocument::Manifest,
 			"0.20",
 			serde_json::json!({"abiVersion": "0.20"}),
 			&steps,
@@ -3294,7 +3545,7 @@ mod tests {
 
 		// Reading 0.21 toward 0.22 skips the step it already passed.
 		let walked = walk_document_to(
-			"migration manifest",
+			AbiDocument::Manifest,
 			"0.21",
 			serde_json::json!({"abiVersion": "0.21"}),
 			&steps,
@@ -3315,10 +3566,11 @@ mod tests {
 		let failing_steps = [AbiStep {
 			from: "0.20",
 			to: "0.22",
-			convert: failing,
+			manifest: failing,
+			publications: identity_step,
 		}];
 		let error = walk_document_to(
-			"migration manifest",
+			AbiDocument::Manifest,
 			"0.20",
 			serde_json::json!({}),
 			&failing_steps,
@@ -3327,6 +3579,27 @@ mod tests {
 		)
 		.unwrap_err();
 		assert!(error.contains("converter refused the document"));
+
+		// A converter must hand back a document object to stamp the version on.
+		fn scalar(_: serde_json::Value) -> Result<serde_json::Value, String> {
+			Ok(serde_json::Value::Null)
+		}
+		let scalar_steps = [AbiStep {
+			from: "0.20",
+			to: "0.22",
+			manifest: scalar,
+			publications: identity_step,
+		}];
+		let error = walk_document_to(
+			AbiDocument::Manifest,
+			"0.20",
+			serde_json::json!({}),
+			&scalar_steps,
+			"0.20",
+			"0.22",
+		)
+		.unwrap_err();
+		assert!(error.contains("did not produce a JSON object"), "{error}");
 	}
 
 	/// An identity step returns the document unchanged, so a version that
@@ -3358,6 +3631,7 @@ mod tests {
 		let history = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Instruction, 1, 4).unwrap(),
 			rust_name: "Transfer".to_owned(),
+			envelope: true,
 			versions: vec![version(schema, Some(original.clone())), second],
 		};
 
@@ -3395,6 +3669,7 @@ mod tests {
 		let account = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap(),
 			rust_name: "State".to_owned(),
+			envelope: true,
 			versions: vec![version(fixed_schema(&[("value", "u64")]), None)],
 		};
 		assert_eq!(
@@ -3413,6 +3688,7 @@ mod tests {
 		let empty = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap(),
 			rust_name: "State".to_owned(),
+			envelope: true,
 			versions: Vec::new(),
 		};
 		assert!(
@@ -3445,6 +3721,7 @@ mod tests {
 		let narrow = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Account, 1, 1).unwrap(),
 			rust_name: "State".to_owned(),
+			envelope: true,
 			versions: vec![version(schema.clone(), None)],
 		};
 		let mut many = narrow.clone();
@@ -3502,6 +3779,7 @@ mod tests {
 		let event = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Event, 1, 1).unwrap(),
 			rust_name: "Changed".to_owned(),
+			envelope: true,
 			versions: vec![entry],
 		};
 		assert!(
@@ -3523,6 +3801,7 @@ mod tests {
 		let instruction = ContractHistory {
 			identity: ContractIdentity::try_new(ContractKind::Instruction, 1, 1).unwrap(),
 			rust_name: "Send".to_owned(),
+			envelope: true,
 			versions: vec![version(
 				compact,
 				Some(process(vec![process_account("a", false)])),
@@ -3560,6 +3839,7 @@ mod tests {
 				ContractHistory {
 					identity: ContractIdentity::try_new(ContractKind::Account, 1, 0xAB).unwrap(),
 					rust_name: "Profile".to_owned(),
+					envelope: true,
 					versions: vec![version(schema, None), second],
 				},
 			)]),
@@ -3636,11 +3916,16 @@ mod tests {
 			let manifest_path = directory.join("manifest.json");
 			let bytes = std::fs::read(&manifest_path)
 				.unwrap_or_else(|error| panic!("{}: {error}", manifest_path.display()));
-			let manifest = decode_manifest(&bytes)
+			let value = serde_json::from_slice::<serde_json::Value>(&bytes);
+			let value =
+				value.unwrap_or_else(|error| panic!("{}: {error}", manifest_path.display()));
+			let recorded = document_abi_version("migration manifest", &value)
 				.unwrap_or_else(|error| panic!("{}: {error}", manifest_path.display()));
 			// Only the current version's shape is representable by these types;
-			// an older fixture keeps its own frozen schema alongside it.
-			if manifest.abi_version == ABI_VERSION {
+			// an older fixture keeps its own frozen schema alongside it. The
+			// recorded version decides, because decoding walks every fixture to
+			// the current version.
+			if recorded == ABI_VERSION {
 				for kind in AbiDocument::ALL {
 					let schema_path = directory.join(kind.schema_file_name());
 					let frozen = std::fs::read_to_string(&schema_path)
@@ -3784,10 +4069,11 @@ mod tests {
 		let steps = [AbiStep {
 			from: "0.30",
 			to: "0.99",
-			convert: identity_step,
+			manifest: identity_step,
+			publications: identity_step,
 		}];
 		let value = serde_json::Value::Object(serde_json::Map::new());
-		let error = walk_document_to("migration manifest", "0.20", value, &steps, "0.20", "0.99")
+		let error = walk_document_to(AbiDocument::Manifest, "0.20", value, &steps, "0.20", "0.99")
 			.unwrap_err();
 		assert!(
 			error.contains("no ABI converter reaches"),
@@ -3844,5 +4130,179 @@ mod tests {
 		fixed_schema(&[("authority", "Address"), ("amount", "u64")])
 			.validate()
 			.unwrap_or_else(|error| panic!("distinct fields must validate: {error}"));
+	}
+
+	/// Dropping the stored codec must not move a single published pin.
+	///
+	/// These are the schema hashes `examples/migrations_program`'s ledger pinned
+	/// while every schema still stored `"codec": "pinaPodV2"`.
+	#[test]
+	fn schema_hashes_keep_the_codec_in_their_preimage() {
+		let state_v0 = fixed_schema(&[("authority", "Address"), ("value", "u64")]);
+		assert_eq!(
+			state_v0.sha256(),
+			"fc50469544b1b137ad1418775cc54e96cb82c4033d5d2bd5d4b4be8b2c675d10"
+		);
+		let event_v0 = fixed_schema(&[("value", "u64")]);
+		assert_eq!(
+			event_v0.sha256(),
+			"f84fea2ce909521189b04f6ccc69f8bc191098770d9d7a08220ae6d3e34e43e6"
+		);
+		assert_eq!(SCHEMA_CODEC, "pinaPodV2");
+	}
+
+	fn transition(mode: TransitionMode) -> Transition {
+		Transition {
+			mode,
+			renames: Vec::new(),
+			implementation_sha256: None,
+		}
+	}
+
+	fn history(
+		kind: ContractKind,
+		envelope: bool,
+		versions: Vec<SchemaVersion>,
+	) -> ContractHistory {
+		ContractHistory {
+			identity: ContractIdentity::try_new(kind, 1, 7).unwrap(),
+			rust_name: "Contract".to_owned(),
+			envelope,
+			versions,
+		}
+	}
+
+	#[test]
+	fn only_an_instruction_may_omit_the_envelope() {
+		let schema = fixed_schema(&[("value", "u64")]);
+		for kind in [ContractKind::Account, ContractKind::Event] {
+			let error = history(kind, false, vec![version(schema.clone(), None)])
+				.validate(MigrationVersionType::U8)
+				.unwrap_err();
+			assert!(
+				error.contains("cannot omit the version envelope"),
+				"{error}"
+			);
+		}
+
+		let accounts = process(vec![process_account("authority", false)]);
+		let unenveloped = history(
+			ContractKind::Instruction,
+			false,
+			vec![version(schema.clone(), Some(accounts.clone()))],
+		);
+		assert_eq!(unenveloped.validate(MigrationVersionType::U8), Ok(()));
+		assert!(!unenveloped.is_migrated());
+
+		// With no version on the wire, a second version could never be chosen.
+		let mut second = version(schema.clone(), Some(accounts.clone()));
+		second.transition = Some(transition(TransitionMode::Automatic));
+		let two = history(
+			ContractKind::Instruction,
+			false,
+			vec![version(schema, Some(accounts)), second],
+		);
+		let error = two.validate(MigrationVersionType::U8).unwrap_err();
+		assert!(error.contains("must record exactly one version"), "{error}");
+	}
+
+	#[test]
+	fn an_unenveloped_instruction_serializes_its_envelope_flag() {
+		let accounts = process(vec![process_account("authority", false)]);
+		let mut manifest = MigrationManifest::new("program".to_owned(), MigrationVersionType::U8);
+		let identity = ContractIdentity::try_new(ContractKind::Instruction, 1, 3).unwrap();
+		manifest.contracts.insert(
+			identity.key(),
+			ContractHistory {
+				identity,
+				rust_name: "Transfer".to_owned(),
+				envelope: false,
+				versions: vec![version(fixed_schema(&[("amount", "u64")]), Some(accounts))],
+			},
+		);
+
+		let encoded = encode_manifest(&manifest).unwrap();
+		let text = String::from_utf8(encoded.clone()).unwrap();
+		assert!(text.contains("\"envelope\": false"), "{text}");
+		assert_eq!(decode_manifest(&encoded).unwrap(), manifest);
+	}
+
+	#[test]
+	fn events_are_versioned_without_transitions() {
+		let first = fixed_schema(&[("value", "u64")]);
+		let second = fixed_schema(&[("value", "u64"), ("memo", "u16")]);
+		let event = history(
+			ContractKind::Event,
+			true,
+			vec![version(first.clone(), None), version(second.clone(), None)],
+		);
+		assert_eq!(event.validate(MigrationVersionType::U8), Ok(()));
+		assert!(!event.is_migrated());
+
+		let mut converted = version(second, None);
+		converted.transition = Some(transition(TransitionMode::Automatic));
+		let error = history(
+			ContractKind::Event,
+			true,
+			vec![version(first.clone(), None), converted],
+		)
+		.validate(MigrationVersionType::U8)
+		.unwrap_err();
+		assert!(error.contains("events are decoded per version"), "{error}");
+
+		// An account still needs a transition for every later version.
+		let account = history(
+			ContractKind::Account,
+			true,
+			vec![version(first.clone(), None), version(first, None)],
+		);
+		assert!(account.is_migrated());
+		assert!(
+			account
+				.validate(MigrationVersionType::U8)
+				.unwrap_err()
+				.contains("has no adjacent transition")
+		);
+	}
+
+	/// The frozen 0.20 fixture must convert to exactly the 0.21 fixture.
+	///
+	/// This pins what the converter produces, not merely that the current model
+	/// accepts it: the 0.20 documents are decoded, re-encoded by the current
+	/// writer, and compared value for value with the checked-in 0.21 documents.
+	#[test]
+	fn the_0_20_fixtures_convert_to_the_0_21_fixtures() {
+		let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures");
+		let read = |version: &str, file: &str| {
+			let path = root.join(version).join(file);
+			std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+		};
+		let value = |bytes: &[u8]| {
+			let value = serde_json::from_slice::<serde_json::Value>(bytes);
+			value.unwrap_or_else(|error| panic!("fixture JSON: {error}"))
+		};
+
+		let manifest = decode_manifest(&read("0.20", "manifest.json"));
+		let manifest = manifest.unwrap_or_else(|error| panic!("0.20 manifest: {error}"));
+		let manifest = encode_manifest(&manifest).unwrap();
+		assert_eq!(value(&manifest), value(&read("0.21", "manifest.json")));
+
+		let ledger = decode_publication_ledger(&read("0.20", "publications.json"));
+		let ledger = ledger.unwrap_or_else(|error| panic!("0.20 ledger: {error}"));
+		let ledger = encode_publication_ledger(&ledger).unwrap();
+		assert_eq!(value(&ledger), value(&read("0.21", "publications.json")));
+
+		for file in [
+			"manifest.json",
+			"publications.json",
+			"manifest.schema.json",
+			"publications.schema.json",
+		] {
+			assert_eq!(
+				read("0.21", file),
+				read("current", file),
+				"current/{file} must match the 0.21 fixture"
+			);
+		}
 	}
 }

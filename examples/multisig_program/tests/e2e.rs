@@ -361,8 +361,9 @@ fn encode_message_fixture(keys: &[Pubkey], instructions: &[(usize, &[u8], &[u8])
 }
 
 fn empty_ix_data(discriminant: u8) -> Vec<u8> {
-	// The migrations envelope gives every instruction a version byte.
-	vec![discriminant, 0]
+	// Instructions carry no version envelope, so an argument-free
+	// instruction is its discriminator alone.
+	vec![discriminant]
 }
 
 fn clock_meta() -> AccountMeta {

@@ -4,8 +4,9 @@
       "additionalProperties": false,
       "description": "Complete history for one discriminator identity.",
       "properties": {
-        "identity": {
-          "$ref": "#/$defs/ContractIdentity"
+        "envelope": {
+          "description": "Whether the version envelope follows the discriminator on the wire.\n\nAccounts and events are always enveloped. An instruction is recorded\nwithout one unless its declaration opts in with the `migrations` token:\nits single snapshot then gates wire-breaking changes, and it carries no\nversion byte and no transitions.",
+          "type": "boolean"
         },
         "rustName": {
           "description": "Current Rust source name. It is not part of stable identity.",
@@ -19,77 +20,15 @@
         }
       },
       "required": [
-        "identity",
         "rustName",
         "versions"
       ],
       "type": "object"
     },
-    "ContractIdentity": {
-      "additionalProperties": false,
-      "description": "Identity of a wire contract, independent of its Rust name.",
-      "properties": {
-        "discriminatorBytes": {
-          "description": "Width of the existing discriminator.",
-          "format": "uint8",
-          "maximum": 255,
-          "minimum": 0,
-          "type": "integer"
-        },
-        "discriminatorHex": {
-          "description": "Discriminator encoded little-endian using exactly `discriminator_bytes`.",
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/$defs/ContractKind",
-          "description": "Contract namespace."
-        }
-      },
-      "required": [
-        "kind",
-        "discriminatorBytes",
-        "discriminatorHex"
-      ],
-      "type": "object"
-    },
-    "ContractKind": {
-      "description": "Kind of versioned data contract.",
-      "oneOf": [
-        {
-          "const": "account",
-          "description": "Program-owned persisted account data.",
-          "type": "string"
-        },
-        {
-          "const": "instruction",
-          "description": "Data bytes sent to one stable instruction process.",
-          "type": "string"
-        },
-        {
-          "const": "event",
-          "description": "Immutable data emitted into transaction logs.",
-          "type": "string"
-        }
-      ]
-    },
-    "DataCodec": {
-      "description": "Versioned byte codec whose invariants define a schema snapshot.",
-      "oneOf": [
-        {
-          "const": "pinaPodV2",
-          "description": "`PinaPod` 0.2 fixed and compact wire semantics.",
-          "type": "string"
-        }
-      ]
-    },
     "DataSchema": {
       "additionalProperties": false,
-      "description": "Canonical source schema for one version.\n\nA version stores the facts a reader cannot recompute — the layout family, the\nfields in physical order, and the codec that defines their wire semantics.\nThe byte-level descriptor is derived on load rather than stored, so a\ndocument cannot disagree with its own derivation and a layout change is a\ndeliberate, visible version event instead of a silently reinterpreted cache.",
+      "description": "Canonical source schema for one version.\n\nA version stores the facts a reader cannot recompute — the layout family and\nthe fields in physical order. The wire format they are derived under is\nimplied by the document's `abiVersion` ([`SCHEMA_CODEC`]), and the\nbyte-level descriptor is derived on load rather than stored, so a document\ncannot disagree with its own derivation and a layout change is a deliberate,\nvisible version event instead of a silently reinterpreted cache.",
       "properties": {
-        "codec": {
-          "$ref": "#/$defs/DataCodec",
-          "description": "Versioned codec used to validate and reconstruct these bytes."
-        },
         "fields": {
           "description": "User fields in physical declaration order. Framework envelope fields are omitted.",
           "items": {
@@ -104,8 +43,7 @@
       },
       "required": [
         "layout",
-        "fields",
-        "codec"
+        "fields"
       ],
       "type": "object"
     },
@@ -144,7 +82,7 @@
       ]
     },
     "MigrationAuto": {
-      "description": "Contract kinds enveloped without a per-item token, in stable order.",
+      "description": "Contract kinds recorded without a per-item token, in stable order. Accounts and events are enveloped; instructions are recorded without an envelope unless they opt in.",
       "items": {
         "enum": [
           "accounts",
@@ -281,7 +219,7 @@
               "type": "null"
             }
           ],
-          "description": "Absent only for version zero."
+          "description": "The conversion from the previous version. Present on every later version\nof a migrated contract; absent on version zero, on every event version\n(events are decoded per version, never converted), and on an instruction\nrecorded without an envelope."
         }
       },
       "required": [
@@ -332,7 +270,7 @@
       ]
     }
   },
-  "$id": "https://pina-rs.github.io/pina/abi/schemas/0.20/manifest.schema.json",
+  "$id": "https://pina-rs.github.io/pina/abi/schemas/0.21/manifest.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Checked-in source of truth for every migration-aware data contract.",
@@ -343,11 +281,15 @@
     },
     "auto": {
       "$ref": "#/$defs/MigrationAuto",
-      "description": "Kinds whose declarations are enveloped without a per-item token."
+      "description": "Kinds whose declarations are recorded without a per-item token."
     },
     "contracts": {
       "additionalProperties": {
         "$ref": "#/$defs/ContractHistory"
+      },
+      "description": "Every recorded history, keyed by its identity's [`ContractIdentity::key`].",
+      "propertyNames": {
+        "pattern": "^(account|instruction|event):(1|2|4|8):([0-9a-f]{2})+$"
       },
       "type": "object"
     },

@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "TodoState",
 			"versions": [
 				{
@@ -36,20 +31,14 @@
 								"name": "digest",
 								"rustType": "[u8; 32]"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "InitializeInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -63,8 +52,7 @@
 								"name": "digest",
 								"rustType": "[u8; 32]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -93,24 +81,18 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "ToggleCompletedInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": [
@@ -131,18 +113,13 @@
 								"pda": "todo"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:02": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "UpdateDigestInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -152,8 +129,7 @@
 								"name": "digest",
 								"rustType": "[u8; 32]"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -174,8 +150,7 @@
 								"pda": "todo"
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

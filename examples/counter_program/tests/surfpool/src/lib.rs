@@ -50,10 +50,10 @@ fn initialize_instruction(
 	bump: u8,
 ) -> pina_test::Instruction {
 	program.instruction(
-		// discriminator + migration version + bump. The program envelopes
-		// instructions, so the payload carries the version byte; the generated
-		// `InitializeInstruction::SIZE` pins the same length.
-		&[CounterInstruction::Initialize as u8, 0u8, bump],
+		// discriminator + bump. Instructions carry no version envelope unless
+		// they opt into migrations; the generated `InitializeInstruction::SIZE`
+		// pins the same length.
+		&[CounterInstruction::Initialize as u8, bump],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*counter, false),
@@ -69,8 +69,8 @@ fn increment_instruction(
 	counter: &Pubkey,
 ) -> pina_test::Instruction {
 	program.instruction(
-		// discriminator + migration version; Increment takes no arguments.
-		&[CounterInstruction::Increment as u8, 0u8],
+		// Discriminator only; Increment takes no arguments.
+		&[CounterInstruction::Increment as u8],
 		vec![
 			AccountMeta::new_readonly(*authority, true),
 			AccountMeta::new(*counter, false),

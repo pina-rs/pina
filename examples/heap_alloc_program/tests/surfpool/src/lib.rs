@@ -28,11 +28,10 @@ use program::ID;
 /// Bytes in the runtime's default heap frame.
 const DEFAULT_HEAP_FRAME: u32 = 32 * 1024;
 
-/// `Allocate` instruction data: discriminator, migration version, value.
+/// `Allocate` instruction data: discriminator, value.
 fn allocate_data(value: u64) -> Vec<u8> {
 	let mut data = Vec::with_capacity(AllocateInstruction::SIZE);
 	data.push(HeapInstruction::Allocate as u8);
-	data.push(0);
 	data.extend_from_slice(&value.to_le_bytes());
 
 	assert_eq!(
@@ -44,11 +43,10 @@ fn allocate_data(value: u64) -> Vec<u8> {
 	data
 }
 
-/// `Fill` instruction data: discriminator, migration version, bytes, fill.
+/// `Fill` instruction data: discriminator, bytes, fill.
 fn fill_data(bytes: u32, fill: u8) -> Vec<u8> {
 	let mut data = Vec::with_capacity(FillInstruction::SIZE);
 	data.push(HeapInstruction::Fill as u8);
-	data.push(0);
 	data.extend_from_slice(&bytes.to_le_bytes());
 	data.push(fill);
 

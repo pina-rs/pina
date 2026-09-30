@@ -13,7 +13,6 @@
 /// Same layout as `CpiTransferInstruction` but with a different discriminator
 /// byte.
 pub const DIRECT_TRANSFER_DISCRIMINATOR: u8 = 1u8;
-pub const DIRECT_TRANSFER_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -67,7 +66,6 @@ impl DirectTransferInstructionData {
 		<DirectTransferInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = DIRECT_TRANSFER_DISCRIMINATOR;
-			data.migration_version = DIRECT_TRANSFER_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -81,7 +79,6 @@ impl DirectTransferInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DirectTransferInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// Amount of lamports to transfer.
 	pub amount: u64,
 }

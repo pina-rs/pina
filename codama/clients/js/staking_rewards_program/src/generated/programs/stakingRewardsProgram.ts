@@ -111,30 +111,24 @@ export function identifyStakingRewardsProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): StakingRewardsProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return StakingRewardsProgramInstruction.InitializePool;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return StakingRewardsProgramInstruction.OpenPosition;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return StakingRewardsProgramInstruction.Deposit;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return StakingRewardsProgramInstruction.Withdraw;
-	if (
-		containsBytes(data, getU8Encoder().encode(4), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return StakingRewardsProgramInstruction.Claim;
-	if (
-		containsBytes(data, getU8Encoder().encode(5), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return StakingRewardsProgramInstruction.SetRewardIndex;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return StakingRewardsProgramInstruction.InitializePool;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return StakingRewardsProgramInstruction.OpenPosition;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return StakingRewardsProgramInstruction.Deposit;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return StakingRewardsProgramInstruction.Withdraw;
+	}
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return StakingRewardsProgramInstruction.Claim;
+	}
+	if (containsBytes(data, getU8Encoder().encode(5), 0)) {
+		return StakingRewardsProgramInstruction.SetRewardIndex;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "stakingRewardsProgram" },

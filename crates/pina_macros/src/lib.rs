@@ -224,6 +224,14 @@ pub fn pda(args: TokenStream, input: TokenStream) -> TokenStream {
 /// return `ProgramError::InvalidInstructionData` by default and call
 /// validation automatically after structural decoding.
 ///
+/// Under a `[migrations].auto` policy that covers instructions, the payload is
+/// recorded in the migration manifest without a version envelope, and the
+/// build fails when it drifts from that snapshot. Add `migrations` to opt one
+/// instruction into full migrations instead: a version envelope, adjacent
+/// transitions, and an `#[discriminator(entrypoint)]` dispatcher that
+/// normalizes historical payloads before calling
+/// `ProcessAccountInfos::process_from_version`.
+///
 /// # Example
 ///
 /// ```ignore
@@ -247,9 +255,10 @@ pub fn instruction(args: TokenStream, input: TokenStream) -> TokenStream {
 /// `validate(with = function)` hook. Event views implement `PinaValidate` and
 /// generated read/initialize helpers validate automatically.
 ///
-/// Add `migrations` to generate exact historical decoders and
-/// `with_current_event_data`. The helper projects immutable historical bytes to
-/// the current representation and supplies their source version as provenance.
+/// Add `migrations` to put the version envelope after the discriminator.
+/// Events are versioned, not migrated: the program only emits the current
+/// version, and generated clients decode every historical version recorded in
+/// the migration manifest with that version's own schema.
 ///
 /// # Example
 ///

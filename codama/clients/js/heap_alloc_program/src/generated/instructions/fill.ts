@@ -25,22 +25,13 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { HEAP_ALLOC_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const FILL_DISCRIMINATOR = 1;
 
 export function getFillDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(FILL_DISCRIMINATOR);
-}
-
-export const FILL_DISCRIMINATOR2 = 0;
-
-export function getFillDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(FILL_DISCRIMINATOR2);
 }
 
 export type FillInstruction<
@@ -53,7 +44,6 @@ export type FillInstruction<
 
 export type FillInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	/**
 	 * Bytes to allocate.
 	 *
@@ -83,13 +73,11 @@ export function getFillInstructionDataEncoder(): FixedSizeEncoder<
 	FillInstructionDataArgs
 > {
 	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["bytes", getU32Encoder()],
-			["fill", getU8Encoder()],
-		]),
-		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"bytes",
+			getU32Encoder(),
+		], ["fill", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 1 }),
 	);
 }
 
@@ -101,7 +89,6 @@ export function getFillInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(FILL_DISCRIMINATOR, getU8Decoder()),
 		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bytes", getU32Decoder()],
 		["fill", getU8Decoder()],
 	]);

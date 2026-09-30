@@ -1,5 +1,5 @@
 {
-	"abiVersion": "0.20",
+	"abiVersion": "0.21",
 	"programId": "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe",
 	"versionType": "u8",
 	"auto": [
@@ -9,11 +9,6 @@
 	],
 	"contracts": {
 		"account:1:01": {
-			"identity": {
-				"kind": "account",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "State",
 			"versions": [
 				{
@@ -24,41 +19,29 @@
 								"name": "bump",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
-					},
-					"transition": null
+						]
+					}
 				}
 			]
 		},
 		"instruction:1:00": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "00"
-			},
 			"rustName": "HelloInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
 						"layout": "fixed",
-						"fields": [],
-						"codec": "pinaPodV2"
+						"fields": []
 					},
 					"process": {
 						"accounts": []
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:01": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "01"
-			},
 			"rustName": "ForwardRotateWithSignerInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -68,8 +51,7 @@
 								"name": "new_authority",
 								"rustType": "Address"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -98,18 +80,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:02": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "02"
-			},
 			"rustName": "ForwardRotateWithPdaInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -123,8 +100,7 @@
 								"name": "new_authority",
 								"rustType": "Address"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -153,18 +129,13 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		},
 		"instruction:1:03": {
-			"identity": {
-				"kind": "instruction",
-				"discriminatorBytes": 1,
-				"discriminatorHex": "03"
-			},
 			"rustName": "CreatePdaInstruction",
+			"envelope": false,
 			"versions": [
 				{
 					"schema": {
@@ -174,8 +145,7 @@
 								"name": "bump",
 								"rustType": "u8"
 							}
-						],
-						"codec": "pinaPodV2"
+						]
 					},
 					"process": {
 						"accounts": [
@@ -204,8 +174,7 @@
 								"pda": null
 							}
 						]
-					},
-					"transition": null
+					}
 				}
 			]
 		}

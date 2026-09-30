@@ -9,7 +9,6 @@
 )]
 
 pub const CHALLENGE_DISCLOSURE_DISCRIMINATOR: u8 = 9u8;
-pub const CHALLENGE_DISCLOSURE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -88,7 +87,6 @@ impl ChallengeDisclosureInstructionData {
 			|data| {
 				configure(data);
 				data.discriminator = CHALLENGE_DISCLOSURE_DISCRIMINATOR;
-				data.migration_version = CHALLENGE_DISCLOSURE_MIGRATION_VERSION;
 				Ok(())
 			},
 		)
@@ -103,7 +101,6 @@ impl ChallengeDisclosureInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ChallengeDisclosureInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// Reserved; must be zero.
 	pub reserved: u8,
 }

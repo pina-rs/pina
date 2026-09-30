@@ -9,7 +9,6 @@
 )]
 
 pub const RESOLVE_CHALLENGE_DISCRIMINATOR: u8 = 10u8;
-pub const RESOLVE_CHALLENGE_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -80,7 +79,6 @@ impl ResolveChallengeInstructionData {
 		<ResolveChallengeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = RESOLVE_CHALLENGE_DISCRIMINATOR;
-			data.migration_version = RESOLVE_CHALLENGE_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -94,7 +92,6 @@ impl ResolveChallengeInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ResolveChallengeInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 	/// Nonzero resolves in the requester's favor (execution may proceed);
 	/// zero rejects the request outright.
 	pub approve: u8,

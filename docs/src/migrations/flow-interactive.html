@@ -246,7 +246,7 @@
 	<h1>How Pina Migrations Work</h1>
 	<p class="sub">A step-by-step guide to versioned, automatic ABI migrations: what you run, what the framework does for you, and what happens on-chain when old data meets a new program.</p>
 	<div class="tldr">
-		<strong>The short version:</strong> you never write a migration by hand for ordinary changes. You change your structs like always and run one CLI command when the build asks. If a field was renamed or removed, you answer one question. The program then carries every old account, instruction, and event forward to the current shape inside whichever transaction touches it. Clients keep working unchanged.
+		<strong>The short version:</strong> you never write a migration by hand for ordinary changes. You change your structs like always and run one CLI command when the build asks. If a field was renamed or removed, you answer one question. The program then carries every old account forward to the current shape inside whichever transaction touches it. Instructions are snapshots that stop the build before a wire-breaking change ships, unless one opts into migrations, and events are versioned rather than migrated: clients decode each historical version with its own schema. Clients keep working unchanged.
 	</div>
 </header>
 
@@ -274,7 +274,8 @@ version_type = "u8"</span></div>
 		<details class="under">
 			<summary>What happens under the hood</summary>
 			<div class="under-body">
-				<p>Accounts, instruction payloads, and events all gain a <strong>version envelope</strong>. The version number sits immediately after the existing discriminator. The framework owns these bytes, so your code never reads or writes them by hand.</p>
+				<p>Accounts and events gain a <strong>version envelope</strong>. The version number sits immediately after the existing discriminator. The framework owns these bytes, so your code never reads or writes them by hand.</p>
+				<p>Instructions keep their plain <code>[discriminator][payload]</code> format. The manifest records one snapshot of each (<code>"envelope": false</code>), and the build fails if the struct drifts from it. An instruction that must accept older payloads under the same discriminator opts in with <code>#[instruction(discriminator = X, migrations)]</code> and gains the envelope too.</p>
 				<p>The encoding (<code>u8</code>, <code>u16</code>, or <code>u32</code>) is program-wide, so every contract shares one envelope size. Generated code picks the matching implementation, not you.</p>
 			</div>
 		</details>
@@ -359,9 +360,8 @@ stderr: error: ambiguous field changes need an explicit answer
 ├── <span class="f">publications.json</span>    <span class="c">← hash-chained release ledger (step 6)</span>
 └── <span class="d">transitions/</span>
     ├── <span class="d">account_1_02/</span>   <span class="c">← v1 → v2 for the State account</span>
-    ├── <span class="d">instruction_1_00/</span>
-    └── <span class="d">event_1_04/</span></div>
-				<p>Renames are recorded as byte-preserving moves. If a new answer ever contradicts recorded history, the CLI rejects it instead of guessing.</p>
+    └── <span class="d">instruction_1_00/</span> <span class="c">← only for an instruction with <code>migrations</code></span></div>
+				<p>Renames are recorded as byte-preserving moves. If a new answer ever contradicts recorded history, the CLI rejects it instead of guessing. Events never get a transition directory: a changed event appends a version with its own schema, and clients decode each version with that schema. An instruction transition that would zero-fill an added argument is always manual, because the handler could not tell that default from a value a client sent.</p>
 			</div>
 		</details>
 	</div>
@@ -427,13 +427,13 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 ✓ rust       → clients/rust
 ✓ cpi        → clients/cpi</span></div>
 		<p>Every generated encoder stamps the current version into the envelope automatically. Your client code constructs instructions and decodes accounts exactly as before.</p>
-		<div class="box info"><b>Old clients keep working.</b> A client built before the migration still writes version 1. The program accepts it and normalizes it on-chain (Part 2). You upgrade clients on your own schedule, not in lockstep with deploys.</div>
+		<div class="box info"><b>Old clients keep working.</b> A client built before the migration still writes version 1. The program accepts it and migrates the accounts it touches on-chain, and it normalizes the payload of an instruction that opts into migrations (Part 2). You upgrade clients on your own schedule, not in lockstep with deploys.</div>
 	</div>
 </div>
 
 <!-- ============ PART 2: RUNTIME ============ -->
 <h2>Part 2: what happens on-chain</h2>
-<p class="lead">Every wire format carries the framework-owned envelope. When a transaction arrives, the program routes on the version byte. This diagram is the entire decision tree.</p>
+<p class="lead">Every enveloped wire format carries the framework-owned version after its discriminator: accounts, and the payload of an instruction that opts into migrations. When those bytes arrive, the program routes on the version. This diagram is the entire decision tree.</p>
 
 <div class="diagram">
 <svg viewBox="0 0 900 430" width="900" height="430" xmlns="http://www.w3.org/2000/svg" font-family="ui-sans-serif, system-ui, sans-serif">
@@ -450,7 +450,7 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 	</defs>
 
 	<!-- envelope -->
-	<text x="60" y="34" font-size="13" fill="#78716c">incoming bytes (instruction, account, or event)</text>
+	<text x="60" y="34" font-size="13" fill="#78716c">incoming bytes (an account, or an instruction that opts into migrations)</text>
 	<rect x="60" y="46" width="130" height="40" rx="7" fill="#6d28d9"/>
 	<text x="125" y="71" font-size="13.5" fill="#fff" text-anchor="middle" font-weight="600">discriminator</text>
 	<rect x="190" y="46" width="90" height="40" rx="0" fill="#0f766e"/>
@@ -504,6 +504,8 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 	<text x="435" y="402" font-size="12.5" text-anchor="middle" fill="#78716c">Wrong discriminator? Rejected before the version is even read, so one contract can never be misread as another.</text>
 </svg>
 </div>
+
+<div class="box info"><b>Instructions and events take a different path.</b> An instruction recorded as a snapshot has no version byte, so it skips this tree: once published its payload cannot change (<code class="inline">PublishedPayloadChanged</code>; declare a new discriminator), appending optional accounts is recorded in place, and it cannot gain an envelope (<code class="inline">EnvelopeAddition</code>). An instruction with <code class="inline">migrations</code> takes the stale branch: <code class="inline">#[discriminator(entrypoint)]</code> routes it through the generated <code class="inline">process_versioned</code>, which converts the payload and then calls <code class="inline">ProcessAccountInfos::process_from_version(self, data, source_version)</code>; the default forwards to <code class="inline">process(data)</code>, so the handler sees the current layout. Removing an envelope after publication fails with <code class="inline">EnvelopeRemoval</code>. Events never enter the program: it emits only the current version, and clients decode older log records with the schema of the version that wrote them.</div>
 
 <h3 style="font-size:18px; margin-top: 32px;">An old account meeting a new program, step by step</h3>
 <p class="lead">Account migrations are the interesting case because they can change the account's size, and size changes rent. This is what one instruction does when the account is two versions behind.</p>
@@ -574,7 +576,7 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 	<div class="card">
 		<h3>Old client → new program</h3>
 		<div class="vs">client writes v0 · program knows v2</div>
-		<p>The program normalizes the request, and any accounts it touches, inline in the same transaction. The old client just sees the transaction succeed.</p>
+		<p>The program migrates any accounts the request touches inline in the same transaction, and normalizes the request itself when its instruction opts into migrations. The old client just sees the transaction succeed.</p>
 		<span class="verdict v-magic">JUST WORKS</span>
 	</div>
 	<div class="card">
@@ -595,7 +597,8 @@ pub(crate) fn migrate(data: &amp;mut [u8]) {
 <table>
 	<tr><th>Responsibility</th><th>Client</th><th>Program</th></tr>
 	<tr><td>Stamp the current version into anything it sends</td><td class="yes">Yes, automatic in generated encoders</td><td>n/a</td></tr>
-	<tr><td>Rewrite stale accounts, instructions, or events</td><td class="no">Never</td><td class="yes">Always, inline in the touching transaction</td></tr>
+	<tr><td>Rewrite stale accounts or migration-aware instruction payloads</td><td class="no">Never</td><td class="yes">Always, inline in the touching transaction</td></tr>
+	<tr><td>Decode historical events</td><td class="yes">Yes, each version with its own generated decoder</td><td>Emits only the current version; never rewrites a log</td></tr>
 	<tr><td>Know the migration history</td><td class="no">Never. It lives in <code>migrations/</code> and in the program</td><td class="yes">Owns it</td></tr>
 	<tr><td>Fund a rent deficit when an account grows</td><td class="part">Passes the payer account (old clients omit it)</td><td class="yes">Charges within a developer-set cap</td></tr>
 	<tr><td>Reject data from the future</td><td class="part">Generated decoders enforce the envelope in TypeScript, Dart, and Rust, with an error that names the version it found and what to do</td><td class="yes">Always fails closed</td></tr>
@@ -673,7 +676,7 @@ if let Some(state) = state {
 	<tr><td><code>pina migrations reconcile</code></td><td>A deploy died halfway</td><td>Inspects the pending publication receipt, then completes it or abandons it with <code>--abandon</code>.</td></tr>
 	<tr><td><code>pina build</code></td><td>Always</td><td>The drift gate. Fails until every schema change is recorded and every TODO transition is filled.</td></tr>
 	<tr><td><code>pina deploy --cluster &lt;CLUSTER&gt;</code></td><td>Shipping</td><td>Deploys and appends a hash-chained receipt, freezing the shipped versions. Loopback targets record one only with <code>--record-publication</code>.</td></tr>
-	<tr><td><code>pina generate</code></td><td>After <code>make</code></td><td>Regenerates the TypeScript, Dart, Rust, and CPI clients with the new shape and current version constants.</td></tr>
+	<tr><td><code>pina generate</code></td><td>After <code>create</code></td><td>Regenerates the TypeScript, Dart, Rust, and CPI clients with the new shape and current version constants.</td></tr>
 </table>
 
 <!-- ============ GUARANTEES ============ -->
@@ -692,7 +695,7 @@ if is_migrate_instruction(data) {
 <p>That is the client flow the sweep section above describes, now with a framework-owned entry point: prepend <code class="inline">[Migrate { payer }, …real instructions]</code> and the payer authorizes exactly the migration cost.</p>
 
 <h3 style="font-size:18px; margin-top: 28px;">Generated client helpers</h3>
-<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer that always sends the payer and system program slots (the system program is the default for slot 1) and whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs. Migratable <strong>events</strong> use the same envelope on the read path: each client emits a log entry point (<code class="inline">parse&lt;Program&gt;EventsFromLogs</code> in TypeScript and Dart, <code class="inline">project_from_bytes</code> in Rust) that enforces the version and projects historical bytes into the current shape when the checked-in manifest proves the transition is automatic, reporting <code class="inline">sourceVersion</code> and <code class="inline">wasMigrated</code>. The program-level parser decodes a line only while this program is the innermost invocation in the transaction's logs, so another program cannot forge its events. Manual transitions fail closed with a message naming the transition.</p>
+<p>The TypeScript, Dart, and Rust clients generate the pieces of that flow so you never compose metas by hand. Each migratable account module gains the generic <code class="inline">needsMigration</code> envelope check as a per-account helper (<code class="inline">stateNeedsMigration(bytes)</code> for a <code class="inline">State</code> account) — true only when the bytes name this account's discriminator and a version older than the client's schema — plus a <code class="inline">&lt;Account&gt;MIGRATION_VERSION</code> constant. Each program gains a <code class="inline">Migrate</code> composer that always sends the payer and system program slots (the system program is the default for slot 1) and whose migratable slots are all optional: omitted slots become program-address placeholders and trailing omitted slots are truncated, so a client sends only the accounts it needs. Versioned <strong>events</strong> are decoded, never converted: the IDL lists each earlier version as its own event, <code class="inline">&lt;Event&gt;V&lt;n&gt;</code> (for example <code class="inline">ValueChangedEventV0</code>), with that version's own codec. The program-level log parser (<code class="inline">parse&lt;Program&gt;EventsFromLogs</code> in TypeScript and Dart) dispatches each record by discriminator and version and throws on a version no generated event describes, naming the version and telling you to regenerate the client. Nothing is projected into the current shape or zero-filled. In Rust, each version's <code class="inline">try_from_bytes</code> tells a stale record from a future one and points at the event generated for the other version. The program-level parser decodes a line only while this program is the innermost invocation in the transaction's logs, so another program cannot forge its events.</p>
 <div class="code"><span class="k">const</span> account = <span class="k">await</span> fetchEncodedAccount(rpc, address);
 <span class="k">if</span> (account.exists &amp;&amp; stateNeedsMigration(account.data)) {
 	<span class="k">await</span> send(getMigrateInstruction({ state: address, payer }));

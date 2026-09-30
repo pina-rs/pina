@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: cae0f3033756ed258e644de0cd32d618e0cfe86a05ef813c1882ff38d3355623
+// manifest-sha256: 61d820d0e9878d3687bf518971e84b538c4882c664e054f75f8786f216cc16d2
 // program-id: Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS
 // version_type: u8
 
@@ -30,7 +30,7 @@ pub mod account_1_01 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
+	/// Width of the migration version field in bytes; zero without an envelope.
 	pub const VERSION_BYTES: usize = 1;
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
@@ -62,10 +62,10 @@ pub mod instruction_1_00 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
-	pub const VERSION_BYTES: usize = 1;
+	/// Width of the migration version field in bytes; zero without an envelope.
+	pub const VERSION_BYTES: usize = 0;
 	/// Bytes occupied by the discriminator and version envelope together.
-	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	pub const MIGRATION_HEADER_SIZE: usize = 1;
 	/// Payload size in bytes, excluding the envelope header.
 	pub const PAYLOAD_SIZE: usize = 12;
 	/// Total encoded size in bytes, including the envelope header.
@@ -93,10 +93,10 @@ pub mod instruction_1_01 {
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
 	pub const VERSION_OFFSET: usize = 1;
-	/// Width of the migration version field in bytes.
-	pub const VERSION_BYTES: usize = 1;
+	/// Width of the migration version field in bytes; zero without an envelope.
+	pub const VERSION_BYTES: usize = 0;
 	/// Bytes occupied by the discriminator and version envelope together.
-	pub const MIGRATION_HEADER_SIZE: usize = 2;
+	pub const MIGRATION_HEADER_SIZE: usize = 1;
 	/// Payload size in bytes, excluding the envelope header.
 	pub const PAYLOAD_SIZE: usize = 12;
 	/// Total encoded size in bytes, including the envelope header.

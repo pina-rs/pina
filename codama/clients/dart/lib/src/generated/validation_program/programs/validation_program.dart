@@ -26,12 +26,10 @@ enum ValidationProgramInstruction { initializePolicy, checkPolicy }
 ValidationProgramInstruction identifyValidationProgramInstruction(
   Uint8List data,
 ) {
-  if (containsBytes(data, getU8Encoder().encode(0), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(0), 0)) {
     return ValidationProgramInstruction.initializePolicy;
   }
-  if (containsBytes(data, getU8Encoder().encode(1), 0) &&
-      containsBytes(data, getU8Encoder().encode(0), 1)) {
+  if (containsBytes(data, getU8Encoder().encode(1), 0)) {
     return ValidationProgramInstruction.checkPolicy;
   }
 

@@ -194,66 +194,51 @@ export function identifyMultisigProgramInstruction(
 	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MultisigProgramInstruction {
 	const data = "data" in instruction ? instruction.data : instruction;
-	if (
-		containsBytes(data, getU8Encoder().encode(0), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ConfigInitialize;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ConfigUpdate;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.MultisigCreate;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.MultisigImport;
-	if (
-		containsBytes(data, getU8Encoder().encode(4), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ProposalCreate;
-	if (
-		containsBytes(data, getU8Encoder().encode(5), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ProposalActivate;
-	if (
-		containsBytes(data, getU8Encoder().encode(6), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ProposalApprove;
-	if (
-		containsBytes(data, getU8Encoder().encode(7), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ProposalReject;
-	if (
-		containsBytes(data, getU8Encoder().encode(8), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ProposalRevoke;
-	if (
-		containsBytes(data, getU8Encoder().encode(9), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ProposalCancel;
-	if (
-		containsBytes(data, getU8Encoder().encode(10), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.VaultExecute;
-	if (
-		containsBytes(data, getU8Encoder().encode(11), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ConfigExecute;
-	if (
-		containsBytes(data, getU8Encoder().encode(12), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ConfigAuthorityExecute;
-	if (
-		containsBytes(data, getU8Encoder().encode(13), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.SpendingLimitUse;
-	if (
-		containsBytes(data, getU8Encoder().encode(14), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return MultisigProgramInstruction.ProposalClose;
+	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
+		return MultisigProgramInstruction.ConfigInitialize;
+	}
+	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
+		return MultisigProgramInstruction.ConfigUpdate;
+	}
+	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
+		return MultisigProgramInstruction.MultisigCreate;
+	}
+	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
+		return MultisigProgramInstruction.MultisigImport;
+	}
+	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
+		return MultisigProgramInstruction.ProposalCreate;
+	}
+	if (containsBytes(data, getU8Encoder().encode(5), 0)) {
+		return MultisigProgramInstruction.ProposalActivate;
+	}
+	if (containsBytes(data, getU8Encoder().encode(6), 0)) {
+		return MultisigProgramInstruction.ProposalApprove;
+	}
+	if (containsBytes(data, getU8Encoder().encode(7), 0)) {
+		return MultisigProgramInstruction.ProposalReject;
+	}
+	if (containsBytes(data, getU8Encoder().encode(8), 0)) {
+		return MultisigProgramInstruction.ProposalRevoke;
+	}
+	if (containsBytes(data, getU8Encoder().encode(9), 0)) {
+		return MultisigProgramInstruction.ProposalCancel;
+	}
+	if (containsBytes(data, getU8Encoder().encode(10), 0)) {
+		return MultisigProgramInstruction.VaultExecute;
+	}
+	if (containsBytes(data, getU8Encoder().encode(11), 0)) {
+		return MultisigProgramInstruction.ConfigExecute;
+	}
+	if (containsBytes(data, getU8Encoder().encode(12), 0)) {
+		return MultisigProgramInstruction.ConfigAuthorityExecute;
+	}
+	if (containsBytes(data, getU8Encoder().encode(13), 0)) {
+		return MultisigProgramInstruction.SpendingLimitUse;
+	}
+	if (containsBytes(data, getU8Encoder().encode(14), 0)) {
+		return MultisigProgramInstruction.ProposalClose;
+	}
 	throw new SolanaError(
 		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
 		{ instructionData: data, programName: "multisigProgram" },

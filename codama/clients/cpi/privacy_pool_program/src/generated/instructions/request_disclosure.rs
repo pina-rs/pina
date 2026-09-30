@@ -84,20 +84,20 @@ pub struct RequestDisclosureIx {
 
 impl RequestDisclosureIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 173;
+	pub const LEN: usize = 172;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 173], ProgramError> {
-		let mut data = [0u8; 173];
-		data[..2].copy_from_slice(&REQUEST_DISCLOSURE_DISCRIMINATOR);
-		data[2..3].copy_from_slice(&self.bump.to_le_bytes());
-		data[3..11].copy_from_slice(&self.nonce.to_le_bytes());
-		data[11..12].copy_from_slice(&self.tier.to_le_bytes());
-		data[12..44].copy_from_slice(&self.commitment);
-		data[44..45].copy_from_slice(&self.notice_len.to_le_bytes());
-		data[45..141].copy_from_slice(&self.notice);
-		data[141..173].copy_from_slice(&self.legal_basis_hash);
+	pub fn to_bytes(&self) -> Result<[u8; 172], ProgramError> {
+		let mut data = [0u8; 172];
+		data[..1].copy_from_slice(&REQUEST_DISCLOSURE_DISCRIMINATOR);
+		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
+		data[2..10].copy_from_slice(&self.nonce.to_le_bytes());
+		data[10..11].copy_from_slice(&self.tier.to_le_bytes());
+		data[11..43].copy_from_slice(&self.commitment);
+		data[43..44].copy_from_slice(&self.notice_len.to_le_bytes());
+		data[44..140].copy_from_slice(&self.notice);
+		data[140..172].copy_from_slice(&self.legal_basis_hash);
 
 		Ok(data)
 	}
@@ -133,4 +133,4 @@ impl<'account> RequestDisclosure<'account> {
 	}
 }
 
-const REQUEST_DISCLOSURE_DISCRIMINATOR: [u8; 2] = [7, 0];
+const REQUEST_DISCLOSURE_DISCRIMINATOR: [u8; 1] = [7];

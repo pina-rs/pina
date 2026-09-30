@@ -9,7 +9,6 @@
 )]
 
 pub const TEST_EVENT_DISCRIMINATOR: u8 = 1u8;
-pub const TEST_EVENT_MIGRATION_VERSION: u8 = 0u8;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -53,7 +52,6 @@ impl TestEventInstructionData {
 		<TestEventInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TEST_EVENT_DISCRIMINATOR;
-			data.migration_version = TEST_EVENT_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
@@ -67,5 +65,4 @@ impl TestEventInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TestEventInstructionWire {
 	pub discriminator: u8,
-	pub migration_version: u8,
 }

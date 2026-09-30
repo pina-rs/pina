@@ -1,6 +1,6 @@
 # ADR 0007: Make ABI migrations first-class
 
-- Status: Proposed
+- Status: Proposed; amended 2026-09-30 for ABI 0.21 (see [Amendment](#amendment-abi-021-2026-09-30))
 - Date: 2026-09-09
 - Owners: Pina maintainers
 - Related: [ADR 0001](./0001-discriminator-first-layout.md), [ADR 0002](./0002-zero-copy-account-model.md), [ADR 0003](./0003-guard-backed-typed-account-loaders.md), [ADR 0004](./0004-no-std-and-no-allocator-boundary.md)
@@ -56,11 +56,15 @@ The discriminator remains at offset zero. The version is little-endian and is hi
 
 Each account, instruction contract, and event advances independently. An instruction version snapshots both its payload and its process account ABI. Either a payload change or a compatible appended-optional process change advances the instruction version after publication.
 
+> **Amended (ABI 0.21):** only accounts, events, and instructions that opt in with `migrations` use the envelope; an instruction covered by `auto` alone is recorded as a single snapshot without one. An appended-optional process change now extends the published version in place instead of advancing it.
+
 Existing unversioned data is not silently treated as version zero. Its first payload bytes may be a valid version by accident. Adoption requires an explicit legacy bridge or a new discriminator.
 
 ### Auto opt-in policy
 
 A `[migrations].auto` list opts whole contract kinds in without per-item annotations. The vocabulary is exactly `accounts`, `events`, and `instructions`, and `auto = true` is sugar for all three. Unknown names, duplicates, and mixing the boolean with a kind list are configuration errors. Staging a subset is supported because the kinds carry different costs: an instruction envelope changes payload bytes and ripples into CPI call sites.
+
+> **Amended (ABI 0.21):** an `auto` policy no longer envelopes instructions, so covering them does not change a payload byte. This staging rationale applies to instructions opted in individually with `migrations`.
 
 The resolved policy is recorded in `migrations/manifest.json`, and the manifest remains the only policy source procedural macros consult. Macros must not read `pina.toml`: the manifest is the checked-in, hash-chained document that keeps builds deterministic and reproducible, and a proc macro does not re-expand when an unrelated toml file changes, so a toml read would leave stale expansions after a policy flip. `pina migrations create` therefore records the policy and snapshots every contract of the listed kinds, and a declaration without a snapshot still fails the build with the existing `pina migrations create` remedy.
 
@@ -73,6 +77,8 @@ Because the macros read the manifest, a policy flip must re-expand contracts wit
 ### Current IDL and ABI history
 
 The public IDL describes only the current program contract. For each opted-in account or instruction, it includes `migrationVersion` as an omitted constant and a constant discriminator at the byte immediately after the ordinary discriminator. Generated clients therefore write the current version without exposing it as an application argument, while an IDL captured from an older release continues to write its own frozen version. The IDL does not contain historical schemas or transition code; it is not the migration database.
+
+> **Amended (ABI 0.21):** each earlier version of an event is listed in the IDL as its own event node, `<Event>V<n>`, so clients can decode old log records. Historical account and instruction schemas and all transition code remain outside the IDL. A snapshot-only instruction has no `migrationVersion` field.
 
 The checked-in Pina ABI history records the physical information needed to reconstruct every supported representation:
 
@@ -201,6 +207,8 @@ Account-local structural migrations cannot read or mutate unrelated accounts. A 
 
 Events are not migrated on-chain. New code emits only the current event representation. `normalize_event_data` and the generated `with_current_event_data` helper validate exact historical bytes and project them into caller-owned scratch space. The projection returns the source version with the latest-shape bytes, preserving whether a defaulted field was absent historically or was actually emitted with its default value. Golden event fixtures live in `pina_test::HistoricalEvent`; generated clients can apply the same manifest transitions off-chain.
 
+> **Superseded (ABI 0.21):** events are versioned, not projected. See the [Amendment](#amendment-abi-021-2026-09-30).
+
 ### Compatibility verification
 
 `pina test --compatibility` and `pina_test` consume checked-in historical fixtures, not fixtures regenerated from current code. The required suite covers:
@@ -239,6 +247,36 @@ An upgrade authority can bypass Pina and deploy arbitrary code. Publication guar
 - The runtime stays `no_std` and allocator-free.
 - PinaPod remains responsible for byte-layout validity; Pina owns versioning, rent, dispatch, publication, and compatibility policy.
 - Appended optional process accounts can share a discriminator; all process changes outside the proved relationship use a new discriminator.
+
+## Amendment (ABI 0.21, 2026-09-30)
+
+ABI 0.21 narrows where the envelope applies and stops converting events. Accounts are unchanged: they keep the envelope, adjacent transitions, the reserved `Migrate` instruction, and `MigrateAccount`.
+
+### Instructions are snapshots unless they opt in
+
+Under an `auto` policy, a plain `#[instruction]` is recorded with exactly one version and `"envelope": false`, and its wire format stays `[discriminator][payload]`. The snapshot still gates wire-breaking changes: the macro fails the build when the struct drifts from it, `pina migrations create` replaces it while nothing is published, and after publication `create` refuses a payload change (`PublishedPayloadChanged`) and asks for a new discriminator. Appending optional accounts extends a published version in place, for snapshot-only and enveloped instructions alike, because an older request that omits the new slots still parses.
+
+`#[instruction(discriminator = X, migrations)]` opts one instruction into the envelope and the adjacent transitions this ADR describes. An envelope cannot be added to or removed from a published instruction (`EnvelopeAddition`, `EnvelopeRemoval`), because existing clients send exactly the bytes they were generated with. Programs published under ABI 0.20, where every recorded instruction was enveloped, keep their wire format by adding `migrations` to each such attribute; the build error names the contract.
+
+The reason is cost without benefit. Most instructions never change their payload under one discriminator, yet the envelope added a byte to every request, a wire change at every CPI call site, and a conversion path to every dispatch. A new discriminator already expresses a new payload, and an instruction that must keep accepting old payloads can still opt in.
+
+### The dispatcher normalizes, not the handler
+
+`#[discriminator(entrypoint)]` routes each instruction the manifest records with an envelope through its generated `process_versioned`, which converts a historical payload to the current layout and then calls `ProcessAccountInfos::process_from_version(self, data, source_version: u32)`. The default implementation forwards to `process(data)`, so handlers read current bytes without normalizing them. `normalize_instruction_data` returns a `NormalizedInstruction` with `as_bytes()`, `source_version()`, and `was_migrated()` for manual dispatch.
+
+A transition that adds an instruction argument is always manual: a zero-filled argument is indistinguishable from a zero the client sent, so the developer chooses the value. Transitions that only move or drop bytes stay automatic.
+
+### Events are versioned, not migrated
+
+The [Events](#events) section above no longer describes the implementation. The program emits only the current version. Changing a published event appends a version with its own schema and no transition, so there is no `migrations/transitions/event_*` directory. `normalize_event_data`, `with_current_event_data`, `MigratableEvent`, and `CurrentEventData` are removed from the runtime.
+
+Clients decode each version with its own schema. The IDL lists every earlier version as its own event node, `<Event>V<n>`, with its own codec, and the program-level log parsers (`parse<Program>EventsFromLogs` in TypeScript and Dart) dispatch each record by discriminator and version and fail closed on a version no generated event describes. Decoded records carry only the fields their version emitted, with no `sourceVersion` or `wasMigrated`. Client generation reads the event history from the IDL rather than the migration manifest. `pina_test::HistoricalEvent` fixtures are decoded with the generated event for their version.
+
+Projection could only present a field an old event never emitted as zero, and a manual event transition left generated clients unable to decode that version at all. Decoding each version with the schema that emitted it is exact and needs no transition code.
+
+### Document shape
+
+The ABI 0.21 manifest stores each fact once: the contract key is the identity, the wire codec is implied by `abiVersion`, and instruction histories record `"envelope": false` when they have no envelope. [ADR 0009](./0009-abi-document-versioning.md#amendment-abi-021-2026-09-30) records those changes.
 
 ## Rejected alternatives
 

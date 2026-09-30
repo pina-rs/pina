@@ -49,6 +49,7 @@ pub use ledger::reconcile_publication;
 pub use ledger::record_publication;
 use ledger::validate_ledger_for_manifest;
 use pina_abi::ContractHistory;
+use pina_abi::ContractKind;
 use pina_abi::MANIFEST_PATH;
 use pina_abi::MigrationAuto;
 use pina_abi::MigrationManifest;
@@ -88,6 +89,16 @@ pub struct CreateMigrationsOutput {
 	pub created_contracts: Vec<String>,
 	pub advanced_versions: Vec<String>,
 	pub updated_drafts: Vec<String>,
+	/// Published instruction snapshots whose account list gained appended
+	/// optional slots in place. Old clients omit those slots, so the change
+	/// needs no new version.
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub extended_processes: Vec<String>,
+	/// Instruction snapshots recorded without an envelope that the source no
+	/// longer asks to record (`migrations = false`, or an auto policy that
+	/// stopped covering instructions). Nothing on the wire changes.
+	#[serde(skip_serializing_if = "Vec::is_empty")]
+	pub released_snapshots: Vec<String>,
 	pub unchanged_contracts: Vec<String>,
 	pub manual_transitions: Vec<PathBuf>,
 	/// Data-loss warnings for removals the developer explicitly accepted.
@@ -117,6 +128,10 @@ pub struct MigrationStatus {
 	pub identity: String,
 	pub kind: String,
 	pub rust_name: String,
+	/// Whether the contract carries the version envelope. An instruction
+	/// recorded by an auto policy without the `migrations` token does not: its
+	/// single snapshot only gates wire-breaking changes.
+	pub envelope: bool,
 	pub current_version: u32,
 	pub published: bool,
 	pub publication_pending: bool,
@@ -144,6 +159,10 @@ pub struct MigrationStatusReport {
 pub(crate) struct IdlMigrationMetadata {
 	pub version_type: MigrationVersionType,
 	pub current_versions: BTreeMap<String, u32>,
+	/// Every earlier schema of each event, oldest first, keyed like
+	/// `current_versions`. Log records emitted before the current version are
+	/// decoded with these, so the IDL lists each one as its own event.
+	pub historical_events: BTreeMap<String, Vec<pina_abi::DataSchema>>,
 }
 
 /// Errors produced by migration snapshot and compatibility operations.
@@ -235,6 +254,26 @@ pub enum MigrationError {
 		name: String,
 		identity: String,
 	},
+
+	#[error(
+		"Instruction `{name}` ({identity}) is published without a version envelope, so it cannot \
+		 gain one: every existing client sends its payload with no version byte. Declare a new \
+		 discriminator for the migration-aware instruction."
+	)]
+	EnvelopeAddition { name: String, identity: String },
+
+	#[error(
+		"Instruction `{name}` ({identity}) is published without a version envelope, so its \
+		 payload cannot change: no byte tells the program which layout a client sent. Declare a \
+		 new discriminator for the new payload, or restore the published fields."
+	)]
+	PublishedPayloadChanged { name: String, identity: String },
+
+	#[error(
+		"Instruction `{name}` ({identity}) no longer asks to be recorded, but the migration \
+		 manifest still holds its snapshot. Run `pina migrations create` to release it."
+	)]
+	StaleSnapshot { name: String, identity: String },
 
 	#[error(
 		"Migration auto policy requires the exact line `{directive}` in {path}. Run `pina \
@@ -504,168 +543,193 @@ pub fn create_migrations_with_answers(
 			key.clone(),
 			(source.identity.kind, source.rust_name.clone()),
 		);
-		match manifest.contracts.get_mut(&key) {
-			None => {
-				manifest.contracts.insert(
-					key.clone(),
-					ContractHistory {
-						identity: source.identity,
-						rust_name: source.rust_name,
-						versions: vec![SchemaVersion {
-							schema: source.schema,
-							process: source.process,
-							transition: None,
-						}],
-					},
-				);
-				output.created_contracts.push(key);
-			}
-			Some(history) => {
-				history.rust_name = source.rust_name;
-				let latest = history
-					.current()
-					.expect("decoded migration histories always contain a current version");
-				// `--manual <field>` must turn an unchanged automatic draft into a
-				// hand-written one; otherwise the answer would be silently dropped.
-				let converts_to_manual = !answers.manual.is_empty()
-					&& latest
-						.transition
-						.as_ref()
-						.is_some_and(|transition| transition.mode == TransitionMode::Automatic)
-					&& !ledger.version_is_frozen(&key, history.current_version().unwrap_or(0))
-					&& source
-						.schema
-						.fields
-						.iter()
-						.any(|field| answers.manual.contains(&field.name));
-				if latest.schema == source.schema
-					&& latest.process == source.process
-					&& !converts_to_manual
-				{
-					refresh_draft_transition_hash(&project, &ledger, &key, history, &mut output)?;
-					output.unchanged_contracts.push(key);
-					continue;
-				}
-
-				let latest_version = history.current_version().unwrap_or_else(|| {
-					panic!("decoded migration histories always contain a current version")
-				});
-				if ledger.version_is_frozen(&key, latest_version) {
-					let next = next_migration_version(&key, latest_version, manifest.version_type)?;
-					// The frozen version's recorded transition describes the hop
-					// that produced it, not this new adjacent one. Its renames
-					// are already baked into the stored schema, and replaying its
-					// manual mode here would brand every hop after a hand-written
-					// transition manual forever.
-					let intent = resolve_field_changes(
-						&key,
-						&latest.schema,
-						&source.schema,
-						&SourceIntent::default(),
-						answers,
-						&mut output.data_warnings,
-						&mut prompts,
-					)?;
-					let stale_ladder = supported_stale_ladder(history, next);
-					let transition = create_transition(
-						&project,
-						TransitionRequest {
-							identity: &history.identity,
-							rust_name: &history.rust_name,
-							source: latest,
-							source_version: latest_version,
-							stale_ladder: &stale_ladder,
-							intent,
-							destination_version: next,
-							destination: &source.schema,
-							destination_process: source.process.as_ref(),
-							preserve_manual: false,
-						},
-						&mut output,
-					)?;
-					history.versions.push(SchemaVersion {
+		let Some(history) = manifest.contracts.get_mut(&key) else {
+			manifest.contracts.insert(
+				key.clone(),
+				ContractHistory {
+					identity: source.identity,
+					rust_name: source.rust_name,
+					envelope: source.envelope,
+					versions: vec![SchemaVersion {
 						schema: source.schema,
 						process: source.process,
-						transition: Some(transition),
-					});
-					output.advanced_versions.push(format!("{key}@{next}"));
-				} else {
-					let replacement = if latest_version == 0 {
-						SchemaVersion {
-							schema: source.schema,
-							process: source.process,
-							transition: None,
-						}
-					} else {
-						let previous = history.version(latest_version - 1).unwrap_or_else(|| {
-							panic!("decoded histories contain every adjacent prior version")
-						});
-						// The draft's own transition carries the disambiguation
-						// answers recorded when it was created; reusing them
-						// keeps repeated `create` runs over the draft stable
-						// instead of re-asking settled questions.
-						let previous_intent = recorded_intent(latest.transition.as_ref());
-						let intent = resolve_field_changes(
-							&key,
-							&previous.schema,
-							&source.schema,
-							&previous_intent,
-							answers,
-							&mut output.data_warnings,
-							&mut prompts,
-						)?;
-						let stale_ladder = supported_stale_ladder(history, latest_version);
-						let transition = create_transition(
-							&project,
-							TransitionRequest {
-								identity: &history.identity,
-								rust_name: &history.rust_name,
-								source: previous,
-								source_version: latest_version - 1,
-								stale_ladder: &stale_ladder,
-								intent,
-								destination_version: latest_version,
-								destination: &source.schema,
-								destination_process: source.process.as_ref(),
-								// A hand-written body is only valid for the byte
-								// layouts it was written against. A process-only
-								// change keeps it; any change to the destination
-								// schema or to the recorded intent regenerates it.
-								preserve_manual: latest.schema == source.schema
-									&& !converts_to_manual,
-							},
-							&mut output,
-						)?;
-						SchemaVersion {
-							schema: source.schema,
-							process: source.process,
-							transition: Some(transition),
-						}
-					};
-					let index = latest_version as usize;
-					history.versions[index] = replacement;
-					output
-						.updated_drafts
-						.push(format!("{key}@{latest_version}"));
-				}
+						transition: None,
+					}],
+				},
+			);
+			output.created_contracts.push(key);
+			continue;
+		};
+		history.rust_name.clone_from(&source.rust_name);
+		if history.envelope != source.envelope {
+			change_envelope(&ledger, &key, history, source, &mut output)?;
+			continue;
+		}
+		if !history.is_migrated() {
+			record_unmigrated(
+				manifest.version_type,
+				&ledger,
+				&key,
+				history,
+				source,
+				&mut output,
+			)?;
+			continue;
+		}
+		let latest = history
+			.current()
+			.expect("decoded migration histories always contain a current version");
+		// `--manual <field>` must turn an unchanged automatic draft into a
+		// hand-written one; otherwise the answer would be silently dropped.
+		let converts_to_manual = !answers.manual.is_empty()
+			&& latest
+				.transition
+				.as_ref()
+				.is_some_and(|transition| transition.mode == TransitionMode::Automatic)
+			&& !ledger.version_is_frozen(&key, history.current_version().unwrap_or(0))
+			&& source
+				.schema
+				.fields
+				.iter()
+				.any(|field| answers.manual.contains(&field.name));
+		if latest.schema == source.schema && latest.process == source.process && !converts_to_manual
+		{
+			refresh_draft_transition_hash(&project, &ledger, &key, history, &mut output)?;
+			output.unchanged_contracts.push(key);
+			continue;
+		}
+
+		let latest_version = history
+			.current_version()
+			.expect("decoded migration histories always contain a current version");
+		if ledger.version_is_frozen(&key, latest_version) {
+			if latest.schema == source.schema {
+				extend_published_process(&key, history, source, &mut output)?;
+				continue;
 			}
+			let next = next_migration_version(&key, latest_version, manifest.version_type)?;
+			// The frozen version's recorded transition describes the hop
+			// that produced it, not this new adjacent one. Its renames
+			// are already baked into the stored schema, and replaying its
+			// manual mode here would brand every hop after a hand-written
+			// transition manual forever.
+			let intent = resolve_field_changes(
+				&key,
+				&latest.schema,
+				&source.schema,
+				&SourceIntent::default(),
+				answers,
+				&mut output.data_warnings,
+				&mut prompts,
+			)?;
+			let stale_ladder = supported_stale_ladder(history, next);
+			let transition = create_transition(
+				&project,
+				TransitionRequest {
+					identity: &history.identity,
+					rust_name: &history.rust_name,
+					source: latest,
+					source_version: latest_version,
+					stale_ladder: &stale_ladder,
+					intent,
+					destination_version: next,
+					destination: &source.schema,
+					destination_process: source.process.as_ref(),
+					preserve_manual: false,
+				},
+				&mut output,
+			)?;
+			history.versions.push(SchemaVersion {
+				schema: source.schema,
+				process: source.process,
+				transition: Some(transition),
+			});
+			output.advanced_versions.push(format!("{key}@{next}"));
+		} else {
+			let replacement = if latest_version == 0 {
+				SchemaVersion {
+					schema: source.schema,
+					process: source.process,
+					transition: None,
+				}
+			} else {
+				let previous = history
+					.version(latest_version - 1)
+					.expect("decoded histories contain every adjacent prior version");
+				// The draft's own transition carries the disambiguation
+				// answers recorded when it was created; reusing them
+				// keeps repeated `create` runs over the draft stable
+				// instead of re-asking settled questions.
+				let previous_intent = recorded_intent(latest.transition.as_ref());
+				let intent = resolve_field_changes(
+					&key,
+					&previous.schema,
+					&source.schema,
+					&previous_intent,
+					answers,
+					&mut output.data_warnings,
+					&mut prompts,
+				)?;
+				let stale_ladder = supported_stale_ladder(history, latest_version);
+				let transition = create_transition(
+					&project,
+					TransitionRequest {
+						identity: &history.identity,
+						rust_name: &history.rust_name,
+						source: previous,
+						source_version: latest_version - 1,
+						stale_ladder: &stale_ladder,
+						intent,
+						destination_version: latest_version,
+						destination: &source.schema,
+						destination_process: source.process.as_ref(),
+						// A hand-written body is only valid for the byte
+						// layouts it was written against. A process-only
+						// change keeps it; any change to the destination
+						// schema or to the recorded intent regenerates it.
+						preserve_manual: latest.schema == source.schema && !converts_to_manual,
+					},
+					&mut output,
+				)?;
+				SchemaVersion {
+					schema: source.schema,
+					process: source.process,
+					transition: Some(transition),
+				}
+			};
+			let index = latest_version as usize;
+			history.versions[index] = replacement;
+			output
+				.updated_drafts
+				.push(format!("{key}@{latest_version}"));
 		}
 	}
 
-	// A contract whose kind the policy no longer covers is an envelope removal,
-	// not a silent source deletion.
+	// A contract the source no longer declares is removed history, except an
+	// instruction snapshot the source explicitly stopped recording: it carries
+	// no envelope, so releasing it changes nothing on the wire.
 	let dropped = auto.removed_since(&manifest.auto);
+	let mut released = Vec::new();
 	for (key, history) in &manifest.contracts {
-		if !seen.contains_key(key) {
-			if dropped.contains(&history.identity.kind) {
-				return Err(envelope_removal(history));
-			}
-			return Err(MigrationError::ContractRemoved {
-				kind: history.identity.kind.to_string(),
-				name: history.rust_name.clone(),
-				identity: key.clone(),
-			});
+		if seen.contains_key(key) {
+			continue;
 		}
+		if snapshot_released(history, &auto, &current.opt_outs) {
+			released.push(key.clone());
+			continue;
+		}
+		if dropped.contains(&history.identity.kind) {
+			return Err(envelope_removal(history));
+		}
+		return Err(MigrationError::ContractRemoved {
+			kind: history.identity.kind.to_string(),
+			name: history.rust_name.clone(),
+			identity: key.clone(),
+		});
+	}
+	for key in released {
+		manifest.contracts.remove(&key);
+		output.released_snapshots.push(key);
 	}
 
 	manifest.auto = auto;
@@ -684,6 +748,140 @@ pub fn create_migrations_with_answers(
 		output.build_script = Some(ensure_build_script(&project.program_dir)?);
 	}
 	Ok(output)
+}
+
+/// Move a contract between the enveloped and snapshot-only framings.
+///
+/// Only an instruction can change framing, and only while nothing is
+/// published: once live, existing clients send exactly the bytes they were
+/// generated with, so neither adding nor removing the version byte can be
+/// reconciled under the same discriminator.
+fn change_envelope(
+	ledger: &PublicationLedger,
+	key: &str,
+	history: &mut ContractHistory,
+	source: CurrentContract,
+	output: &mut CreateMigrationsOutput,
+) -> Result<(), MigrationError> {
+	if ledger.version_is_frozen(key, 0) {
+		return Err(if history.envelope {
+			envelope_removal(history)
+		} else {
+			MigrationError::EnvelopeAddition {
+				name: history.rust_name.clone(),
+				identity: key.to_owned(),
+			}
+		});
+	}
+	// Unpublished history holds a single draft version, so the new framing
+	// starts a fresh baseline.
+	history.envelope = source.envelope;
+	history.versions = vec![SchemaVersion {
+		schema: source.schema,
+		process: source.process,
+		transition: None,
+	}];
+	output.updated_drafts.push(format!("{key}@0"));
+	Ok(())
+}
+
+/// Record a change to a history that carries no transitions.
+///
+/// An event is decoded with the schema of the version that emitted it, so a
+/// published event gains a new version with nothing to convert. An instruction
+/// recorded without an envelope has a single snapshot: a draft is replaced,
+/// and a published one may only append optional accounts.
+fn record_unmigrated(
+	version_type: MigrationVersionType,
+	ledger: &PublicationLedger,
+	key: &str,
+	history: &mut ContractHistory,
+	source: CurrentContract,
+	output: &mut CreateMigrationsOutput,
+) -> Result<(), MigrationError> {
+	let latest_version = history
+		.current_version()
+		.expect("decoded migration histories always contain a current version");
+	let latest = &history.versions[latest_version as usize];
+	if latest.schema == source.schema && latest.process == source.process {
+		output.unchanged_contracts.push(key.to_owned());
+		return Ok(());
+	}
+	if !ledger.version_is_frozen(key, latest_version) {
+		history.versions[latest_version as usize] = SchemaVersion {
+			schema: source.schema,
+			process: source.process,
+			transition: None,
+		};
+		output
+			.updated_drafts
+			.push(format!("{key}@{latest_version}"));
+		return Ok(());
+	}
+	if history.identity.kind == ContractKind::Event {
+		let next = next_migration_version(key, latest_version, version_type)?;
+		history.versions.push(SchemaVersion {
+			schema: source.schema,
+			process: None,
+			transition: None,
+		});
+		output.advanced_versions.push(format!("{key}@{next}"));
+		return Ok(());
+	}
+	if latest.schema != source.schema {
+		return Err(MigrationError::PublishedPayloadChanged {
+			name: history.rust_name.clone(),
+			identity: key.to_owned(),
+		});
+	}
+	extend_published_process(key, history, source, output)
+}
+
+/// Append optional accounts to a published instruction's current version.
+///
+/// A request built for the shorter list still parses: the accounts parser
+/// reads a missing trailing optional slot as absent. The published payload is
+/// unchanged, so no version is consumed and no transition is written; any
+/// other account-list change fails closed.
+fn extend_published_process(
+	key: &str,
+	history: &mut ContractHistory,
+	source: CurrentContract,
+	output: &mut CreateMigrationsOutput,
+) -> Result<(), MigrationError> {
+	let latest_version = history
+		.current_version()
+		.expect("decoded migration histories always contain a current version");
+	let latest = &mut history.versions[latest_version as usize];
+	transition::process_transition(
+		&history.identity,
+		&history.rust_name,
+		latest.process.as_ref(),
+		source.process.as_ref(),
+	)?;
+	latest.process = source.process;
+	output
+		.extended_processes
+		.push(format!("{key}@{latest_version}"));
+	Ok(())
+}
+
+/// Whether an unseen history is an instruction snapshot the source released.
+///
+/// A snapshot without an envelope is released when its declaration opts out
+/// with `migrations = false` or the auto policy stops covering instructions.
+/// An enveloped contract is never released this way: dropping its envelope
+/// is a wire-format change.
+fn snapshot_released(
+	history: &ContractHistory,
+	auto: &MigrationAuto,
+	opt_outs: &[CurrentOptOut],
+) -> bool {
+	!history.envelope
+		&& (!auto.contains(ContractKind::Instruction)
+			|| opt_outs.iter().any(|opt_out| {
+				opt_out.kind == ContractKind::Instruction && opt_out.rust_name == history.rust_name
+			}))
 }
 
 /// Write the machine-checked ABI layout test.
@@ -787,7 +985,8 @@ fn first_time_envelopes(
 	let mut names = Vec::new();
 	for source in contracts {
 		let key = source.identity.key();
-		if manifest.contracts.contains_key(&key) {
+		// A snapshot without an envelope adds no byte to the wire.
+		if !source.envelope || manifest.contracts.contains_key(&key) {
 			continue;
 		}
 		names.push(format!("{} ({})", source.rust_name, key));
@@ -795,7 +994,8 @@ fn first_time_envelopes(
 	names
 }
 
-/// Reject an explicit `migrations = false` on a contract already recorded.
+/// Reject an explicit `migrations = false` on a contract recorded with an
+/// envelope.
 fn reject_opt_outs(
 	manifest: &MigrationManifest,
 	opt_outs: &[CurrentOptOut],
@@ -804,7 +1004,9 @@ fn reject_opt_outs(
 		let Ok(history) = manifest.contract_for_source(opt_out.kind, &opt_out.rust_name) else {
 			continue;
 		};
-		return Err(envelope_removal(history));
+		if history.envelope {
+			return Err(envelope_removal(history));
+		}
 	}
 	Ok(())
 }
@@ -920,7 +1122,13 @@ fn check_project_migrations_with_manifest(
 		let latest_version = history.current_version().unwrap_or_else(|| {
 			panic!("validated migration histories always contain a current version")
 		});
-		if latest.schema != source.schema || latest.process != source.process {
+		if history.envelope && !source.envelope {
+			return Err(envelope_removal(history));
+		}
+		if latest.schema != source.schema
+			|| latest.process != source.process
+			|| history.envelope != source.envelope
+		{
 			return Err(MigrationError::SchemaDrift {
 				kind: source.identity.kind.to_string(),
 				name: source.rust_name,
@@ -932,6 +1140,7 @@ fn check_project_migrations_with_manifest(
 			identity: key.clone(),
 			kind: source.identity.kind.to_string(),
 			rust_name: source.rust_name,
+			envelope: history.envelope,
 			current_version: latest_version,
 			published: ledger.ever_published(&key, latest_version),
 			publication_pending: ledger.pending.as_ref().is_some_and(|pending| {
@@ -941,20 +1150,32 @@ fn check_project_migrations_with_manifest(
 					.is_some_and(|published| published.version >= latest_version)
 			}),
 			schema_sha256: latest.schema_sha256(),
-			versions_remaining: manifest
-				.version_type
-				.max_version()
-				.saturating_sub(latest_version),
+			// A snapshot without an envelope never consumes a version.
+			versions_remaining: if history.envelope {
+				manifest
+					.version_type
+					.max_version()
+					.saturating_sub(latest_version)
+			} else {
+				0
+			},
 		});
 	}
 	for (key, history) in &manifest.contracts {
-		if !seen.contains_key(key) {
-			return Err(MigrationError::ContractRemoved {
-				kind: history.identity.kind.to_string(),
+		if seen.contains_key(key) {
+			continue;
+		}
+		if snapshot_released(history, &auto, &current.opt_outs) {
+			return Err(MigrationError::StaleSnapshot {
 				name: history.rust_name.clone(),
 				identity: key.clone(),
 			});
 		}
+		return Err(MigrationError::ContractRemoved {
+			kind: history.identity.kind.to_string(),
+			name: history.rust_name.clone(),
+			identity: key.clone(),
+		});
 	}
 	Ok((statuses, Some(manifest)))
 }
@@ -999,16 +1220,30 @@ pub(crate) fn idl_migration_metadata(
 	start: &Path,
 ) -> Result<Option<IdlMigrationMetadata>, MigrationError> {
 	let project = Project::discover(start)?;
-	let statuses = check_project_migrations(&project)?;
-	if statuses.is_empty() {
+	let (statuses, manifest) = check_project_migrations_with_manifest(&project)?;
+	let Some(manifest) = manifest.filter(|_| !statuses.is_empty()) else {
 		return Ok(None);
-	}
+	};
 
 	Ok(Some(IdlMigrationMetadata {
 		version_type: project.migration_version_type,
 		current_versions: statuses
 			.into_iter()
 			.map(|status| (status.identity, status.current_version))
+			.collect(),
+		historical_events: manifest
+			.contracts
+			.into_iter()
+			.filter(|(_, history)| history.identity.kind == ContractKind::Event)
+			.map(|(key, mut history)| {
+				history.versions.pop();
+				let schemas = history
+					.versions
+					.into_iter()
+					.map(|version| version.schema)
+					.collect();
+				(key, schemas)
+			})
 			.collect(),
 	}))
 }

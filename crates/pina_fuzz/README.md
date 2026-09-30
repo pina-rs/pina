@@ -4,7 +4,7 @@ Fuzz harnesses for the Pina Solana framework, targeting its security-critical de
 
 - **`PinaAccount::try_from_bytes`** — zero-copy account data reinterpretation with discriminator and content validation
 - **`parse_instruction`** — instruction discriminator decoding with program-ID verification
-- **Migration decoding** — generated fixed, compact, instruction, and event transitions over arbitrary historical bytes
+- **Migration decoding** — generated fixed, compact, and instruction transitions over arbitrary historical bytes, and current-only event decoding
 
 ## Structure
 

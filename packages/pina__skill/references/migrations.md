@@ -1,14 +1,21 @@
 # Migrations
 
-Migration is opt-in and program-owned. Accounts, instruction payloads, and events are normalized into the current representation inside the transaction that touches them; clients never migrate and never pass a version. Use this file as the operational checklist; `docs/src/migrations/flow.md` in the Pina repository carries the full runtime decision tree.
+Migration is opt-in and program-owned. Accounts are migrated to the current representation inside the transaction that touches them, and the payload of an instruction that opts in with `migrations` is normalized before its handler runs. Instructions covered only by `auto` are snapshots without a version byte, and events are versioned, never converted. Clients never migrate and never pass a version. Use this file as the operational checklist; `docs/src/migrations/flow.md` in the Pina repository carries the full runtime decision tree.
 
 ## Envelope
 
-Every opted-in contract writes:
+Every enveloped contract writes:
 
 ```text
 [discriminator][schema version][payload]
 ```
+
+| Kind                             | Envelope                        | History                                                 |
+| -------------------------------- | ------------------------------- | ------------------------------------------------------- |
+| Account (`migrations` or `auto`) | yes                             | every version, adjacent transitions                     |
+| Instruction under `auto` only    | no — `[discriminator][payload]` | one snapshot, `"envelope": false`, no transitions       |
+| Instruction with `migrations`    | yes                             | every version, adjacent transitions                     |
+| Event (`migrations` or `auto`)   | yes                             | every version, each with its own schema, no transitions |
 
 - The version sits immediately after the discriminator, is little-endian, and is never written by application source. Macros inject it from `migrations/manifest.json`.
 - Version `0` is the first captured shape. `pina migrations create` allocates later versions; source code never declares a number.
@@ -54,7 +61,7 @@ auto = true # every kind, or ["accounts", "events", "instructions"], or false
 ```
 
 - `auto` accepts `true`, `false`, or a list of exactly `accounts`, `events`, and `instructions`. Unknown names, duplicates, and mixing a boolean with a kind list are configuration errors.
-- Staging a subset is meaningful: instruction envelopes change payload bytes and ripple into CPI call sites, so `auto = ["accounts", "events"]` is a useful intermediate step. Event envelopes are immutable and projected rather than rewritten.
+- `auto` envelopes accounts and events. It records instructions as snapshots without an envelope, so covering them changes no payload byte; opt one instruction into the envelope with `#[instruction(discriminator = X, migrations)]`. Events are versioned, never converted: the program emits only the current version.
 - `pina migrations create` records the resolved policy as `auto` in `migrations/manifest.json` and snapshots every contract of the listed kinds. Macros read the recorded policy, so a declaration covered by `auto` still fails the build with the `pina migrations create` remedy until it has a snapshot.
 - When a policy is recorded, `create` scaffolds a `build.rs`:
 
@@ -66,8 +73,19 @@ fn main() {
 
 Scaffolding is idempotent and never overwrites a hand-written build script; `create` prints the exact line to add instead, and `pina migrations check` fails until the directive is present. The directive exists because proc macros do not re-expand when `pina.toml` or the manifest changes, so a policy flip must trigger expansion from the manifest alone.
 
-- Enabling `auto` on an already-launched program inserts an envelope into every listed contract. `create` records one history entry per newly enveloped contract and the change is a deliberate wire-format change; on a new program it is simply the version-zero baseline.
+- Enabling `auto` on an already-launched program inserts an envelope into every listed account and event. `create` records one history entry per newly enveloped contract and the change is a deliberate wire-format change; on a new program it is simply the version-zero baseline.
 - `migrations = false` cannot remove an envelope the manifest already records, and dropping a kind from `auto` is rejected the same way. Stripping an envelope is a wire-format change that must be recorded deliberately.
+
+### Instructions without an envelope
+
+An instruction covered by `auto` without the `migrations` token keeps `[discriminator][payload]` and is recorded with exactly one version and `"envelope": false`.
+
+- The `#[instruction]` macro fails the build when the struct drifts from the snapshot. While nothing is published, `create` replaces the snapshot.
+- After publication a payload change fails with `PublishedPayloadChanged`: declare a new discriminator, or restore the published fields. Do not add `migrations` to get past it — a published snapshot cannot gain an envelope (`EnvelopeAddition`), because every existing client sends no version byte.
+- Appending optional accounts to a published instruction (snapshot or enveloped) extends its recorded process in place; no version is consumed. `create` prints `Appended optional accounts to <contract>@<version>`.
+- An instruction that stops asking to be recorded (`migrations = false`, or `auto` no longer covering instructions) fails `check` with `StaleSnapshot`; `create` releases the snapshot and nothing on the wire changes.
+- `#[instruction(discriminator = X, migrations)]` opts in to the envelope and adjacent transitions under `migrations/transitions/instruction_<width>_<hex>/`. Removing the token before publication and re-running `create` turns it back into a snapshot. After publication the removal fails with `EnvelopeRemoval`, and the macro fails first with "removing an envelope is a wire-format change that `pina migrations create` must record deliberately".
+- A manifest written at ABI `0.20` recorded every instruction with an envelope. After upgrading, add `migrations` to each published instruction to keep its wire format; the build error names the contract.
 
 ## The loop
 
@@ -83,7 +101,7 @@ pina migrations sync      # create -> build -> generate for unambiguous changes
 - `create` writes `migrations/manifest.json`, `migrations/publications.json`, and `migrations/transitions/<contract>/vN_to_vM.rs`, then prints any manual transition paths and growth warnings. It replaces an unpublished draft in place; once the version appears in a publication receipt or a pending deployment it appends the next version instead.
 - `create` also generates and regenerates `tests/abi_layout.rs`, a committed file carrying one module per contract with its `SCHEMA_SHA256`, sizes, offsets, and field list. It holds constants, not `#[test]` functions, so `cargo test` passing says nothing about it; its force is that `check` fails with "the generated ABI layout test … is stale" whenever the file no longer matches the manifest, which makes it a second drift gate rather than a convenience. Compact modules report `MIN_SIZE` and `MAX_SIZE` including the envelope header and `HEADER_SIZE` excluding it. Never hand-edit it; regenerate with `create`. A change that alters a contract's _physical_ layout — including widening a compact capacity, which moves `MAX_SIZE` but leaves the active bytes alone — makes it stale even when the transition body itself is a no-op.
 - `check` fails on source drift, a missing snapshot, an unfinished or hash-changed transition, a changed published schema, a version-width mismatch, a stale or missing `tests/abi_layout.rs`, or a missing build-script rerun directive. `check --json` stays a status-only array.
-- `status` runs the same drift checks as `check`, prints `kind name vN (draft|published|publication pending)`, and ends with the cost preview below. `status --json` keeps the status array unchanged under `statuses` and adds a `costPreview` object.
+- `status` runs the same drift checks as `check`, prints `kind name vN (draft|published|publication pending, N version(s) remaining)` — or `kind name (<state>, snapshot without envelope)` for a snapshot-only instruction — and ends with the cost preview below. Its JSON carries `envelope` per contract. `status --json` keeps the status array unchanged under `statuses` and adds a `costPreview` object.
 - `pina migrations inspect <ADDRESS> [--url <RPC>] [--json]` reads one on-chain account and reports its stored version against the manifest plus the pending adjacent hops with byte sizes and approximate rent delta. It exits non-zero when the account is stale or from the future.
 - `pina migrations reconcile [--abandon]` resolves an ambiguous pending deployment. Do not start a different deployment while one is pending. `pina deploy` discards its own pending record only when the deploy program provably never started (for example `solana` is not installed), so an install-and-rerun needs no `--abandon`; any deploy command that started and failed keeps the record, because it may have reached the cluster.
 - `pina migrations reconcile --pin-legacy` pins receipts that name published versions without their schema hashes. Every other command refuses such a ledger with `UnpinnedPublication`, because an unpinned receipt cannot prove the published schemas are unchanged. Confirm from version control that `migrations/manifest.json` still records exactly what those receipts shipped before running it; never blank a receipt's `history` to get past a check.
@@ -110,9 +128,9 @@ pina migrations create --manual value           # write the conversion by hand
 pina migrations create --envelope-ack
 ```
 
-Pass it when the change is deliberate — a brand-new contract of a published kind, or a contract whose discriminator changed, also trips this even though nothing live shifts, since the recorded policy did not previously envelope it — and stop when you did not expect it, because the usual cause is a contract you did not mean to opt in. The flag never appears in a plain `create` run, so seeing it named is itself information: something just gained an envelope.
+Pass it when the change is deliberate — a brand-new contract of a published kind, or a contract whose discriminator changed, also trips this even though nothing live shifts, since the recorded policy did not previously envelope it — and stop when you did not expect it, because the usual cause is a contract you did not mean to opt in. The flag never appears in a plain `create` run, so seeing it named is itself information: something just gained an envelope. A snapshot-only instruction adds no byte, so it never trips this guard.
 
-The same guard covers removing an envelope. `migrations = false` on a contract the manifest already records, or dropping a kind from `auto`, fails with `EnvelopeRemoval` and has no override flag: stripping an envelope is a wire-format break you must record deliberately rather than silence.
+The same guard covers removing an envelope. `migrations = false` on a contract the manifest records with an envelope, or dropping a kind from `auto`, fails with `EnvelopeRemoval` and has no override flag: stripping an envelope is a wire-format break you must record deliberately rather than silence.
 
 ## Cost preview
 
@@ -134,12 +152,13 @@ Instruction processes link to account contracts by account-slot name, and only a
 - Do not hand-edit the manifest, the publication ledger, or generated transition files. If `migrations/publications.json` is lost while the manifest records advanced versions, every later check fails because published history must stay pinned; restore the ledger from version control.
 - The manifest records the program ID. While nothing was ever deployed (no receipt and no pending record), `pina migrations create` rebinds the history to a new `declare_id!`, which is the normal path after `pina keys new`; `pina keys` prints that hint. Once anything is published the history belongs to that program, and every command fails with `ProgramIdentityChanged` until the original `declare_id!` is restored.
 - Removing a contract from source fails with `ContractRemoved`, even while it is only a draft. On a program that has never been deployed, every version is a version-0 draft, so deleting `migrations/` and re-running `create` re-baselines losslessly; after publication, retire it with a successor contract instead.
-- The document version is the string `abiVersion` (currently `"0.20"`), a sibling of the on-chain versions and independent of them: an ABI document upgrade never consumes an on-chain migration version. The older integer `formatVersion` counters are retired, and a document written before `abiVersion` existed fails to decode rather than upgrading itself. The same string appears in `migrations/manifest.json` and `migrations/publications.json`.
+- The document version is the string `abiVersion` (currently `"0.21"`), a sibling of the on-chain versions and independent of them: an ABI document upgrade never consumes an on-chain migration version. The older integer `formatVersion` counters are retired, and a document written before `abiVersion` existed fails to decode rather than upgrading itself. The same string appears in `migrations/manifest.json` and `migrations/publications.json`.
+- The contract key `kind:width:hex` (for example `account:1:01`) is the identity, and the wire codec is implied by `abiVersion`; a `0.21` manifest stores neither an `identity` object nor a `codec`, and omits `transition` on a version that has none. A `0.20` document is converted in memory, and the next `create` writes it in the new shape. Leftover `migrations/transitions/event_*` directories are no longer read; delete them.
 - A document whose `abiVersion` is newer than the running build fails closed. Regenerate the documents with the matching CLI instead of editing the field.
 
 ## Generated vs manual transitions
 
-`create` generates automatic transitions for direction-safe fixed-layout changes: exact field copies, insertions and removals that shift later fields, and zero-fill for unambiguous additions, plus the generated size constants and length guard. Byte offsets and `SOURCE_SIZE` always come from the **stored** schema, so a field removed from the middle of a layout leaves the fields after it readable at their original offsets. Type changes (including widening such as `u64` to `u128`), reordering existing fields, compact layouts, ambiguous moves, and a `--manual` answer produce a manual file containing `TODO(pina-manual-migration)`. Replace the body.
+`create` generates automatic transitions for direction-safe fixed-layout changes: exact field copies, insertions and removals that shift later fields, and zero-fill for unambiguous account additions, plus the generated size constants and length guard. An instruction argument is never zero-filled — the handler could not tell that default from a value the client sent — so an instruction transition that adds an argument is always manual. Byte offsets and `SOURCE_SIZE` always come from the **stored** schema, so a field removed from the middle of a layout leaves the fields after it readable at their original offsets. Type changes (including widening such as `u64` to `u128`), reordering existing fields, compact layouts, ambiguous moves, and a `--manual` answer produce a manual file containing `TODO(pina-manual-migration)`. Replace the body.
 
 A finished manual body is valid only for the two layouts it converts between. While its draft's destination schema stays unchanged (for example only an account slot changes), `create` keeps the body. When you change the draft's layout again, `create` moves the finished body to `vN_to_vM.rs.stale`, writes a fresh stub for the new offsets, and prints the move. The stub's `TODO` blocks the build until you port the old body to the new offsets; delete the `.stale` file once you have. Never copy the old body back unchanged: it compiles against the new layout and misplaces bytes without any error.
 
@@ -185,7 +204,7 @@ pub(crate) fn migrate(data: &mut [u8]) {
 - Read source bytes at their **stored** offsets and write destination bytes at their **destination** offsets. When a field moves, copy it before overwriting the region it came from; generated automatic transitions order their `copy_within` calls for exactly that reason, so preserve the ordering they establish.
 
 - A manual account `migrate` returns `()` and must be total for the accepted source: it must fully initialize every active destination byte. It cannot reject once funding or resizing may have happened — a failure there aborts the instruction instead of returning a catchable error. Validate rejectable value constraints in `target_size`/`working_size`, which run before any mutation.
-- A manual instruction or event `migrate` returns `bool` (`false` rejects) and runs in scratch space, so it may reject invalid semantic values before dispatch.
+- A manual instruction `migrate` returns `bool` (`false` rejects) and runs in scratch space, so it may reject invalid semantic values before dispatch. Events have no transitions.
 
 A **compact** contract replaces the plain fixed stub with a three-function shape, because its destination length depends on the stored values rather than the schema alone:
 
@@ -227,8 +246,8 @@ MigrateAccount {
 
 Each account climbs its own ladder one adjacent step at a time: plan from the exact historical layout without retaining borrows, fund the rent deficit, resize, apply, validate the destination, then commit the version last. Accounts in one instruction migrate independently. A failure after the first mutation aborts the instruction so Solana rolls back every resize, transfer, and byte write. The payer is the instruction's declared migration payer, a signer or a program PDA signing through `invoke_signed`; growth transfers only the deficit, capped by `max_lamports`, and never refunds. A client generated before the instruction gained its optional migration payer cannot fund growth, and its transaction fails with `MigrationRequired`.
 
-- Historical instruction payloads project forward through generated `T::with_current_instruction_data(data, |current| ...)`: the workspace is cleared, each adjacent step runs and validates, and the current version marker is committed last. Unknown and future versions are rejected without trial decoding. Handlers always see current types.
-- Events are never rewritten on chain. `normalize_event_data` and generated `with_current_event_data` project historical log bytes into caller-owned scratch space and report `source_version()` (which schema actually emitted the log) and `was_migrated()`. Keep golden log bytes in `pina_test::HistoricalEvent`.
+- `#[discriminator(entrypoint)]` routes every instruction the manifest records with an envelope through its generated `process_versioned`: the workspace is cleared, each adjacent step runs and validates, the current version marker is committed last, and then `ProcessAccountInfos::process_from_version(self, data, source_version)` runs. Its default forwards to `process(data)`, so a handler reads `data` as the current layout and never normalizes it itself; override `process_from_version` only to tell a converted field from one the client sent. A hand-written dispatcher calls `<Instruction>::process_versioned(parsed_accounts, data)`, and `pina::normalize_instruction_data` returns a `NormalizedInstruction` (`as_bytes()`, `source_version()`, `was_migrated()`). Unknown and future versions are rejected without trial decoding.
+- Events are never rewritten or converted. The program emits only the current version; a changed event appends a version with its own schema and no transition file. Generated clients decode each earlier version as its own `<Event>V<n>` event. Keep golden log bytes in `pina_test::HistoricalEvent` and decode them with the generated event for their version.
 - The instruction process contract stays compatible only when existing account slots form an identical prefix and every new slot is appended at the end and optional. Any other change (reorder, insertion, removal, rename, signer/writable/PDA/known-address change, new required account) needs a new instruction discriminator.
 - A rolled-back binary does not roll back accounts. Accounts written at version N are future versions for a binary whose current is N-1 and are rejected; rollback means redeploying an executable built from the current ABI history.
 
@@ -253,12 +272,12 @@ If a writable touch genuinely cannot be scheduled, generated accounts expose a r
 
 ## Budget failures
 
-| Error                            | Raised when                                                                                                                                                                                                                 | Remedy                                                                                                                                                                                                |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MigrationUnavailable`           | A stale account is further behind than the generated `MAX_INLINE_STEPS` (at most 8 adjacent transitions), the plan is not exactly the next adjacent step, or a reserved-instruction slot index is past the 63-slot bitmask. | Rebalance the history into more frequent, smaller versions and migrate accounts before they fall further behind. The reserved `Migrate` route is the out-of-band path but enforces the same step cap. |
-| `MigrationWorkspaceExceeded`     | A generated transition's `WORKING_SIZE` is below its `CURRENT_SIZE`, or a caller-supplied workspace is shorter than `WORKING_SIZE`.                                                                                         | Give the workspace at least `WORKING_SIZE` bytes. Generated `with_current_*` helpers already size it at the compile-time maximum, which stays at or below `MAX_MIGRATION_WORKSPACE` (1,024 bytes).    |
-| `MigrationAccountGrowthExceeded` | One step would grow the account past the runtime reallocation limit, `MAX_PERMITTED_DATA_INCREASE` (10,240 bytes), over the account's size at instruction start.                                                            | Publish intermediate versions so the change grows across separate transactions; no lamport budget raises this limit.                                                                                  |
-| `MigrationLamportBudgetExceeded` | The cumulative rent deficit of the planned steps exceeds the `max_lamports` the program passes to `MigrateAccount` or `MigrateContext`.                                                                                     | Raise the program's `max_lamports` constant (for example `MAX_INLINE_MIGRATION_LAMPORTS`) to cover the quoted deficit. `create` prints the estimated deficit for each growing transition.             |
+| Error                            | Raised when                                                                                                                                                                                                                 | Remedy                                                                                                                                                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MigrationUnavailable`           | A stale account is further behind than the generated `MAX_INLINE_STEPS` (at most 8 adjacent transitions), the plan is not exactly the next adjacent step, or a reserved-instruction slot index is past the 63-slot bitmask. | Rebalance the history into more frequent, smaller versions and migrate accounts before they fall further behind. The reserved `Migrate` route is the out-of-band path but enforces the same step cap.                 |
+| `MigrationWorkspaceExceeded`     | A generated transition's `WORKING_SIZE` is below its `CURRENT_SIZE`, or a caller-supplied workspace is shorter than `WORKING_SIZE`.                                                                                         | Give the workspace at least `WORKING_SIZE` bytes. The generated `with_current_instruction_data` helper already sizes it at the compile-time maximum, which stays at or below `MAX_MIGRATION_WORKSPACE` (1,024 bytes). |
+| `MigrationAccountGrowthExceeded` | One step would grow the account past the runtime reallocation limit, `MAX_PERMITTED_DATA_INCREASE` (10,240 bytes), over the account's size at instruction start.                                                            | Publish intermediate versions so the change grows across separate transactions; no lamport budget raises this limit.                                                                                                  |
+| `MigrationLamportBudgetExceeded` | The cumulative rent deficit of the planned steps exceeds the `max_lamports` the program passes to `MigrateAccount` or `MigrateContext`.                                                                                     | Raise the program's `max_lamports` constant (for example `MAX_INLINE_MIGRATION_LAMPORTS`) to cover the quoted deficit. `create` prints the estimated deficit for each growing transition.                             |
 
 Also expect `MigrationRequired` (a stale account was touched without a migration path) and `InvalidMigrationVersion` (the stored version is unknown or newer than the program).
 
@@ -266,7 +285,7 @@ Builds before the split reported the workspace, growth, and lamport failures as 
 
 ## Version exhaustion
 
-Versions are counted per contract, not per program: each account, instruction, and event owns an independent history starting at `0`, so a `u8` program gives every contract its own 255-version budget. `pina migrations status` prints what is left (`account State v3 (published, 252 version(s) remaining)`), and `status --json`/`check --json` carry it as `versionsRemaining`.
+Versions are counted per contract, not per program: each account, instruction, and event owns an independent history starting at `0`, so a `u8` program gives every contract its own 255-version budget. A snapshot-only instruction never consumes a version. `pina migrations status` prints what is left (`account State v3 (published, 252 version(s) remaining)`), and `status --json`/`check --json` carry it as `versionsRemaining`.
 
 The width is program-wide and freezes at the first persistent publication, so it cannot be widened after release. Pre-launch, the only widening path is deleting `migrations/` and re-running `create` with the wider setting, which re-baselines history; there is nothing deployed to stay compatible with yet.
 

@@ -13,26 +13,21 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 @immutable
 class ProposalActivateInstructionData {
-  const ProposalActivateInstructionData()
-    : discriminator = 5,
-      migrationVersion = 0;
+  const ProposalActivateInstructionData() : discriminator = 5;
 
   final int discriminator;
-  final int migrationVersion;
 }
 
 Encoder<ProposalActivateInstructionData>
 getProposalActivateInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('migrationVersion', getU8Encoder()),
   ]);
 
   return transformEncoder(
     structEncoder,
     (ProposalActivateInstructionData value) => <String, Object?>{
       'discriminator': 5,
-      'migrationVersion': 0,
     },
   );
 }
@@ -41,7 +36,6 @@ Decoder<ProposalActivateInstructionData>
 getProposalActivateInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('migrationVersion', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -57,7 +51,6 @@ getProposalActivateInstructionDataDecoder() {
     int offset,
   ) {
     getConstantDecoder(getU8Encoder().encode(5)).read(bytes, offset + 0);
-    getConstantDecoder(getU8Encoder().encode(0)).read(bytes, offset + 1);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);

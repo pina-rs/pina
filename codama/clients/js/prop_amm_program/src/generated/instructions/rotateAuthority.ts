@@ -38,22 +38,13 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import {
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PROP_AMM_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const ROTATE_AUTHORITY_DISCRIMINATOR = 2;
 
 export function getRotateAuthorityDiscriminatorBytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(ROTATE_AUTHORITY_DISCRIMINATOR);
-}
-
-export const ROTATE_AUTHORITY_DISCRIMINATOR2 = 0;
-
-export function getRotateAuthorityDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(ROTATE_AUTHORITY_DISCRIMINATOR2);
 }
 
 export type RotateAuthorityInstruction<
@@ -78,7 +69,6 @@ export type RotateAuthorityInstruction<
 
 export type RotateAuthorityInstructionData = {
 	discriminator: number;
-	migrationVersion: number;
 	newAuthority: Address;
 };
 
@@ -89,27 +79,23 @@ export function getRotateAuthorityInstructionDataEncoder(): FixedSizeEncoder<
 > {
 	return transformEncoder(
 		getStructEncoder([["discriminator", getU8Encoder()], [
-			"migrationVersion",
-			getU8Encoder(),
-		], ["newAuthority", getAddressEncoder()]]),
-		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
+			"newAuthority",
+			getAddressEncoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 2 }),
 	);
 }
 
 export function getRotateAuthorityInstructionDataDecoder(): FixedSizeDecoder<
 	RotateAuthorityInstructionData
 > {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				ROTATE_AUTHORITY_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["newAuthority", getAddressDecoder()],
-	]);
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			ROTATE_AUTHORITY_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["newAuthority", getAddressDecoder()]]);
 }
 
 export function getRotateAuthorityInstructionDataCodec(): FixedSizeCodec<
