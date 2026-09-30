@@ -21,6 +21,8 @@ pub enum CounterInstruction {
 
 fn main() {
 	assert_eq!(CounterInstruction::MAX_INSTRUCTION_ACCOUNTS, 3);
+	// Exact routes keep the bounded array: the widest route plus a spare slot.
+	assert_eq!(CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY, 4);
 	assert_eq!(
 		<InitializeAccounts<'static> as ParseAccounts<'static>>::ACCOUNT_BOUND,
 		3,

@@ -286,8 +286,28 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			})
 			.collect::<Vec<_>>();
 
+		// The limit counts the same positional slots but has no slot for a
+		// `remaining` slice: a struct with one consumes every account left.
+		let limit = if remaining_field.is_some() {
+			quote! { <Self as #crate_path::ParseAccounts #ty_generics>::UNBOUNDED }
+		} else {
+			let nested_limits = field_kinds
+				.iter()
+				.filter(|(_, kind)| *kind == AccountFieldKind::Nested)
+				.map(|(field, _)| {
+					let ty = &field.ty;
+
+					quote! {
+						.saturating_add(<#ty as #crate_path::ParseAccounts #ty_generics>::ACCOUNT_LIMIT)
+					}
+				});
+
+			quote! { #positional #(#nested_limits)* }
+		};
+
 		quote! {
 			const ACCOUNT_BOUND: usize = #positional #(#nested)*;
+			const ACCOUNT_LIMIT: usize = #limit;
 		}
 	};
 

@@ -200,7 +200,7 @@ The PDA-creation builders share one allocation spine (`CompactCreationTarget::al
 
 The loader does not reject accounts beyond the array; it skips them. An array sized to exactly the widest instruction therefore hides an extra trailing account from `finish_exact`, and an over-supplied instruction that pina would otherwise reject with `TooManyAccountKeys` runs instead. The safe bound is one slot larger: the spare slot keeps the first extra account visible, so every instruction whose accounts struct ends with `finish_exact` still rejects it, however many extras follow.
 
-`#[discriminator(entrypoint)]` computes that bound as `ENTRYPOINT_ACCOUNT_CAPACITY`: one more than the widest routed accounts struct and the reserved `Migrate` route's slots, or the full 255 when a route accepts unbounded trailing accounts. Pass it as the second argument when it is five or less:
+`#[discriminator(entrypoint)]` computes that bound as `ENTRYPOINT_ACCOUNT_CAPACITY`: one more than the most accounts any route accepts, which is each accounts struct's `ACCOUNT_LIMIT` and the reserved `Migrate` route's slot count. A route that accepts any number of accounts makes it the full 255: a struct with a `#[pina(remaining)]` slice, directly or through a nested account group, and a hand-written parser that declares no limit. The declared `ACCOUNT_BOUND`, which counts a trailing slice as one slot, is not a limit, so the capacity never uses it. Pass the capacity as the second argument when it is five or less:
 
 ```rust,ignore
 nostd_entrypoint!(

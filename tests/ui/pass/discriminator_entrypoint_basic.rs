@@ -1,6 +1,7 @@
 //! The generated dispatch must compile and derive `MAX_INSTRUCTION_ACCOUNTS`
 //! from every route's declared bound, including a per-variant override and a
-//! trailing `remaining` slice.
+//! trailing `remaining` slice, while `ENTRYPOINT_ACCOUNT_CAPACITY` follows the
+//! routes' limits.
 
 use pina::*;
 
@@ -65,5 +66,19 @@ fn main() {
 	assert_eq!(
 		<SweepAccounts<'static> as ParseAccounts<'static>>::ACCOUNT_BOUND,
 		2,
+	);
+	// The slice counts one declared slot but accepts any number of accounts, so
+	// the entrypoint array falls back to the transaction maximum.
+	assert_eq!(
+		<SweepAccounts<'static> as ParseAccounts<'static>>::ACCOUNT_LIMIT,
+		<SweepAccounts<'static> as ParseAccounts<'static>>::UNBOUNDED,
+	);
+	assert_eq!(
+		<InitializeAccounts<'static> as ParseAccounts<'static>>::ACCOUNT_LIMIT,
+		2,
+	);
+	assert_eq!(
+		Instruction::ENTRYPOINT_ACCOUNT_CAPACITY,
+		pinocchio::MAX_TX_ACCOUNTS,
 	);
 }

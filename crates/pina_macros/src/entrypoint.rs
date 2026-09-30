@@ -229,6 +229,26 @@ pub(crate) fn expand(
 	let bound_values = routes.iter().map(route_bound).collect::<Vec<_>>();
 	let bound_count = Literal::usize_unsuffixed(bound_values.len());
 
+	// The entrypoint array must hold every account a route could accept, which
+	// is the parser's limit, not its declared bound: a `remaining` slice counts
+	// one declared slot but consumes every account left.
+	let route_limit = |route: &Route| {
+		let accounts = &route.accounts;
+
+		quote_spanned! {accounts.span()=>
+			{
+				const fn __pina_account_limit<'a, T>() -> usize
+				where
+					T: #crate_path::ParseAccounts<'a>,
+				{
+					<T as #crate_path::ParseAccounts<'a>>::ACCOUNT_LIMIT
+				}
+				__pina_account_limit::<'static, #accounts>()
+			}
+		}
+	};
+	let limit_values = routes.iter().map(route_limit).collect::<Vec<_>>();
+
 	let maximum_accounts = if let Some(expression) = &args.maximum_accounts {
 		quote!(#expression)
 	} else {
@@ -252,6 +272,7 @@ pub(crate) fn expand(
 			let assertions = routes.iter().map(|route| {
 				let name = route.accounts_name.to_string();
 				let bound = route_bound(route);
+				let limit = route_limit(route);
 
 				quote! {
 					const _: () = assert!(
@@ -265,13 +286,13 @@ pub(crate) fn expand(
 						),
 					);
 					const _: () = assert!(
-						#bound < #enum_name::ENTRYPOINT_ACCOUNT_CAPACITY
+						#limit < #enum_name::ENTRYPOINT_ACCOUNT_CAPACITY
 							|| #enum_name::ENTRYPOINT_ACCOUNT_CAPACITY
 								== #crate_path::pinocchio::MAX_TX_ACCOUNTS,
 						concat!(
-							"ENTRYPOINT_ACCOUNT_CAPACITY must leave a spare slot past `",
+							"ENTRYPOINT_ACCOUNT_CAPACITY must leave a spare slot past every account `",
 							#name,
-							"`, or `finish_exact` cannot see an extra trailing account",
+							"` can accept, or `finish_exact` cannot see an extra trailing account",
 						),
 					);
 				}
@@ -304,7 +325,7 @@ pub(crate) fn expand(
 	let migrate_helper = migration_ladder.as_ref().map(|route| &route.helper);
 	let migrate_prelude = migration_ladder.as_ref().map(|route| &route.prelude);
 	let migrate_slots = migration_ladder.as_ref().map(|route| route.account_slots);
-	let capacity_values = capacity_values(&bound_values, migrate_slots);
+	let capacity_values = capacity_values(&limit_values, migrate_slots);
 	let capacity_count = Literal::usize_unsuffixed(capacity_values.len());
 
 	// `macro_export` lifts the name into the crate root regardless of the module
@@ -362,8 +383,14 @@ pub(crate) fn expand(
 			};
 
 			/// The account-array size to pass to `nostd_entrypoint!` as its second
-			/// argument: one slot more than any route reads, or the transaction
-			/// maximum when a route accepts unbounded trailing accounts.
+			/// argument: one slot more than any route can accept, or the transaction
+			/// maximum when a route accepts any number of accounts.
+			///
+			/// Each route contributes its accounts struct's `ACCOUNT_LIMIT`, not its
+			/// declared `ACCOUNT_BOUND`: a `#[pina(remaining)]` slice, directly or in
+			/// a nested account group, and a hand-written parser that declares no
+			/// limit all make it the transaction maximum, so such a route sees every
+			/// account it is sent.
 			///
 			/// Pinocchio's deserializer walks accounts five at a time, so an array
 			/// of five or fewer slots drops that loop and shrinks the deployed
@@ -434,17 +461,17 @@ pub(crate) fn expand(
 }
 
 /// The account counts `ENTRYPOINT_ACCOUNT_CAPACITY` must exceed: every
-/// route's declared bound, then the reserved `Migrate` route's slots when the
-/// program has one.
+/// route's `ACCOUNT_LIMIT`, then the reserved `Migrate` route's slots when
+/// the program has one.
 ///
-/// The reserved route reads its slots straight from the account slice and
-/// treats a missing slot as omitted, so the entrypoint's array must hold all of
-/// them as well as every routed instruction's declared accounts.
+/// The reserved route reads its slots straight from the account slice, treats
+/// a missing slot as omitted, and fails on an account past its last slot, so its
+/// slot count is a limit like any route's.
 fn capacity_values(
-	bound_values: &[proc_macro2::TokenStream],
+	limit_values: &[proc_macro2::TokenStream],
 	migrate_slots: Option<usize>,
 ) -> Vec<proc_macro2::TokenStream> {
-	bound_values
+	limit_values
 		.iter()
 		.cloned()
 		.chain(migrate_slots.map(|slots| {
@@ -567,19 +594,24 @@ fn migrate_emission(
 		Primitive::U64 => quote!(is_migrate_instruction_u64),
 	};
 
+	let slots = Literal::usize_unsuffixed(MIGRATE_LEADING_SLOTS + ladder.len());
+
 	let helper = quote! {
 		/// Routes the reserved framework `Migrate` instruction.
 		///
 		/// Slots are `[payer, systemProgram, ...migratable]`, in the order declared by
 		/// `migrations(...)`. A slot holding the program address, or an index past the
 		/// end of the slice, is treated as omitted, so a client sends only the accounts
-		/// it needs and every slot draws from one shared lamport budget.
+		/// it needs and every slot draws from one shared lamport budget. An account
+		/// past the last slot is never read or validated, and it fails the
+		/// instruction, so the slot count is the most accounts the route accepts and
+		/// `ENTRYPOINT_ACCOUNT_CAPACITY` can bound the array by it.
 		///
 		/// # Errors
 		///
-		/// Returns `IncorrectProgramId` when `program_id` is not this program, then
-		/// inherits `MigrateContext`'s layout validation and each slot's migration
-		/// failures.
+		/// Returns `IncorrectProgramId` when `program_id` is not this program and
+		/// `TooManyAccountKeys` when an account follows the last slot, then inherits
+		/// `MigrateContext`'s layout validation and each slot's migration failures.
 		pub fn process_migrate(
 			program_id: & #crate_path::Address,
 			accounts: &mut [#crate_path::AccountView],
@@ -596,9 +628,19 @@ fn migrate_emission(
 			if program_id != &#program_id {
 				return Err(#crate_path::ProgramError::IncorrectProgramId);
 			}
+			// The steps only see the declared slots. An account past them fails the
+			// instruction after the steps, which the runtime rolls back; returning
+			// before them measured up to 1.6 KB larger, because LLVM restructures
+			// the inlined steps around that early exit.
+			let accounts_len = accounts.len();
+			let accounts = &mut accounts[..accounts_len.min(#slots)];
 
 			let mut migrate = #crate_path::MigrateContext::new(program_id, accounts, #budget)?;
 			#(#steps)*
+
+			if accounts_len > #slots {
+				return Err(#crate_path::PinaProgramError::TooManyAccountKeys.into());
+			}
 
 			Ok(())
 		}
@@ -915,6 +957,14 @@ mod tests {
 		assert!(helper.contains("run_optional::<ManualState>(3)"));
 		assert!(helper.contains("run_optional::<CompactState>(4)"));
 		assert!(helper.contains("run_optional::<State>(5)"));
+		// An account past the last slot is rejected, so the slot count bounds
+		// the entrypoint array.
+		assert!(
+			helper.contains("letaccounts=&mutaccounts[..accounts_len.min(6)];"),
+			"helper: {helper}"
+		);
+		assert!(helper.contains("ifaccounts_len>6{"), "helper: {helper}");
+		assert!(helper.contains("PinaProgramError::TooManyAccountKeys"));
 		// The reserved path validates the program id before migrating anything.
 		assert!(helper.contains("ProgramError::IncorrectProgramId"));
 		// The prelude routes through the associated helper.
@@ -1022,6 +1072,28 @@ mod tests {
 			expanded.contains("highest+1"),
 			"the capacity must add the spare slot; got: {expanded}"
 		);
+	}
+
+	/// The capacity folds each route's limit, not its declared bound, which
+	/// counts a `remaining` slice as a single slot.
+	#[test]
+	fn entrypoint_account_capacity_folds_route_limits() {
+		let expanded = expand_with(
+			quote!(entrypoint),
+			quote!(
+				pub enum CounterInstruction {
+					Run = 0,
+				}
+			),
+		);
+		let capacity = expanded
+			.split("pubconstENTRYPOINT_ACCOUNT_CAPACITY:usize")
+			.nth(1)
+			.and_then(|rest| rest.split("pubfnprocess_instruction").next())
+			.expect("the capacity must be generated");
+
+		assert!(capacity.contains("ACCOUNT_LIMIT"), "capacity: {capacity}");
+		assert!(!capacity.contains("ACCOUNT_BOUND"), "capacity: {capacity}");
 	}
 
 	#[test]
