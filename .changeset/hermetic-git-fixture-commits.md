@@ -1,8 +1,6 @@
 ---
 pina_cli: fix
 pina: none
-# `pina_root` propagates from every core-group change; unpublished, so no bump.
-pina_root: none
 ---
 
 # Isolate CLI test fixture commits from global git config
