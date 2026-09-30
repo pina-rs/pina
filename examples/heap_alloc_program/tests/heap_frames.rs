@@ -39,14 +39,21 @@ fn program_id() -> Pubkey {
 	Pubkey::new_from_array(ID.to_bytes())
 }
 
+/// `Fill` instruction data: discriminator, bytes, fill.
+///
+/// ABI 0.21 records a plain `#[instruction]` as a snapshot, so the payload has
+/// no version byte after the discriminator.
 fn fill_instruction(bytes: u32, fill: u8) -> Instruction {
 	let mut data = Vec::with_capacity(FillInstruction::SIZE);
 	data.push(HeapInstruction::Fill as u8);
-	data.push(0);
 	data.extend_from_slice(&bytes.to_le_bytes());
 	data.push(fill);
 
-	assert_eq!(data.len(), FillInstruction::SIZE);
+	assert_eq!(
+		data.len(),
+		FillInstruction::SIZE,
+		"Fill encoding must match the generated SIZE"
+	);
 
 	Instruction {
 		program_id: program_id(),

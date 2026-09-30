@@ -34,6 +34,9 @@ const PROGRAM_ID: Pubkey = Pubkey::new_from_array([
 const INIT: u8 = 0;
 const TOUCH: u8 = 1;
 const INSPECT: u8 = 2;
+/// `StoreState`'s stored migration version. Only the account carries a
+/// version byte: ABI 0.21 records these instructions as snapshots, so their
+/// payloads start right after the discriminator.
 const CURRENT_VERSION: u8 = 0;
 
 fn create_mollusk() -> Mollusk {
@@ -64,7 +67,7 @@ fn derive_store(authority: &Pubkey) -> (Pubkey, u8) {
 fn init_ix(authority: &Pubkey, store: &Pubkey, bump: u8) -> Instruction {
 	Instruction::new_with_bytes(
 		PROGRAM_ID,
-		&[INIT, CURRENT_VERSION, bump],
+		&[INIT, bump],
 		vec![
 			AccountMeta::new(*authority, true),
 			AccountMeta::new(*store, false),
@@ -83,7 +86,7 @@ fn touch_ix(authority: &Pubkey, store: Option<&Pubkey>) -> Instruction {
 
 	Instruction::new_with_bytes(
 		PROGRAM_ID,
-		&[TOUCH, CURRENT_VERSION],
+		&[TOUCH],
 		vec![AccountMeta::new_readonly(*authority, true), store_meta],
 	)
 }
@@ -100,7 +103,7 @@ fn inspect_ix(authority: &Pubkey, store: Option<&Pubkey>, witness: Option<&Pubke
 		Some(witness) => metas.push(AccountMeta::new_readonly(*witness, true)),
 		None => metas.push(AccountMeta::new_readonly(PROGRAM_ID, false)),
 	}
-	Instruction::new_with_bytes(PROGRAM_ID, &[INSPECT, CURRENT_VERSION], metas)
+	Instruction::new_with_bytes(PROGRAM_ID, &[INSPECT], metas)
 }
 
 fn payer_account() -> Account {

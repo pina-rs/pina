@@ -14,7 +14,7 @@ import {
 } from "../../../clients/js/profile_program/src/generated/pinaPodCodecs";
 
 describe("profile generated codecs", () => {
-	test("instruction encoders prepend their migration envelope", () => {
+	test("instruction encoders start the payload right after the discriminator", () => {
 		const initialize = getInitializeInstructionDataEncoder().encode({
 			bump: 42,
 			name: "A",
@@ -22,10 +22,12 @@ describe("profile generated codecs", () => {
 		});
 		const addTag = getAddTagInstructionDataEncoder().encode({ tag: 10 });
 
-		expect(initialize).toHaveLength(165);
-		expect(Array.from(initialize.slice(0, 5))).toEqual([0, 0, 42, 1, 65]);
-		expect(addTag).toHaveLength(10);
-		expect(Array.from(addTag.slice(0, 3))).toEqual([2, 0, 10]);
+		// ABI 0.21 records these instructions as snapshots, so no migration
+		// version byte sits between the discriminator and the payload.
+		expect(initialize).toHaveLength(164);
+		expect(Array.from(initialize.slice(0, 4))).toEqual([0, 42, 1, 65]);
+		expect(addTag).toHaveLength(9);
+		expect(Array.from(addTag.slice(0, 2))).toEqual([2, 10]);
 	});
 
 	test("account decoder consumes the migration envelope before state", () => {
