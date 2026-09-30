@@ -369,7 +369,9 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
             )
             .map(|_| ())
     }
-    ///Load and validate `CounterState` and its stored-bump PDA address in one pass.
+    /**Load and validate `CounterState` and its stored-bump PDA address in one pass.
+
+Re-derives the address from the stored `bump` with `sha256` and compares it, without the ed25519 curve check `create_program_address` adds: the program created the account through `invoke_signed`, which only signs for an off-curve address. See `pina::is_derived_address`.*/
     #[inline(always)]
     pub fn load_pda<'account>(
         account: &'account pina::AccountView,
@@ -379,19 +381,21 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
         pina::Ref<'account, <Self as pina::PinaPodFixed>::Zc>,
         pina::ProgramError,
     > {
-        let account_address = *account.address();
+        let account_view = *account;
         let state = pina::AsAccount::as_account::<Self>(account, program_id)?;
-        let seeds = Self::seeds(authority).with_bump(state.bump);
-        let expected_address = pina::create_program_address(
-            &seeds.as_slices(),
+        if !pina::is_derived_address(
+            account_view.address(),
+            &Self::seeds(authority).as_slices(),
+            state.bump,
             program_id,
-        )?;
-        if account_address != expected_address {
+        ) {
             return Err(pina::ProgramError::InvalidSeeds);
         }
         Ok(state)
     }
-    ///Mutably load and validate `CounterState` and its stored-bump PDA address in one pass.
+    /**Mutably load and validate `CounterState` and its stored-bump PDA address in one pass.
+
+Re-derives the address from the stored `bump` with `sha256` and compares it, without the ed25519 curve check `create_program_address` adds: the program created the account through `invoke_signed`, which only signs for an off-curve address. See `pina::is_derived_address`.*/
     #[inline(always)]
     pub fn load_pda_mut<'account>(
         account: &'account mut pina::AccountView,
@@ -401,14 +405,14 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
         pina::RefMut<'account, <Self as pina::PinaPodFixed>::Zc>,
         pina::ProgramError,
     > {
-        let account_address = *account.address();
+        let account_view = *account;
         let state = pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
-        let seeds = Self::seeds(authority).with_bump(state.bump);
-        let expected_address = pina::create_program_address(
-            &seeds.as_slices(),
+        if !pina::is_derived_address(
+            account_view.address(),
+            &Self::seeds(authority).as_slices(),
+            state.bump,
             program_id,
-        )?;
-        if account_address != expected_address {
+        ) {
             return Err(pina::ProgramError::InvalidSeeds);
         }
         Ok(state)
@@ -1051,7 +1055,9 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
             )
             .map(|_| ())
     }
-    ///Load and validate `AllSeedState` and its stored-bump PDA address in one pass.
+    /**Load and validate `AllSeedState` and its stored-bump PDA address in one pass.
+
+Re-derives the address from the stored `bump` with `sha256` and compares it, without the ed25519 curve check `create_program_address` adds: the program created the account through `invoke_signed`, which only signs for an off-curve address. See `pina::is_derived_address`.*/
     #[inline(always)]
     pub fn load_pda<'account>(
         account: &'account ::pina::AccountView,
@@ -1066,20 +1072,21 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
         ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
         ::pina::ProgramError,
     > {
-        let account_address = *account.address();
+        let account_view = *account;
         let state = ::pina::AsAccount::as_account::<Self>(account, program_id)?;
-        let seeds = Self::seeds(authority, amount, side, tag, width, height)
-            .with_bump(state.bump);
-        let expected_address = ::pina::create_program_address(
-            &seeds.as_slices(),
+        if !::pina::is_derived_address(
+            account_view.address(),
+            &Self::seeds(authority, amount, side, tag, width, height).as_slices(),
+            state.bump,
             program_id,
-        )?;
-        if account_address != expected_address {
+        ) {
             return Err(::pina::ProgramError::InvalidSeeds);
         }
         Ok(state)
     }
-    ///Mutably load and validate `AllSeedState` and its stored-bump PDA address in one pass.
+    /**Mutably load and validate `AllSeedState` and its stored-bump PDA address in one pass.
+
+Re-derives the address from the stored `bump` with `sha256` and compares it, without the ed25519 curve check `create_program_address` adds: the program created the account through `invoke_signed`, which only signs for an off-curve address. See `pina::is_derived_address`.*/
     #[inline(always)]
     pub fn load_pda_mut<'account>(
         account: &'account mut ::pina::AccountView,
@@ -1094,15 +1101,14 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
         ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
         ::pina::ProgramError,
     > {
-        let account_address = *account.address();
+        let account_view = *account;
         let state = ::pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
-        let seeds = Self::seeds(authority, amount, side, tag, width, height)
-            .with_bump(state.bump);
-        let expected_address = ::pina::create_program_address(
-            &seeds.as_slices(),
+        if !::pina::is_derived_address(
+            account_view.address(),
+            &Self::seeds(authority, amount, side, tag, width, height).as_slices(),
+            state.bump,
             program_id,
-        )?;
-        if account_address != expected_address {
+        ) {
             return Err(::pina::ProgramError::InvalidSeeds);
         }
         Ok(state)
@@ -1843,7 +1849,9 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
             )
             .map(|_| ())
     }
-    ///Load and validate `TodoState` and its stored-bump PDA address in one pass.
+    /**Load and validate `TodoState` and its stored-bump PDA address in one pass.
+
+Re-derives the address from the stored `bump` with `sha256` and compares it, without the ed25519 curve check `create_program_address` adds: the program created the account through `invoke_signed`, which only signs for an off-curve address. See `pina::is_derived_address`.*/
     #[inline(always)]
     pub fn load_pda<'account>(
         account: &'account ::pina::AccountView,
@@ -1853,19 +1861,21 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
         ::pina::Ref<'account, <Self as ::pina::PinaPodFixed>::Zc>,
         ::pina::ProgramError,
     > {
-        let account_address = *account.address();
+        let account_view = *account;
         let state = ::pina::AsAccount::as_account::<Self>(account, program_id)?;
-        let seeds = Self::seeds(owner).with_bump(state.bump);
-        let expected_address = ::pina::create_program_address(
-            &seeds.as_slices(),
+        if !::pina::is_derived_address(
+            account_view.address(),
+            &Self::seeds(owner).as_slices(),
+            state.bump,
             program_id,
-        )?;
-        if account_address != expected_address {
+        ) {
             return Err(::pina::ProgramError::InvalidSeeds);
         }
         Ok(state)
     }
-    ///Mutably load and validate `TodoState` and its stored-bump PDA address in one pass.
+    /**Mutably load and validate `TodoState` and its stored-bump PDA address in one pass.
+
+Re-derives the address from the stored `bump` with `sha256` and compares it, without the ed25519 curve check `create_program_address` adds: the program created the account through `invoke_signed`, which only signs for an off-curve address. See `pina::is_derived_address`.*/
     #[inline(always)]
     pub fn load_pda_mut<'account>(
         account: &'account mut ::pina::AccountView,
@@ -1875,14 +1885,14 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
         ::pina::RefMut<'account, <Self as ::pina::PinaPodFixed>::Zc>,
         ::pina::ProgramError,
     > {
-        let account_address = *account.address();
+        let account_view = *account;
         let state = ::pina::AsAccount::as_account_mut::<Self>(account, program_id)?;
-        let seeds = Self::seeds(owner).with_bump(state.bump);
-        let expected_address = ::pina::create_program_address(
-            &seeds.as_slices(),
+        if !::pina::is_derived_address(
+            account_view.address(),
+            &Self::seeds(owner).as_slices(),
+            state.bump,
             program_id,
-        )?;
-        if account_address != expected_address {
+        ) {
             return Err(::pina::ProgramError::InvalidSeeds);
         }
         Ok(state)
@@ -3047,7 +3057,7 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
     }
     /// Load and validate `CompactState`, its stored-bump PDA address, and its compact representation for the duration of `use_account`.
     ///
-    /// Derives the address once from the account's own `bump` field and rejects a mismatch, so only the address that field derives is loadable. This is a single derivation, not a canonical bump search.
+    /// Derives the address once from the account's own `bump` field and rejects a mismatch, so only the address that field derives is loadable. This is a single `sha256` derivation without the curve check, not a canonical bump search; see `pina::is_derived_address`.
     ///
     /// Canonicality is the creation builder's proof. `CreateCompactProgramAccount` and `CreateCompactProgramAccountWithBump` both reject a noncanonical bump, so a compact PDA this program created stores the canonical one. That makes this method safe when the address is already established -- a per-signer namespace whose handlers require that signer.
     ///
@@ -3061,7 +3071,7 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
             <Self as pina::PinaCompactAccount>::Ref<'_>,
         ) -> ::core::result::Result<R, pina::ProgramError>,
     ) -> ::core::result::Result<R, pina::ProgramError> {
-        let account_address = *account.address();
+        let account_view = *account;
         pina::AsCompactAccount::with_compact_account::<
             Self,
             _,
@@ -3069,12 +3079,12 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
             account,
             program_id,
             |state| {
-                let seeds = Self::seeds(authority).with_bump(state.bump);
-                let expected_address = pina::create_program_address(
-                    &seeds.as_slices(),
+                if !pina::is_derived_address(
+                    account_view.address(),
+                    &Self::seeds(authority).as_slices(),
+                    state.bump,
                     program_id,
-                )?;
-                if account_address != expected_address {
+                ) {
                     return Err(pina::ProgramError::InvalidSeeds);
                 }
                 use_account(state)

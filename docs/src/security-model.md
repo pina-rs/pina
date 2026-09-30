@@ -100,6 +100,16 @@ Closing guidance under Pinocchio 0.11:
 
 <!-- {/pinaSecurityBestPractices} -->
 
+## Stored-bump PDA verification
+
+`load_pda`, `load_pda_mut`, and `with_stored_bump_pda` re-derive the account's address from the bump stored in its data with `sha256` (`pina::is_derived_address`) instead of the `sol_create_program_address` syscall, which saves about 1,350 compute units per load. The syscall adds one check the hash does not: that the result lies off the ed25519 curve. That check is redundant for any account these loaders accept.
+
+- **Checks run in order.** Each loader first requires the program to own the account and its data to pass the type's discriminator and layout checks, so the program itself initialized the account.
+- **Only a valid program address can get that far.** The program can only create an account at a seed-derived address through `invoke_signed`, and the runtime signs only for an off-curve address. Pina's creation builders cannot adopt an account someone else assigned to the program, because the system program's `allocate` and `assign` refuse an account the system program does not own. So the stored bump already derived a valid program address.
+- **The skipped check adds nothing here.** The only address it would additionally reject is an on-curve address equal to the hash, for which no one can derive a private key.
+
+Keep `create_program_address` (through `assert_seeds_with_bump`) for a bump a caller supplies, and the canonical loaders (`load_checked_pda`, `load_checked_pda_mut`, `with_checked_pda`) when the bump must be the highest valid one. Both still check the curve.
+
 ## Content validation with PinaPod
 
 Pina's zero-copy account model is built on PinaPod. Its generated storage view makes validation load-bearing: `PinaAccount::try_from_bytes` and `as_account` reject noncanonical booleans, invalid UTF-8, overlength vector prefixes, invalid option tags, invalid active nested values, and invalid enum discriminants before returning a reference.
