@@ -1,5 +1,5 @@
 ---
-pina_cli: fix
+pina_cli: test
 pina: none
 ---
 
