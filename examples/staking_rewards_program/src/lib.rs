@@ -35,7 +35,7 @@ declare_id!("9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr");
 pub mod entrypoint {
 	use super::*;
 
-	nostd_entrypoint!(StakingInstruction::process_instruction);
+	dispatch_entrypoint!(StakingInstruction);
 }
 
 #[error]

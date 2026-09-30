@@ -1129,6 +1129,7 @@ impl<'a> AccountsCursor<'a> {
 		clippy::should_implement_trait,
 		reason = "this cursor operation is fallible and intentionally returns Result"
 	)]
+	#[inline(always)]
 	pub fn next(&mut self) -> Result<&'a AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
 		let (account, rest) = accounts
@@ -1145,6 +1146,7 @@ impl<'a> AccountsCursor<'a> {
 	/// `ProgramError::InvalidAccountData` error is returned. This makes the
 	/// `&mut AccountView` field type the single source of truth for writable
 	/// accounts — no separate `assert_writable()` call is required.
+	#[inline(always)]
 	pub fn next_mut(&mut self) -> Result<&'a mut AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
 		let (account, rest) = accounts
@@ -1307,11 +1309,22 @@ pub trait ParseAccounts<'a>: Sized {
 	/// one. A derived parser rejects any account past its limit with
 	/// `TooManyAccountKeys`, so an entrypoint array one slot larger sees every
 	/// account the parser could accept, which is what
-	/// `ENTRYPOINT_ACCOUNT_CAPACITY` relies on.
+	/// `ENTRYPOINT_ACCOUNT_CAPACITY` relies on, and `dispatch_entrypoint!` walks
+	/// at most this many accounts for the route.
 	///
 	/// Hand-written parsers keep [`Self::UNBOUNDED`] unless they reject every
 	/// account past a smaller limit.
 	const ACCOUNT_LIMIT: usize = Self::UNBOUNDED;
+
+	/// The fewest accounts this parser accepts.
+	///
+	/// `#[derive(Accounts)]` counts one slot per positional field plus each
+	/// nested struct's minimum; optional fields and a `#[pina(remaining)]` slice
+	/// may be absent, so they count nothing. When it equals
+	/// [`Self::ACCOUNT_LIMIT`], `dispatch_entrypoint!` parses a fixed-length
+	/// account array, which lets the struct's own length checks fold away.
+	/// Hand-written parsers keep zero.
+	const ACCOUNT_MINIMUM: usize = 0;
 
 	/// Sentinel for a parser that declares no capacity.
 	///

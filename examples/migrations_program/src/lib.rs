@@ -240,5 +240,5 @@ impl<'a> ProcessAccountInfos<'a> for RelayAccounts<'a> {
 pub mod entrypoint {
 	use super::*;
 
-	nostd_entrypoint!(MigrationInstruction::process_instruction);
+	dispatch_entrypoint!(MigrationInstruction);
 }

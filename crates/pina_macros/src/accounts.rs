@@ -305,9 +305,37 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			quote! { #positional #(#nested_limits)* }
 		};
 
+		// Only positional fields are required: an optional field or a
+		// `remaining` slice may be absent.
+		let minimum = {
+			let required = field_kinds
+				.iter()
+				.filter(|(_, kind)| {
+					matches!(
+						kind,
+						AccountFieldKind::Immutable | AccountFieldKind::Mutable
+					)
+				})
+				.count();
+			let required = proc_macro2::Literal::usize_suffixed(required);
+			let nested_minimums = field_kinds
+				.iter()
+				.filter(|(_, kind)| *kind == AccountFieldKind::Nested)
+				.map(|(field, _)| {
+					let ty = &field.ty;
+
+					quote! {
+						.saturating_add(<#ty as #crate_path::ParseAccounts #ty_generics>::ACCOUNT_MINIMUM)
+					}
+				});
+
+			quote! { #required #(#nested_minimums)* }
+		};
+
 		quote! {
 			const ACCOUNT_BOUND: usize = #positional #(#nested)*;
 			const ACCOUNT_LIMIT: usize = #limit;
+			const ACCOUNT_MINIMUM: usize = #minimum;
 		}
 	};
 

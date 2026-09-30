@@ -54,8 +54,8 @@
 #![allow(clippy::inline_always)]
 
 mod cpi;
-// `__process_entrypoint` is public so the entrypoint macros can reach it from
-// the program crate; the module itself is not part of the API.
+// The `entry` functions are public so the entrypoint macros can reach them
+// from the program crate; the module itself is not part of the API.
 mod entry;
 mod error;
 mod event;
@@ -75,7 +75,17 @@ mod utils;
 mod verification;
 
 #[doc(hidden)]
+pub use entry::__dispatch_entrypoint;
+#[doc(hidden)]
 pub use entry::__process_entrypoint;
+#[doc(hidden)]
+pub use entry::EntrypointInput;
+#[doc(hidden)]
+pub use entry::ROUTE_BOUNDED;
+#[doc(hidden)]
+pub use entry::ROUTE_EXACT;
+#[doc(hidden)]
+pub use entry::ROUTE_UNBOUNDED;
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.
 #[cfg(feature = "derive")]
@@ -302,6 +312,50 @@ macro_rules! nostd_entrypoint {
 	};
 	($process_instruction:expr, $maximum:expr) => {
 		$crate::__program_entrypoint!($process_instruction, $maximum);
+		$crate::pinocchio::no_allocator!();
+		$crate::pinocchio::nostd_panic_handler!();
+	};
+}
+
+/// Sets up a `no_std` Solana program entrypoint that reads the instruction
+/// before any account.
+///
+/// Takes the `#[discriminator(entrypoint)]` enum that routes the program. The
+/// entrypoint reads the instruction data through the pointer the loader passes
+/// since SIMD-0321, validates the program ID and discriminator exactly as the
+/// generated `process_instruction` does, then walks only the accounts the
+/// routed accounts struct can read: at most its `ACCOUNT_LIMIT`, rejecting an
+/// instruction with more as `TooManyAccountKeys`. Routes whose parser has no
+/// limit, such as a struct with a `#[pina(remaining)]` slice, and the reserved
+/// `Migrate` route walk up to `ENTRYPOINT_ACCOUNT_CAPACITY` accounts, as
+/// [`nostd_entrypoint!`] does for every instruction.
+///
+/// ```ignore
+/// dispatch_entrypoint!(CounterInstruction);
+/// ```
+///
+/// Every check the routed accounts struct and handler make still runs. One
+/// precedence differs from `nostd_entrypoint!`: an instruction with more
+/// accounts than its struct reads fails with `TooManyAccountKeys` before any
+/// per-account check.
+///
+/// The program must run where SIMD-0321 is active, which every public cluster
+/// is: without it the second entrypoint argument is undefined. Like
+/// [`nostd_entrypoint!`], this denies the allocator and installs a minimal
+/// panic handler.
+#[macro_export]
+macro_rules! dispatch_entrypoint {
+	($instruction:ty) => {
+		/// Program entrypoint.
+		#[unsafe(no_mangle)]
+		pub unsafe extern "C" fn entrypoint(input: *mut u8, instruction_data: *const u8) -> u64 {
+			// SAFETY: the SVM loader calls `entrypoint` with its program input
+			// buffer and, since SIMD-0321, the instruction data pointer, both
+			// valid for the whole instruction.
+			unsafe {
+				$crate::__dispatch_entrypoint(input, instruction_data, <$instruction>::__dispatch)
+			}
+		}
 		$crate::pinocchio::no_allocator!();
 		$crate::pinocchio::nostd_panic_handler!();
 	};

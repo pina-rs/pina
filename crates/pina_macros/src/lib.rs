@@ -114,6 +114,12 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 /// `FooAccounts`, overridable per variant with
 /// `#[dispatch(accounts = BarAccounts)]`.
 ///
+/// It also emits the router behind `dispatch_entrypoint!(CounterInstruction)`,
+/// which reads the instruction before any account and then walks only the
+/// accounts the routed struct reads. That entrypoint is smaller and cheaper for
+/// most programs; one with many routes may measure smaller with
+/// `nostd_entrypoint!`, because each route parses its own fixed-length struct.
+///
 /// At most one enum in a program may opt in: a module-level marker collides if
 /// a second one does. Only the instruction enum needs the flag; account-type
 /// and event discriminators leave it off.

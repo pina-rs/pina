@@ -32,7 +32,7 @@ declare_id!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT");
 pub mod entrypoint {
 	use super::*;
 
-	nostd_entrypoint!(EscrowInstruction::process_instruction);
+	dispatch_entrypoint!(EscrowInstruction);
 }
 
 #[discriminator(entrypoint)]

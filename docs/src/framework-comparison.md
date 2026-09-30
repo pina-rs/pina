@@ -27,7 +27,7 @@ The comparison is meant to show framework overhead, not build settings, so every
 - `lto = "fat"`, `codegen-units = 1`, `opt-level = 3`, overflow checks off
 - `crate-type = ["cdylib"]` only, which is what lets LTO apply at all
 
-Each program uses its framework's recommended entrypoint. For Pina that is the `#[discriminator(entrypoint)]` router with its generated `ENTRYPOINT_ACCOUNT_CAPACITY`, which sizes the account array to the widest instruction plus one spare slot so extra trailing accounts are still rejected.
+Each program uses its framework's recommended entrypoint. For Pina that is `dispatch_entrypoint!` over the `#[discriminator(entrypoint)]` router: it reads the instruction through the loader's instruction-data pointer, then walks only the accounts the routed instruction reads, rejecting extra trailing accounts.
 
 See [Program size](./program-size.md) for why those settings matter and what each one is worth on its own.
 
@@ -39,7 +39,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 | Framework                   | Size (bytes) | `hello` CU | vs Pinocchio size |
 | --------------------------- | -----------: | ---------: | ----------------: |
-| Pina                        |        1,984 |        146 |              −37% |
+| Pina                        |        1,616 |        136 |              −49% |
 | Pinocchio (hand-written)    |        3,160 |        111 |               +0% |
 | Quasar                      |        2,520 |        115 |              −20% |
 | Anchor v2 (`lang-v2`, rc.1) |        1,880 |        127 |              −41% |
@@ -48,7 +48,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 | Framework                   | Size (bytes) | `initialize` CU | `increment` CU | vs Pinocchio size |
 | --------------------------- | -----------: | --------------: | -------------: | ----------------: |
-| Pina                        |        8,424 |           1,713 |            378 |              +29% |
+| Pina                        |        7,592 |           1,694 |            360 |              +17% |
 | Pinocchio (hand-written)    |        6,512 |           1,490 |          1,721 |               +0% |
 | Quasar                      |        7,808 |           3,488 |            330 |              +20% |
 | Anchor v2 (`lang-v2`, rc.1) |        8,696 |           3,458 |          2,117 |              +34% |
@@ -63,7 +63,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 **The Pinocchio row is the floor.** It is hand-written `pinocchio` with no framework at all, and it is the number a framework has to justify. Pina's gap to it is the cost of derive-generated dispatch and validation.
 
-**Pina's `initialize` was the one number that looked like a defect.** The first measurement of this page caught it at 10,719 CU against Pinocchio's 1,490 for the same `create_account` CPI: [`CreateProgramAccountWithBump`](../crates/pina/src/cpi.rs) validated the PDA with a full canonical bump search although the caller had already supplied the bump. The counter now uses [`CreateProgramAccountWithUncheckedBump`](../crates/pina/src/cpi.rs), which checks one derivation instead of searching, and `initialize` measures 3,263 CU.
+**Pina's `initialize` was the one number that looked like a defect.** The first measurement of this page caught it at 10,719 CU against Pinocchio's 1,490 for the same `create_account` CPI: [`CreateProgramAccountWithBump`](../crates/pina/src/cpi.rs) validated the PDA with a full canonical bump search although the caller had already supplied the bump. The counter now uses [`CreateProgramAccountWithUncheckedBump`](../crates/pina/src/cpi.rs), which checks one derivation instead of searching, and checks it with `sha256` rather than the `sol_create_program_address` syscall, because the runtime repeats the curve check when it signs the allocation (see [Security model](./security-model.md)). `initialize` measures 1,694 CU.
 
 The distinction between the two builders is the one to keep in mind when reading the row. The canonical builder proves the supplied bump is the highest valid one, so a seed namespace maps to exactly one address; the unchecked builder proves only that the supplied bump derives the account's address, which is about 9,200 CU cheaper per creation. A non-canonical bump creates a second valid address that canonical derivation will not find — harmless for a per-authority counter, wrong for a vault that another program derives by seed alone. Every PDA-creating example in this repository now uses the unchecked builder, which is why the row reads the way it does.
 
