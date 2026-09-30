@@ -1,5 +1,5 @@
 ---
-pina_cli: fix
+pina_cli: docs
 ---
 
 # Accept macOS system path aliases in link checks
