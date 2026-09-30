@@ -37,6 +37,7 @@ pub enum TestAccountType {
 	TestState = 1,
 	CounterState = 2,
 	InterleavedState = 3,
+	LongSeedState = 4,
 }
 
 /// On-chain state exercising every supported seed type.
@@ -101,6 +102,18 @@ pub struct CounterState {
 pub struct InterleavedState {
 	pub owner: Address,
 	pub nonce: u64,
+	pub bump: u8,
+}
+
+/// A constant seed one byte past `MAX_SEED_LEN`. `create_program_address`
+/// rejects it, and the hash-only check must too: hashed back to back, it
+/// derives the same address as its first 32 bytes followed by the last one.
+const LONG_SEED: &[u8] = &[3; 33];
+
+/// A PDA whose only seed is the oversized constant.
+#[account(crate = ::pina, discriminator = TestAccountType, variant = LongSeedState)]
+#[pda(crate = ::pina, seeds = [LONG_SEED], bump = bump)]
+pub struct LongSeedState {
 	pub bump: u8,
 }
 
@@ -659,6 +672,31 @@ fn load_pda_mut_returns_a_writable_validated_guard() {
 		.as_account::<TestState>(&TEST_PROGRAM_ID)
 		.expect("mutated account remains valid");
 	assert_eq!(state.amount.get(), 43);
+}
+
+/// A constant-reference seed longer than `MAX_SEED_LEN` never verifies, even
+/// at the address that splitting it into two valid seeds derives.
+#[test]
+fn load_pda_rejects_a_constant_seed_longer_than_the_limit() {
+	let split: [&[u8]; 2] = [&LONG_SEED[..32], &LONG_SEED[32..]];
+	let (pda, bump) = try_find_program_address(&split, &TEST_PROGRAM_ID)
+		.unwrap_or_else(|| panic!("the split seeds derive a program address"));
+	let mut bytes = vec![0u8; LongSeedState::SIZE];
+	LongSeedState::initialize(&mut bytes, |state| {
+		state.bump = bump;
+		Ok(())
+	})
+	.expect("valid account storage");
+	let mut test_account = build_account_view(pda, &bytes);
+
+	assert!(matches!(
+		LongSeedState::load_pda(&test_account.view, &TEST_PROGRAM_ID),
+		Err(ProgramError::InvalidSeeds)
+	));
+	assert!(matches!(
+		LongSeedState::load_pda_mut(&mut test_account.view, &TEST_PROGRAM_ID),
+		Err(ProgramError::InvalidSeeds)
+	));
 }
 
 #[test]

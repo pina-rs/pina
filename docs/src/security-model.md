@@ -107,6 +107,7 @@ Closing guidance under Pinocchio 0.11:
 - **Checks run in order.** Each loader first requires the program to own the account and its data to pass the type's discriminator and layout checks, so the program itself initialized the account.
 - **Only a valid program address can get that far.** The program can only create an account at a seed-derived address through `invoke_signed`, and the runtime signs only for an off-curve address. Pina's creation builders cannot adopt an account someone else assigned to the program, because the system program's `allocate` and `assign` refuse an account the system program does not own. So the stored bump already derived a valid program address.
 - **The skipped check adds nothing here.** The only address it would additionally reject is an on-curve address equal to the hash, for which no one can derive a private key.
+- **Seed lengths are still checked.** `sha256` concatenates the seeds, so a 33-byte seed hashes exactly like a 32-byte seed followed by a 1-byte one, which can be a valid program address. `create_program_address` rejects any seed longer than `MAX_SEED_LEN`, and `is_derived_address` does the same before hashing. A seed of constant or fixed-size length, which every generated loader passes, folds the check away.
 
 Keep `create_program_address` (through `assert_seeds_with_bump`) for a bump a caller supplies, and the canonical loaders (`load_checked_pda`, `load_checked_pda_mut`, `with_checked_pda`) when the bump must be the highest valid one. Both still check the curve.
 

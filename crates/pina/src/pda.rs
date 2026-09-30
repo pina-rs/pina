@@ -99,7 +99,10 @@ pub fn create_program_address(
 ///
 /// This hashes the same input as [`create_program_address`] with the
 /// `sol_sha256` syscall instead of `sol_create_program_address`, which saves
-/// about 1,350 compute units per call. The only address it accepts that
+/// about 1,350 compute units per call. Like [`create_program_address`], it
+/// rejects a seed longer than [`MAX_SEED_LEN`](crate::MAX_SEED_LEN): the hash
+/// concatenates the seeds, so without that check a 33-byte seed would hash like
+/// a 32-byte seed followed by a 1-byte one. The only address it accepts that
 /// [`create_program_address`] rejects is an on-curve hash of those inputs.
 ///
 /// That makes it the right check for re-verifying an account the program
@@ -129,7 +132,9 @@ pub fn is_derived_address<const N: usize>(
 	bump: u8,
 	program_id: &Address,
 ) -> bool {
-	Address::derive_address(seeds, Some(bump), program_id) == *address
+	// A seed of constant or fixed-size length folds this check away.
+	seeds.iter().all(|seed| seed.len() <= crate::MAX_SEED_LEN)
+		&& Address::derive_address(seeds, Some(bump), program_id) == *address
 }
 
 #[cfg(test)]
@@ -149,6 +154,35 @@ mod tests {
 			.unwrap_or_else(|err| panic!("failed to recreate pda: {err:?}"));
 
 		assert_eq!(pda, recreated);
+	}
+
+	/// Seeds are hashed back to back, so a 33-byte seed hashes like a valid
+	/// 32-byte seed followed by a 1-byte one. The check must reject it, as
+	/// `create_program_address` does, instead of accepting that address.
+	#[test]
+	fn derived_address_check_rejects_a_seed_longer_than_the_limit() {
+		let bytes = [3_u8; 33];
+		let split: [&[u8]; 2] = [&bytes[..32], &bytes[32..]];
+		let (address, bump) = try_find_program_address(&split, &crate::system::ID)
+			.expect("the split seeds derive a program address");
+		let bump_seed = [bump];
+
+		assert!(is_derived_address(
+			&address,
+			&split,
+			bump,
+			&crate::system::ID
+		));
+		assert_eq!(
+			create_program_address(&[&bytes, &bump_seed], &crate::system::ID),
+			Err(ProgramError::InvalidSeeds)
+		);
+		assert!(!is_derived_address(
+			&address,
+			&[&bytes],
+			bump,
+			&crate::system::ID
+		));
 	}
 
 	/// The hash-only check agrees with `create_program_address` for every
