@@ -53,6 +53,8 @@ Failure paths are the largest avoidable cost. `log!("address: {} …", addr)` an
 
 The default `logs` feature now logs a fixed message per failure and keeps the descriptive text. Formatted detail and `file:line:column` locations moved to the opt-in `verbose-logs` feature.
 
+A fixed message is only logged when it tells a client something the error code does not. Five validations fail with a code that names exactly one check — `MissingRequiredSignature`, `InvalidAccountOwner`, `AccountAlreadyInitialized`, `UninitializedAccount`, and pina's `InvalidAccountSize` — so their messages are logged only with `verbose-logs`, alongside the account's address. Each such site cost about 150 bytes, because a logging branch cannot be merged with the other failures that return the same code. Messages that tell apart the causes of a shared code, such as the several reasons for `InvalidAccountData` or an account discriminator versus an instruction discriminator, are still logged by default.
+
 ```toml
 [dependencies]
 pina = { version = "0.17", features = ["logs", "derive"] }
@@ -192,19 +194,50 @@ Runtime compute units were verified on escrow with Surfpool, three runs each, fu
 
 The PDA-creation builders share one allocation spine (`CompactCreationTarget::allocate_zeroed`, `PdaCreationTarget::allocate`), so a program that creates several account types pays the seed marshalling, signer assembly, and rent computation once instead of once per generic instantiation — the multisig example keeps 5,252 bytes this way. Each spine keeps the shape its users measured best with: the compact-creation spine stays a real outlined call, which is what collapses multisig's three instantiations into one shared function, while the PDA-creation spine is `#[inline(always)]`, because a single-instantiation program has no duplicate to collapse and pays only the call boundary — outlining it measured +80 CU on the counter fixture's `initialize`.
 
-## Bound the entrypoint account budget
+## Bound the entrypoint account array
 
-`nostd_entrypoint!` accepts a second argument: the maximum number of accounts the entrypoint deserializes (the default is `pinocchio::MAX_TX_ACCOUNTS`, 255). Pinocchio's deserializer unrolls the account walk at compile time, so a program compiled with the default carries walking code for 255 accounts even when every instruction uses two. Passing the program's real bound — its widest instruction's account count plus headroom — removes that code:
+`nostd_entrypoint!` accepts a second argument: the size of the account array the entrypoint deserializes into (the default is `pinocchio::MAX_TX_ACCOUNTS`, 255). Pinocchio's deserializer walks accounts five at a time and then copies the remaining one to four through an unrolled match. With five or fewer slots, the five-account loop can never run, so it disappears from the program. With more slots the loop stays, and a bounded array adds a second loop that skips accounts past the array, so the program grows instead.
 
-| Fixture                                               | Default budget | Bounded budget | Δ size | Δ CU               |
-| ----------------------------------------------------- | -------------: | -------------: | ------ | ------------------ |
-| hello (`nostd_entrypoint!(process_instruction, 1)`)   |          4,680 |          2,736 | −41.5% | 145 → 151          |
-| counter (`nostd_entrypoint!(process_instruction, 3)`) |         11,400 |          9,976 | −12.5% | 3,203 → 3,202 / +4 |
+The loader does not reject accounts beyond the array; it skips them. An array sized to exactly the widest instruction therefore hides an extra trailing account from `finish_exact`, and an over-supplied instruction that pina would otherwise reject with `TooManyAccountKeys` runs instead. The safe bound is one slot larger: the spare slot keeps the first extra account visible, so every instruction whose accounts struct ends with `finish_exact` still rejects it, however many extras follow.
 
-The budget is a program-level contract: accounts beyond the bound are ignored rather than rejected, so a program that accepts unbounded remaining accounts must not lower it. [ADR 0010](./adrs/0010-lean-entrypoint-strategy.md) measures this lever and builds the case for the lean dispatcher on top of it.
+`#[discriminator(entrypoint)]` computes that bound as `ENTRYPOINT_ACCOUNT_CAPACITY`: one more than the widest routed accounts struct and the reserved `Migrate` route's slots, or the full 255 when a route accepts unbounded trailing accounts. Pass it as the second argument when it is five or less:
+
+```rust,ignore
+nostd_entrypoint!(
+	CounterInstruction::process_instruction,
+	CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+);
+```
+
+| Program                            | Capacity | Default array | Bounded array | Δ size |
+| ---------------------------------- | -------: | ------------: | ------------: | -----: |
+| hello fixture                      |        2 |         4,680 |         2,944 | −1,736 |
+| counter fixture                    |        4 |        10,456 |         9,416 | −1,040 |
+| `examples/counter_program`         |        4 |        16,096 |        14,896 | −1,200 |
+| `examples/migrations_program`      |      > 5 |        39,624 |        39,808 |   +184 |
+| `examples/escrow_program`          |      > 5 |        44,712 |        45,104 |   +392 |
+| `examples/staking_rewards_program` |      > 5 |        57,456 |        57,920 |   +464 |
+
+The bounded walk also costs a few compute units, because the deserializer caps the account count and checks for accounts to skip: +1 on the hello fixture's `hello`, +1 on the counter fixture's `initialize`, and +4 on its `increment`. A smaller array does shrink the entrypoint's stack frame by eight bytes per slot removed, which matters for a program close to the 4 KB frame limit even when it costs size.
+
+Accounts past the spare slot are never materialized, so the one observable difference from the full array is error precedence: a writable account whose duplicate sits past the spare slot fails with `TooManyAccountKeys` rather than `DuplicateMutableAccount`. Both reject the instruction. A program with a hand-written router, or one that reads accounts outside its routed accounts structs, must size its array itself by the same rule — its widest instruction plus one — and must keep the default when any instruction accepts unbounded trailing accounts.
 
 ## Prefer exclusive slice bounds in seed and signer assembly
 
 Every `[..=len]` slice over a seed or signer array monomorphizes its own 216-byte `RangeInclusive<usize>::index` copy plus panic plumbing; the equivalent exclusive `[..len + 1]` inlines to a few instructions. Pina's PDA-creation CPI spine carried three of them — the derivation-seed slice, the combined-seed signer slice, and the signer-list slice — so every program that creates a PDA paid ~1.3 KB of deployed size for them. They now use exclusive bounds (each guarded by the `len < MAX` check that already ran), which measured −1,320 bytes and −92 compute units on the counter fixture's `initialize` with byte-identical behavior. Generated code and user code should follow the same shape: exclusive ranges over arrays whose filled prefix is `len + 1`.
 
+## Size arrays that escape to syscalls by what the syscall reads
+
+A stack array passed to a syscall keeps every store to it, because LLVM cannot see that the runtime reads only a prefix. Safe Rust initializes every slot, so a `[Seed; MAX_SEEDS]` that carries two seeds and a bump still costs sixteen slot writes. Pina's PDA-creation spine used to build three such 16-slot arrays per created account. It now sizes the derivation and signer seeds to the smallest of 4, 8, or 16 slots that holds the seeds plus the bump, and skips the signer array entirely when there are no extra signers. Because every `#[pda]` seed array has a compile-time length, only one size survives inlining. On the counter fixture that measured −944 bytes and −124 compute units on `initialize`. The same applies to program code: when a fixed-capacity array only exists to hand a prefix to a syscall, size it by the prefix the call actually uses.
+
 [`DETAIL_POINTER_MESSAGE`]: https://docs.rs/pina/latest/pina/constant.DETAIL_POINTER_MESSAGE.html
+
+## Convert entrypoint errors where they are returned
+
+The entrypoint turns a `ProgramError` into the `u64` status the runtime reads. Pinocchio's `program_entrypoint!` does this in an `#[inline(never)]` function, an 864-byte comparison tree over every `ProgramError` variant that every program carries, even one whose errors are all constants. `nostd_entrypoint!` declares its own entrypoint instead: it deserializes accounts through the same pinocchio function and converts the error inline, so an error returned by value folds to its status code where it is returned. The comparison tree is only emitted for errors the compiler cannot see through, such as one returned by an outlined helper or a CPI. That measured −856 bytes on the hello fixture, which drops the tree entirely, and −1,048 on `escrow_program`, at no compute-unit cost.
+
+## Keep a shared check's error at its call site
+
+An out-of-line function that returns `ProgramResult` hands its result back through memory, so its caller cannot see which error it carries, and neither can the entrypoint's inline conversion. `assert_address` was the common case: LLVM kept `validate_address` out of line because the program and sysvar checks call it too. The address comparison and its failure log now live in one out-of-line helper that returns `bool`, while `validate_address` and `assert_address` are always inlined, so every call site returns `InvalidAccountData` as a constant and keeps a single copy of the comparison. Across the examples this measured smaller for 14 programs (−8 to −664 bytes), unchanged for 12, and +184 bytes for `privacy_pool_program`, where LLVM's inlining choices leave six more out-of-line call sites (+88 bytes of code, +96 of relocations). The counter fixture fell 80 bytes to 8,632.
+
+Inlining the whole check instead, comparison and log at every call site, measured −248 bytes on the counter fixture but grew programs with many address checks by up to 624 bytes. On the SBF target each call to an out-of-line function also costs a 16-byte relocation next to its 8-byte instruction, so a helper pays for itself only when enough call sites share it. Program code can use the same shape: give a check that many call sites share an out-of-line part that returns `bool`, and build the error where it is returned.

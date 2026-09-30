@@ -1064,6 +1064,38 @@ fn account_validation_accepts_matching_metadata() {
 	assert!(account.assert_owners(&[SYSVAR_OWNER]).is_ok());
 }
 
+/// The validations whose message only restates their error still fail with
+/// that error when the message is not logged.
+#[test]
+fn account_validation_rejects_empty_and_foreign_owned_accounts() {
+	let unique_accounts = [
+		AccountBuilder::new()
+			.address(fake_address(31))
+			.owner(SYSVAR_OWNER),
+		AccountBuilder::new()
+			.address(fake_address(32))
+			.owner(SYSVAR_OWNER)
+			.data(&[1]),
+	];
+
+	let (_input, mut accounts, count) = load_accounts!(&unique_accounts, 0, 4);
+	let account_views = initialized_account_views(&mut accounts, count);
+	let (empty, filled) = (&account_views[0], &account_views[1]);
+
+	assert_eq!(
+		empty.assert_not_empty().err(),
+		Some(ProgramError::UninitializedAccount)
+	);
+	assert_eq!(
+		filled.assert_empty().err(),
+		Some(ProgramError::AccountAlreadyInitialized)
+	);
+	assert_eq!(
+		empty.assert_owners(&[TEST_PROGRAM_ID]).err(),
+		Some(ProgramError::InvalidAccountOwner)
+	);
+}
+
 #[test]
 fn non_canonical_pda_requires_explicit_bump_verification() {
 	let (seed_bytes, _canonical_address, canonical_bump, non_canonical_address, non_canonical_bump) =
@@ -1263,4 +1295,60 @@ fn associated_token_loader_rejects_spoofed_mint_in_data() {
 	let result = account_views[0].as_associated_token_account(&wallet, &mint, &token_2022::ID);
 
 	assert!(matches!(result, Err(ProgramError::InvalidAccountData)));
+}
+
+/// A program declared with `nostd_entrypoint!`, so its generated `entrypoint`
+/// symbol can be run over loader-format input.
+mod declared_entrypoint {
+	use core::sync::atomic::AtomicUsize;
+	use core::sync::atomic::Ordering;
+
+	use super::*;
+
+	/// How many accounts the last invocation received.
+	pub(super) static SEEN_ACCOUNTS: AtomicUsize = AtomicUsize::new(0);
+
+	/// Succeeds on empty data, fails with the custom code a one-byte payload
+	/// names, and rejects anything longer.
+	fn process(program_id: &Address, accounts: &mut [AccountView], data: &[u8]) -> ProgramResult {
+		assert_eq!(program_id, &TEST_PROGRAM_ID);
+		SEEN_ACCOUNTS.store(accounts.len(), Ordering::SeqCst);
+
+		match data {
+			[] => Ok(()),
+			[code] => Err(ProgramError::Custom(u32::from(*code))),
+			_ => Err(ProgramError::InvalidInstructionData),
+		}
+	}
+
+	pina::nostd_entrypoint!(process, 2);
+}
+
+/// The declared entrypoint hands the program only its array's accounts, finds
+/// the instruction data past the skipped ones, and returns the program's
+/// result as the same status `u64::from(ProgramError)` produces.
+#[test]
+fn declared_entrypoint_runs_the_program_and_returns_its_status() {
+	let accounts = [
+		writable_account(1),
+		writable_account(2),
+		writable_account(3),
+	];
+	let cases: [(&[u8], u64); 4] = [
+		(&[], 0),
+		(&[7], 7),
+		(&[0], u64::from(ProgramError::Custom(0))),
+		(&[1, 2], u64::from(ProgramError::InvalidInstructionData)),
+	];
+
+	for (data, status) in cases {
+		let mut input = unsafe { create_test_input(&accounts, 0, data) };
+		let returned = unsafe { declared_entrypoint::entrypoint(input.as_mut_ptr()) };
+
+		assert_eq!(returned, status, "instruction data {data:?}");
+		assert_eq!(
+			declared_entrypoint::SEEN_ACCOUNTS.load(core::sync::atomic::Ordering::SeqCst),
+			2
+		);
+	}
 }

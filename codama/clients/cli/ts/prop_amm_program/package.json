@@ -1,9 +1,9 @@
 {
 	"name": "prop-amm-program-cli",
 	"version": "0.1.0",
+	"private": true,
 	"description": "Command-line interface for propAmmProgram",
 	"type": "module",
-	"private": true,
 	"bin": {
 		"prop-amm-program-cli": "./src/main.ts"
 	},

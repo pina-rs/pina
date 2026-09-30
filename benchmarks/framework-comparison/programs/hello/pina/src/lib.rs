@@ -6,7 +6,7 @@ use pina::*;
 
 declare_id!("DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A");
 
-#[discriminator]
+#[discriminator(entrypoint)]
 pub enum HelloInstruction {
 	Hello = 0,
 }
@@ -28,17 +28,10 @@ impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
 	}
 }
 
-nostd_entrypoint!(process_instruction);
-
-#[inline(always)]
-pub fn process_instruction(
-	program_id: &Address,
-	accounts: &mut [AccountView],
-	data: &[u8],
-) -> ProgramResult {
-	let instruction: HelloInstruction = parse_instruction(program_id, &ID, data)?;
-
-	match instruction {
-		HelloInstruction::Hello => HelloAccounts::try_from((program_id, accounts))?.process(data),
-	}
-}
+// The generated router, with the account array its routes need: the widest
+// instruction plus one spare slot, so an extra trailing account is still
+// rejected by `finish_exact`.
+nostd_entrypoint!(
+	HelloInstruction::process_instruction,
+	HelloInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+);

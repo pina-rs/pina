@@ -1,7 +1,11 @@
 # @pina-rs/cli
 
 <p align="center">
-	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+	<img
+		src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png"
+		alt="The Pina logo: a low-poly origami pineapple"
+		width="140"
+	>
 </p>
 
 Prebuilt `pina` binaries for macOS, Linux, Windows, and FreeBSD.

@@ -231,7 +231,13 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 pub mod entrypoint {
 	use super::*;
 
-	nostd_entrypoint!(CounterInstruction::process_instruction);
+	// The generated capacity sizes the entrypoint's account array to the
+	// widest instruction plus one spare slot, so an extra trailing account is
+	// still rejected while the deserializer only walks the accounts it needs.
+	nostd_entrypoint!(
+		CounterInstruction::process_instruction,
+		CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+	);
 }
 
 // ---------------------------------------------------------------------------

@@ -13,8 +13,7 @@ Labels: **CONFIRMED** = reproduced against the deployed artifact this sweep; **S
 
 ## Wire formats used (for reproduction)
 
-Instruction data is `[discriminator, version_byte(0), payload…]` (the migration envelope adds a version byte even to zero-field instructions). Multisig account payload (envelope 2 bytes, compact header 126): `threshold@99..101`, `timelock@101..105`, `ttl@105..109`, `transaction_index@109..117`, `stale_transaction_index@117..125`, roster length u16 `@125..127`, roster bytes `@128..`. Proposal payload (header 106): `index@67..75`, `status@78`, `status_at@79..87`, `expires_at@87..95`, `approved_mask@95..99`. Config actions: `[u8 count]` then tagged payloads, e.g. `SetTimeLock` = `[01, 03, seconds:u32le]`, `RemoveMember` = `[01, 01, key:32]`, `AddSpendingLimit` = `[01, 06, create_key:32, vault_index:u8, mint:32,
-amount:u64le, period:u8, members_len:u8, members…, dest_len:u8, dests…]` (must fit the 128-byte `actions` proposal cap).
+Instruction data is `[discriminator, version_byte(0), payload…]` (the migration envelope adds a version byte even to zero-field instructions). Multisig account payload (envelope 2 bytes, compact header 126): `threshold@99..101`, `timelock@101..105`, `ttl@105..109`, `transaction_index@109..117`, `stale_transaction_index@117..125`, roster length u16 `@125..127`, roster bytes `@128..`. Proposal payload (header 106): `index@67..75`, `status@78`, `status_at@79..87`, `expires_at@87..95`, `approved_mask@95..99`. Config actions: `[u8 count]` then tagged payloads, e.g. `SetTimeLock` = `[01, 03, seconds:u32le]`, `RemoveMember` = `[01, 01, key:32]`, `AddSpendingLimit` = `[01, 06, create_key:32, vault_index:u8, mint:32, amount:u64le, period:u8, members_len:u8, members…, dest_len:u8, dests…]` (must fit the 128-byte `actions` proposal cap).
 
 ---
 
@@ -30,8 +29,7 @@ amount:u64le, period:u8, members_len:u8, members…, dest_len:u8, dests…]` (mu
 2. `ProposalCreate` a `KIND_CONFIG` proposal carrying actions `[01 03 2A 00 00 00]` (`SetTimeLock{42}`); `expires_at = t₀+600` is stored.
 3. `ProposalActivate` + `ProposalApprove` → `STATUS_APPROVED`.
 4. `time_travel_to_timestamp_millis((t₀+600+3600)*1000)` — one hour past expiry.
-5. `ConfigExecute` (data `[0B, 00]`, accounts `multisig/mut, proposal/mut,
-   member/ro+signer, rent_payer/w+signer, system, clock`) → **transaction succeeds**; multisig `timelock` now reads `42`, proposal `STATUS_EXECUTED`. Harness log: `[M3] EXPLOITED: config proposal executed 3600s past expiry`.
+5. `ConfigExecute` (data `[0B, 00]`, accounts `multisig/mut, proposal/mut, member/ro+signer, rent_payer/w+signer, system, clock`) → **transaction succeeds**; multisig `timelock` now reads `42`, proposal `STATUS_EXECUTED`. Harness log: `[M3] EXPLOITED: config proposal executed 3600s past expiry`.
 
 **Severity:** Low-to-Medium. The payload itself was legitimately approved at threshold, so this is not a threshold bypass; the impact is that a consent-freshness control (proposal TTL, which the module doc advertises as "stale consent cannot linger forever") is silently unenforced on the path that rewrites governance. Combined with E2 the consent is both unrevokable and unbounded in time. For a treasury whose members approved a config change under conditions that later changed (e.g., pending member exit), stale execution is a real governance hazard, hence not Informational.
 
@@ -82,12 +80,10 @@ Add a regression test mirroring M4 (approve → remove an approver → expect ei
 **Exploit (reproduced; M5):**
 
 1. Threshold-2 multisig A/B/C. Config proposal adds a spending limit (create key `0x71…`, vault 0, SOL, amount 1000, `PERIOD_ONE_TIME`, `members = [B]`, destinations unrestricted).
-2. B draws 400 via `SpendingLimitUse` (data `[amount:u64le, 09]`; accounts `multisig/ro, limit/mut, member/ro+signer, vault/mut, destination/mut,
-   clock, pid, pid, pid, system`) → pays out.
+2. B draws 400 via `SpendingLimitUse` (data `[amount:u64le, 09]`; accounts `multisig/ro, limit/mut, member/ro+signer, vault/mut, destination/mut, clock, pid, pid, pid, system`) → pays out.
 3. Config proposal removes B from the multisig roster; executes cleanly.
 4. B's vote on a fresh proposal → **blocked**, `NotAMember` (the roster is enforced on the vote path).
-5. B's `SpendingLimitUse` again → **succeeds**; another 400 leaves the vault. Harness log: `[M5] EXPLOITED: B (removed from the multisig) drew another
-   400; the allowance roster was never revised`.
+5. B's `SpendingLimitUse` again → **succeeds**; another 400 leaves the vault. Harness log: `[M5] EXPLOITED: B (removed from the multisig) drew another 400; the allowance roster was never revised`.
 
 **Severity:** Medium. Permission revocation gaps are the classic insider failure (incident class "admin/role removal incomplete"). The amount is bounded by the allowance per period, but the bound renews, the destination list is attacker-friendly if unrestricted, and removal-for-cause is precisely when the key must stop working.
 
@@ -105,8 +101,7 @@ Add a regression test mirroring M4 (approve → remove an approver → expect ei
 
 1. Initialize the registry (admin-funded).
 2. `AddRole role_id=1, permissions=u64::MAX` at the canonical bump.
-3. Find `bump' > canonical` whose `create_program_address` succeeds (`bump' = 2` here); `AddRole role_id=1, grantee=G2, permissions=0xFFFF,
-   bump=bump'` → **succeeds**. Two accounts now both claim role 1.
+3. Find `bump' > canonical` whose `create_program_address` succeeds (`bump' = 2` here); `AddRole role_id=1, grantee=G2, permissions=0xFFFF, bump=bump'` → **succeeds**. Two accounts now both claim role 1.
 4. `UpdateRole` on the shadow entry succeeds — two divergent records for one role in one registry. Harness log: `[R1] EXPLOITED: role 1 exists twice …`.
 
 **Severity:** Low. Every step requires the **admin's signature**, so this is not a stranger exploit; it is a uniqueness-invariant break (buggy retrying clients, key-padding confusion) plus indexer shadowing, and `role_count` inflates past the number of distinct roles. Note the multisig program is _not_ affected: all its compact creates use the checked builder.
@@ -119,8 +114,7 @@ Add a regression test mirroring M4 (approve → remove an approver → expect ei
 
 **Location:** `examples/role_registry_program/src/lib.rs:317-329` (`RotateAdmin` writes `registry_config.admin = *self.new_admin.address()` with no signature or plausibility requirement on `new_admin`).
 
-**Exploit (reproduced; R1):** `RotateAdmin` with `new_admin =
-Pubkey::default()` succeeds. Every later admin instruction fails: the stored admin can never sign, so `AddRole`/`UpdateRole`/`DeactivateRole`/ `RotateAdmin` all die at `assert_address` (runtime `invalid account data for instruction`, program log "account address is invalid"). There is no recovery path; role entries are frozen forever.
+**Exploit (reproduced; R1):** `RotateAdmin` with `new_admin = Pubkey::default()` succeeds. Every later admin instruction fails: the stored admin can never sign, so `AddRole`/`UpdateRole`/`DeactivateRole`/ `RotateAdmin` all die at `assert_address` (runtime `invalid account data for instruction`, program log "account address is invalid"). There is no recovery path; role entries are frozen forever.
 
 **Severity:** Low (the program holds no funds), and the root cause — one-step rotation with no new-admin signature — is already recorded as known L10 in `security/deep-audit-2026-09-18.md`. This run adds the concrete zero-address-brick evidence and confirms the blast radius (total, irreversible liveness loss from a single signature). Counted as covered, not new.
 

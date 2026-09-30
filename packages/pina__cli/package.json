@@ -13,12 +13,12 @@
 	"bugs": {
 		"url": "https://github.com/pina-rs/pina/issues"
 	},
-	"license": "Apache-2.0",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/pina-rs/pina.git",
 		"directory": "packages/pina__cli"
 	},
+	"license": "Apache-2.0",
 	"bin": {
 		"pina": "bin/pina.cjs"
 	},
@@ -26,10 +26,6 @@
 		"bin",
 		"README.md"
 	],
-	"publishConfig": {
-		"access": "public",
-		"provenance": true
-	},
 	"optionalDependencies": {
 		"@pina-rs/cli-darwin-arm64": "^0.22.0",
 		"@pina-rs/cli-darwin-x64": "^0.22.0",
@@ -43,5 +39,9 @@
 	},
 	"engines": {
 		"node": ">=18"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
 	}
 }

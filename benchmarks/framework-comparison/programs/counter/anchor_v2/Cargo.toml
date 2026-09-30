@@ -15,7 +15,9 @@ no-log-ix-name = []
 no-entrypoint = []
 
 [dependencies]
-anchor-lang = { git = "https://github.com/otter-sec/anchor", rev = "e4878b6d2c93064957cc78930b84e4431d6f955c", default-features = false, features = ["alloc"] }
+anchor-lang = { git = "https://github.com/otter-sec/anchor", rev = "e4878b6d2c93064957cc78930b84e4431d6f955c", default-features = false, features = [
+	"alloc",
+] }
 bytemuck = { version = "1", features = ["derive"] }
 pinocchio = { version = "0.11", default-features = false, features = ["copy"] }
 solana-program-error = "3.0"

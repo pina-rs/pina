@@ -2,9 +2,6 @@
 pina_cli_renderer: fix
 pina_cpi_renderer: fix
 pina_codama_renderer: fix
-# `pina_root` owns every workspace path, is unpublished, and records the
-# coverage without a bump.
-pina_root: none
 ---
 
 # Distrust root-owned project symlinks in renderers

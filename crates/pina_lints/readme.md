@@ -1,7 +1,11 @@
 # `pina_lints`
 
 <p align="center">
-	<img src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png" alt="The Pina logo: a low-poly origami pineapple" width="140">
+	<img
+		src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png"
+		alt="The Pina logo: a low-poly origami pineapple"
+		width="140"
+	>
 </p>
 
 `pina_lints` is Pina's self-contained replacement for the previous [Dylint](https://github.com/trailofbits/dylint) setup: every security, performance, and IDL lint that Pina ships lives in this one importable crate, so the lints are built into Pina instead of being distributed as separate Dylint libraries. They turn repository security conventions into compiler diagnostics and are intended to run during normal development and CI.

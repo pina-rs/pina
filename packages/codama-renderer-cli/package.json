@@ -2,7 +2,6 @@
 	"name": "@pina-rs/codama-renderer-cli",
 	"version": "0.22.0",
 	"description": "Codama visitor that renders commander-based TypeScript CLI applications from program IDLs",
-	"license": "Apache-2.0",
 	"homepage": "https://pina.rs",
 	"bugs": {
 		"url": "https://github.com/pina-rs/pina/issues"
@@ -12,22 +11,19 @@
 		"url": "git+https://github.com/pina-rs/pina.git",
 		"directory": "packages/codama-renderer-cli"
 	},
-	"type": "module",
+	"license": "Apache-2.0",
 	"sideEffects": false,
-	"main": "./dist/index.js",
-	"types": "./dist/types/index.d.ts",
+	"type": "module",
 	"exports": {
 		"types": "./dist/types/index.d.ts",
 		"import": "./dist/index.js"
 	},
+	"main": "./dist/index.js",
+	"types": "./dist/types/index.d.ts",
 	"files": [
 		"./dist",
 		"./README.md"
 	],
-	"publishConfig": {
-		"access": "public",
-		"provenance": true
-	},
 	"scripts": {
 		"build": "rimraf dist && tsup && tsc -p ./tsconfig.declarations.json",
 		"test": "pnpm test:types && pnpm test:unit",
@@ -46,5 +42,9 @@
 	},
 	"engines": {
 		"node": ">=18"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
 	}
 }

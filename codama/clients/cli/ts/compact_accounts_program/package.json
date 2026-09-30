@@ -1,9 +1,9 @@
 {
 	"name": "compact-accounts-program-cli",
 	"version": "0.1.0",
+	"private": true,
 	"description": "Command-line interface for compactAccountsProgram",
 	"type": "module",
-	"private": true,
 	"bin": {
 		"compact-accounts-program-cli": "./src/main.ts"
 	},
