@@ -258,6 +258,13 @@ fi
 	path
 }
 
+/// Commit `root` as a throwaway fixture repository.
+///
+/// The fixture reads no global or system git config, so the developer's setup
+/// cannot reach it: a global `commit.gpgsign = true` would sign every fixture
+/// commit through the developer's gpg-agent, which fails under the parallel
+/// load of a full test run. A `/dev/null` global config also turns a
+/// `--global` write into an error instead of an edit to `~/.gitconfig`.
 fn commit_project(root: &Path) {
 	let commands: &[&[&str]] = &[
 		&["init", "-q"],
@@ -277,6 +284,8 @@ fn commit_project(root: &Path) {
 		sanitize_git_environment(&mut command);
 		let status = command
 			.current_dir(root)
+			.env("GIT_CONFIG_GLOBAL", "/dev/null")
+			.env("GIT_CONFIG_NOSYSTEM", "1")
 			.args(*arguments)
 			.status()
 			.unwrap_or_else(|error| panic!("failed to run git {arguments:?}: {error}"));
@@ -321,10 +330,18 @@ fn git_environment_isolation_preserves_external_config() {
 	let contents = b"[user]\n\tname = Sentinel\n";
 	fs::write(&sentinel, contents)
 		.unwrap_or_else(|error| panic!("failed to write sentinel config: {error}"));
+	// Stands in for a developer config that signs every commit through a
+	// signer that fails, like a gpg-agent under parallel test load.
+	let signing = temp.path().join("signing.gitconfig");
+	let signing_contents = b"[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = false\n";
+	fs::write(&signing, signing_contents)
+		.unwrap_or_else(|error| panic!("failed to write signing config: {error}"));
 	let current_exe = std::env::current_exe()
 		.unwrap_or_else(|error| panic!("failed to locate integration test binary: {error}"));
 	let output = Command::new(current_exe)
 		.args(["verified_build_", "--test-threads=1"])
+		.env("GIT_CONFIG_GLOBAL", &signing)
+		.env("GIT_CONFIG_SYSTEM", &signing)
 		.env("GIT_CONFIG", &sentinel)
 		.env("GIT_CONFIG_PARAMETERS", "malformed-injected-parameters")
 		.env("GIT_CONFIG_COUNT", "1")
@@ -345,6 +362,10 @@ fn git_environment_isolation_preserves_external_config() {
 		fs::read(&sentinel)
 			.unwrap_or_else(|error| panic!("failed to read sentinel config: {error}")),
 		contents
+	);
+	assert_eq!(
+		fs::read(&signing).unwrap_or_else(|error| panic!("failed to read signing config: {error}")),
+		signing_contents
 	);
 }
 
