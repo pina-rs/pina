@@ -277,10 +277,27 @@ fn validate_owners(account: AccountView, owners: &[Address]) -> ProgramResult {
 	Err(ProgramError::InvalidAccountOwner)
 }
 
+#[inline(always)]
 #[track_caller]
 fn validate_address(account: AccountView, addr: &Address) -> ProgramResult {
-	if account.address() == addr {
+	if address_matches(account, addr) {
 		return Ok(());
+	}
+
+	Err(ProgramError::InvalidAccountData)
+}
+
+/// Compares `account`'s address with `addr` and logs a mismatch.
+///
+/// This returns `bool` rather than [`ProgramResult`] so it can stay out of
+/// line while its always-inlined callers build `InvalidAccountData` as a
+/// constant at each call site. An out-of-line `ProgramResult` comes back
+/// through memory, where neither the caller nor the entrypoint's error
+/// conversion can see which error it holds.
+#[track_caller]
+fn address_matches(account: AccountView, addr: &Address) -> bool {
+	if account.address() == addr {
+		return true;
 	}
 
 	log_failure!(
@@ -291,7 +308,7 @@ fn validate_address(account: AccountView, addr: &Address) -> ProgramResult {
 	);
 	log_caller();
 
-	Err(ProgramError::InvalidAccountData)
+	false
 }
 
 #[track_caller]
@@ -508,6 +525,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[track_caller]
 			fn assert_address(self, address: &Address) -> Result<Self, ProgramError> {
 				validate_address(*self, address)?;
