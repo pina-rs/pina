@@ -248,8 +248,21 @@ pub const VERBOSE_LOGS_ENABLED: bool = false;
 /// nostd_entrypoint!(process_instruction);
 /// ```
 ///
-/// An optional second argument overrides the maximum number of transaction
-/// accounts (defaults to `pinocchio::MAX_TX_ACCOUNTS`).
+/// An optional second argument sizes the entrypoint's account array
+/// (defaults to `pinocchio::MAX_TX_ACCOUNTS`). The loader skips accounts beyond
+/// the array instead of rejecting them, so a smaller array hides extra
+/// accounts from `finish_exact` unless it keeps a spare slot. A smaller array
+/// only shrinks the program when it has five slots or fewer, because pinocchio
+/// walks accounts five at a time. Programs routed by
+/// `#[discriminator(entrypoint)]` get that bound, spare slot included, as the
+/// generated `ENTRYPOINT_ACCOUNT_CAPACITY`:
+///
+/// ```ignore
+/// nostd_entrypoint!(
+///     CounterInstruction::process_instruction,
+///     CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+/// );
+/// ```
 ///
 /// The allocator is denied rather than merely unused, so code that reaches for
 /// `alloc` still links but aborts at runtime the moment it allocates. Programs
@@ -259,10 +272,12 @@ pub const VERBOSE_LOGS_ENABLED: bool = false;
 #[macro_export]
 macro_rules! nostd_entrypoint {
 	($process_instruction:expr) => {
-		$crate::nostd_entrypoint!($process_instruction, { $crate::pinocchio::MAX_TX_ACCOUNTS });
+		$crate::nostd_entrypoint!($process_instruction, $crate::pinocchio::MAX_TX_ACCOUNTS);
 	};
 	($process_instruction:expr, $maximum:expr) => {
-		$crate::pinocchio::program_entrypoint!($process_instruction, $maximum);
+		// Braced so a path such as `Enum::ENTRYPOINT_ACCOUNT_CAPACITY` is a
+		// valid const generic argument.
+		$crate::pinocchio::program_entrypoint!($process_instruction, { $maximum });
 		$crate::pinocchio::no_allocator!();
 		$crate::pinocchio::nostd_panic_handler!();
 	};
@@ -321,9 +336,7 @@ macro_rules! nostd_entrypoint {
 #[macro_export]
 macro_rules! nostd_entrypoint_alloc {
 	($process_instruction:expr) => {
-		$crate::nostd_entrypoint_alloc!($process_instruction, {
-			$crate::pinocchio::MAX_TX_ACCOUNTS
-		});
+		$crate::nostd_entrypoint_alloc!($process_instruction, $crate::pinocchio::MAX_TX_ACCOUNTS);
 	};
 	($process_instruction:expr, $maximum:expr) => {
 		// The allocator macro only exists when pinocchio's `alloc` feature is
@@ -331,7 +344,9 @@ macro_rules! nostd_entrypoint_alloc {
 		// first makes a missing feature an unresolved symbol that names the
 		// remedy, instead of an error about `default_allocator!`.
 		const _: () = $crate::ALLOC_FEATURE_REQUIRED_FOR_HEAP_ENTRYPOINT;
-		$crate::pinocchio::program_entrypoint!($process_instruction, $maximum);
+		// Braced so a path such as `Enum::ENTRYPOINT_ACCOUNT_CAPACITY` is a
+		// valid const generic argument.
+		$crate::pinocchio::program_entrypoint!($process_instruction, { $maximum });
 		$crate::pinocchio::default_allocator!();
 		$crate::pinocchio::nostd_panic_handler!();
 	};

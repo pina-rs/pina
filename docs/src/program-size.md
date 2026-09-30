@@ -192,16 +192,33 @@ Runtime compute units were verified on escrow with Surfpool, three runs each, fu
 
 The PDA-creation builders share one allocation spine (`CompactCreationTarget::allocate_zeroed`, `PdaCreationTarget::allocate`), so a program that creates several account types pays the seed marshalling, signer assembly, and rent computation once instead of once per generic instantiation — the multisig example keeps 5,252 bytes this way. Each spine keeps the shape its users measured best with: the compact-creation spine stays a real outlined call, which is what collapses multisig's three instantiations into one shared function, while the PDA-creation spine is `#[inline(always)]`, because a single-instantiation program has no duplicate to collapse and pays only the call boundary — outlining it measured +80 CU on the counter fixture's `initialize`.
 
-## Bound the entrypoint account budget
+## Bound the entrypoint account array
 
-`nostd_entrypoint!` accepts a second argument: the maximum number of accounts the entrypoint deserializes (the default is `pinocchio::MAX_TX_ACCOUNTS`, 255). Pinocchio's deserializer unrolls the account walk at compile time, so a program compiled with the default carries walking code for 255 accounts even when every instruction uses two. Passing the program's real bound — its widest instruction's account count plus headroom — removes that code:
+`nostd_entrypoint!` accepts a second argument: the size of the account array the entrypoint deserializes into (the default is `pinocchio::MAX_TX_ACCOUNTS`, 255). Pinocchio's deserializer walks accounts five at a time and then copies the remaining one to four through an unrolled match. With five or fewer slots, the five-account loop can never run, so it disappears from the program. With more slots the loop stays, and a bounded array adds a second loop that skips accounts past the array, so the program grows instead.
 
-| Fixture                                               | Default budget | Bounded budget | Δ size | Δ CU               |
-| ----------------------------------------------------- | -------------: | -------------: | ------ | ------------------ |
-| hello (`nostd_entrypoint!(process_instruction, 1)`)   |          4,680 |          2,736 | −41.5% | 145 → 151          |
-| counter (`nostd_entrypoint!(process_instruction, 3)`) |         11,400 |          9,976 | −12.5% | 3,203 → 3,202 / +4 |
+The loader does not reject accounts beyond the array; it skips them. An array sized to exactly the widest instruction therefore hides an extra trailing account from `finish_exact`, and an over-supplied instruction that pina would otherwise reject with `TooManyAccountKeys` runs instead. The safe bound is one slot larger: the spare slot keeps the first extra account visible, so every instruction whose accounts struct ends with `finish_exact` still rejects it, however many extras follow.
 
-The budget is a program-level contract: accounts beyond the bound are ignored rather than rejected, so a program that accepts unbounded remaining accounts must not lower it. [ADR 0010](./adrs/0010-lean-entrypoint-strategy.md) measures this lever and builds the case for the lean dispatcher on top of it.
+`#[discriminator(entrypoint)]` computes that bound as `ENTRYPOINT_ACCOUNT_CAPACITY`: one more than the widest routed accounts struct and the reserved `Migrate` route's slots, or the full 255 when a route accepts unbounded trailing accounts. Pass it as the second argument when it is five or less:
+
+```rust,ignore
+nostd_entrypoint!(
+	CounterInstruction::process_instruction,
+	CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+);
+```
+
+| Program                            | Capacity | Default array | Bounded array | Δ size |
+| ---------------------------------- | -------: | ------------: | ------------: | -----: |
+| hello fixture                      |        2 |         4,680 |         2,944 | −1,736 |
+| counter fixture                    |        4 |        10,456 |         9,416 | −1,040 |
+| `examples/counter_program`         |        4 |        16,096 |        14,896 | −1,200 |
+| `examples/migrations_program`      |      > 5 |        39,624 |        39,808 |   +184 |
+| `examples/escrow_program`          |      > 5 |        44,712 |        45,104 |   +392 |
+| `examples/staking_rewards_program` |      > 5 |        57,456 |        57,920 |   +464 |
+
+The bounded walk also costs a few compute units, because the deserializer caps the account count and checks for accounts to skip: +1 on the hello fixture's `hello`, +1 on the counter fixture's `initialize`, and +4 on its `increment`. A smaller array does shrink the entrypoint's stack frame by eight bytes per slot removed, which matters for a program close to the 4 KB frame limit even when it costs size.
+
+Accounts past the spare slot are never materialized, so the one observable difference from the full array is error precedence: a writable account whose duplicate sits past the spare slot fails with `TooManyAccountKeys` rather than `DuplicateMutableAccount`. Both reject the instruction. A program with a hand-written router, or one that reads accounts outside its routed accounts structs, must size its array itself by the same rule — its widest instruction plus one — and must keep the default when any instruction accepts unbounded trailing accounts.
 
 ## Prefer exclusive slice bounds in seed and signer assembly
 

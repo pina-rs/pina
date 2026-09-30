@@ -27,6 +27,8 @@ The comparison is meant to show framework overhead, not build settings, so every
 - `lto = "fat"`, `codegen-units = 1`, `opt-level = 3`, overflow checks off
 - `crate-type = ["cdylib"]` only, which is what lets LTO apply at all
 
+Each program uses its framework's recommended entrypoint. For Pina that is the `#[discriminator(entrypoint)]` router with its generated `ENTRYPOINT_ACCOUNT_CAPACITY`, which sizes the account array to the widest instruction plus one spare slot so extra trailing accounts are still rejected.
+
 See [Program size](./program-size.md) for why those settings matter and what each one is worth on its own.
 
 ## Results
@@ -37,7 +39,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 | Framework                   | Size (bytes) | `hello` CU | vs Pinocchio size |
 | --------------------------- | -----------: | ---------: | ----------------: |
-| Pina                        |        4,680 |        145 |              +48% |
+| Pina                        |        2,944 |        146 |               −7% |
 | Pinocchio (hand-written)    |        3,160 |        111 |               +0% |
 | Quasar                      |        2,520 |        115 |              −20% |
 | Anchor v2 (`lang-v2`, rc.1) |        1,880 |        127 |              −41% |
@@ -46,7 +48,7 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 | Framework                   | Size (bytes) | `initialize` CU | `increment` CU | vs Pinocchio size |
 | --------------------------- | -----------: | --------------: | -------------: | ----------------: |
-| Pina                        |       10,456 |           3,079 |          1,753 |              +61% |
+| Pina                        |        9,416 |           3,080 |          1,757 |              +45% |
 | Pinocchio (hand-written)    |        6,512 |           1,490 |          1,721 |               +0% |
 | Quasar                      |        7,808 |           3,488 |            330 |              +20% |
 | Anchor v2 (`lang-v2`, rc.1) |        8,696 |           3,458 |          2,117 |              +34% |
