@@ -1,3 +1,5 @@
+//! Curve-checked PDA derivation and recovery from invalid seeds.
+
 use pina::ProgramError;
 use pina::create_program_address;
 use pina::try_find_program_address;
@@ -70,6 +72,32 @@ fn create_program_address_wrong_bump_fails() {
 			assert_eq!(err, ProgramError::InvalidSeeds);
 		}
 	}
+}
+
+#[test]
+fn curve_preflight_returns_a_recoverable_error_for_an_on_curve_seed_hash() {
+	let seed = b"recoverable-pda";
+	let bump = (0..=u8::MAX)
+		.find(|bump| {
+			create_program_address(&[seed, &[*bump]], &SYSTEM_ID) == Err(ProgramError::InvalidSeeds)
+		})
+		.expect("at least one bump hashes to an on-curve address");
+	let bump_seed = [bump];
+	let seeds: &[&[u8]] = &[seed, &bump_seed];
+	let raw_address = pina::Address::derive_address(&[seed], Some(bump), &SYSTEM_ID);
+	assert!(raw_address.is_on_curve());
+
+	// This is the optional preflight documented for noncanonical creation.
+	// Handling its error lets the instruction continue before any signed CPI.
+	let (valid, valid_bump) =
+		try_find_program_address(&[seed], &SYSTEM_ID).expect("a valid fallback PDA");
+	let result = create_program_address(seeds, &SYSTEM_ID);
+	assert_eq!(result, Err(ProgramError::InvalidSeeds));
+	assert_eq!(result.unwrap_or(valid), valid);
+	assert_eq!(
+		create_program_address(&[seed, &[valid_bump]], &SYSTEM_ID),
+		Ok(valid)
+	);
 }
 
 #[test]

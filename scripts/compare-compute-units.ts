@@ -11,14 +11,23 @@ interface Threshold {
 	deltaPercent: number;
 }
 
+/** A reviewed increase that expires as soon as its PR base changes. */
+interface RegressionApproval {
+	baseRevision: string;
+	base: number;
+	head: number;
+	reason: string;
+}
+
 export interface ComputeUnitPolicy {
 	excludedPrograms?: string[];
 	trackedPrograms?: string[];
 	runtimeCases?: string[];
 	warn: Threshold;
 	fail: Threshold;
-	approvedTotals?: Record<string, number>;
-	runtimeApprovedTotals?: Record<string, number>;
+	staticCuApprovals?: Record<string, RegressionApproval>;
+	runtimeCuApprovals?: Record<string, RegressionApproval>;
+	binarySizeApprovals?: Record<string, RegressionApproval>;
 	runtimeExpectedOutcomes?: Record<string, boolean>;
 }
 
@@ -69,6 +78,8 @@ type ComparisonStatus =
 interface StaticComparison {
 	program: string;
 	status: ComparisonStatus;
+	cuStatus: ComparisonStatus;
+	sizeStatus: ComparisonStatus;
 	baseTotalCu: number;
 	headTotalCu: number;
 	deltaCu: number;
@@ -114,6 +125,7 @@ interface RuntimeComparisonResult {
 
 interface Arguments {
 	policyFile: string;
+	baseRevision?: string;
 	baseDir: string;
 	headDir: string;
 	markdownOutput: string;
@@ -151,6 +163,9 @@ function parseArguments(values: string[]): Arguments {
 		}
 		const value = requireValue(values, index, option);
 		switch (option) {
+			case "--base-revision":
+				parsed.baseRevision = value;
+				break;
 			case "--policy-file":
 				parsed.policyFile = value;
 				break;
@@ -287,6 +302,19 @@ export function performancePercent(
 	return ((baseValue - headValue) / baseValue) * 100;
 }
 
+/** Keep a historical exception from undoing savings on a later PR. */
+function isApprovedRegression(
+	approval: RegressionApproval | undefined,
+	baseRevision: string | undefined,
+	base: number,
+	head: number,
+): boolean {
+	return approval !== undefined && baseRevision !== undefined &&
+		/^[0-9a-f]{40}$/u.test(baseRevision) &&
+		approval.baseRevision === baseRevision && approval.base === base &&
+		head <= approval.head;
+}
+
 function classifyStatic(
 	program: string,
 	baseTotalCu: number,
@@ -294,6 +322,7 @@ function classifyStatic(
 	performanceScoreCu: number,
 	performanceScorePercent: number,
 	policy: ComputeUnitPolicy,
+	baseRevision?: string,
 ): ComparisonStatus {
 	if (performanceScoreCu > 0) {
 		return "improved";
@@ -319,12 +348,14 @@ function classifyStatic(
 		status = "small-regression";
 	}
 
-	const approvedTotal = policy.approvedTotals?.[program];
 	if (
 		(status === "fail" || status === "warn") &&
-		approvedTotal !== undefined &&
-		baseTotalCu < approvedTotal &&
-		headTotalCu <= approvedTotal
+		isApprovedRegression(
+			policy.staticCuApprovals?.[program],
+			baseRevision,
+			baseTotalCu,
+			headTotalCu,
+		)
 	) {
 		return "approved-regression";
 	}
@@ -337,6 +368,7 @@ function classifyRuntime(
 	headCu: number,
 	performanceScoreCu: number,
 	policy: ComputeUnitPolicy,
+	baseRevision?: string,
 ): ComparisonStatus {
 	if (performanceScoreCu > 0) {
 		return "improved";
@@ -345,20 +377,66 @@ function classifyRuntime(
 		return "unchanged";
 	}
 
-	const approvedTotal = policy.runtimeApprovedTotals?.[caseId];
 	if (
-		approvedTotal !== undefined && baseCu < approvedTotal &&
-		headCu <= approvedTotal
+		isApprovedRegression(
+			policy.runtimeCuApprovals?.[caseId],
+			baseRevision,
+			baseCu,
+			headCu,
+		)
 	) {
 		return "approved-regression";
 	}
 	return "fail";
 }
 
+/** Gate every byte of ELF growth independently of compute-unit savings. */
+function classifyBinarySize(
+	program: string,
+	base: number,
+	head: number,
+	policy: ComputeUnitPolicy,
+	baseRevision?: string,
+): ComparisonStatus {
+	if (head < base) {
+		return "improved";
+	}
+
+	if (head === base) {
+		return "unchanged";
+	}
+
+	return isApprovedRegression(
+			policy.binarySizeApprovals?.[program],
+			baseRevision,
+			base,
+			head,
+		)
+		? "approved-regression"
+		: "fail";
+}
+
+/** Summarize a program by its worst result, preserving both metric statuses. */
+function programStatus(
+	cu: ComparisonStatus,
+	size: ComparisonStatus,
+): ComparisonStatus {
+	if (cu === "fail" || size === "fail") {
+		return "fail";
+	}
+
+	if (cu !== "improved" && cu !== "unchanged") {
+		return cu;
+	}
+
+	return size === "unchanged" ? cu : size;
+}
+
 export function compareRuntimeReports(
 	policy: ComputeUnitPolicy,
 	baseReport: RuntimeReport,
 	headReport: RuntimeReport,
+	baseRevision?: string,
 ): RuntimeComparisonResult {
 	const comparisons: RuntimeComparison[] = [];
 	const newBaselines: string[] = [];
@@ -431,6 +509,7 @@ export function compareRuntimeReports(
 				head.computeUnits,
 				deltaCu,
 				policy,
+				baseRevision,
 			),
 			baseCu: base.computeUnits,
 			headCu: head.computeUnits,
@@ -555,6 +634,7 @@ function compareStaticReports(
 	policy: ComputeUnitPolicy,
 	baseDir: string,
 	headDir: string,
+	baseRevision?: string,
 ): {
 	comparisons: StaticComparison[];
 	newBaselines: StaticBaseline[];
@@ -567,6 +647,18 @@ function compareStaticReports(
 	const hardErrors: string[] = [];
 	const baseManifest = loadOptionalManifest(baseDir);
 	const headManifest = loadOptionalManifest(headDir);
+
+	for (
+		const [side, manifest] of [["base", baseManifest], [
+			"head",
+			headManifest,
+		]] as const
+	) {
+		if (manifest.results === undefined) {
+			hardErrors.push(`${side} static profile inventory is missing`);
+		}
+	}
+
 	const programs = new Set([
 		...(policy.trackedPrograms ?? []),
 		...Object.keys(baseManifest.results ?? {}),
@@ -620,16 +712,28 @@ function compareStaticReports(
 
 		const deltaCu = base.total_cu - head.total_cu;
 		const deltaPercent = performancePercent(base.total_cu, head.total_cu);
+		const cuStatus = classifyStatic(
+			program,
+			base.total_cu,
+			head.total_cu,
+			deltaCu,
+			deltaPercent,
+			policy,
+			baseRevision,
+		);
+		const sizeStatus = classifyBinarySize(
+			program,
+			base.binary_size,
+			head.binary_size,
+			policy,
+			baseRevision,
+		);
+
 		comparisons.push({
 			program,
-			status: classifyStatic(
-				program,
-				base.total_cu,
-				head.total_cu,
-				deltaCu,
-				deltaPercent,
-				policy,
-			),
+			status: programStatus(cuStatus, sizeStatus),
+			cuStatus,
+			sizeStatus,
 			baseTotalCu: base.total_cu,
 			headTotalCu: head.total_cu,
 			deltaCu,
@@ -837,7 +941,8 @@ function renderMarkdown(
 		`- fail when \`total_cu\` increases by at least +${policy.fail.deltaCu} CU and +${
 			policy.fail.deltaPercent.toFixed(1)
 		}%`,
-		"- explicit absolute totals approve reviewed redesigns once without weakening future relative checks",
+		"- every byte of ELF growth fails independently of compute-unit results",
+		"- reviewed increases require a metric-specific approval matching the PR base revision and measured base; the head must stay within its approved total",
 		"- savings are positive; increases are negative and visibly marked as regressions",
 		"- smaller increases pass the threshold gate but are not labeled as improvements",
 		"- values come from `pina profile` static SBF estimates, not runtime validator traces",
@@ -845,8 +950,8 @@ function renderMarkdown(
 	);
 	if (staticComparisons.length > 0) {
 		lines.push(
-			"| Program | Base CU | Head CU | CU change | Change % | Base size | Head size | Size change | Status |",
-			"| ------- | ------: | ------: | --------: | -------: | --------: | --------: | ----------: | ------ |",
+			"| Program | Base CU | Head CU | CU change | Change % | CU status | Base size | Head size | Size change | Size status |",
+			"| ------- | ------: | ------: | --------: | -------: | --------- | --------: | --------: | ----------: | ----------- |",
 		);
 		for (const item of staticComparisons) {
 			lines.push(
@@ -854,11 +959,11 @@ function renderMarkdown(
 					formatInt(item.headTotalCu)
 				} | ${formatSignedInt(item.deltaCu)} | ${
 					formatPercent(item.deltaPercent)
-				} | ${formatInt(item.baseBinarySize)} B | ${
-					formatInt(item.headBinarySize)
-				} B | ${formatSignedInt(item.deltaBinarySize)} B | ${
-					statusLabel(item.status)
-				} |`,
+				} | ${statusLabel(item.cuStatus)} | ${
+					formatInt(item.baseBinarySize)
+				} B | ${formatInt(item.headBinarySize)} B | ${
+					formatSignedInt(item.deltaBinarySize)
+				} B | ${statusLabel(item.sizeStatus)} |`,
 			);
 		}
 	} else {
@@ -910,11 +1015,14 @@ export function run(arguments_: Arguments): number {
 	const requiredRuntimeCases = new Set(
 		hasExactRuntime ? policy.runtimeCases ?? [] : [],
 	);
-	const staticResult = compareStaticReports(
-		policy,
-		arguments_.baseDir,
-		arguments_.headDir,
-	);
+	const staticResult = arguments_.runtimeOnly
+		? { comparisons: [], newBaselines: [], removedPrograms: [], hardErrors: [] }
+		: compareStaticReports(
+			policy,
+			arguments_.baseDir,
+			arguments_.headDir,
+			arguments_.baseRevision,
+		);
 	let baseRuntime: RuntimeReport = {};
 	let headRuntime: RuntimeReport = {};
 	let runtime: RuntimeComparisonResult = {
@@ -928,7 +1036,7 @@ export function run(arguments_: Arguments): number {
 	const headReports: RuntimeReport[] = [];
 
 	if (
-		arguments_.baseExactRuntime !== undefined &&
+		!arguments_.staticOnly && arguments_.baseExactRuntime !== undefined &&
 		arguments_.headExactRuntime !== undefined
 	) {
 		baseReports.push(
@@ -946,7 +1054,8 @@ export function run(arguments_: Arguments): number {
 	}
 
 	if (
-		arguments_.baseRuntime !== undefined && arguments_.headRuntime !== undefined
+		!arguments_.staticOnly && arguments_.baseRuntime !== undefined &&
+		arguments_.headRuntime !== undefined
 	) {
 		baseReports.push(loadJson<RuntimeReport>(arguments_.baseRuntime));
 		headReports.push(loadJson<RuntimeReport>(arguments_.headRuntime));
@@ -959,6 +1068,7 @@ export function run(arguments_: Arguments): number {
 			hasExactRuntime ? policy : { ...policy, runtimeCases: [] },
 			baseRuntime,
 			headRuntime,
+			arguments_.baseRevision,
 		);
 	}
 
@@ -981,6 +1091,7 @@ export function run(arguments_: Arguments): number {
 			JSON.stringify(
 				{
 					policy,
+					baseRevision: arguments_.baseRevision,
 					summary: {
 						runtimeComparedCases: runtime.comparisons.length,
 						runtimeFailures:

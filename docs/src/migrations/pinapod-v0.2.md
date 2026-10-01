@@ -289,4 +289,4 @@ devenv shell -- report:cu:compare:main
 
 Then run the generated TypeScript and Dart contract suites, the tracked SBF compact-account build, and the Surfpool lifecycle tests. The failure cases must compare both account data and lamport balances before and after the rejected update.
 
-The compute-unit report must show savings as positive values and increases as negative values. Exact runtime increases fail unless `scripts/compute-unit-policy.json` records a reviewed absolute ceiling. See [Compute-unit performance](../compute-unit-performance.md) for the PinaPod v0.2 measurements and methodology.
+The compute-unit report must show savings as positive values and increases as negative values. Exact runtime increases fail unless `scripts/compute-unit-policy.json` records a reviewed exception matching the PR base commit and measured baseline. See [Compute-unit performance](../compute-unit-performance.md) for the PinaPod v0.2 measurements and methodology.
