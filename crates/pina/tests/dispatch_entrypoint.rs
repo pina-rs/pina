@@ -28,8 +28,8 @@ pub enum Instruction {
 
 #[derive(Accounts)]
 pub struct InitializeAccounts<'a> {
-	pub authority: &'a AccountView,
 	pub state: &'a mut AccountView,
+	pub authority: &'a AccountView,
 }
 
 #[derive(Accounts)]
@@ -47,7 +47,7 @@ pub struct SweepAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
-		handle(&[self.authority, self.state], data)
+		handle(&[self.state, self.authority], data)
 	}
 }
 
@@ -103,6 +103,13 @@ fn account(address: u8) -> Slot {
 	Slot::Account {
 		address,
 		writable: true,
+	}
+}
+
+fn read_only(address: u8) -> Slot {
+	Slot::Account {
+		address,
+		writable: false,
 	}
 }
 
@@ -261,17 +268,23 @@ fn routed_struct_checks_still_run() {
 		(status(PinaProgramError::DuplicateMutableAccount), None)
 	);
 	assert_eq!(
-		run(
-			&[
-				account(1),
-				Slot::Account {
-					address: 2,
-					writable: false,
-				},
-			],
-			&[0],
-		),
+		run(&[read_only(1), account(2)], &[0]),
 		(status(ProgramError::InvalidAccountData), None)
+	);
+}
+
+/// A wrong account count on an exact route fails before the struct's
+/// per-account checks, which would otherwise reject the read-only `state`
+/// first.
+#[test]
+fn account_count_precedes_per_account_checks() {
+	assert_eq!(
+		run(&[read_only(1)], &[0]),
+		(status(ProgramError::NotEnoughAccountKeys), None)
+	);
+	assert_eq!(
+		run(&[read_only(1), account(2), account(3)], &[0]),
+		(status(PinaProgramError::TooManyAccountKeys), None)
 	);
 }
 

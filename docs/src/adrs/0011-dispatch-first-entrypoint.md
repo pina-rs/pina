@@ -137,7 +137,7 @@ The hello fixture is now the smallest of the four frameworks, and the counter is
 
 Across the fleet, 13 programs got smaller (−16 to −3,000 bytes) and two larger: `transfer_sol_program` (+40) and `profile_program` (+16), both on `nostd_entrypoint!` and changed only by the inlined account cursor. 61 instructions got cheaper, most by 30 to 170 compute units. The increases are:
 
-- `migrations_program/update`, +34 (+28 for a historical payload). The route runs its instruction through `process_versioned`, and LLVM compiles that call less well inside the dispatch-first arm; without it the historical update measured 157 compute units against `nostd_entrypoint!`'s 171.
+- `migrations_program/update`, +34 (+28 for a historical payload). Its struct has six optional accounts, and in the dispatch-first arm LLVM keeps more of their cursor reads out of line. Always inlining `AccountsCursor::next_opt` and `next_mut_opt` brought `update` to 280 (120 historical) but grew `migrations_program` by 680 bytes, so they stay as they are.
 - `pina_bpf_program/createPda` and `todo_program/initialize` +4, `compact_accounts_program/rename` +2, and three instructions +1, all on `nostd_entrypoint!` and all from the inlined cursor, without which the counter measured 800 bytes larger and its instructions 40 compute units dearer.
 
 ## Consequences

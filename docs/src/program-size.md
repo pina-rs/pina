@@ -208,7 +208,7 @@ dispatch_entrypoint!(CounterInstruction);
 - **Bounded**, when trailing optional fields may be absent: the walk rejects more than `ACCOUNT_LIMIT` accounts, and the struct reports a missing required one.
 - **Leading**, for a struct with a `#[pina(remaining)]` slice, a hand-written parser, or the reserved `Migrate` route: the walk reads up to `ENTRYPOINT_ACCOUNT_CAPACITY` accounts and ignores the rest, which is what `nostd_entrypoint!` hands those routes.
 
-Every check the routed struct and handler make still runs, and the program-ID and discriminator checks still come first. One precedence changes: an instruction with more accounts than its struct reads fails with `TooManyAccountKeys` before any per-account check.
+Every check the routed struct and handler make still runs, and the program-ID and discriminator checks still come first. Account counts now take precedence over per-account checks: an instruction with more accounts than its struct reads fails with `TooManyAccountKeys`, and one with fewer than a fixed-length struct reads fails with `NotEnoughAccountKeys`, where the struct's parser could report an earlier field's failure first.
 
 The walk is fastest inlined: a route with a fixed account count unrolls it and folds the checks its positions make impossible. Every route then carries its own copy, though, so a router with more than two routes calls one shared copy instead; the reserved `Migrate` route follows that choice without counting toward it. The shared copy costs 10 to 40 compute units per instruction and keeps large routers from growing.
 

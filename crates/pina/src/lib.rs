@@ -334,10 +334,11 @@ macro_rules! nostd_entrypoint {
 /// dispatch_entrypoint!(CounterInstruction);
 /// ```
 ///
-/// Every check the routed accounts struct and handler make still runs. One
-/// precedence differs from `nostd_entrypoint!`: an instruction with more
-/// accounts than its struct reads fails with `TooManyAccountKeys` before any
-/// per-account check.
+/// Every check the routed accounts struct and handler make still runs. Account
+/// counts take precedence over per-account checks, where `nostd_entrypoint!`
+/// can report an earlier field's failure first: an instruction with more
+/// accounts than its struct reads fails with `TooManyAccountKeys`, and one with
+/// fewer than a fixed-length struct reads fails with `NotEnoughAccountKeys`.
 ///
 /// The program must run where SIMD-0321 is active, which every public cluster
 /// is: without it the second entrypoint argument is undefined. Like

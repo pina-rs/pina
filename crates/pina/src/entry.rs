@@ -147,8 +147,9 @@ pub const ROUTE_UNBOUNDED: u8 = 2;
 /// `dispatch_entrypoint!` calls this for a route whose accounts struct reads
 /// exactly `N` accounts (its `ACCOUNT_MINIMUM` equals its `ACCOUNT_LIMIT`).
 /// The fixed length lets the struct's own length checks fold away. An input
-/// with any other count fails here with the error the struct's parser would
-/// return for it.
+/// with any other count fails here, before any of the struct's per-account
+/// checks, so the count error wins over a field the struct's parser would have
+/// rejected first.
 ///
 /// # Errors
 ///
