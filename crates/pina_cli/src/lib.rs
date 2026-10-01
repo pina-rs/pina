@@ -21,6 +21,7 @@ pub mod lint_driver;
 pub mod lint_reference;
 pub mod lint_toolchain;
 pub mod migrations;
+mod npm_isolation;
 pub mod parse;
 mod path_security;
 pub mod profile;
@@ -31,6 +32,7 @@ pub mod workflow;
 
 mod dart_client;
 mod dart_events;
+mod generation_manifest;
 mod js_client;
 mod js_events;
 mod verifiable;

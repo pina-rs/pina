@@ -183,6 +183,16 @@ fn render_root_node_enforces_modes_and_safety() {
 		"refused destinations are left untouched"
 	);
 
+	let mut overwrite_foreign = config();
+	overwrite_foreign.mode = RenderMode::Overwrite;
+	let refusal = render_root_node(&fixture_root(), &foreign, &overwrite_foreign)
+		.expect_err("overwrite must refuse an untracked nonempty destination");
+	assert!(
+		matches!(refusal, super::RenderError::InvalidGenerationState { .. }),
+		"the refusal names the remedy: {refusal}"
+	);
+	assert!(foreign.join("notes.txt").is_file());
+
 	let mut update_generated = config();
 	update_generated.mode = RenderMode::Update;
 	fs::write(root.join("Cargo.toml"), "# custom manifest")
@@ -202,12 +212,50 @@ fn render_root_node_enforces_modes_and_safety() {
 		"create mode must reject a nonempty destination"
 	);
 
+	fs::write(root.join("keep.txt"), "keep")
+		.unwrap_or_else(|error| panic!("write keep file: {error}"));
 	let mut overwrite = config();
 	overwrite.mode = RenderMode::Overwrite;
 	render_root_node(&fixture_root(), &root, &overwrite)
 		.unwrap_or_else(|error| panic!("overwrite mode replaces the crate: {error}"));
 	assert!(root.join("Cargo.toml").is_file());
 	assert!(root.join(super::MARKER_FILE).is_file());
+	assert!(
+		root.join("keep.txt").is_file(),
+		"untracked files survive the manifest-bounded overwrite"
+	);
+}
+
+#[cfg(unix)]
+#[test]
+fn tracked_overwrite_still_refuses_repository_trees() {
+	use std::os::unix::fs::symlink;
+
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp: {error}"));
+	let temp_root = fs::canonicalize(temp.path())
+		.unwrap_or_else(|error| panic!("canonicalize temp dir: {error}"));
+	let root = read_root_node(&fixture("counter_program"))
+		.unwrap_or_else(|error| panic!("fixture: {error}"));
+
+	// A tracked tree that contains a repository is refused even though
+	// deletion is manifest-bounded.
+	let git_tree = temp_root.join("git-tree");
+	fs::create_dir_all(git_tree.join(".git")).unwrap_or_else(|error| panic!("mkdir: {error}"));
+	super::generation_manifest::write(
+		&git_tree,
+		&std::collections::BTreeSet::from([std::path::PathBuf::from("src/main.rs")]),
+	)
+	.unwrap_or_else(|error| panic!("manifest write: {error}"));
+
+	let mut overwrite = config();
+	overwrite.mode = RenderMode::Overwrite;
+	let refusal = render_root_node(&root, &git_tree, &overwrite)
+		.expect_err("overwrite must refuse a repository tree");
+	assert!(
+		matches!(refusal, super::RenderError::UnsafeOutputPath { .. }),
+		"the guards still apply to tracked trees: {refusal}"
+	);
+	assert!(git_tree.join(".git").is_dir());
 }
 
 #[cfg(unix)]

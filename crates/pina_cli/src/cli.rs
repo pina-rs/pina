@@ -226,11 +226,14 @@ pub(crate) enum Commands {
 		#[arg(long = "client", value_enum, value_name = "LANGUAGE")]
 		clients: Vec<ClientArg>,
 
-		/// Override the configured client output directory.
+		/// Override the configured client output directory. Configured
+		/// outputs stay inside the Git worktree; only this flag publishes
+		/// outside it.
 		#[arg(short, long, value_name = "DIR")]
 		output: Option<PathBuf>,
 
-		/// Override how existing client destinations are handled.
+		/// Override how existing client destinations are handled. Selecting
+		/// `overwrite` is an operator decision: pina.toml cannot request it.
 		#[arg(long, value_enum, value_name = "MODE")]
 		mode: Option<GenerationMode>,
 
@@ -238,7 +241,10 @@ pub(crate) enum Commands {
 		#[arg(long)]
 		no_scaffold: bool,
 
-		/// Executable used to invoke JavaScript or Dart renderers. Defaults to npx.
+		/// Executable used to invoke JavaScript or Dart renderers. Defaults to
+		/// npx, which resolves the pinned packages isolated from the project;
+		/// pass a Node executable to resolve packages from the project on
+		/// purpose.
 		#[arg(
 			long,
 			default_value = "npx",

@@ -1,0 +1,19 @@
+{
+	"paths": [
+		".pina-generated.json",
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/profileState.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/errors/profileProgram.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/addTag.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initialize.ts",
+		"src/generated/instructions/removeTag.ts",
+		"src/generated/instructions/updateProfile.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/profile.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/profileProgram.ts"
+	]
+}

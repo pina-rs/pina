@@ -1,0 +1,18 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/hello.ts",
+		"src/commands/hello_next.ts",
+		"src/commands/hello_no_msg.ts",
+		"src/commands/require_eq.ts",
+		"src/commands/require_gt.ts",
+		"src/commands/require_gte.ts",
+		"src/commands/require_neq.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

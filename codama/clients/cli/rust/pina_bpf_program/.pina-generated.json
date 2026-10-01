@@ -1,0 +1,13 @@
+{
+	"paths": [
+		".pina-generated",
+		"src/commands/create_pda.rs",
+		"src/commands/forward_rotate_with_pda.rs",
+		"src/commands/forward_rotate_with_signer.rs",
+		"src/commands/hello.rs",
+		"src/commands/mod.rs",
+		"src/context.rs",
+		"src/fetch.rs",
+		"src/main.rs"
+	]
+}

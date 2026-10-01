@@ -1,0 +1,16 @@
+{
+	"paths": [
+		".pina-generated.json",
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/oracleState.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/errors/propAmmProgram.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initialize.ts",
+		"src/generated/instructions/rotateAuthority.ts",
+		"src/generated/instructions/update.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/propAmmProgram.ts"
+	]
+}

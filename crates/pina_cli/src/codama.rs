@@ -45,12 +45,11 @@ const MINIMUM_GENERATED_KIT_MAJOR: u16 = 8;
 const CLIENT_RENDER_SCRIPT: &str = r#"
 import {
 	copyFileSync,
-	cpSync,
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
-	renameSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -127,6 +126,8 @@ if (!renderer || !outputRoot || !clientRoot || !requestedMode || !scaffoldValue)
 const scaffold = scaffoldValue === "true";
 const names = idlPaths.map((path) => basename(path, ".json")).sort();
 const stagingRoot = mkdtempSync(join(tmpdir(), "pina-clients-"));
+const MANIFEST_FILE = ".pina-generated.json";
+const manifests = new Map();
 
 try {
 	for (const idlPath of idlPaths.sort()) {
@@ -185,13 +186,19 @@ try {
 		}
 	} else if (renderer === "cli-ts") {
 		for (const name of names) {
-			publishDirectory(join(stagingRoot, name), join(outputRoot, name));
+			publishDirectory(
+				join(outputRoot, name),
+				join(stagingRoot, name),
+				join(outputRoot, name),
+			);
 		}
 	} else if (renderer === "cli-dart") {
 		publishDartCli();
 	} else {
 		publishDart();
 	}
+
+	writeManifests();
 } finally {
 	rmSync(stagingRoot, { force: true, recursive: true });
 }
@@ -213,16 +220,137 @@ function sanitizeDocs(json) {
 	});
 }
 
+// Cleanup is bounded by a tracked-files manifest (`.pina-generated.json`)
+// at each published root: regeneration removes only the paths a previous run
+// recorded, so files the developer added survive, and `overwrite` refuses a
+// directory Pina never generated instead of removing it. A committed
+// manifest is untrusted input: only plain relative entries are honored, and
+// a path whose lookup finds a symbolic link is skipped rather than followed.
+function loadTracked(root) {
+	const manifestPath = join(root, MANIFEST_FILE);
+	if (!existsSync(manifestPath)) {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(readFileSync(manifestPath, "utf8"));
+		if (!Array.isArray(parsed?.paths)) {
+			return null;
+		}
+		const tracked = new Set();
+		for (const entry of parsed.paths) {
+			if (typeof entry === "string" && isTrackedEntry(entry)) {
+				tracked.add(entry);
+			}
+		}
+		return tracked;
+	} catch {
+		return null;
+	}
+}
+
+function isTrackedEntry(entry) {
+	if (!entry || entry.startsWith("/") || entry.startsWith("\\")) {
+		return false;
+	}
+	if (/^[A-Za-z]:[\\/]/.test(entry)) {
+		return false;
+	}
+	return !entry.split(/[\\/]/).some((part) => part === ".." || part === "");
+}
+
+function record(root, path) {
+	if (!manifests.has(root)) {
+		manifests.set(root, new Set());
+	}
+	manifests.get(root).add(relative(root, path).split(sep).join("/"));
+}
+
+function writeManifests() {
+	for (const [root, paths] of manifests) {
+		// The record is cumulative: files an earlier run tracked but this
+		// one did not rewrite (a scaffold manifest, another program's
+		// entrypoints in a shared CLI package) stay tracked.
+		const merged = new Set([...(loadTracked(root) ?? new Set()), ...paths]);
+		mkdirSync(root, { recursive: true });
+		writeFileSync(
+			join(root, MANIFEST_FILE),
+			`${JSON.stringify({ paths: [...merged].sort() }, null, 2)}\n`,
+			"utf8",
+		);
+	}
+}
+
+function refuseUntrackedOverwrite(directory) {
+	if (loadTracked(directory) !== null) {
+		return;
+	}
+	if (!existsSync(directory) || readdirSync(directory).length === 0) {
+		return;
+	}
+	throw new Error(
+		`cannot overwrite ${directory}: it was not generated with tracked manifests; remove it by hand, or generate once without overwrite to record its files`,
+	);
+}
+
+// Remove every tracked entry under `scope` inside `root`, pruning
+// directories the removals left empty. Returns whether a manifest existed.
+function removeTrackedUnder(root, scope) {
+	const tracked = loadTracked(root);
+	if (tracked === null) {
+		return false;
+	}
+	const prefix = relative(root, scope).split(sep).join("/");
+
+	for (const entry of tracked) {
+		if (prefix !== "" && !(entry === prefix || entry.startsWith(`${prefix}/`))) {
+			continue;
+		}
+		const target = join(root, entry);
+		let metadata;
+		try {
+			metadata = lstatSync(target);
+		} catch {
+			continue;
+		}
+		if (metadata.isSymbolicLink()) {
+			continue;
+		}
+		rmSync(target, { force: true, recursive: true });
+		pruneEmptyParents(root, dirname(target));
+	}
+
+	return true;
+}
+
+function pruneEmptyParents(root, directory) {
+	let current = directory;
+	// The `root + sep` prefix keeps a sibling such as `${root}X` from
+	// matching, so pruning can never climb past the manifest's own root.
+	while (current.startsWith(`${root}${sep}`)) {
+		try {
+			if (readdirSync(current).length !== 0) {
+				return;
+			}
+			rmSync(current);
+		} catch {
+			return;
+		}
+		current = dirname(current);
+	}
+}
+
 function publishTypescript(name) {
 	const destination = join(outputRoot, name);
 	const staged = join(stagingRoot, name);
 	const mode = resolveMode(destination);
 
 	if (mode === "overwrite") {
-		rmSync(destination, { force: true, recursive: true });
+		refuseUntrackedOverwrite(destination);
+		removeTrackedUnder(destination, destination);
 	}
 
 	publishDirectory(
+		destination,
 		join(staged, "src", "generated"),
 		join(destination, "src", "generated"),
 	);
@@ -230,7 +358,8 @@ function publishTypescript(name) {
 	const manifest = join(destination, "package.json");
 	if (scaffold && !existsSync(manifest)) {
 		mkdirSync(destination, { recursive: true });
-		cpSync(join(staged, "package.json"), manifest);
+		copyFileSync(join(staged, "package.json"), manifest);
+		record(destination, manifest);
 	}
 }
 
@@ -238,11 +367,13 @@ function publishDart() {
 	const mode = resolveMode(outputRoot);
 
 	if (mode === "overwrite") {
-		rmSync(outputRoot, { force: true, recursive: true });
+		refuseUntrackedOverwrite(outputRoot);
+		removeTrackedUnder(outputRoot, outputRoot);
 	}
 
 	for (const name of names) {
 		publishDirectory(
+			outputRoot,
 			join(stagingRoot, "lib", "src", "generated", name),
 			join(outputRoot, "lib", "src", "generated", name),
 		);
@@ -252,22 +383,39 @@ function publishDart() {
 	if (scaffold && !existsSync(manifest)) {
 		mkdirSync(outputRoot, { recursive: true });
 		writeFileSync(manifest, dartManifest(), "utf8");
+		record(outputRoot, manifest);
 	}
 }
 
-function publishDirectory(staged, destination) {
-	const parent = dirname(destination);
-	const next = `${destination}.pina-next`;
-	mkdirSync(parent, { recursive: true });
-	rmSync(next, { force: true, recursive: true });
-	cpSync(staged, next, { recursive: true });
-	rmSync(destination, { force: true, recursive: true });
-	renameSync(next, destination);
+function publishDirectory(root, staged, destination) {
+	if (!removeTrackedUnder(root, destination)) {
+		// A destination from before tracked manifests keeps the historical
+		// whole-directory replacement so stale files do not linger.
+		rmSync(destination, { force: true, recursive: true });
+	}
+
+	mkdirSync(destination, { recursive: true });
+	copyTree(staged, destination, root);
+}
+
+function copyTree(staged, destination, root) {
+	for (const entry of readdirSync(staged, { withFileTypes: true })) {
+		const from = join(staged, entry.name);
+		const to = join(destination, entry.name);
+		if (entry.isDirectory()) {
+			mkdirSync(to, { recursive: true });
+			copyTree(from, to, root);
+		} else if (entry.isFile()) {
+			copyFileSync(from, to);
+			record(root, to);
+		}
+	}
 }
 
 function publishDartCli() {
 	for (const name of names) {
 		publishDirectory(
+			outputRoot,
 			join(stagingRoot, "lib", "src", name),
 			join(outputRoot, "lib", "src", name),
 		);
@@ -275,15 +423,18 @@ function publishDartCli() {
 		// whole staged bin directory would drop the entrypoints of programs
 		// that are not part of this invocation.
 		publishFile(
+			outputRoot,
 			join(stagingRoot, "bin", `${name}.dart`),
 			join(outputRoot, "bin", `${name}.dart`),
 		);
 	}
 	publishFile(
+		outputRoot,
 		join(stagingRoot, "lib", "src", "endpoint_guard.dart"),
 		join(outputRoot, "lib", "src", "endpoint_guard.dart"),
 	);
 	publishFile(
+		outputRoot,
 		join(stagingRoot, "test", "endpoint_guard_test.dart"),
 		join(outputRoot, "test", "endpoint_guard_test.dart"),
 	);
@@ -292,12 +443,14 @@ function publishDartCli() {
 	if (scaffold && !existsSync(manifest)) {
 		mkdirSync(outputRoot, { recursive: true });
 		writeFileSync(manifest, dartCliManifest(), "utf8");
+		record(outputRoot, manifest);
 	}
 }
 
-function publishFile(staged, destination) {
+function publishFile(root, staged, destination) {
 	mkdirSync(dirname(destination), { recursive: true });
 	copyFileSync(staged, destination);
+	record(root, destination);
 }
 
 function dartCliManifest() {
@@ -395,6 +548,14 @@ pub struct ProjectGenerateOptions {
 	pub npx: String,
 }
 
+/// One generated client's resolved destination and lifecycle mode.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedClientTarget {
+	pub language: ClientLanguage,
+	pub path: PathBuf,
+	pub mode: GenerationMode,
+}
+
 /// Outputs produced by project-aware client generation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectGenerateOutput {
@@ -402,6 +563,9 @@ pub struct ProjectGenerateOutput {
 	pub idl: PathBuf,
 	pub clients_dir: PathBuf,
 	pub clients: Vec<ClientLanguage>,
+	/// The resolved destination and mode of every generated client, in
+	/// generation order.
+	pub targets: Vec<GeneratedClientTarget>,
 }
 
 #[derive(Debug)]
@@ -422,6 +586,21 @@ struct GenerationPlan {
 	clients: BTreeSet<ClientLanguage>,
 	generation: BTreeMap<ClientLanguage, GenerationSettings>,
 	npx: String,
+	/// The project directory the workspace root is discovered from. The
+	/// discovery spawns `git`, so it runs lazily: a native-renderer run with
+	/// `--output` never needs the boundary.
+	project_root: PathBuf,
+	/// The root configured outputs must stay within, and the boundary the
+	/// renderer children's `PATH` is scrubbed against.
+	workspace_root: std::cell::OnceCell<PathBuf>,
+}
+
+impl GenerationPlan {
+	/// The workspace root, discovered on first use.
+	fn workspace_root(&self) -> &Path {
+		self.workspace_root
+			.get_or_init(|| crate::project::generation_containment_root(&self.project_root))
+	}
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -441,6 +620,11 @@ struct BoundedOutput {
 /// An empty `clients` override uses the languages configured in `pina.toml`.
 /// The output override is resolved from the process working directory, matching
 /// normal command-line path behavior.
+///
+/// Configured outputs must resolve inside the project's Git working tree; only
+/// the `--output` flag
+/// publishes elsewhere. `pina.toml` cannot select `overwrite`: destructive
+/// regeneration is an operator decision, requested with `--mode overwrite`.
 ///
 /// # Errors
 ///
@@ -470,15 +654,36 @@ pub fn generate_project_clients(
 		.client_generation
 		.iter()
 		.map(|(language, configured)| {
-			(
+			if clients.contains(language)
+				&& options.mode.is_none()
+				&& configured.mode == GenerationMode::Overwrite
+			{
+				return Err(CodamaError::ConfiguredOverwrite {
+					language: language.as_str(),
+				});
+			}
+
+			Ok((
 				*language,
 				GenerationSettings {
 					mode: options.mode.unwrap_or(configured.mode),
 					scaffold: options.scaffold.unwrap_or(configured.scaffold),
 				},
-			)
+			))
 		})
-		.collect();
+		.collect::<Result<BTreeMap<_, _>, _>>()?;
+	let mut targets = Vec::with_capacity(clients.len());
+	for language in &clients {
+		let configured = client_target(*language);
+		let path = std::path::absolute(&configured)
+			.map_err(|source| create_dir_error(&configured, source))?;
+
+		targets.push(GeneratedClientTarget {
+			language: *language,
+			path,
+			mode: generation[language].mode,
+		});
+	}
 	let plan = GenerationPlan {
 		programs: vec![(project.library_name.clone(), project.program_dir.clone())],
 		override_idl_names: true,
@@ -497,7 +702,16 @@ pub fn generate_project_clients(
 		clients: clients.clone(),
 		generation,
 		npx: options.npx.clone(),
+		project_root: project.root.clone(),
+		workspace_root: std::cell::OnceCell::new(),
 	};
+
+	if options.output.is_none() {
+		// `workspace_root()` primes the plan's cache, so the renderer
+		// children's `PATH` scrub reuses this discovery instead of
+		// spawning `git` a second time.
+		reject_outside_workspace(plan.workspace_root(), &clients, &client_target)?;
+	}
 
 	let idl_paths = generate_plan(&plan)?;
 	let idl = idl_paths
@@ -510,7 +724,39 @@ pub fn generate_project_clients(
 		idl,
 		clients_dir,
 		clients: clients.into_iter().collect(),
+		targets,
 	})
+}
+
+/// Refuse configured client outputs that resolve outside the workspace root.
+///
+/// `pina.toml` ships with the repository, so a configured escape would let a
+/// malicious project write — and, with `overwrite`, delete — anywhere the
+/// developer can write. The operator opts into an outside destination with
+/// the `--output` flag, which skips this check.
+fn reject_outside_workspace(
+	workspace_root: &Path,
+	clients: &BTreeSet<ClientLanguage>,
+	client_target: &impl Fn(ClientLanguage) -> PathBuf,
+) -> Result<(), CodamaError> {
+	for language in clients {
+		let configured = client_target(*language);
+		let absolute = std::path::absolute(&configured)
+			.map_err(|source| create_dir_error(&configured, source))?;
+
+		if !absolute.starts_with(workspace_root) {
+			return Err(CodamaError::UnsafeOutput {
+				path: absolute,
+				reason: format!(
+					"configured client outputs must stay inside the Git worktree {}; pass \
+					 `--output` to publish outside it",
+					workspace_root.display()
+				),
+			});
+		}
+	}
+
+	Ok(())
 }
 
 /// Add each selected CLI's base client and warn when several CLIs are picked.
@@ -671,8 +917,22 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			verify_typescript_scaffold_kit_major(&plan.typescript_out.join(example), settings)?;
 		}
 
+		let snapshots = examples
+			.iter()
+			.map(|example| snapshot_client_tree(&plan.typescript_out.join(example)))
+			.collect::<Result<Vec<_>, _>>()?;
 		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
 		harden_generated_clients(&plan.typescript_out, &examples, &idl_paths)?;
+		let roots = examples
+			.iter()
+			.map(|example| plan.typescript_out.join(example))
+			.collect::<Vec<_>>();
+		record_added_files(&roots, snapshots, |path, source| {
+			CodamaError::HardenJavaScript {
+				path: path.to_path_buf(),
+				source,
+			}
+		})?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::Dart) {
@@ -685,9 +945,27 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		}
 
 		validate_dart_client_idls(&plan.dart_out, &examples, &idl_paths)?;
+		let snapshots = snapshot_client_tree(&plan.dart_out)
+			.map(|snapshot| vec![snapshot])
+			.map_err(|source| {
+				CodamaError::DartClient {
+					path: plan.dart_out.clone(),
+					source: Box::new(source),
+				}
+			})?;
 		run_client_generation(plan, ClientLanguage::Dart, &idl_paths)?;
 		harden_generated_dart_clients(&plan.dart_out, &examples, &idl_paths)?;
 		write_dart_package_barrels(&plan.dart_out, &examples)?;
+		record_added_files(
+			std::slice::from_ref(&plan.dart_out),
+			snapshots,
+			|path, source| {
+				CodamaError::DartClient {
+					path: path.to_path_buf(),
+					source: Box::new(source),
+				}
+			},
+		)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::CliRust) {
@@ -734,6 +1012,37 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	Ok(idl_paths)
+}
+
+/// Snapshot a client tree before a post-render step so the files the step
+/// adds can be recorded in its manifest afterwards.
+fn snapshot_client_tree(
+	root: &Path,
+) -> Result<crate::generation_manifest::FileSnapshot, CodamaError> {
+	crate::generation_manifest::FileSnapshot::take(root).map_err(|source| {
+		CodamaError::CreateDir {
+			path: root.to_path_buf(),
+			source,
+		}
+	})
+}
+
+/// Record the files post-render steps added in each client root's manifest.
+fn record_added_files(
+	roots: &[PathBuf],
+	snapshots: Vec<crate::generation_manifest::FileSnapshot>,
+	error: impl Fn(&Path, std::io::Error) -> CodamaError,
+) -> Result<(), CodamaError> {
+	for (root, snapshot) in roots.iter().zip(snapshots) {
+		let added = snapshot
+			.added_since(root)
+			.map_err(|source| error(root, source))?;
+
+		crate::generation_manifest::append_generated_paths(root, &added)
+			.map_err(|source| error(root, source))?;
+	}
+
+	Ok(())
 }
 
 /// Read the package name of a generated Rust client crate, falling back to
@@ -1325,15 +1634,13 @@ fn run_client_generation(
 	} else {
 		match run_client_generation_with_npx(plan, renderer, idl_paths) {
 			Ok(output) => output,
-			Err(source) if source.kind() == std::io::ErrorKind::NotFound && plan.npx == "npx" => {
+			Err(CodamaError::RunCommand {
+				ref source,
+				ref cmd,
+			}) if source.kind() == std::io::ErrorKind::NotFound && *cmd == "npx" => {
 				run_client_generation_with_pnpm(plan, renderer, idl_paths)?
 			}
-			Err(source) => {
-				return Err(CodamaError::RunCommand {
-					cmd: plan.npx.clone(),
-					source,
-				});
-			}
+			Err(source) => return Err(source),
 		}
 	};
 
@@ -1385,11 +1692,20 @@ fn diagnostic_text(bytes: &[u8]) -> String {
 		})
 }
 
+/// Absolutize a renderer argument against the process working directory.
+///
+/// The npx and pnpm children run from an isolated temporary directory, so a
+/// relative renderer output, client root, or IDL path would resolve against
+/// that directory instead of the project the paths were computed from.
+fn renderer_arg(path: &Path) -> Result<PathBuf, CodamaError> {
+	std::path::absolute(path).map_err(|source| create_dir_error(path, source))
+}
+
 fn run_client_generation_with_npx(
 	plan: &GenerationPlan,
 	renderer: ClientLanguage,
 	idl_paths: &[PathBuf],
-) -> std::io::Result<BoundedOutput> {
+) -> Result<BoundedOutput, CodamaError> {
 	let mut command = Command::new(&plan.npx);
 
 	command.arg("-y").arg("-p").arg(CODAMA_PACKAGE);
@@ -1399,15 +1715,31 @@ fn run_client_generation_with_npx(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_output(plan, renderer))
-		.arg(client_root(plan, renderer));
+		.arg(renderer_arg(renderer_output(plan, renderer))?)
+		.arg(renderer_arg(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(idl_path);
+		command.arg(renderer_arg(idl_path)?);
 	}
 
-	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes()))
+	let isolated = crate::npm_isolation::isolate_package_child(&mut command, plan.workspace_root())
+		.map_err(|source| {
+			CodamaError::RunCommand {
+				cmd: plan.npx.clone(),
+				source,
+			}
+		})?;
+	let output =
+		run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
+			CodamaError::RunCommand {
+				cmd: plan.npx.clone(),
+				source,
+			}
+		})?;
+	drop(isolated);
+
+	Ok(output)
 }
 
 fn run_client_generation_with_pnpm(
@@ -1423,22 +1755,39 @@ fn run_client_generation_with_pnpm(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_output(plan, renderer))
-		.arg(client_root(plan, renderer));
+		.arg(renderer_arg(renderer_output(plan, renderer))?)
+		.arg(renderer_arg(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(idl_path);
+		command.arg(renderer_arg(idl_path)?);
 	}
 
-	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
-		CodamaError::RunCommand {
-			cmd: "pnpm".to_string(),
-			source,
-		}
-	})
+	let isolated = crate::npm_isolation::isolate_package_child(&mut command, plan.workspace_root())
+		.map_err(|source| {
+			CodamaError::RunCommand {
+				cmd: "pnpm".to_string(),
+				source,
+			}
+		})?;
+	let output =
+		run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
+			CodamaError::RunCommand {
+				cmd: "pnpm".to_string(),
+				source,
+			}
+		})?;
+	drop(isolated);
+
+	Ok(output)
 }
 
+/// Run the render script through a Node executable the operator selected.
+///
+/// This is the documented project-package mode: the child keeps the project
+/// working directory and `PATH` so the script resolves packages from the
+/// project on purpose, which is why it skips
+/// [`crate::npm_isolation::isolate_package_child`].
 fn run_client_generation_with_node(
 	plan: &GenerationPlan,
 	renderer: ClientLanguage,
@@ -1450,12 +1799,12 @@ fn run_client_generation_with_node(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_output(plan, renderer))
-		.arg(client_root(plan, renderer));
+		.arg(renderer_arg(renderer_output(plan, renderer))?)
+		.arg(renderer_arg(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(idl_path);
+		command.arg(renderer_arg(idl_path)?);
 	}
 
 	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
@@ -1714,6 +2063,8 @@ mod tests {
 			clients: BTreeSet::new(),
 			generation: default_generation_settings(),
 			npx: npx.into(),
+			project_root: PathBuf::from("workspace"),
+			workspace_root: std::cell::OnceCell::new(),
 		}
 	}
 
@@ -1726,6 +2077,41 @@ mod tests {
 		let path = dir.join(name);
 		let written = std::fs::write(path, contents);
 		written.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+	}
+
+	#[test]
+	fn configured_outputs_outside_the_workspace_are_refused_per_language() {
+		let workspace = Path::new("/work/repo");
+		let clients = BTreeSet::from([ClientLanguage::Typescript]);
+		let inside = |language: ClientLanguage| {
+			match language {
+				ClientLanguage::Typescript => PathBuf::from("/work/repo/clients/typescript"),
+				_ => PathBuf::from("/work/repo/clients/other"),
+			}
+		};
+		let outside = |language: ClientLanguage| {
+			match language {
+				ClientLanguage::Typescript => PathBuf::from("/work/other/typescript"),
+				_ => PathBuf::from("/work/repo/clients/other"),
+			}
+		};
+
+		reject_outside_workspace(workspace, &clients, &inside)
+			.expect("targets inside the workspace are accepted");
+		let error = reject_outside_workspace(workspace, &clients, &outside)
+			.expect_err("a target outside the workspace must be refused");
+		assert!(matches!(error, CodamaError::UnsafeOutput { ref reason, .. }
+				if reason.contains("Git worktree") && reason.contains("--output")));
+	}
+
+	#[test]
+	fn renderer_arguments_absolutize_relative_plan_paths() {
+		let current = std::env::current_dir()
+			.unwrap_or_else(|error| panic!("test requires a working directory: {error}"));
+		let resolved = renderer_arg(Path::new("codama/clients/typescript"))
+			.unwrap_or_else(|error| panic!("relative renderer paths must resolve: {error}"));
+
+		assert_eq!(resolved, current.join("codama/clients/typescript"));
 	}
 
 	fn write_kit_manifest(dir: &Path, kit_range: &str) {
@@ -2282,6 +2668,8 @@ mod tests {
 			.collect(),
 			generation: default_generation_settings(),
 			npx: "npx".to_owned(),
+			project_root: PathBuf::from("workspace"),
+			workspace_root: std::cell::OnceCell::new(),
 		};
 
 		assert_eq!(

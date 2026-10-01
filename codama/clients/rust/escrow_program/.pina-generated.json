@@ -1,0 +1,17 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/escrow_state.rs",
+		"src/generated/accounts/mod.rs",
+		"src/generated/errors/escrow_program.rs",
+		"src/generated/errors/mod.rs",
+		"src/generated/instructions/cancel.rs",
+		"src/generated/instructions/make.rs",
+		"src/generated/instructions/migrate.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/take.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

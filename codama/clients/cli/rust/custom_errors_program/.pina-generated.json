@@ -1,0 +1,15 @@
+{
+	"paths": [
+		".pina-generated",
+		"src/commands/hello.rs",
+		"src/commands/hello_next.rs",
+		"src/commands/hello_no_msg.rs",
+		"src/commands/mod.rs",
+		"src/commands/require_eq.rs",
+		"src/commands/require_gt.rs",
+		"src/commands/require_gte.rs",
+		"src/commands/require_neq.rs",
+		"src/context.rs",
+		"src/main.rs"
+	]
+}

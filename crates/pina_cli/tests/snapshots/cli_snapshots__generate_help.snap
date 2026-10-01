@@ -32,10 +32,10 @@ Options:
           - cli-dart:   An args-based Dart CLI application
 
   -o, --output <DIR>
-          Override the configured client output directory
+          Override the configured client output directory. Configured outputs stay inside the Git worktree; only this flag publishes outside it
 
       --mode <MODE>
-          Override how existing client destinations are handled
+          Override how existing client destinations are handled. Selecting `overwrite` is an operator decision: pina.toml cannot request it
 
           Possible values:
           - auto:      Create clients in empty destinations and update clients in existing ones
@@ -47,7 +47,7 @@ Options:
           Generate source files without package manifests or crate entrypoints
 
       --npx <COMMAND>
-          Executable used to invoke JavaScript or Dart renderers. Defaults to npx
+          Executable used to invoke JavaScript or Dart renderers. Defaults to npx, which resolves the pinned packages isolated from the project; pass a Node executable to resolve packages from the project on purpose
 
   -h, --help
           Print help (see a summary with '-h')

@@ -1,0 +1,17 @@
+{
+	"paths": [
+		".pina-generated.json",
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/storeState.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/init.ts",
+		"src/generated/instructions/inspect.ts",
+		"src/generated/instructions/note.ts",
+		"src/generated/instructions/touch.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/store.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/optionalAccountsProgram.ts"
+	]
+}

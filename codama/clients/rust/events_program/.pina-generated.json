@@ -1,0 +1,15 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/events/mod.rs",
+		"src/generated/events/my_event.rs",
+		"src/generated/events/my_other_event.rs",
+		"src/generated/instructions/initialize.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/test_event.rs",
+		"src/generated/instructions/test_event_cpi.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

@@ -1,0 +1,13 @@
+{
+	"paths": [
+		".pina-generated",
+		"src/commands/initialize.rs",
+		"src/commands/mod.rs",
+		"src/commands/rename.rs",
+		"src/commands/resize.rs",
+		"src/commands/write.rs",
+		"src/context.rs",
+		"src/fetch.rs",
+		"src/main.rs"
+	]
+}

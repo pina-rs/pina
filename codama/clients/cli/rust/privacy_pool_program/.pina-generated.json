@@ -1,0 +1,22 @@
+{
+	"paths": [
+		".pina-generated",
+		"src/commands/approve_disclosure.rs",
+		"src/commands/cancel_disclosure.rs",
+		"src/commands/challenge_disclosure.rs",
+		"src/commands/deposit.rs",
+		"src/commands/grant_disclosure.rs",
+		"src/commands/initialize.rs",
+		"src/commands/mod.rs",
+		"src/commands/register_requester.rs",
+		"src/commands/request_disclosure.rs",
+		"src/commands/resolve_challenge.rs",
+		"src/commands/set_custodians.rs",
+		"src/commands/set_verification_key.rs",
+		"src/commands/transfer.rs",
+		"src/commands/withdraw.rs",
+		"src/context.rs",
+		"src/fetch.rs",
+		"src/main.rs"
+	]
+}

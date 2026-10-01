@@ -1,0 +1,23 @@
+{
+	"paths": [
+		".pina-generated.json",
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/poolState.ts",
+		"src/generated/accounts/positionState.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/errors/stakingRewardsProgram.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/claim.ts",
+		"src/generated/instructions/deposit.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initializePool.ts",
+		"src/generated/instructions/openPosition.ts",
+		"src/generated/instructions/setRewardIndex.ts",
+		"src/generated/instructions/withdraw.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/pool.ts",
+		"src/generated/pdas/position.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/stakingRewardsProgram.ts"
+	]
+}

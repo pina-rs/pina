@@ -1,0 +1,11 @@
+{
+	"paths": [
+		".pina-generated",
+		"src/commands/check_policy.rs",
+		"src/commands/initialize_policy.rs",
+		"src/commands/mod.rs",
+		"src/context.rs",
+		"src/fetch.rs",
+		"src/main.rs"
+	]
+}
