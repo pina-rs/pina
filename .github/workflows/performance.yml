@@ -98,7 +98,7 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
       # Diagnostic only: the script exits 0 unless it cannot run at all, so the
-      # instruction-CU policy gate above stays the sole enforcement point.
+      # independent CU and size policy gates above remain the enforcement point.
       - name: diff program function profiles
         if: always()
         run: |
@@ -134,13 +134,13 @@ jobs:
           path: target/performance/programs
           if-no-files-found: error
 
-      - name: enforce program compute-unit threshold
+      - name: enforce program performance thresholds
         if: always()
         env:
           COMPARE_STATUS: ${{ steps.program-report.outputs.status }}
         run: |
           if [ -z "$COMPARE_STATUS" ]; then
-            echo "compute-unit comparison did not finish" >&2
+            echo "program comparison did not finish" >&2
             exit 1
           fi
 
