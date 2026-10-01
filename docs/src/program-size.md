@@ -6,17 +6,17 @@ Deployed program size determines rent, and rent is paid in SOL. A Pina program i
 
 Same toolchain for every row: `cargo-build-sbf` (Agave 4.2.2), `sbpf-solana-solana` target, equivalent program semantics — a single-instruction hello world, and a PDA counter with `initialize`/`increment`.
 
-| Framework                   | Hello world | Counter    |
-| --------------------------- | ----------- | ---------- |
-| Quasar                      | 2,520       | 7,808      |
-| Pinocchio (hand-written)    | 3,160       | 6,512      |
-| **Pina**                    | **4,680**   | **12,720** |
-| Anchor v2 (`lang-v2`, rc.1) | 1,880       | 8,696      |
-| Anchor (v1, 1.2.0)          | 55,752      | 122,160    |
+| Framework                   | Hello world | Counter   |
+| --------------------------- | ----------- | --------- |
+| Quasar                      | 2,520       | 7,808     |
+| Pinocchio (hand-written)    | 3,160       | 6,512     |
+| **Pina**                    | **1,616**   | **7,592** |
+| Anchor v2 (`lang-v2`, rc.1) | 1,880       | 8,696     |
+| Anchor (v1, 1.2.0)          | 55,752      | 122,160   |
 
 [Framework comparison](./framework-comparison.md) holds the generated version of this table together with the compute units each instruction consumes, and `benchmark:frameworks` rebuilds and rewrites it. The headline: a v1 Anchor program is more than ten times the size of any of the others, and LTO makes it _larger_ rather than smaller.
 
-Pina's remaining gap to Pinocchio is mostly framework surface: derive-generated validation and dispatch, plus the entrypoint wrapper. With no derive and no logs the framework floor is 3,352 bytes against Pinocchio's 3,160 — 192 bytes.
+Pina's hello world is smaller than the hand-written Pinocchio program, which carries pinocchio's full account deserializer and its out-of-line error conversion. Its counter is 1,080 bytes over Pinocchio's, mostly derive-generated validation that the hand-written program does not perform.
 
 ## What determines the size
 
@@ -193,6 +193,37 @@ Across the twenty-two programs converted in the second pass the aggregate is 551
 Runtime compute units were verified on escrow with Surfpool, three runs each, fully deterministic: Make 29,535 → 29,105 CU and Take 32,230 → 31,658 CU, and the framework-comparison fixtures re-measured byte- and CU-identical after the creation-builder dedup below (counter `initialize` 3,295 CU). Fat LTO does not trade compute units for size here; it removes them, because the single codegen unit lets inlining collapse cross-crate glue that the unoptimized link kept as call sequences. Every entrypoint frame stays within the 4 KB stack limit after the switch (deepest: vesting at 3,992; multisig reaches exactly 4,096 — no offset exceeds it, its manifest documents the re-check rule, and its full e2e + Surfpool suites pass against the LTO ELF).
 
 The PDA-creation builders share one allocation spine (`CompactCreationTarget::allocate_zeroed`, `PdaCreationTarget::allocate`), so a program that creates several account types pays the seed marshalling, signer assembly, and rent computation once instead of once per generic instantiation — the multisig example keeps 5,252 bytes this way. Each spine keeps the shape its users measured best with: the compact-creation spine stays a real outlined call, which is what collapses multisig's three instantiations into one shared function, while the PDA-creation spine is `#[inline(always)]`, because a single-instantiation program has no duplicate to collapse and pays only the call boundary — outlining it measured +80 CU on the counter fixture's `initialize`.
+
+## Dispatch before parsing accounts
+
+`dispatch_entrypoint!` replaces `nostd_entrypoint!` for a program routed by `#[discriminator(entrypoint)]`. Since [SIMD-0321](https://github.com/solana-foundation/solana-improvement-documents/blob/main/proposals/0321-vm-r2-instruction-data-pointer.md), active on every public cluster, the loader passes the entrypoint a pointer to the instruction data, so the router can read the discriminator before it touches an account. It then walks only the accounts the routed struct reads, instead of walking every account through pinocchio's deserializer first:
+
+```rust,ignore
+dispatch_entrypoint!(CounterInstruction);
+```
+
+`#[derive(Accounts)]` declares two counts for this: `ACCOUNT_LIMIT`, the most accounts the struct reads, and `ACCOUNT_MINIMUM`, the fewest it accepts. The router picks each route's walk from them at compile time:
+
+- **Exact**, when the two are equal: the route parses a fixed-length array, so the struct's own length checks fold away, and any other count fails before the struct runs, with the error its parser would return.
+- **Bounded**, when trailing optional fields may be absent: the walk rejects more than `ACCOUNT_LIMIT` accounts, and the struct reports a missing required one.
+- **Leading**, for a struct with a `#[pina(remaining)]` slice, a hand-written parser, or the reserved `Migrate` route: the walk reads up to `ENTRYPOINT_ACCOUNT_CAPACITY` accounts and ignores the rest, which is what `nostd_entrypoint!` hands those routes.
+
+Every check the routed struct and handler make still runs, and the program-ID and discriminator checks still come first. Account counts now take precedence over per-account checks: an instruction with more accounts than its struct reads fails with `TooManyAccountKeys`, and one with fewer than a fixed-length struct reads fails with `NotEnoughAccountKeys`, where the struct's parser could report an earlier field's failure first.
+
+The walk is fastest inlined: a route with a fixed account count unrolls it and folds the checks its positions make impossible. Every route then carries its own copy, though, so a router with more than two routes calls one shared copy instead; the reserved `Migrate` route follows that choice without counting toward it. The shared copy costs 10 to 40 compute units per instruction and keeps large routers from growing.
+
+| Program                    | `nostd_entrypoint!` | `dispatch_entrypoint!` | Change |
+| -------------------------- | ------------------: | ---------------------: | -----: |
+| hello comparison fixture   |               1,984 |                  1,616 |   −368 |
+| counter comparison fixture |               8,424 |                  7,592 |   −832 |
+| `counter_program`          |              13,192 |                 12,984 |   −208 |
+| `migrations_program`       |              39,512 |                 37,952 | −1,560 |
+| `escrow_program`           |              41,912 |                 38,912 | −3,000 |
+| `staking_rewards_program`  |              52,504 |                 50,192 | −2,312 |
+
+The first two routes' walks are inlined; `escrow_program` and `staking_rewards_program`, with seven and eight routes, share one. On the fixtures, `hello` fell from 146 to 136 compute units and the counter's `increment` from 378 to 360.
+
+A large router can still come out larger, because every route parses its own fixed-length struct where the old router's identical parsing code merged. `multisig_program`, with twenty routes, measured 1,448 bytes larger, so it keeps `nostd_entrypoint!`. Measure both entrypoints on a program with many routes before switching.
 
 ## Bound the entrypoint account array
 

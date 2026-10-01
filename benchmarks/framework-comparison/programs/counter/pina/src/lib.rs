@@ -96,10 +96,6 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 	}
 }
 
-// The generated router, with the account array its routes need: the widest
-// instruction plus one spare slot, so an extra trailing account is still
-// rejected by `finish_exact`.
-nostd_entrypoint!(
-	CounterInstruction::process_instruction,
-	CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
-);
+// The generated router reads the instruction first, then walks only the
+// accounts the routed struct reads.
+dispatch_entrypoint!(CounterInstruction);

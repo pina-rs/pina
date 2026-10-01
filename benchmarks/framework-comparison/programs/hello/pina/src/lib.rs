@@ -28,10 +28,6 @@ impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
 	}
 }
 
-// The generated router, with the account array its routes need: the widest
-// instruction plus one spare slot, so an extra trailing account is still
-// rejected by `finish_exact`.
-nostd_entrypoint!(
-	HelloInstruction::process_instruction,
-	HelloInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
-);
+// The generated router reads the instruction first, then walks only the
+// accounts the routed struct reads.
+dispatch_entrypoint!(HelloInstruction);

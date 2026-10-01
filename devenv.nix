@@ -551,8 +551,11 @@ in
         # its tests build that input byte for byte.
         MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
           cargo +"$TOOLCHAIN" miri test --locked -p pina --lib --all-features entry::
+        # `dispatch_entrypoint!` programs walk that input from generated code.
+        MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check" \
+          cargo +"$TOOLCHAIN" miri test --locked -p pina --test dispatch_entrypoint --all-features
       '';
-      description = "Run Miri regressions for loader guards, macro-generated schema storage, and the program entrypoint.";
+      description = "Run Miri regressions for loader guards, macro-generated schema storage, and the program entrypoints.";
       binary = "bash";
     };
     "test:kani:quick" = {

@@ -28,7 +28,7 @@ Includes:
 - `AccountView` and validation chain helpers.
 - Typed account loaders and discriminator checks.
 - CPI/system/token helper utilities.
-- `nostd_entrypoint!` and instruction parsing helpers.
+- `nostd_entrypoint!`, `dispatch_entrypoint!`, and instruction parsing helpers.
 - Instruction introspection (program-ID checks, sandwich detection).
 - Pod types with full arithmetic operator support.
 

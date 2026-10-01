@@ -113,6 +113,16 @@ The PDA creation builders check the target address the same way before the creat
 
 Keep `create_program_address` (through `assert_seeds_with_bump`) for a bump a caller supplies when no `invoke_signed` follows, and the canonical loaders and builders (`load_checked_pda`, `load_checked_pda_mut`, `with_checked_pda`, `CreateProgramAccount`) when the bump must be the highest valid one. Both still check the curve.
 
+## Dispatch-first account parsing
+
+`dispatch_entrypoint!` reads the instruction data through the pointer the loader passes since SIMD-0321, then walks the serialized accounts itself instead of through pinocchio's deserializer. That walk is the same trust boundary: it reads the loader's input region, which the runtime lays out and bounds.
+
+- **The raw input stays inside pina.** The entrypoint wraps it in `EntrypointInput`, which only pina can create and whose parse methods take it by value, so generated routers contain no `unsafe` code and cannot walk the input twice. A second walk after a handler resized an account would read the changed data length and step outside the records.
+- **The walk matches pinocchio's.** A property test in `pina::entry` serializes random account layouts, including duplicates and varied data lengths, and requires the walk to find the same views as `pinocchio::entrypoint::deserialize` and to leave the input byte for byte as it does. The unit and property tests also run under Miri.
+- **It rejects a duplicate marker the runtime never writes.** A marker that does not name an earlier slot fails with `InvalidAccountData` instead of copying an uninitialized view.
+- **Every check still runs, in the same order, except that account counts come first.** The program-ID and discriminator checks still run before any account is read, and the routed struct and handler run unchanged. An instruction with more accounts than its struct reads now fails with `TooManyAccountKeys`, and one with fewer than a fixed-length struct reads with `NotEnoughAccountKeys`, before any per-account check, where the struct's parser could report an earlier field's failure first.
+- **It needs SIMD-0321.** Without the feature the second entrypoint argument is undefined. It is active on every public cluster, in Surfpool, and in Mollusk.
+
 ## Content validation with PinaPod
 
 Pina's zero-copy account model is built on PinaPod. Its generated storage view makes validation load-bearing: `PinaAccount::try_from_bytes` and `as_account` reject noncanonical booleans, invalid UTF-8, overlength vector prefixes, invalid option tags, invalid active nested values, and invalid enum discriminants before returning a reference.

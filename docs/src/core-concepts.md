@@ -213,6 +213,8 @@ Optional signers are validated only when present (`if let Some(witness) = self.w
 
 `nostd_entrypoint!` wires BPF entrypoint plumbing while preserving `no_std` constraints for on-chain builds.
 
+A program routed by `#[discriminator(entrypoint)]` can use `dispatch_entrypoint!(Instruction)` instead. It reads the instruction before any account, then walks only the accounts the routed struct reads, which makes most programs smaller and cheaper to run. See [Program size](./program-size.md#dispatch-before-parsing-accounts) for when each entrypoint measures smaller.
+
 ## Pod types
 
 <!-- {=podTypesTable} -->

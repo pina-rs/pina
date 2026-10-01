@@ -273,6 +273,113 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::proce
             }
         }
     }
+    /// The dispatch-first router behind `dispatch_entrypoint!`: validates
+    /// the program ID and discriminator, then parses only the routed
+    /// struct's accounts from the loader's input.
+    #[doc(hidden)]
+    #[inline(always)]
+    pub fn __dispatch(
+        input: ::pina::EntrypointInput,
+        program_id: &::pina::Address,
+        data: &[u8],
+    ) -> ::pina::ProgramResult {
+        const SHARED_WALK: bool = false;
+        let instruction: CounterInstruction = ::pina::parse_instruction(
+            program_id,
+            &ID,
+            data,
+        )?;
+        match instruction {
+            CounterInstruction::Initialize => {
+                const LIMIT: usize = {
+                    const fn __pina_account_limit<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT
+                    }
+                    __pina_account_limit::<'static, InitializeAccounts>()
+                };
+                const MINIMUM: usize = {
+                    const fn __pina_account_minimum<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_MINIMUM
+                    }
+                    __pina_account_minimum::<'static, InitializeAccounts>()
+                };
+                const SLOTS: usize = if LIMIT <= ::pina::pinocchio::MAX_TX_ACCOUNTS {
+                    LIMIT
+                } else {
+                    CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+                };
+                const MODE: u8 = if LIMIT > ::pina::pinocchio::MAX_TX_ACCOUNTS {
+                    ::pina::ROUTE_UNBOUNDED
+                } else if MINIMUM == LIMIT {
+                    ::pina::ROUTE_EXACT
+                } else {
+                    ::pina::ROUTE_BOUNDED
+                };
+                let mut slots = [const {
+                    ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
+                }; SLOTS];
+                let accounts = input
+                    .parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+                let __pina_accounts = <InitializeAccounts as ::core::convert::TryFrom<
+                    (&::pina::Address, &mut [::pina::AccountView]),
+                >>::try_from((program_id, accounts))?;
+                <InitializeAccounts as ::pina::ProcessAccountInfos>::process(
+                    __pina_accounts,
+                    data,
+                )
+            }
+            CounterInstruction::Increment => {
+                const LIMIT: usize = {
+                    const fn __pina_account_limit<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT
+                    }
+                    __pina_account_limit::<'static, IncrementAccounts>()
+                };
+                const MINIMUM: usize = {
+                    const fn __pina_account_minimum<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_MINIMUM
+                    }
+                    __pina_account_minimum::<'static, IncrementAccounts>()
+                };
+                const SLOTS: usize = if LIMIT <= ::pina::pinocchio::MAX_TX_ACCOUNTS {
+                    LIMIT
+                } else {
+                    CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+                };
+                const MODE: u8 = if LIMIT > ::pina::pinocchio::MAX_TX_ACCOUNTS {
+                    ::pina::ROUTE_UNBOUNDED
+                } else if MINIMUM == LIMIT {
+                    ::pina::ROUTE_EXACT
+                } else {
+                    ::pina::ROUTE_BOUNDED
+                };
+                let mut slots = [const {
+                    ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
+                }; SLOTS];
+                let accounts = input
+                    .parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+                let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
+                    (&::pina::Address, &mut [::pina::AccountView]),
+                >>::try_from((program_id, accounts))?;
+                <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
+                    __pina_accounts,
+                    data,
+                )
+            }
+        }
+    }
 }
 #[repr(u8)]
 #[non_exhaustive]
@@ -548,6 +655,113 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::proc
             }
         }
     }
+    /// The dispatch-first router behind `dispatch_entrypoint!`: validates
+    /// the program ID and discriminator, then parses only the routed
+    /// struct's accounts from the loader's input.
+    #[doc(hidden)]
+    #[inline(always)]
+    pub fn __dispatch(
+        input: ::pina::EntrypointInput,
+        program_id: &::pina::Address,
+        data: &[u8],
+    ) -> ::pina::ProgramResult {
+        const SHARED_WALK: bool = false;
+        let instruction: OverrideInstruction = ::pina::parse_instruction(
+            program_id,
+            &ID,
+            data,
+        )?;
+        match instruction {
+            OverrideInstruction::Routed => {
+                const LIMIT: usize = {
+                    const fn __pina_account_limit<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT
+                    }
+                    __pina_account_limit::<'static, IncrementAccounts>()
+                };
+                const MINIMUM: usize = {
+                    const fn __pina_account_minimum<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_MINIMUM
+                    }
+                    __pina_account_minimum::<'static, IncrementAccounts>()
+                };
+                const SLOTS: usize = if LIMIT <= ::pina::pinocchio::MAX_TX_ACCOUNTS {
+                    LIMIT
+                } else {
+                    OverrideInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+                };
+                const MODE: u8 = if LIMIT > ::pina::pinocchio::MAX_TX_ACCOUNTS {
+                    ::pina::ROUTE_UNBOUNDED
+                } else if MINIMUM == LIMIT {
+                    ::pina::ROUTE_EXACT
+                } else {
+                    ::pina::ROUTE_BOUNDED
+                };
+                let mut slots = [const {
+                    ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
+                }; SLOTS];
+                let accounts = input
+                    .parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+                let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
+                    (&::pina::Address, &mut [::pina::AccountView]),
+                >>::try_from((program_id, accounts))?;
+                <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
+                    __pina_accounts,
+                    data,
+                )
+            }
+            OverrideInstruction::Untouched => {
+                const LIMIT: usize = {
+                    const fn __pina_account_limit<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT
+                    }
+                    __pina_account_limit::<'static, UntouchedAccounts>()
+                };
+                const MINIMUM: usize = {
+                    const fn __pina_account_minimum<'a, T>() -> usize
+                    where
+                        T: ::pina::ParseAccounts<'a>,
+                    {
+                        <T as ::pina::ParseAccounts<'a>>::ACCOUNT_MINIMUM
+                    }
+                    __pina_account_minimum::<'static, UntouchedAccounts>()
+                };
+                const SLOTS: usize = if LIMIT <= ::pina::pinocchio::MAX_TX_ACCOUNTS {
+                    LIMIT
+                } else {
+                    OverrideInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+                };
+                const MODE: u8 = if LIMIT > ::pina::pinocchio::MAX_TX_ACCOUNTS {
+                    ::pina::ROUTE_UNBOUNDED
+                } else if MINIMUM == LIMIT {
+                    ::pina::ROUTE_EXACT
+                } else {
+                    ::pina::ROUTE_BOUNDED
+                };
+                let mut slots = [const {
+                    ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
+                }; SLOTS];
+                let accounts = input
+                    .parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+                let __pina_accounts = <UntouchedAccounts as ::core::convert::TryFrom<
+                    (&::pina::Address, &mut [::pina::AccountView]),
+                >>::try_from((program_id, accounts))?;
+                <UntouchedAccounts as ::pina::ProcessAccountInfos>::process(
+                    __pina_accounts,
+                    data,
+                )
+            }
+        }
+    }
 }
 #[pina(crate = pina)]
 pub struct InitializeAccounts<'a> {
@@ -558,6 +772,7 @@ pub struct InitializeAccounts<'a> {
 impl<'a> pina::ParseAccounts<'a> for InitializeAccounts<'a> {
     const ACCOUNT_BOUND: usize = 3usize;
     const ACCOUNT_LIMIT: usize = 3usize;
+    const ACCOUNT_MINIMUM: usize = 3usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -626,6 +841,7 @@ pub struct IncrementAccounts<'a> {
 impl<'a> pina::ParseAccounts<'a> for IncrementAccounts<'a> {
     const ACCOUNT_BOUND: usize = 2usize;
     const ACCOUNT_LIMIT: usize = 2usize;
+    const ACCOUNT_MINIMUM: usize = 2usize;
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {

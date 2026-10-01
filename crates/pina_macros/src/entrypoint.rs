@@ -37,6 +37,18 @@ const UNIQUENESS_MARKER: &str = "__pina_entrypoint_must_be_unique_per_program";
 /// accounts: the payer and the system program.
 const MIGRATE_LEADING_SLOTS: usize = 2;
 
+/// The most routes whose account walks the dispatch-first router inlines;
+/// a program with more calls one shared copy of the walk from every route.
+///
+/// An inlined walk is faster: a fixed-length route unrolls it, and the shared
+/// copy cost the example routes 10 to 40 compute units. Every route carries its
+/// own inlined copy, though, 150 to 300 bytes on SBF, where the shared copy
+/// costs about as much once. Measured on the example programs, routers with up
+/// to two routes stay smaller than `nostd_entrypoint!` with inlined walks,
+/// and routers with seven or more only with the shared one. The reserved
+/// `Migrate` route follows its program's choice without counting toward it.
+const INLINE_ACCOUNT_ROUTES: usize = 2;
+
 /// One resolved variant → accounts-struct route.
 struct Route {
 	/// The enum variant this route dispatches.
@@ -146,14 +158,7 @@ fn dispatch_arm(
 	let Route {
 		variant, accounts, ..
 	} = route;
-	let versioned = enveloped.iter().map(|(value, instruction)| {
-		let value = Literal::u64_unsuffixed(*value);
-		quote_spanned! {variant.span()=>
-			if #enum_name::#variant as u64 == #value {
-				return #instruction::process_versioned(__pina_accounts, data);
-			}
-		}
-	});
+	let versioned = versioned_returns(enum_name, route, enveloped);
 
 	quote_spanned! {variant.span()=>
 		#enum_name::#variant => {
@@ -168,6 +173,26 @@ fn dispatch_arm(
 			<#accounts as #crate_path::ProcessAccountInfos>::process(__pina_accounts, data)
 		}
 	}
+}
+
+/// The early returns that route an enveloped instruction through its
+/// `process_versioned`, for both routers. Each compares the variant with a
+/// constant, so only the matching route keeps its return.
+fn versioned_returns<'a>(
+	enum_name: &'a Ident,
+	route: &'a Route,
+	enveloped: &'a [(u64, Ident)],
+) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
+	let variant = &route.variant;
+
+	enveloped.iter().map(move |(value, instruction)| {
+		let value = Literal::u64_unsuffixed(*value);
+		quote_spanned! {variant.span()=>
+			if #enum_name::#variant as u64 == #value {
+				return #instruction::process_versioned(__pina_accounts, data);
+			}
+		}
+	})
 }
 
 /// Everything the entrypoint expansion emits besides the enum itself.
@@ -210,6 +235,64 @@ pub(crate) fn expand(
 	let dispatch_arms = routes
 		.iter()
 		.map(|route| dispatch_arm(crate_path, &enum_name, route, &enveloped));
+
+	// The dispatch-first arms parse each route's accounts straight from the
+	// loader's input: at most the struct's `ACCOUNT_LIMIT`, or every account up to
+	// the entrypoint capacity for a parser with no limit. `SLOTS` keeps the
+	// unused branch's array type valid when the limit is unbounded.
+	let dispatch_first_arms = routes.iter().map(|route| {
+		let Route {
+			variant, accounts, ..
+		} = route;
+		let versioned = versioned_returns(&enum_name, route, &enveloped);
+
+		quote_spanned! {variant.span()=>
+			#enum_name::#variant => {
+				const LIMIT: usize = {
+					const fn __pina_account_limit<'a, T>() -> usize
+					where
+						T: #crate_path::ParseAccounts<'a>,
+					{
+						<T as #crate_path::ParseAccounts<'a>>::ACCOUNT_LIMIT
+					}
+					__pina_account_limit::<'static, #accounts>()
+				};
+				const MINIMUM: usize = {
+					const fn __pina_account_minimum<'a, T>() -> usize
+					where
+						T: #crate_path::ParseAccounts<'a>,
+					{
+						<T as #crate_path::ParseAccounts<'a>>::ACCOUNT_MINIMUM
+					}
+					__pina_account_minimum::<'static, #accounts>()
+				};
+				const SLOTS: usize = if LIMIT <= #crate_path::pinocchio::MAX_TX_ACCOUNTS {
+					LIMIT
+				} else {
+					#enum_name::ENTRYPOINT_ACCOUNT_CAPACITY
+				};
+				const MODE: u8 = if LIMIT > #crate_path::pinocchio::MAX_TX_ACCOUNTS {
+					#crate_path::ROUTE_UNBOUNDED
+				} else if MINIMUM == LIMIT {
+					#crate_path::ROUTE_EXACT
+				} else {
+					#crate_path::ROUTE_BOUNDED
+				};
+
+				let mut slots = [const {
+					::core::mem::MaybeUninit::<#crate_path::AccountView>::uninit()
+				}; SLOTS];
+				let accounts = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+				let __pina_accounts = <#accounts as ::core::convert::TryFrom<(
+					& #crate_path::Address,
+					&mut [#crate_path::AccountView],
+				)>>::try_from((program_id, accounts))?;
+
+				#(#versioned)*
+				<#accounts as #crate_path::ProcessAccountInfos>::process(__pina_accounts, data)
+			}
+		}
+	});
 
 	let route_bound = |route: &Route| {
 		let accounts = &route.accounts;
@@ -324,7 +407,10 @@ pub(crate) fn expand(
 
 	let migrate_helper = migration_ladder.as_ref().map(|route| &route.helper);
 	let migrate_prelude = migration_ladder.as_ref().map(|route| &route.prelude);
+	let migrate_route = migration_ladder.as_ref();
+	let migrate_dispatch_prelude = migrate_route.map(|route| &route.dispatch_prelude);
 	let migrate_slots = migration_ladder.as_ref().map(|route| route.account_slots);
+	let shared_walk = routes.len() > INLINE_ACCOUNT_ROUTES;
 	let capacity_values = capacity_values(&limit_values, migrate_slots);
 	let capacity_count = Literal::usize_unsuffixed(capacity_values.len());
 
@@ -448,6 +534,28 @@ pub(crate) fn expand(
 				}
 			}
 
+			/// The dispatch-first router behind `dispatch_entrypoint!`: validates
+			/// the program ID and discriminator, then parses only the routed
+			/// struct's accounts from the loader's input.
+			#[doc(hidden)]
+			#inline_attribute
+			pub fn __dispatch(
+				input: #crate_path::EntrypointInput,
+				program_id: & #crate_path::Address,
+				data: &[u8],
+			) -> #crate_path::ProgramResult {
+				const SHARED_WALK: bool = #shared_walk;
+
+				#migrate_dispatch_prelude
+
+				let instruction: #enum_name =
+					#crate_path::parse_instruction(program_id, & #program_id, data)?;
+
+				match instruction {
+					#(#dispatch_first_arms),*
+				}
+			}
+
 			#migrate_helper
 		}
 
@@ -487,6 +595,8 @@ struct MigrateRoute {
 	helper: proc_macro2::TokenStream,
 	/// The width-matched `is_migrate_instruction` guard run before dispatch.
 	prelude: proc_macro2::TokenStream,
+	/// The same guard for `__dispatch`, which walks the accounts itself.
+	dispatch_prelude: proc_macro2::TokenStream,
 	/// Account slots the route reads: the leading slots plus one per ladder
 	/// entry.
 	account_slots: usize,
@@ -656,9 +766,23 @@ fn migrate_emission(
 		}
 	};
 
+	// The dispatch-first router has no account slice yet, so its guard reads
+	// the accounts `nostd_entrypoint!` would hand the route before running it.
+	let dispatch_prelude = quote! {
+		if #crate_path::#is_migrate_instruction(data) {
+			let mut slots = [const {
+				::core::mem::MaybeUninit::<#crate_path::AccountView>::uninit()
+			}; Self::ENTRYPOINT_ACCOUNT_CAPACITY];
+			let accounts =
+				input.parse_leading::<{ Self::ENTRYPOINT_ACCOUNT_CAPACITY }, SHARED_WALK>(&mut slots)?;
+			return Self::process_migrate(program_id, accounts);
+		}
+	};
+
 	MigrateRoute {
 		helper,
 		prelude,
+		dispatch_prelude,
 		account_slots: MIGRATE_LEADING_SLOTS + ladder.len(),
 	}
 }
@@ -927,6 +1051,7 @@ mod tests {
 		let MigrateRoute {
 			helper,
 			prelude,
+			dispatch_prelude,
 			account_slots,
 		} = migrate_emission(
 			&crate_path,
@@ -970,6 +1095,14 @@ mod tests {
 		// The prelude routes through the associated helper.
 		assert!(prelude.contains("is_migrate_instruction(data)"));
 		assert!(prelude.contains("Self::process_migrate(program_id,accounts)"));
+		// The dispatch-first guard walks the accounts `nostd_entrypoint!` would
+		// before running the same helper.
+		let dispatch_prelude = squeezed(&dispatch_prelude.to_string());
+		assert!(dispatch_prelude.contains("is_migrate_instruction(data)"));
+		assert!(dispatch_prelude.contains(
+			"input.parse_leading::<{Self::ENTRYPOINT_ACCOUNT_CAPACITY},SHARED_WALK>(&mutslots)?"
+		));
+		assert!(dispatch_prelude.contains("Self::process_migrate(program_id,accounts)"));
 	}
 
 	#[test]
@@ -1094,6 +1227,71 @@ mod tests {
 
 		assert!(capacity.contains("ACCOUNT_LIMIT"), "capacity: {capacity}");
 		assert!(!capacity.contains("ACCOUNT_BOUND"), "capacity: {capacity}");
+	}
+
+	/// Every routed enum also gets the dispatch-first router, which picks each
+	/// route's account walk from the struct's declared limit and minimum.
+	#[test]
+	fn dispatch_first_router_is_generated_for_every_route() {
+		let expanded = expand_with(
+			quote!(entrypoint),
+			quote!(
+				pub enum CounterInstruction {
+					Run = 0,
+				}
+			),
+		);
+
+		assert!(
+			expanded.contains("pubfn__dispatch(input:::pina::EntrypointInput,"),
+			"expanded: {expanded}"
+		);
+		assert!(
+			expanded.contains("<Tas::pina::ParseAccounts<'a>>::ACCOUNT_LIMIT"),
+			"the route must read the struct's limit; got: {expanded}"
+		);
+		assert!(
+			expanded.contains("<Tas::pina::ParseAccounts<'a>>::ACCOUNT_MINIMUM"),
+			"the route must read the struct's minimum; got: {expanded}"
+		);
+		assert!(
+			expanded.contains("input.parse_route::<SLOTS,MODE,SHARED_WALK>(&mutslots)?"),
+			"the route must parse through the input token; got: {expanded}"
+		);
+	}
+
+	/// Up to `INLINE_ACCOUNT_ROUTES` routes inline their walks; one more shares
+	/// a single copy.
+	#[test]
+	fn router_shares_the_account_walk_past_the_inline_limit() {
+		let two = expand_with(
+			quote!(entrypoint),
+			quote!(
+				pub enum CounterInstruction {
+					Initialize = 0,
+					Increment = 1,
+				}
+			),
+		);
+		assert!(
+			two.contains("constSHARED_WALK:bool=false;"),
+			"expanded: {two}"
+		);
+
+		let three = expand_with(
+			quote!(entrypoint),
+			quote!(
+				pub enum CounterInstruction {
+					Initialize = 0,
+					Increment = 1,
+					Close = 2,
+				}
+			),
+		);
+		assert!(
+			three.contains("constSHARED_WALK:bool=true;"),
+			"expanded: {three}"
+		);
 	}
 
 	#[test]
