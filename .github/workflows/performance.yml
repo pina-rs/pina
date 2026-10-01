@@ -85,6 +85,7 @@ jobs:
           set +e
           node ./scripts/compare-compute-units.ts \
             --policy-file ./scripts/compute-unit-policy.json \
+            --base-revision "${{ github.event.pull_request.base.sha }}" \
             --base-dir ./target/performance/programs/base \
             --head-dir ./target/performance/programs/head \
             --markdown-output ./target/performance/programs/report.md \
@@ -230,6 +231,7 @@ jobs:
             ./target/performance/instructions/empty-head
           node ./scripts/compare-compute-units.ts \
             --policy-file ./scripts/compute-unit-policy.json \
+            --base-revision "${{ github.event.pull_request.base.sha }}" \
             --base-dir ./target/performance/instructions/empty-base \
             --head-dir ./target/performance/instructions/empty-head \
             --base-runtime ./target/performance/instructions/runtime-base.json \
@@ -342,6 +344,7 @@ jobs:
             ./target/performance/token-loader/empty-head
           node ./scripts/compare-compute-units.ts \
             --policy-file ./scripts/compute-unit-policy.json \
+            --base-revision "${{ github.event.pull_request.base.sha }}" \
             --base-dir ./target/performance/token-loader/empty-base \
             --head-dir ./target/performance/token-loader/empty-head \
             --base-exact-runtime ./target/performance/token-loader/exact-runtime-base.json \

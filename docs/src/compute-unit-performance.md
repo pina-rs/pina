@@ -52,7 +52,7 @@ The focused token-loader fixture compares the former unsuffixed API with the con
 | Legacy ATA, wrong address             |   7,636 |   7,638 |                 -2 | rejected -> rejected |
 | Legacy ATA, reassigned authority      |   7,689 |   7,704 |                -15 | success -> rejected  |
 
-The 34-CU ATA increase is 0.44% for legacy Token and 1.07% for Token-2022. It buys validation that the stored mint and current token authority agree with the inputs used to derive the ATA address. The reassigned-authority case is a deliberate semantic change, so CI labels it as a behavior change instead of claiming that the earlier rejection is a performance improvement. Reviewed absolute ceilings cover the three unchanged-outcome ATA increases; any later increase above those totals fails again.
+The 34-CU ATA increase is 0.44% for legacy Token and 1.07% for Token-2022. It buys validation that the stored mint and current token authority agree with the inputs used to derive the ATA address. The reassigned-authority case is a deliberate semantic change, so CI labels it as a behavior change instead of claiming that the earlier rejection is a performance improvement. The three unchanged-outcome ATA increases were approved for that migration. Those historical allowances have since been retired so future pull requests preserve the improved baseline.
 
 ## Static SBF profile results
 
@@ -74,7 +74,7 @@ The four changed binaries also shrink: `account_realloc_program` by 2,872 bytes,
 
 ## Pull request policy
 
-Instruction cases with the same result fail on every unapproved increase. A reviewed redesign can add an absolute ceiling to `runtimeApprovedTotals`. The allowance applies only when the base is below that ceiling and the head does not exceed it, so a later increase fails again. When base and head have different success outcomes, the report labels the case as a behavior change rather than comparing unlike execution paths as a speedup or regression. Security-sensitive cases also declare their required head outcome in `runtimeExpectedOutcomes`, so an accidental rejection-to-success change fails CI.
+Instruction cases with the same result fail on every unapproved increase. A reviewed redesign can add an exception to `runtimeCuApprovals`, recording the full PR `baseRevision`, measured `base`, approved maximum `head`, and a `reason`. It applies only to that base commit and measured value, then expires when the base changes. Binary growth is independently gated through `binarySizeApprovals`; a CU exception does not permit size growth. See [CI and releases](./ci-and-releases.md) for the exception format. When base and head have different success outcomes, the report labels the case as a behavior change rather than comparing unlike execution paths as a speedup or regression. Security-sensitive cases also declare their required head outcome in `runtimeExpectedOutcomes`, so an accidental rejection-to-success change fails CI.
 
 Static profiles warn when both the absolute and percentage warning thresholds are reached, and fail when both failure thresholds are reached. Smaller static increases stay visible as regressions. Programs and instructions are discovered from the head checkout. Head-only items create baselines; missing head measurements fail.
 

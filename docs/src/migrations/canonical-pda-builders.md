@@ -114,3 +114,5 @@ The generated client derives the account from the PDA metadata in the IDL. You c
 ## Use noncanonical allocation only for compatibility
 
 `AllocateAccountWithBump` is deprecated. Its replacement is `AllocateAccountWithNonCanonicalBump`, which makes the relaxed guarantee clear in code review. It accepts any valid PDA bump and only allocates untyped bytes. Use it for an existing address scheme that cannot migrate to canonical bumps. Use `AllocateAccount` for new PDA namespaces.
+
+The noncanonical allocation and unchecked typed-creation builders now hash the supplied seeds locally and let the runtime perform the curve check during CPI signer derivation. An on-curve bump therefore aborts execution rather than returning a catchable `Err(ProgramError::InvalidSeeds)` from the builder. If an instruction catches invalid bumps and continues, call `create_program_address` with the full seed list, including the bump, before invoking the builder and handle its error there. This optional preflight restores recovery while keeping the default creation path cheap. Canonical builders already prove a valid bump before allocating.

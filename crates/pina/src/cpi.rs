@@ -557,10 +557,9 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 ///
 /// This is the cheap sibling of [`CreateProgramAccountWithBump`]. It checks
 /// one derivation instead of searching for the highest valid bump, which is
-/// the difference between roughly 3,000 and 10,700 compute units per creation
-/// on a program with PDA seeds. Use it whenever several addresses for one seed
-/// namespace cannot cause harm — a per-authority counter, an escrow whose
-/// seeds already bind the parties.
+/// cheaper for programs accepting an explicit bump. Use it whenever several
+/// addresses for one seed namespace cannot cause harm — a per-authority
+/// counter, an escrow whose seeds already bind the parties.
 ///
 /// Prefer [`CreateProgramAccountWithBump`] when the program, a CPI target, or
 /// an indexer derives the canonical address from `seeds` alone: a non-canonical
@@ -583,6 +582,14 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 /// address, and `AccountAlreadyInitialized` when the target storage is not
 /// zeroed. It also returns allocation and system-program CPI errors from the
 /// checked creation path.
+///
+/// An address matching the seed hash can still be on the ed25519 curve.
+/// The runtime rejects that bump while deriving the CPI signer and aborts
+/// execution; it does **not** return a catchable `Err(InvalidSeeds)` to this
+/// builder's caller. To recover and continue in the same instruction, call
+/// [`crate::create_program_address`] with the seeds **including the bump**
+/// before invoking this builder. This optional curve check costs additional
+/// compute units. See [`AllocateAccountWithNonCanonicalBump`] for an example.
 ///
 /// # Examples
 ///
@@ -1293,6 +1300,35 @@ impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
 /// `Assign`. `invoke_signed` returns `InvalidArgument` when 16 additional
 /// signers would exceed the runtime's 16-signer limit after adding the target
 /// PDA signer.
+///
+/// An on-curve address matching the seed hash passes the local address check,
+/// but the runtime aborts execution when deriving the CPI signer. The caller
+/// cannot catch that abort as a `ProgramError`. If the instruction must recover
+/// from an invalid bump, preflight it with [`crate::create_program_address`]
+/// before calling `invoke` or `invoke_signed`:
+///
+/// ```
+/// use pina::Address;
+/// use pina::ProgramError;
+/// use pina::create_program_address;
+///
+/// // Include the bump in the seed slice, exactly as invoke_signed will.
+/// fn recoverable_address(
+/// 	seeds_with_bump: &[&[u8]],
+/// 	owner: &Address,
+/// ) -> Result<Option<Address>, ProgramError> {
+/// 	match create_program_address(seeds_with_bump, owner) {
+/// 		Ok(address) => Ok(Some(address)),
+/// 		Err(ProgramError::InvalidSeeds) => Ok(None),
+/// 		Err(error) => Err(error),
+/// 	}
+/// }
+/// ```
+///
+/// `Ok(None)` lets the instruction choose another path without invoking an
+/// allocation CPI. The preflight adds a curve check; callers that propagate
+/// creation failures can keep the cheaper default path. Address mismatches
+/// and oversized seeds still return a catchable `InvalidSeeds` locally.
 ///
 /// # Examples
 ///

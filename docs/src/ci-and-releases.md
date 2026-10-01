@@ -83,14 +83,32 @@ The compute-unit policy is:
 - fail when `total_cu` increases by at least `+500` CU and `+10.0%`
 - decreases are positive and increases are negative
 - smaller static increases remain visible but do not fail the threshold gate
-- instruction runtime increases fail unless a reviewed absolute ceiling permits that total
+- instruction runtime increases and every byte of ELF growth fail unless a matching reviewed exception permits the increase
 
 Notes:
 
 - instruction cases use real transaction simulation through Surfpool; static profiles complement them with whole-program coverage and binary sizes
-- reviewed redesigns may record an absolute total in `approvedTotals`; the allowance applies only while the base is below that total, so later increases are still evaluated normally
-- reviewed instruction redesigns use `runtimeApprovedTotals` with the same absolute-ceiling behavior
-- update `scripts/compute-unit-policy.json` only for exclusions, thresholds, or reviewed ceilings; do not add new examples to an allowlist
+- reviewed exceptions use `staticCuApprovals`, `runtimeCuApprovals`, or `binarySizeApprovals`, keyed by program name or instruction case ID
+- each exception records the full PR `baseRevision`, its measured `base`, the approved maximum `head`, and a `reason` explaining the accepted trade-off; the comparison must match both the base commit and measured value
+- an exception expires when its PR merges or the base changes; a CU exception never permits binary growth, and a size exception never permits a CU increase
+- update `scripts/compute-unit-policy.json` only for exclusions, thresholds, or explicitly reviewed exceptions; do not add new examples to an allowlist
+
+For example, a reviewed instruction increase can be recorded as:
+
+```json
+{
+	"runtimeCuApprovals": {
+		"example/instruction": {
+			"baseRevision": "0123456789abcdef0123456789abcdef01234567",
+			"base": 1000,
+			"head": 1050,
+			"reason": "Maintainer approved the additional validation cost."
+		}
+	}
+}
+```
+
+CI and `report:cu:compare:main` supply `--base-revision` automatically. A direct comparison must pass the same full base commit ID for an exception to apply. Without it, increases receive the ordinary policy checks.
 
 Local reproduction:
 

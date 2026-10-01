@@ -16,8 +16,10 @@ const policy: ComputeUnitPolicy = {
 	runtimeCases: ["example/instruction"],
 	warn: { deltaCu: 250, deltaPercent: 5 },
 	fail: { deltaCu: 500, deltaPercent: 10 },
-	runtimeApprovedTotals: {},
+	runtimeCuApprovals: {},
 };
+
+const baseRevision = "a".repeat(40);
 
 test("runtime savings are positive and regressions are negative", () => {
 	const savings = compareRuntimeReports(
@@ -42,15 +44,207 @@ test("runtime savings are positive and regressions are negative", () => {
 test("an approved runtime regression retains its negative score", () => {
 	const approvedPolicy = {
 		...policy,
-		runtimeApprovedTotals: { "example/instruction": 1_100 },
+		runtimeCuApprovals: {
+			"example/instruction": {
+				baseRevision,
+				base: 1_000,
+				head: 1_100,
+				reason: "Reviewed redesign",
+			},
+		},
 	};
 	const comparison = compareRuntimeReports(
 		approvedPolicy,
 		{ cases: [{ id: "example/instruction", computeUnits: 1_000 }] },
 		{ cases: [{ id: "example/instruction", computeUnits: 1_050 }] },
+		baseRevision,
 	).comparisons[0];
 	assert.equal(comparison?.deltaCu, -50);
 	assert.equal(comparison?.status, "approved-regression");
+});
+
+test("runtime approvals expire after merging and cannot undo later savings", () => {
+	const approvedPolicy: ComputeUnitPolicy = {
+		...policy,
+		runtimeCuApprovals: {
+			"example/instruction": {
+				baseRevision,
+				base: 1_000,
+				head: 1_100,
+				reason: "Reviewed redesign",
+			},
+		},
+	};
+
+	for (
+		const [base, head, revision] of [
+			[1_000, 1_101, baseRevision], // Above the reviewed head.
+			[900, 1_050, baseRevision], // Savings changed the measured base.
+			[1_000, 1_050, "b".repeat(40)], // A later PR has the same numbers.
+			[1_000, 1_050, undefined], // A caller must provide its PR base.
+		] as const
+	) {
+		const result = compareRuntimeReports(
+			approvedPolicy,
+			{ cases: [{ id: "example/instruction", computeUnits: base }] },
+			{ cases: [{ id: "example/instruction", computeUnits: head }] },
+			revision,
+		);
+		assert.equal(result.comparisons[0]?.status, "fail");
+	}
+});
+
+test("an approval cannot use a moving branch name instead of a commit ID", () => {
+	const result = compareRuntimeReports(
+		{
+			...policy,
+			runtimeCuApprovals: {
+				"example/instruction": {
+					baseRevision: "main",
+					base: 1_000,
+					head: 1_100,
+					reason: "Invalid scope",
+				},
+			},
+		},
+		{ cases: [{ id: "example/instruction", computeUnits: 1_000 }] },
+		{ cases: [{ id: "example/instruction", computeUnits: 1_050 }] },
+		"main",
+	);
+	assert.equal(result.comparisons[0]?.status, "fail");
+});
+
+/** Exercise the actual report writer and CI exit status with synthetic ELFs. */
+function staticReport(
+	baseCu: number,
+	headCu: number,
+	baseSize: number,
+	headSize: number,
+	approvals: Partial<ComputeUnitPolicy> = {},
+	revision: string | undefined = baseRevision,
+) {
+	const root = mkdtempSync(join(tmpdir(), "pina-program-policy-"));
+	const base = join(root, "base");
+	const head = join(root, "head");
+	const manifest = { results: { example: { status: "ok" } } };
+	mkdirSync(base);
+	mkdirSync(head);
+	writeFileSync(join(base, "manifest.json"), JSON.stringify(manifest));
+	writeFileSync(join(head, "manifest.json"), JSON.stringify(manifest));
+	writeFileSync(
+		join(root, "policy.json"),
+		JSON.stringify({ ...policy, ...approvals }),
+	);
+
+	for (
+		const [directory, cu, size] of [[base, baseCu, baseSize], [
+			head,
+			headCu,
+			headSize,
+		]] as const
+	) {
+		writeFileSync(
+			join(directory, "example.json"),
+			JSON.stringify({
+				total_cu: cu,
+				binary_size: size,
+				text_size: 5,
+				total_syscalls: 1,
+			}),
+		);
+	}
+
+	const exitCode = run({
+		policyFile: join(root, "policy.json"),
+		baseRevision: revision,
+		baseDir: base,
+		headDir: head,
+		staticOnly: true,
+		markdownOutput: join(root, "comparison.md"),
+		jsonOutput: join(root, "comparison.json"),
+	});
+	const report = JSON.parse(
+		readFileSync(join(root, "comparison.json"), "utf8"),
+	) as {
+		summary: { failures: number; improvements: number };
+		programs: Array<{ status: string; cuStatus: string; sizeStatus: string }>;
+	};
+
+	return {
+		exitCode,
+		report,
+		markdown: readFileSync(join(root, "comparison.md"), "utf8"),
+	};
+}
+
+test("every byte of binary growth fails even when compute units improve", () => {
+	for (const increase of [1, 90_000]) {
+		const result = staticReport(1_334, 1_333, 12_984, 12_984 + increase);
+		assert.equal(result.exitCode, 2);
+		assert.equal(result.report.programs[0]?.status, "fail");
+		assert.equal(result.report.programs[0]?.cuStatus, "improved");
+		assert.equal(result.report.programs[0]?.sizeStatus, "fail");
+		assert.equal(result.report.summary.failures, 1);
+		assert.equal(result.report.summary.improvements, 0);
+		assert.match(result.markdown, /1 blocking regression/u);
+		assert.match(result.markdown, /CU status.*Size status/u);
+	}
+});
+
+test("binary savings count as an improvement when compute units are unchanged", () => {
+	const result = staticReport(1_000, 1_000, 10_000, 9_999);
+	assert.equal(result.exitCode, 0);
+	assert.equal(result.report.programs[0]?.status, "improved");
+	assert.equal(result.report.programs[0]?.cuStatus, "unchanged");
+	assert.equal(result.report.programs[0]?.sizeStatus, "improved");
+});
+
+test("CU and size approvals are independent and expire with the reviewed base", () => {
+	const approval = {
+		baseRevision,
+		base: 1_000,
+		head: 1_500,
+		reason: "Reviewed trade-off",
+	};
+	const approvals = {
+		staticCuApprovals: { example: approval },
+		binarySizeApprovals: {
+			example: { ...approval, base: 10_000, head: 10_100 },
+		},
+	};
+	const approved = staticReport(1_000, 1_500, 10_000, 10_100, approvals);
+	assert.equal(approved.exitCode, 0);
+	assert.equal(approved.report.programs[0]?.cuStatus, "approved-regression");
+	assert.equal(approved.report.programs[0]?.sizeStatus, "approved-regression");
+
+	for (
+		const [baseCu, headCu, baseSize, headSize, revision] of [
+			[1_000, 1_500, 10_000, 10_100, "b".repeat(40)],
+			[900, 1_500, 10_000, 10_100, baseRevision],
+			[1_000, 1_500, 9_999, 10_100, baseRevision],
+			[1_000, 1_501, 10_000, 10_100, baseRevision],
+			[1_000, 1_500, 10_000, 10_101, baseRevision],
+		] as const
+	) {
+		assert.equal(
+			staticReport(baseCu, headCu, baseSize, headSize, approvals, revision)
+				.exitCode,
+			2,
+		);
+	}
+
+	assert.equal(
+		staticReport(1_000, 1_500, 10_000, 10_100, {
+			staticCuApprovals: approvals.staticCuApprovals,
+		}).exitCode,
+		2,
+	);
+	assert.equal(
+		staticReport(1_000, 1_500, 10_000, 10_100, {
+			binarySizeApprovals: approvals.binarySizeApprovals,
+		}).exitCode,
+		2,
+	);
 });
 
 test("a changed outcome is not misreported as a performance improvement", () => {

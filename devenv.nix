@@ -922,6 +922,7 @@ in
 
         node "$DEVENV_ROOT/scripts/compare-compute-units.ts" \
           --policy-file "$DEVENV_ROOT/scripts/compute-unit-policy.json" \
+          --base-revision "$(git -C "$worktree_dir" rev-parse HEAD)" \
           --base-dir "$DEVENV_ROOT/target/cu/base" \
           --head-dir "$DEVENV_ROOT/target/cu/head" \
           --base-runtime "$DEVENV_ROOT/target/cu/runtime-base.json" \
