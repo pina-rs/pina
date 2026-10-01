@@ -647,6 +647,18 @@ function compareStaticReports(
 	const hardErrors: string[] = [];
 	const baseManifest = loadOptionalManifest(baseDir);
 	const headManifest = loadOptionalManifest(headDir);
+
+	for (
+		const [side, manifest] of [["base", baseManifest], [
+			"head",
+			headManifest,
+		]] as const
+	) {
+		if (manifest.results === undefined) {
+			hardErrors.push(`${side} static profile inventory is missing`);
+		}
+	}
+
 	const programs = new Set([
 		...(policy.trackedPrograms ?? []),
 		...Object.keys(baseManifest.results ?? {}),
@@ -1003,12 +1015,14 @@ export function run(arguments_: Arguments): number {
 	const requiredRuntimeCases = new Set(
 		hasExactRuntime ? policy.runtimeCases ?? [] : [],
 	);
-	const staticResult = compareStaticReports(
-		policy,
-		arguments_.baseDir,
-		arguments_.headDir,
-		arguments_.baseRevision,
-	);
+	const staticResult = arguments_.runtimeOnly
+		? { comparisons: [], newBaselines: [], removedPrograms: [], hardErrors: [] }
+		: compareStaticReports(
+			policy,
+			arguments_.baseDir,
+			arguments_.headDir,
+			arguments_.baseRevision,
+		);
 	let baseRuntime: RuntimeReport = {};
 	let headRuntime: RuntimeReport = {};
 	let runtime: RuntimeComparisonResult = {
@@ -1022,7 +1036,7 @@ export function run(arguments_: Arguments): number {
 	const headReports: RuntimeReport[] = [];
 
 	if (
-		arguments_.baseExactRuntime !== undefined &&
+		!arguments_.staticOnly && arguments_.baseExactRuntime !== undefined &&
 		arguments_.headExactRuntime !== undefined
 	) {
 		baseReports.push(
@@ -1040,7 +1054,8 @@ export function run(arguments_: Arguments): number {
 	}
 
 	if (
-		arguments_.baseRuntime !== undefined && arguments_.headRuntime !== undefined
+		!arguments_.staticOnly && arguments_.baseRuntime !== undefined &&
+		arguments_.headRuntime !== undefined
 	) {
 		baseReports.push(loadJson<RuntimeReport>(arguments_.baseRuntime));
 		headReports.push(loadJson<RuntimeReport>(arguments_.headRuntime));

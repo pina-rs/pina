@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -171,6 +177,7 @@ function staticReport(
 	};
 
 	return {
+		root,
 		exitCode,
 		report,
 		markdown: readFileSync(join(root, "comparison.md"), "utf8"),
@@ -189,6 +196,62 @@ test("every byte of binary growth fails even when compute units improve", () => 
 		assert.match(result.markdown, /1 blocking regression/u);
 		assert.match(result.markdown, /CU status.*Size status/u);
 	}
+});
+
+test("missing static inventories fail instead of silently reporting no regressions", () => {
+	for (const side of ["base", "head"] as const) {
+		const { root } = staticReport(1_000, 1_000, 10_000, 10_000);
+		unlinkSync(join(root, side, "manifest.json"));
+		assert.equal(
+			run({
+				policyFile: join(root, "policy.json"),
+				baseDir: join(root, "base"),
+				headDir: join(root, "head"),
+				staticOnly: true,
+				markdownOutput: join(root, "comparison.md"),
+				jsonOutput: join(root, "comparison.json"),
+			}),
+			1,
+		);
+		assert.match(
+			readFileSync(join(root, "comparison.md"), "utf8"),
+			/static profile inventory is missing/u,
+		);
+	}
+});
+
+test("runtime-only comparisons do not apply the static size gate", () => {
+	const { root } = staticReport(1_000, 1_000, 10_000, 10_001);
+	assert.equal(
+		run({
+			policyFile: join(root, "policy.json"),
+			baseDir: join(root, "base"),
+			headDir: join(root, "head"),
+			runtimeOnly: true,
+			markdownOutput: join(root, "comparison.md"),
+			jsonOutput: join(root, "comparison.json"),
+		}),
+		0,
+	);
+});
+
+test("static-only comparisons do not read runtime input files", () => {
+	const { root } = staticReport(1_000, 1_000, 10_000, 10_000);
+	assert.equal(
+		run({
+			policyFile: join(root, "policy.json"),
+			baseDir: join(root, "base"),
+			headDir: join(root, "head"),
+			baseRuntime: join(root, "does-not-exist.json"),
+			headRuntime: join(root, "does-not-exist.json"),
+			baseExactRuntime: join(root, "does-not-exist.json"),
+			headExactRuntime: join(root, "does-not-exist.json"),
+			staticOnly: true,
+			markdownOutput: join(root, "comparison.md"),
+			jsonOutput: join(root, "comparison.json"),
+		}),
+		0,
+	);
 });
 
 test("binary savings count as an improvement when compute units are unchanged", () => {
