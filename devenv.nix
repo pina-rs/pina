@@ -50,6 +50,7 @@ in
       gcc
       git
       gitleaks
+      jq
       libiconv
       mdbook
       custom.monochange

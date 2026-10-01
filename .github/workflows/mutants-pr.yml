@@ -99,7 +99,7 @@ jobs:
         env:
           PACKAGE: ${{ matrix.package }}
         run: mutants:crate "$PACKAGE"
-        shell: devenv shell -c -- bash -e {0}
+        shell: devenv shell -c PACKAGE -- bash -e {0}
 
       # Historical misses are advisory on pull requests, but the failed step and
       # summary must remain visible instead of presenting a false-green run.
