@@ -556,7 +556,7 @@ fn migration_paths_stay_within_compute_budgets() {
 	let current_instruction_data = {
 		let mut data = [0_u8; 12];
 		data[0] = MigrationInstruction::Update as u8;
-		data[1] = 2;
+		data[1] = 1;
 		data[2..10].copy_from_slice(&88_u64.to_le_bytes());
 		data
 	};
