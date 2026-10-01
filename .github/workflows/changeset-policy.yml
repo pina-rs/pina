@@ -8,6 +8,9 @@ on:
       - reopened
       - labeled
       - unlabeled
+      # Re-check a pull request whose base branch changed, such as a stacked
+      # pull request retargeted after the branch below it merged.
+      - edited
 
 permissions:
   contents: read
@@ -22,6 +25,7 @@ concurrency:
 # pays for the nix/devenv setup once instead of twice.
 jobs:
   check:
+    if: ${{ github.event.action != 'edited' || github.event.changes.base }}
     timeout-minutes: 25
     runs-on: ubuntu-24.04
     permissions:
@@ -72,6 +76,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: classify changes
+        # Classify even when the policy step fails, so the comment always
+        # describes the latest push instead of an earlier commit.
+        if: ${{ !cancelled() }}
         # v0.9.4 moved to the `schema_version` contract monochange 0.14 emits
         # ("0.2"), so this pin and the CLI must move together: 0.9.2 parses the
         # integer `schemaVersion` that 0.13 emitted, and 0.9.4 rejects it with
@@ -79,6 +86,11 @@ jobs:
         uses: monochange/actions/change-classification@6866cbbd35932bdfb496f5b144578c9274d36ca0 # v0.10.0
         with:
           setup-monochange: false
+          # Compare with the branch this pull request targets, not `main`, so a
+          # stacked pull request does not report its parent's changes, and name
+          # the pushed head commit rather than GitHub's synthetic merge commit.
+          base: origin/${{ github.event.pull_request.base.ref }}
+          head: ${{ github.event.pull_request.head.sha }}
           detection-level: signature
           dependency-propagation: public
           github-token: ${{ secrets.GITHUB_TOKEN }}
