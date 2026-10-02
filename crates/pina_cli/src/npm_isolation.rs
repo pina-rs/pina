@@ -87,22 +87,31 @@ fn resolved_entry(entry: &Path, current: &Path) -> PathBuf {
 mod tests {
 	use super::*;
 
-	fn scrub(raw: &str, workspace_root: &Path, current: &Path) -> String {
-		let scrubbed = scrubbed_path(OsStr::new(raw), workspace_root, current)
-			.unwrap_or_else(|error| panic!("scrub failed: {error}"));
+	/// Join entries with the platform's `PATH` separator, so each case reads
+	/// the same where it is `:` and where it is `;`.
+	fn path_list(entries: &[&str]) -> OsString {
+		std::env::join_paths(entries).unwrap_or_else(|error| panic!("join failed: {error}"))
+	}
 
-		scrubbed.to_string_lossy().into_owned()
+	fn scrub(entries: &[&str], workspace_root: &Path, current: &Path) -> OsString {
+		scrubbed_path(&path_list(entries), workspace_root, current)
+			.unwrap_or_else(|error| panic!("scrub failed: {error}"))
 	}
 
 	#[test]
 	fn entries_inside_the_workspace_are_dropped_and_others_kept_in_order() {
 		let workspace = Path::new("/work/repo");
 		let current = Path::new("/work/repo/program");
-		let raw = "/usr/bin:/work/repo/node_modules/.bin:bin:/opt/tools/bin";
+		let entries = [
+			"/usr/bin",
+			"/work/repo/node_modules/.bin",
+			"bin",
+			"/opt/tools/bin",
+		];
 
 		assert_eq!(
-			scrub(raw, workspace, current),
-			"/usr/bin:/opt/tools/bin",
+			scrub(&entries, workspace, current),
+			path_list(&["/usr/bin", "/opt/tools/bin"]),
 			"workspace entries must be dropped, including relative ones resolved against the \
 			 current directory, and survivors must keep their order"
 		);
@@ -113,10 +122,10 @@ mod tests {
 		let workspace = Path::new("/work/repo");
 		let current = Path::new("/work/repo");
 
-		assert_eq!(scrub("", workspace, current), "");
+		assert_eq!(scrub(&[], workspace, current), OsString::new());
 		assert_eq!(
-			scrub("/usr/bin::/opt/bin", workspace, current),
-			"/usr/bin:/opt/bin"
+			scrub(&["/usr/bin", "", "/opt/bin"], workspace, current),
+			path_list(&["/usr/bin", "/opt/bin"])
 		);
 	}
 
@@ -174,8 +183,8 @@ mod tests {
 		let current = Path::new("/home/dev");
 
 		assert_eq!(
-			scrub("/home/dev/.bin", workspace, current),
-			"/home/dev/.bin"
+			scrub(&["/home/dev/.bin"], workspace, current),
+			path_list(&["/home/dev/.bin"])
 		);
 	}
 

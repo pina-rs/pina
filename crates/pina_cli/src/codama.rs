@@ -2081,24 +2081,27 @@ mod tests {
 
 	#[test]
 	fn configured_outputs_outside_the_workspace_are_refused_per_language() {
-		let workspace = Path::new("/work/repo");
+		// The worktree root Git reports is absolute, drive included on Windows,
+		// and the check absolutizes each target the same way.
+		let workspace = std::path::absolute("/work/repo")
+			.unwrap_or_else(|error| panic!("the workspace root must absolutize: {error}"));
 		let clients = BTreeSet::from([ClientLanguage::Typescript]);
 		let inside = |language: ClientLanguage| {
 			match language {
-				ClientLanguage::Typescript => PathBuf::from("/work/repo/clients/typescript"),
-				_ => PathBuf::from("/work/repo/clients/other"),
+				ClientLanguage::Typescript => workspace.join("clients/typescript"),
+				_ => workspace.join("clients/other"),
 			}
 		};
 		let outside = |language: ClientLanguage| {
 			match language {
-				ClientLanguage::Typescript => PathBuf::from("/work/other/typescript"),
-				_ => PathBuf::from("/work/repo/clients/other"),
+				ClientLanguage::Typescript => workspace.with_file_name("other").join("typescript"),
+				_ => workspace.join("clients/other"),
 			}
 		};
 
-		reject_outside_workspace(workspace, &clients, &inside)
+		reject_outside_workspace(&workspace, &clients, &inside)
 			.expect("targets inside the workspace are accepted");
-		let error = reject_outside_workspace(workspace, &clients, &outside)
+		let error = reject_outside_workspace(&workspace, &clients, &outside)
 			.expect_err("a target outside the workspace must be refused");
 		assert!(matches!(error, CodamaError::UnsafeOutput { ref reason, .. }
 				if reason.contains("Git worktree") && reason.contains("--output")));
