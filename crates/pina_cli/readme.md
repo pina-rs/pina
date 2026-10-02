@@ -138,8 +138,9 @@ List bundled reference topics or render one in the terminal.
 
 ```bash
 pina docs
-pina docs pina-overview
 pina docs pina-idl
+pina docs pina-overview
+pina docs pina-validation
 ```
 
 ### `pina init`
