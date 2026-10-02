@@ -249,14 +249,16 @@ enabled = true
 versioned_files = ["Cargo.toml"]
 # Refresh Cargo.lock after a release bumps the workspace version. All pina
 # crates inherit `version = { workspace = true }`, so `cargo update --workspace`
-# syncs exactly those lockfile entries without touching dependencies. The
-# standalone fuzz and Surfpool-test workspaces keep their own lockfiles, so they
-# must be refreshed separately or `cargo check --locked` fails on the release
-# PR.
+# syncs exactly those lockfile entries without touching dependencies.
+#
+# Nested workspaces that depend on a pina crate by path (the fuzz targets, the
+# framework-comparison fixtures) keep their own lockfiles, which record the same
+# versions and fail every `--locked` build once the release moves them. The
+# script finds those lockfiles itself, so a new nested workspace needs no entry
+# here.
 lockfile_commands = [
 	{ command = "cargo update --workspace", cwd = ".", shell = "bash" },
-	{ command = "cargo update --workspace --manifest-path crates/pina_fuzz/Cargo.toml", cwd = ".", shell = "bash" },
-	{ command = "cargo update --workspace --manifest-path crates/pina_fuzz/fuzz/Cargo.toml", cwd = ".", shell = "bash" },
+	{ command = "node scripts/refresh-release-lockfiles.ts", cwd = ".", shell = "bash" },
 ]
 
 [ecosystems.cargo.publish]
