@@ -1,5 +1,5 @@
 ---
-pina_cli: minor
+pina_cli: breaking
 pina_codama_renderer: minor
 pina_cpi_renderer: minor
 pina_cli_renderer: minor
