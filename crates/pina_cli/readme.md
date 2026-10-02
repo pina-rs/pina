@@ -276,12 +276,13 @@ The extractor currently supports these dispatch shapes:
 - Generated dispatch: an `#[discriminator(entrypoint)]` enum, whose variants route to `VariantAccounts` unless `#[dispatch(accounts = OtherAccounts)]` overrides them
 - Canonical routed arms: `Variant => Accounts::try_from((program_id, accounts))?.process(data)`
 - Grouped routed arms: `VariantA | VariantB => SharedAccounts::try_from((program_id, accounts))?.process(data)`
+- Versioned routed arms: `Variant => Instruction::process_versioned(Accounts::try_from((program_id, accounts))?, data)`, the form a hand-written dispatcher uses for an instruction that keeps its migration envelope
 - Accountless arms: `Variant => { let _ = Payload::try_from_bytes(data)?; Ok(()) }`
 - Accountless entrypoint fallback: if a single `process_instruction` exists but has no recognizable dispatch map, Pina emits zero-account instruction nodes from the declared payload structs.
 
 Keep in mind:
 
-- Account metadata is only inferred for routed `Accounts::try_from((program_id, accounts))` arms.
+- Account metadata is inferred from the `Accounts::try_from((program_id, accounts))` conversion an arm performs. The conversion is read wherever the arm performs it, including when it is bound to a local first. An arm that converts into two different structs has no single account layout and is emitted without accounts.
 - Signer, writable, and known default-account metadata can be declared with `#[pina(validate(...))]` on `#[derive(Accounts)]` fields. PDA inference still depends on direct validation calls and a field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
 - Existing direct `assert_signer()`, `assert_writable()`, `assert_address()`, and PDA validation-chain inference remains supported. Writable inference also comes from mutable fields such as `&'a mut AccountView`.
 - If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
