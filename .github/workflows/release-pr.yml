@@ -130,7 +130,7 @@ jobs:
           # exact tree being released.
           release_branch="monochange/release/release"
           tag="$(monochange step release-record --from "$release_branch" --format json \
-            | jq -r '[.record.release_targets[] | select(.tag == true)] | sort_by(.tag_name | startswith("v") | not) | first | .tag_name')"
+            | jq -r '[.record.release_targets[] | select(.tag == true)] | sort_by(.tag_name | startswith("v") | not) | first | .tag_name // empty')"
           if [ -z "$tag" ]; then
             echo "::error::Could not determine the release tag for the dry run." >&2
             exit 1
@@ -194,9 +194,16 @@ jobs:
           # Run the publish dry run against the exact merge commit being
           # tagged. If it fails, the release stops here: no tag, no draft
           # release, no registry publish.
+          #
+          # `publish.yml` builds release binaries only for a `v*` tag, so a
+          # release that also carries an `abi/v*` target must dispatch with the
+          # `v*` one or the dry run skips every build and passes hollow.
           release_tag="$(monochange step release-record --from HEAD --format json \
-            | jq -r '.record.release_targets[] | select(.tag == true) | .tag_name' \
-            | head -1)"
+            | jq -r '[.record.release_targets[] | select(.tag == true)] | sort_by(.tag_name | startswith("v") | not) | first | .tag_name // empty')"
+          if [ -z "$release_tag" ]; then
+            echo "::error::Could not determine the release tag for the dry run." >&2
+            exit 1
+          fi
           # The dispatch API requires a branch or tag ref, not a raw SHA:
           # push a stable per-release branch pointing at the release commit
           # and dispatch against it.
