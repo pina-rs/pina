@@ -32,13 +32,13 @@ pub(crate) fn append_generated_paths(root: &Path, added: &[PathBuf]) -> std::io:
 			.map(PathBuf::from),
 	);
 
-	let payload = serde_json::to_string_pretty(&serde_json::json!({
+	let manifest = serde_json::json!({
 		"paths": paths.iter().map(|path| manifest_entry(path)).collect::<Vec<_>>(),
-	}))
-	.map_err(std::io::Error::other)?;
+	});
 
 	fs::create_dir_all(root)?;
-	fs::write(root.join(MANIFEST_FILE), format!("{payload}\n"))
+	// `{:#}` pretty-prints a JSON value, and formatting one cannot fail.
+	fs::write(root.join(MANIFEST_FILE), format!("{manifest:#}\n"))
 }
 
 /// Spell a tracked path with forward slashes, as every platform reads it.
@@ -141,21 +141,34 @@ fn is_tracked_entry(path: &Path) -> bool {
 mod tests {
 	use super::*;
 
+	/// Write `contents` to `path`, creating its parent directories.
+	fn put(path: &Path, contents: &str) {
+		let parent = path.parent().expect("the fixture path has a parent");
+
+		fs::create_dir_all(parent).unwrap_or_else(|e| panic!("mkdir {}: {e}", parent.display()));
+		fs::write(path, contents).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+	}
+
+	fn read_manifest(root: &Path) -> String {
+		fs::read_to_string(root.join(MANIFEST_FILE)).unwrap_or_else(|e| panic!("read failed: {e}"))
+	}
+
+	fn append(root: &Path, added: &[PathBuf]) {
+		append_generated_paths(root, added).unwrap_or_else(|e| panic!("append failed: {e}"));
+	}
+
 	#[test]
 	fn appending_extends_the_record_and_survives_untrusted_entries() {
 		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let root = temp.path();
 
-		append_generated_paths(root, &[PathBuf::from("src/generated/mod.rs")])
-			.unwrap_or_else(|error| panic!("append failed: {error}"));
-		append_generated_paths(
+		append(root, &[PathBuf::from("src/generated/mod.rs")]);
+		append(
 			root,
 			&[PathBuf::from("lib/barrel.dart"), PathBuf::from("../escape")],
-		)
-		.unwrap_or_else(|error| panic!("append failed: {error}"));
+		);
 
-		let contents = fs::read_to_string(root.join(MANIFEST_FILE))
-			.unwrap_or_else(|error| panic!("read failed: {error}"));
+		let contents = read_manifest(root);
 
 		assert!(contents.contains("src/generated/mod.rs"));
 		assert!(contents.contains("lib/barrel.dart"));
@@ -173,13 +186,11 @@ mod tests {
 		// file snapshot reports do.
 		let nested = Path::new("src").join("generated").join("mod.rs");
 
-		append_generated_paths(root, &[nested])
-			.unwrap_or_else(|error| panic!("append failed: {error}"));
+		append(root, &[nested]);
 
-		assert!(
-			fs::read_to_string(root.join(MANIFEST_FILE))
-				.unwrap_or_else(|error| panic!("read failed: {error}"))
-				.contains("\"src/generated/mod.rs\"")
+		assert_eq!(
+			read_manifest(root),
+			"{\n  \"paths\": [\n    \"src/generated/mod.rs\"\n  ]\n}\n"
 		);
 	}
 
@@ -187,14 +198,11 @@ mod tests {
 	fn appending_over_a_malformed_manifest_starts_a_clean_record() {
 		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let root = temp.path();
-		fs::write(root.join(MANIFEST_FILE), "not json")
-			.unwrap_or_else(|error| panic!("write failed: {error}"));
+		put(&root.join(MANIFEST_FILE), "not json");
 
-		append_generated_paths(root, &[PathBuf::from("helpers.ts")])
-			.unwrap_or_else(|error| panic!("append failed: {error}"));
+		append(root, &[PathBuf::from("helpers.ts")]);
 
-		let contents = fs::read_to_string(root.join(MANIFEST_FILE))
-			.unwrap_or_else(|error| panic!("read failed: {error}"));
+		let contents = read_manifest(root);
 		assert!(contents.contains("helpers.ts"));
 		assert!(!contents.contains("not json"));
 	}
@@ -203,20 +211,46 @@ mod tests {
 	fn snapshots_report_only_new_files_under_the_root() {
 		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let root = temp.path().join("client");
-		fs::create_dir_all(root.join("src/generated"))
-			.unwrap_or_else(|error| panic!("mkdir failed: {error}"));
-		fs::write(root.join("src/generated/index.ts"), "old")
-			.unwrap_or_else(|error| panic!("write failed: {error}"));
+		put(&root.join("src/generated/index.ts"), "old");
 
-		let snapshot =
-			FileSnapshot::take(&root).unwrap_or_else(|error| panic!("snapshot failed: {error}"));
-		fs::write(root.join("src/generated/pinaPodCodecs.ts"), "new")
-			.unwrap_or_else(|error| panic!("write failed: {error}"));
+		let snapshot = FileSnapshot::take(&root).unwrap_or_else(|e| panic!("snapshot failed: {e}"));
+		put(&root.join("src/generated/pinaPodCodecs.ts"), "new");
 
-		let added = snapshot
-			.added_since(&root)
-			.unwrap_or_else(|error| panic!("diff failed: {error}"));
+		let added =
+			FileSnapshot::added_since(snapshot, &root).unwrap_or_else(|e| panic!("diff: {e}"));
 
 		assert_eq!(added, vec![PathBuf::from("src/generated/pinaPodCodecs.ts")]);
+	}
+
+	#[test]
+	fn a_missing_root_is_an_empty_snapshot_and_an_unreadable_one_fails() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path().join("client");
+
+		let snapshot = FileSnapshot::take(&root).unwrap_or_else(|e| panic!("snapshot failed: {e}"));
+		put(&root.join("index.ts"), "new");
+		let added =
+			FileSnapshot::added_since(snapshot, &root).unwrap_or_else(|e| panic!("diff: {e}"));
+
+		assert_eq!(added, vec![PathBuf::from("index.ts")]);
+		// A regular file where the client root belongs cannot be listed, and
+		// that is not the same as a root the renderer has yet to create.
+		assert!(FileSnapshot::take(&root.join("index.ts")).is_err());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn snapshots_skip_entries_that_are_neither_files_nor_directories() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path().join("client");
+		let link = root.join("link.ts");
+
+		let snapshot = FileSnapshot::take(&root).unwrap_or_else(|e| panic!("snapshot failed: {e}"));
+		put(&root.join("index.ts"), "file");
+		std::os::unix::fs::symlink("index.ts", &link).unwrap_or_else(|e| panic!("symlink: {e}"));
+		let added =
+			FileSnapshot::added_since(snapshot, &root).unwrap_or_else(|e| panic!("diff: {e}"));
+
+		assert_eq!(added, vec![PathBuf::from("index.ts")]);
 	}
 }

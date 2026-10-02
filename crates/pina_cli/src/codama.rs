@@ -24,7 +24,10 @@ use crate::dart_client::validate_dart_client_idls;
 use crate::dart_client::write_dart_package_barrels;
 use crate::error::CodamaError;
 use crate::generate_idl;
+use crate::generation_manifest::FileSnapshot;
+use crate::generation_manifest::append_generated_paths;
 use crate::js_client::harden_generated_clients;
+use crate::npm_isolation::isolate_package_child;
 use crate::project::ClientLanguage;
 use crate::project::GenerationMode;
 use crate::project::Project;
@@ -674,13 +677,9 @@ pub fn generate_project_clients(
 		.collect::<Result<BTreeMap<_, _>, _>>()?;
 	let mut targets = Vec::with_capacity(clients.len());
 	for language in &clients {
-		let configured = client_target(*language);
-		let path = std::path::absolute(&configured)
-			.map_err(|source| create_dir_error(&configured, source))?;
-
 		targets.push(GeneratedClientTarget {
 			language: *language,
-			path,
+			path: absolute_path(&client_target(*language))?,
 			mode: generation[language].mode,
 		});
 	}
@@ -710,7 +709,7 @@ pub fn generate_project_clients(
 		// `workspace_root()` primes the plan's cache, so the renderer
 		// children's `PATH` scrub reuses this discovery instead of
 		// spawning `git` a second time.
-		reject_outside_workspace(plan.workspace_root(), &clients, &client_target)?;
+		reject_outside_workspace(plan.workspace_root(), &targets)?;
 	}
 
 	let idl_paths = generate_plan(&plan)?;
@@ -736,17 +735,12 @@ pub fn generate_project_clients(
 /// the `--output` flag, which skips this check.
 fn reject_outside_workspace(
 	workspace_root: &Path,
-	clients: &BTreeSet<ClientLanguage>,
-	client_target: &impl Fn(ClientLanguage) -> PathBuf,
+	targets: &[GeneratedClientTarget],
 ) -> Result<(), CodamaError> {
-	for language in clients {
-		let configured = client_target(*language);
-		let absolute = std::path::absolute(&configured)
-			.map_err(|source| create_dir_error(&configured, source))?;
-
-		if !absolute.starts_with(workspace_root) {
+	for target in targets {
+		if !target.path.starts_with(workspace_root) {
 			return Err(CodamaError::UnsafeOutput {
-				path: absolute,
+				path: target.path.clone(),
 				reason: format!(
 					"configured client outputs must stay inside the Git worktree {}; pass \
 					 `--output` to publish outside it",
@@ -917,22 +911,14 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			verify_typescript_scaffold_kit_major(&plan.typescript_out.join(example), settings)?;
 		}
 
-		let snapshots = examples
-			.iter()
-			.map(|example| snapshot_client_tree(&plan.typescript_out.join(example)))
-			.collect::<Result<Vec<_>, _>>()?;
-		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
-		harden_generated_clients(&plan.typescript_out, &examples, &idl_paths)?;
 		let roots = examples
 			.iter()
 			.map(|example| plan.typescript_out.join(example))
 			.collect::<Vec<_>>();
-		record_added_files(&roots, snapshots, |path, source| {
-			CodamaError::HardenJavaScript {
-				path: path.to_path_buf(),
-				source,
-			}
-		})?;
+		let snapshots = snapshot_client_trees(&roots, harden_javascript_error)?;
+		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
+		harden_generated_clients(&plan.typescript_out, &examples, &idl_paths)?;
+		record_added_files(&roots, snapshots, harden_javascript_error)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::Dart) {
@@ -945,27 +931,12 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		}
 
 		validate_dart_client_idls(&plan.dart_out, &examples, &idl_paths)?;
-		let snapshots = snapshot_client_tree(&plan.dart_out)
-			.map(|snapshot| vec![snapshot])
-			.map_err(|source| {
-				CodamaError::DartClient {
-					path: plan.dart_out.clone(),
-					source: Box::new(source),
-				}
-			})?;
+		let roots = std::slice::from_ref(&plan.dart_out);
+		let snapshots = snapshot_client_trees(roots, dart_client_error)?;
 		run_client_generation(plan, ClientLanguage::Dart, &idl_paths)?;
 		harden_generated_dart_clients(&plan.dart_out, &examples, &idl_paths)?;
 		write_dart_package_barrels(&plan.dart_out, &examples)?;
-		record_added_files(
-			std::slice::from_ref(&plan.dart_out),
-			snapshots,
-			|path, source| {
-				CodamaError::DartClient {
-					path: path.to_path_buf(),
-					source: Box::new(source),
-				}
-			},
-		)?;
+		record_added_files(roots, snapshots, dart_client_error)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::CliRust) {
@@ -1014,32 +985,50 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	Ok(idl_paths)
 }
 
-/// Snapshot a client tree before a post-render step so the files the step
+/// How a post-render step reports a client root it could not read or record.
+type ClientRootError = fn(&Path, std::io::Error) -> CodamaError;
+
+fn harden_javascript_error(path: &Path, source: std::io::Error) -> CodamaError {
+	CodamaError::HardenJavaScript {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn dart_client_error(path: &Path, source: std::io::Error) -> CodamaError {
+	CodamaError::DartClient {
+		path: path.to_path_buf(),
+		source: Box::new(source),
+	}
+}
+
+/// Snapshot each client tree before a post-render step so the files the step
 /// adds can be recorded in its manifest afterwards.
-fn snapshot_client_tree(
-	root: &Path,
-) -> Result<crate::generation_manifest::FileSnapshot, CodamaError> {
-	crate::generation_manifest::FileSnapshot::take(root).map_err(|source| {
-		CodamaError::CreateDir {
-			path: root.to_path_buf(),
-			source,
-		}
-	})
+fn snapshot_client_trees(
+	roots: &[PathBuf],
+	error: ClientRootError,
+) -> Result<Vec<FileSnapshot>, CodamaError> {
+	let mut snapshots = Vec::with_capacity(roots.len());
+
+	for root in roots {
+		snapshots.push(FileSnapshot::take(root).map_err(|source| error(root, source))?);
+	}
+
+	Ok(snapshots)
 }
 
 /// Record the files post-render steps added in each client root's manifest.
 fn record_added_files(
 	roots: &[PathBuf],
-	snapshots: Vec<crate::generation_manifest::FileSnapshot>,
-	error: impl Fn(&Path, std::io::Error) -> CodamaError,
+	snapshots: Vec<FileSnapshot>,
+	error: ClientRootError,
 ) -> Result<(), CodamaError> {
 	for (root, snapshot) in roots.iter().zip(snapshots) {
 		let added = snapshot
 			.added_since(root)
 			.map_err(|source| error(root, source))?;
 
-		crate::generation_manifest::append_generated_paths(root, &added)
-			.map_err(|source| error(root, source))?;
+		append_generated_paths(root, &added).map_err(|source| error(root, source))?;
 	}
 
 	Ok(())
@@ -1692,13 +1681,41 @@ fn diagnostic_text(bytes: &[u8]) -> String {
 		})
 }
 
-/// Absolutize a renderer argument against the process working directory.
+/// Absolutize a path against the process working directory.
 ///
 /// The npx and pnpm children run from an isolated temporary directory, so a
 /// relative renderer output, client root, or IDL path would resolve against
-/// that directory instead of the project the paths were computed from.
-fn renderer_arg(path: &Path) -> Result<PathBuf, CodamaError> {
+/// that directory instead of the project the paths were computed from. The
+/// containment check compares the same spelling of each client target.
+fn absolute_path(path: &Path) -> Result<PathBuf, CodamaError> {
 	std::path::absolute(path).map_err(|source| create_dir_error(path, source))
+}
+
+/// Label an I/O failure with the command that hit it.
+fn run_error(cmd: &str) -> impl Fn(std::io::Error) -> CodamaError + '_ {
+	move |source| {
+		CodamaError::RunCommand {
+			cmd: cmd.to_string(),
+			source,
+		}
+	}
+}
+
+/// Run the render script through a package runner that fetches the pinned
+/// packages, from a directory where no project package can shadow them.
+fn run_isolated_renderer(
+	mut command: Command,
+	plan: &GenerationPlan,
+	cmd: &str,
+) -> Result<BoundedOutput, CodamaError> {
+	let root = plan.workspace_root();
+	let script = Some(CLIENT_RENDER_SCRIPT.as_bytes());
+	// The isolated directory must outlive the child.
+	let isolated = isolate_package_child(&mut command, root).map_err(run_error(cmd))?;
+	let output = run_bounded(&mut command, script).map_err(run_error(cmd))?;
+	drop(isolated);
+
+	Ok(output)
 }
 
 fn run_client_generation_with_npx(
@@ -1715,31 +1732,15 @@ fn run_client_generation_with_npx(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_arg(renderer_output(plan, renderer))?)
-		.arg(renderer_arg(client_root(plan, renderer))?);
+		.arg(absolute_path(renderer_output(plan, renderer))?)
+		.arg(absolute_path(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(renderer_arg(idl_path)?);
+		command.arg(absolute_path(idl_path)?);
 	}
 
-	let isolated = crate::npm_isolation::isolate_package_child(&mut command, plan.workspace_root())
-		.map_err(|source| {
-			CodamaError::RunCommand {
-				cmd: plan.npx.clone(),
-				source,
-			}
-		})?;
-	let output =
-		run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
-			CodamaError::RunCommand {
-				cmd: plan.npx.clone(),
-				source,
-			}
-		})?;
-	drop(isolated);
-
-	Ok(output)
+	run_isolated_renderer(command, plan, &plan.npx)
 }
 
 fn run_client_generation_with_pnpm(
@@ -1755,31 +1756,15 @@ fn run_client_generation_with_pnpm(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_arg(renderer_output(plan, renderer))?)
-		.arg(renderer_arg(client_root(plan, renderer))?);
+		.arg(absolute_path(renderer_output(plan, renderer))?)
+		.arg(absolute_path(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(renderer_arg(idl_path)?);
+		command.arg(absolute_path(idl_path)?);
 	}
 
-	let isolated = crate::npm_isolation::isolate_package_child(&mut command, plan.workspace_root())
-		.map_err(|source| {
-			CodamaError::RunCommand {
-				cmd: "pnpm".to_string(),
-				source,
-			}
-		})?;
-	let output =
-		run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
-			CodamaError::RunCommand {
-				cmd: "pnpm".to_string(),
-				source,
-			}
-		})?;
-	drop(isolated);
-
-	Ok(output)
+	run_isolated_renderer(command, plan, "pnpm")
 }
 
 /// Run the render script through a Node executable the operator selected.
@@ -1799,20 +1784,15 @@ fn run_client_generation_with_node(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_arg(renderer_output(plan, renderer))?)
-		.arg(renderer_arg(client_root(plan, renderer))?);
+		.arg(absolute_path(renderer_output(plan, renderer))?)
+		.arg(absolute_path(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(renderer_arg(idl_path)?);
+		command.arg(absolute_path(idl_path)?);
 	}
 
-	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
-		CodamaError::RunCommand {
-			cmd: "node".to_string(),
-			source,
-		}
-	})
+	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(run_error("node"))
 }
 
 fn add_generation_arguments(command: &mut Command, settings: GenerationSettings) {
@@ -2082,39 +2062,94 @@ mod tests {
 	#[test]
 	fn configured_outputs_outside_the_workspace_are_refused_per_language() {
 		// The worktree root Git reports is absolute, drive included on Windows,
-		// and the check absolutizes each target the same way.
-		let workspace = std::path::absolute("/work/repo")
-			.unwrap_or_else(|error| panic!("the workspace root must absolutize: {error}"));
-		let clients = BTreeSet::from([ClientLanguage::Typescript]);
-		let inside = |language: ClientLanguage| {
-			match language {
-				ClientLanguage::Typescript => workspace.join("clients/typescript"),
-				_ => workspace.join("clients/other"),
+		// and each target is absolutized the same way.
+		let workspace = absolute_path(Path::new("/work/repo")).unwrap_or_else(|e| panic!("{e}"));
+		let target = |path: PathBuf| {
+			GeneratedClientTarget {
+				language: ClientLanguage::Typescript,
+				path,
+				mode: GenerationMode::Auto,
 			}
 		};
-		let outside = |language: ClientLanguage| {
-			match language {
-				ClientLanguage::Typescript => workspace.with_file_name("other").join("typescript"),
-				_ => workspace.join("clients/other"),
-			}
-		};
+		let inside = [target(workspace.join("clients/typescript"))];
+		let outside = [target(workspace.with_file_name("other").join("typescript"))];
 
-		reject_outside_workspace(&workspace, &clients, &inside)
-			.expect("targets inside the workspace are accepted");
-		let error = reject_outside_workspace(&workspace, &clients, &outside)
+		reject_outside_workspace(&workspace, &inside).unwrap_or_else(|e| panic!("inside: {e}"));
+		let error = reject_outside_workspace(&workspace, &outside)
 			.expect_err("a target outside the workspace must be refused");
 		assert!(matches!(error, CodamaError::UnsafeOutput { ref reason, .. }
 				if reason.contains("Git worktree") && reason.contains("--output")));
 	}
 
 	#[test]
-	fn renderer_arguments_absolutize_relative_plan_paths() {
-		let current = std::env::current_dir()
-			.unwrap_or_else(|error| panic!("test requires a working directory: {error}"));
-		let resolved = renderer_arg(Path::new("codama/clients/typescript"))
-			.unwrap_or_else(|error| panic!("relative renderer paths must resolve: {error}"));
+	fn paths_are_absolutized_against_the_working_directory() {
+		let current = std::env::current_dir().unwrap_or_else(|error| panic!("{error}"));
+		let relative = Path::new("codama/clients/typescript");
 
-		assert_eq!(resolved, current.join("codama/clients/typescript"));
+		let resolved = absolute_path(relative).unwrap_or_else(|error| panic!("{error}"));
+
+		assert_eq!(resolved, current.join(relative));
+		// An empty path names nothing to resolve.
+		assert!(matches!(
+			absolute_path(Path::new("")),
+			Err(CodamaError::CreateDir { .. })
+		));
+	}
+
+	fn snapshots(roots: &[PathBuf]) -> Vec<FileSnapshot> {
+		snapshot_client_trees(roots, dart_client_error).unwrap_or_else(|e| panic!("{e}"))
+	}
+
+	#[test]
+	fn post_render_additions_are_recorded_in_each_client_manifest() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let roots = [temp.path().join("client")];
+		let manifest = roots[0].join(".pina-generated.json");
+
+		let before = snapshots(&roots);
+		std::fs::create_dir_all(&roots[0]).unwrap_or_else(|error| panic!("{error}"));
+		std::fs::write(roots[0].join("helpers.ts"), "").unwrap_or_else(|error| panic!("{error}"));
+		record_added_files(&roots, before, dart_client_error).unwrap_or_else(|e| panic!("{e}"));
+
+		let recorded = std::fs::read_to_string(&manifest).unwrap_or_else(|error| panic!("{error}"));
+		assert!(
+			recorded.contains("\"helpers.ts\""),
+			"unexpected record: {recorded}"
+		);
+	}
+
+	#[test]
+	fn unreadable_client_roots_fail_as_the_step_that_needed_them() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		// A regular file where a client root belongs cannot be listed.
+		let roots = [temp.path().join("client")];
+		std::fs::write(&roots[0], "").unwrap_or_else(|error| panic!("{error}"));
+
+		let javascript = snapshot_client_trees(&roots, harden_javascript_error);
+		let dart = snapshot_client_trees(&roots, dart_client_error);
+
+		assert!(matches!(
+			javascript,
+			Err(CodamaError::HardenJavaScript { .. })
+		));
+		assert!(matches!(dart, Err(CodamaError::DartClient { .. })));
+	}
+
+	#[test]
+	fn additions_that_cannot_be_listed_or_recorded_fail_generation() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let vanished = [temp.path().join("vanished")];
+		let blocked = [temp.path().join("blocked")];
+		// A directory where the manifest file belongs makes the record fail.
+		let blocker = blocked[0].join(".pina-generated.json");
+		std::fs::create_dir_all(&blocker).unwrap_or_else(|error| panic!("{error}"));
+
+		// The first root never appears, so its additions cannot be listed.
+		let unlisted = record_added_files(&vanished, snapshots(&vanished), dart_client_error);
+		let unrecorded = record_added_files(&blocked, snapshots(&blocked), dart_client_error);
+
+		assert!(matches!(unlisted, Err(CodamaError::DartClient { .. })));
+		assert!(matches!(unrecorded, Err(CodamaError::DartClient { .. })));
 	}
 
 	fn write_kit_manifest(dir: &Path, kit_range: &str) {

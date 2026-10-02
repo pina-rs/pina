@@ -952,8 +952,9 @@ fn discover_git_root(start: &Path) -> Option<PathBuf> {
 /// configuration) is rejected in favor of `project_root`, because
 /// containment to `$HOME` would contain nothing.
 pub(crate) fn generation_containment_root(project_root: &Path) -> PathBuf {
-	let home = std::env::var_os("HOME")
-		.or_else(|| std::env::var_os("USERPROFILE"))
+	let home = ["HOME", "USERPROFILE"]
+		.into_iter()
+		.find_map(std::env::var_os)
 		.map(PathBuf::from);
 
 	containment_root(

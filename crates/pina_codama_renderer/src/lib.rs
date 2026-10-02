@@ -125,14 +125,7 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 			Some(previous) => previous.remove_under(crate_dir, &config.generated_folder)?,
 			// Trees older than tracked manifests keep the historical
 			// whole-directory replacement so stale files do not linger.
-			None => {
-				fs::remove_dir_all(&generated_dir).map_err(|source| {
-					RenderError::WriteFile {
-						path: generated_dir.clone(),
-						source,
-					}
-				})?;
-			}
+			None => remove_generated_dir(&generated_dir)?,
 		}
 	}
 
@@ -145,6 +138,11 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 
 	write_files(&generated_dir, files)?;
 	generation_manifest::write(crate_dir, &tracked)
+}
+
+/// Remove a generated tree as a whole.
+fn remove_generated_dir(path: &Path) -> Result<()> {
+	fs::remove_dir_all(path).map_err(|source| write_file_error(path, source))
 }
 
 fn resolve_render_mode(crate_dir: &Path, requested: RenderMode) -> Result<RenderMode> {

@@ -82,13 +82,13 @@ impl GenerationManifest {
 
 /// Record `paths` (relative to `root`) as the client's tracked files.
 pub(crate) fn write(root: &Path, paths: &BTreeSet<PathBuf>) -> Result<()> {
-	let payload = serde_json::to_string_pretty(&serde_json::json!({
+	let manifest = serde_json::json!({
 		"paths": paths.iter().map(|path| manifest_entry(path)).collect::<Vec<_>>(),
-	}))
-	.map_err(|source| write_file_error(&root.join(MANIFEST_FILE), std::io::Error::other(source)))?;
+	});
 
 	fs::create_dir_all(root).map_err(|source| write_file_error(root, source))?;
-	fs::write(root.join(MANIFEST_FILE), format!("{payload}\n"))
+	// `{:#}` pretty-prints a JSON value, and formatting one cannot fail.
+	fs::write(root.join(MANIFEST_FILE), format!("{manifest:#}\n"))
 		.map_err(|source| write_file_error(&root.join(MANIFEST_FILE), source))
 }
 
@@ -139,6 +139,18 @@ mod tests {
 		}
 	}
 
+	/// Write `contents` to `path`, creating its parent directories.
+	fn put(path: &Path, contents: &str) {
+		let parent = path.parent().expect("the fixture path has a parent");
+
+		fs::create_dir_all(parent).unwrap_or_else(|e| panic!("mkdir {}: {e}", parent.display()));
+		fs::write(path, contents).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+	}
+
+	fn read_manifest(root: &Path) -> String {
+		fs::read_to_string(root.join(MANIFEST_FILE)).unwrap_or_else(|e| panic!("read failed: {e}"))
+	}
+
 	#[test]
 	fn entries_are_recorded_with_forward_slashes_on_every_platform() {
 		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
@@ -146,14 +158,9 @@ mod tests {
 		// Joined components carry the platform's own separator.
 		let nested = Path::new("src").join("generated").join("mod.rs");
 
-		write(root, &BTreeSet::from([nested]))
-			.unwrap_or_else(|error| panic!("write failed: {error}"));
+		write(root, &BTreeSet::from([nested])).unwrap_or_else(|e| panic!("write failed: {e}"));
 
-		assert!(
-			fs::read_to_string(root.join(MANIFEST_FILE))
-				.unwrap_or_else(|error| panic!("read failed: {error}"))
-				.contains("\"src/generated/mod.rs\"")
-		);
+		assert!(read_manifest(root).contains("\"src/generated/mod.rs\""));
 	}
 
 	#[test]
@@ -175,10 +182,25 @@ mod tests {
 				PathBuf::from("src/generated/mod.rs")
 			]
 		);
+		assert_eq!(
+			read_manifest(root),
+			"{\n  \"paths\": [\n    \"Cargo.toml\",\n    \"src/generated/mod.rs\"\n  ]\n}\n"
+		);
+	}
+
+	#[test]
+	fn a_manifest_that_cannot_be_written_names_its_path() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+		// A directory where the manifest file belongs makes the write fail.
+		put(&root.join(MANIFEST_FILE).join("blocker"), "");
+
+		let error = write(root, &BTreeSet::from([PathBuf::from("Cargo.toml")]))
+			.expect_err("a directory in the manifest's place must fail the write");
+
 		assert!(
-			fs::read_to_string(root.join(MANIFEST_FILE))
-				.unwrap_or_else(|error| panic!("read failed: {error}"))
-				.ends_with("}\n")
+			error.to_string().contains(MANIFEST_FILE),
+			"unexpected error: {error}"
 		);
 	}
 
@@ -190,8 +212,7 @@ mod tests {
 		assert!(GenerationManifest::load(root).is_none(), "absent manifest");
 
 		for contents in ["", "not json", "{\"paths\": 4}", "{\"other\": []}"] {
-			fs::write(root.join(MANIFEST_FILE), contents)
-				.unwrap_or_else(|error| panic!("write failed: {error}"));
+			put(&root.join(MANIFEST_FILE), contents);
 			assert!(
 				GenerationManifest::load(root).is_none(),
 				"{contents} must not load"
@@ -203,10 +224,8 @@ mod tests {
 	fn untrusted_entries_are_ignored_but_sane_entries_still_remove() {
 		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let root = temp.path();
-		fs::create_dir_all(root.join("src/generated")).unwrap_or_else(|error| panic!("{error}"));
-		fs::write(root.join("src/generated/owned.rs"), "old")
-			.unwrap_or_else(|error| panic!("{error}"));
-		fs::write(root.join("foreign.txt"), "keep").unwrap_or_else(|error| panic!("{error}"));
+		put(&root.join("src/generated/owned.rs"), "old");
+		put(&root.join("foreign.txt"), "keep");
 
 		let manifest = manifest_with(&[
 			"src/generated/owned.rs",
@@ -216,9 +235,8 @@ mod tests {
 			"C:\\escape",
 		]);
 
-		manifest
-			.remove_under(root, Path::new(""))
-			.unwrap_or_else(|error| panic!("remove failed: {error}"));
+		let all = Path::new("");
+		GenerationManifest::remove_under(&manifest, root, all).unwrap_or_else(|e| panic!("{e}"));
 
 		assert!(
 			!root.join("src/generated/owned.rs").exists(),
@@ -235,19 +253,36 @@ mod tests {
 	}
 
 	#[test]
+	fn a_tracked_directory_is_removed_with_its_contents() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+		let prefix = Path::new("src/generated");
+		put(&root.join("src/generated/nested/owned.rs"), "old");
+		put(&root.join("src/generated/kept.rs"), "keep");
+
+		let manifest = manifest_with(&["src/generated/nested"]);
+
+		GenerationManifest::remove_under(&manifest, root, prefix).unwrap_or_else(|e| panic!("{e}"));
+
+		assert!(!root.join("src/generated/nested").exists());
+		assert!(
+			root.join("src/generated/kept.rs").exists(),
+			"an untracked sibling survives"
+		);
+	}
+
+	#[test]
 	fn removal_is_scoped_to_the_prefix_and_skips_links_and_missing_paths() {
 		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let root = temp.path();
-		fs::create_dir_all(root.join("src/generated")).unwrap_or_else(|error| panic!("{error}"));
-		fs::create_dir_all(root.join("scaffold")).unwrap_or_else(|error| panic!("{error}"));
-		fs::write(root.join("src/generated/owned.rs"), "old")
-			.unwrap_or_else(|error| panic!("{error}"));
-		fs::write(root.join("scaffold/Cargo.toml"), "keep")
-			.unwrap_or_else(|error| panic!("{error}"));
+		let prefix = Path::new("src/generated");
+		put(&root.join("src/generated/owned.rs"), "old");
+		put(&root.join("scaffold/Cargo.toml"), "keep");
 
 		#[cfg(unix)]
-		std::os::unix::fs::symlink("/etc/passwd", root.join("src/generated/link.rs"))
-			.unwrap_or_else(|error| panic!("symlink failed: {error}"));
+		let link = root.join("src/generated/link.rs");
+		#[cfg(unix)]
+		std::os::unix::fs::symlink("/etc/passwd", &link).unwrap_or_else(|e| panic!("symlink: {e}"));
 
 		let manifest = manifest_with(&[
 			"src/generated/owned.rs",
@@ -256,9 +291,7 @@ mod tests {
 			"scaffold/Cargo.toml",
 		]);
 
-		manifest
-			.remove_under(root, Path::new("src/generated"))
-			.unwrap_or_else(|error| panic!("remove failed: {error}"));
+		GenerationManifest::remove_under(&manifest, root, prefix).unwrap_or_else(|e| panic!("{e}"));
 
 		assert!(!root.join("src/generated/owned.rs").exists());
 		assert!(
@@ -267,8 +300,7 @@ mod tests {
 		);
 		#[cfg(unix)]
 		assert!(
-			root.join("src/generated/link.rs")
-				.symlink_metadata()
+			link.symlink_metadata()
 				.is_ok_and(|metadata| metadata.file_type().is_symlink()),
 			"links are skipped, not followed"
 		);

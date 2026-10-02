@@ -40,9 +40,18 @@ pub(crate) fn isolate_package_child(
 	command: &mut Command,
 	workspace_root: &Path,
 ) -> std::io::Result<TempDir> {
+	isolate_with_path(command, workspace_root, std::env::var_os("PATH"))
+}
+
+/// [`isolate_package_child`] for an explicit `PATH`, which a caller may lack.
+fn isolate_with_path(
+	command: &mut Command,
+	workspace_root: &Path,
+	path: Option<OsString>,
+) -> std::io::Result<TempDir> {
 	let isolated = TempDir::new()?;
 
-	if let Some(path) = std::env::var_os("PATH") {
+	if let Some(path) = path {
 		let current = std::env::current_dir()?;
 		command.env("PATH", scrubbed_path(&path, workspace_root, &current)?);
 	}
@@ -94,8 +103,9 @@ mod tests {
 	}
 
 	fn scrub(entries: &[&str], workspace_root: &Path, current: &Path) -> OsString {
-		scrubbed_path(&path_list(entries), workspace_root, current)
-			.unwrap_or_else(|error| panic!("scrub failed: {error}"))
+		let raw = path_list(entries);
+
+		scrubbed_path(&raw, workspace_root, current).unwrap_or_else(|e| panic!("scrub: {e}"))
 	}
 
 	#[test]
@@ -138,21 +148,22 @@ mod tests {
 		let current = Path::new("/elsewhere");
 		let raw = OsString::from_vec(vec![b'a', 0xFF, b'/', b'x']);
 
-		let scrubbed = scrubbed_path(raw.as_os_str(), workspace, current)
-			.unwrap_or_else(|error| panic!("scrub failed: {error}"));
+		let scrubbed =
+			scrubbed_path(&raw, workspace, current).unwrap_or_else(|e| panic!("scrub: {e}"));
 
 		assert_eq!(scrubbed, raw);
 	}
+
 	#[test]
 	fn isolated_child_runs_outside_the_project_without_workspace_path_entries() {
 		let project = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let workspace = project.path().join("repo");
-		std::fs::create_dir_all(workspace.join("node_modules/.bin"))
-			.unwrap_or_else(|error| panic!("{error}"));
+		let bin = workspace.join("node_modules/.bin");
+		std::fs::create_dir_all(&bin).unwrap_or_else(|error| panic!("{error}"));
 
 		let mut command = Command::new("printer");
-		let isolated = isolate_package_child(&mut command, &workspace)
-			.unwrap_or_else(|error| panic!("{error}"));
+		let isolated =
+			isolate_package_child(&mut command, &workspace).unwrap_or_else(|e| panic!("{e}"));
 		let configured = command
 			.get_current_dir()
 			.expect("isolation sets a working directory");
@@ -171,6 +182,21 @@ mod tests {
 				.get_envs()
 				.any(|(key, value)| { key == "NODE_PATH" && value.is_none() }),
 			"NODE_PATH must be removed from the child environment"
+		);
+	}
+
+	#[test]
+	fn a_caller_without_a_path_is_isolated_without_gaining_one() {
+		let workspace = Path::new("/work/repo");
+		let mut command = Command::new("printer");
+
+		let isolated =
+			isolate_with_path(&mut command, workspace, None).unwrap_or_else(|e| panic!("{e}"));
+
+		assert_eq!(command.get_current_dir(), Some(isolated.path()));
+		assert!(
+			command.get_envs().all(|(key, _)| key != "PATH"),
+			"no PATH may be invented for a caller that has none"
 		);
 	}
 
@@ -199,18 +225,12 @@ mod tests {
 		let project = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let shadow = project.path().join("node_modules/codama");
 		std::fs::create_dir_all(&shadow).unwrap_or_else(|error| panic!("{error}"));
-		std::fs::write(
-			shadow.join("package.json"),
-			r#"{"name":"codama","version":"99.0.0","main":"index.js"}"#,
-		)
-		.unwrap_or_else(|error| panic!("{error}"));
-		std::fs::write(
-			shadow.join("index.js"),
-			r#"import { writeFileSync } from "node:fs";
+		let manifest = r#"{"name":"codama","version":"99.0.0","main":"index.js"}"#;
+		let module = r#"import { writeFileSync } from "node:fs";
 writeFileSync(process.env.PINA_SHADOW_PROBE ?? "/dev/null", "pwned");
-"#,
-		)
-		.unwrap_or_else(|error| panic!("{error}"));
+"#;
+		std::fs::write(shadow.join("package.json"), manifest).unwrap_or_else(|e| panic!("{e}"));
+		std::fs::write(shadow.join("index.js"), module).unwrap_or_else(|e| panic!("{e}"));
 
 		// The render script resolves its packages by importing them from a
 		// stdin module, falling back to every node_modules/.bin directory on
@@ -249,6 +269,7 @@ try {
 }
 "#;
 		let probe = project.path().join("shadow-ran");
+		let root = project.path();
 
 		let run = |isolate: bool| {
 			let mut command = Command::new("node");
@@ -258,8 +279,8 @@ try {
 			if isolate {
 				// The guard must outlive the child, or the isolated
 				// directory disappears before the spawn.
-				let _guard = isolate_package_child(&mut command, project.path())
-					.unwrap_or_else(|error| panic!("isolation failed: {error}"));
+				let _guard =
+					isolate_package_child(&mut command, root).unwrap_or_else(|e| panic!("{e}"));
 				command.stdin(TestStdio::piped());
 				command.stdout(TestStdio::piped());
 				command.stderr(TestStdio::piped());

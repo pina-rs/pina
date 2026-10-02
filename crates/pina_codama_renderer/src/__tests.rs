@@ -1292,6 +1292,31 @@ fn generation_modes_preserve_or_replace_scaffolds() {
 }
 
 #[test]
+fn trees_without_a_manifest_keep_whole_directory_replacement() {
+	let root = load_fixture_root("hello_solana_program");
+	let crate_dir = unique_temp_dir("pina-codama-render-untracked");
+	let manifest = crate_dir.join(".pina-generated.json");
+	let update = RenderConfig {
+		mode: RenderMode::Update,
+		..RenderConfig::default()
+	};
+
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("initial render failed: {error}"));
+	// A tree rendered before tracked manifests existed carries no record.
+	fs::remove_file(&manifest).unwrap_or_else(|error| panic!("manifest removal failed: {error}"));
+
+	render_root_node(&root, &crate_dir, &update)
+		.unwrap_or_else(|error| panic!("update render failed: {error}"));
+
+	assert!(crate_dir.join("src/generated/mod.rs").is_file());
+	assert!(manifest.is_file(), "the render records its files again");
+
+	fs::remove_dir_all(crate_dir)
+		.unwrap_or_else(|error| panic!("untracked fixture cleanup failed: {error}"));
+}
+
+#[test]
 fn tracked_manifests_bound_update_cleanup_to_generated_files() {
 	let root = load_fixture_root("hello_solana_program");
 	let crate_dir = unique_temp_dir("pina-codama-render-manifest");

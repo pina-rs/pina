@@ -1572,11 +1572,9 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn official_client_runs_outside_the_project_directory() {
-		let directory = tempfile::tempdir()
-			.unwrap_or_else(|error| panic!("temporary directory failed: {error}"));
+		let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("{error}"));
 		let project = directory.path().join("project");
-		std::fs::create_dir_all(&project)
-			.unwrap_or_else(|error| panic!("project directory failed: {error}"));
+		std::fs::create_dir_all(&project).unwrap_or_else(|error| panic!("{error}"));
 		let runner = fake_runner_script(directory.path(), "pwd");
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
@@ -1584,8 +1582,7 @@ mod tests {
 			resolver_root: project.clone(),
 		};
 
-		let output = run_official_client(&client, &[])
-			.unwrap_or_else(|error| panic!("official client failed: {error}"));
+		let output = run_official_client(&client, &[]).unwrap_or_else(|e| panic!("client: {e}"));
 		let reported = String::from_utf8_lossy(&output).trim().to_owned();
 		let working_directory = Path::new(&reported);
 
