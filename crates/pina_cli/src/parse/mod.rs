@@ -967,6 +967,73 @@ pub struct RunAccounts<'a> {
 	}
 
 	#[test]
+	fn assemble_program_ir_reads_accounts_through_versioned_dispatch() {
+		// A hand-written dispatcher hands an enveloped instruction's accounts to
+		// the generated `process_versioned`. The instruction must keep its
+		// accounts: an empty list makes every generated client send none.
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[discriminator]
+			pub enum WalkInstruction {
+				Update = 0,
+			}
+
+			#[instruction(discriminator = WalkInstruction::Update, migrations)]
+			pub struct UpdateInstruction {
+				pub score: u64,
+			}
+
+			#[derive(Accounts)]
+			pub struct UpdateAccounts<'a> {
+				#[pina(validate(signer))]
+				pub authority: &'a AccountView,
+				pub profile: Option<&'a mut AccountView>,
+			}
+
+			impl<'a> ProcessAccountInfos<'a> for UpdateAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let _ = UpdateInstruction::try_from_bytes(data)?;
+					Ok(())
+				}
+			}
+
+			pub mod entrypoint {
+				use super::*;
+
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &mut [AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					let instruction: WalkInstruction = parse_instruction(program_id, &ID, data)?;
+
+					match instruction {
+						WalkInstruction::Update => UpdateInstruction::process_versioned(
+							UpdateAccounts::try_from((program_id, accounts))?,
+							data,
+						),
+					}
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir = assemble_program_ir(&file, "walk").unwrap_or_else(|e| panic!("assemble: {e}"));
+
+		assert_eq!(ir.instructions.len(), 1);
+		let accounts = &ir.instructions[0].accounts;
+		assert_eq!(
+			accounts
+				.iter()
+				.map(|account| account.name.as_str())
+				.collect::<Vec<_>>(),
+			["authority", "profile"]
+		);
+		assert!(accounts[0].is_signer);
+		assert!(accounts[1].is_writable);
+	}
+
+	#[test]
 	fn assemble_program_ir_rejects_missing_instruction_discriminator_variant() {
 		let source = r#"
 			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");

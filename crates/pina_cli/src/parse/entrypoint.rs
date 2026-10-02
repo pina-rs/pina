@@ -3,6 +3,7 @@ use syn::File;
 use syn::Item;
 use syn::ItemEnum;
 use syn::Stmt;
+use syn::visit::Visit;
 
 /// The attribute macro that carries the entrypoint declaration.
 const DISCRIMINATOR_ATTRIBUTE: &str = "discriminator";
@@ -21,20 +22,26 @@ pub struct DispatchEntry {
 	pub variant: String,
 	/// The accounts struct name (e.g. `"InitializeAccounts"`).
 	///
-	/// `None` means the instruction arm does not route through either supported
-	/// account conversion: `StructName::try_from(accounts)` or the canonical
-	/// `StructName::try_from((program_id, accounts))`. Such an arm has no
-	/// extractable accounts metadata.
+	/// `None` means the instruction arm does not convert `accounts` into exactly
+	/// one struct through a supported conversion: `StructName::try_from(accounts)`
+	/// or the canonical `StructName::try_from((program_id, accounts))`. Such an
+	/// arm has no extractable accounts metadata.
 	pub accounts_struct: Option<String>,
 }
 
 /// Extract the instruction dispatch map from `process_instruction` functions.
 ///
-/// Looks for the canonical pattern and the legacy account-only equivalent:
+/// Looks for the canonical pattern, the legacy account-only equivalent, and
+/// the versioned form a hand-written dispatcher uses for an instruction that
+/// carries a migration envelope:
 /// ```ignore
 /// match instruction {
 ///     Enum::Variant => AccountsStruct::try_from((program_id, accounts))?.process(data),
 ///     Enum::Legacy => AccountsStruct::try_from(accounts)?.process(data),
+///     Enum::Versioned => Instruction::process_versioned(
+///         AccountsStruct::try_from((program_id, accounts))?,
+///         data,
+///     ),
 /// }
 /// ```
 pub fn extract_dispatch_map(file: &File) -> Vec<DispatchEntry> {
@@ -259,7 +266,8 @@ fn extract_from_expr(expr: &Expr, entries: &mut Vec<DispatchEntry>) {
 	}
 }
 
-/// Parse a match arm that uses either supported account conversion form.
+/// Parse a match arm, pairing each of its variants with the accounts struct
+/// the arm converts `accounts` into.
 fn parse_match_arm(arm: &syn::Arm) -> Vec<DispatchEntry> {
 	let variants = extract_variant_names(&arm.pat);
 	if variants.is_empty() {
@@ -315,27 +323,48 @@ fn extract_variant_names(pat: &syn::Pat) -> Vec<String> {
 	}
 }
 
-/// Extract the accounts struct name from an expression that uses either
-/// `StructName::try_from(accounts)` or the canonical
-/// `StructName::try_from((program_id, accounts))` form.
+/// Extract the accounts struct a match arm converts `accounts` into.
+///
+/// The conversion is recognized wherever the arm performs it, because where it
+/// sits depends on how the arm hands the parsed accounts on: as the receiver of
+/// `.process(data)`, as the first argument of the generated
+/// `Instruction::process_versioned`, or bound to a local first. Reading only
+/// one of those positions would silently describe the others as instructions
+/// that take no accounts.
+///
+/// An arm that converts into two different structs has no single accounts
+/// layout, so it yields `None`, like an arm that converts into none.
 fn extract_accounts_struct_from_body(expr: &Expr) -> Option<String> {
-	match expr {
-		Expr::MethodCall(mc) if mc.method == "process" => {
-			extract_accounts_struct_from_body(&mc.receiver)
-		}
-		Expr::Try(t) => extract_accounts_struct_from_body(&t.expr),
-		Expr::Call(call) => extract_accounts_struct_from_call(call),
-		Expr::Block(b) => {
-			if let Some(Stmt::Expr(expr, _)) = b.block.stmts.last() {
-				extract_accounts_struct_from_body(expr)
-			} else {
-				None
-			}
-		}
+	let mut conversions = AccountsConversions::default();
+	conversions.visit_expr(expr);
+
+	match conversions.structs.as_slice() {
+		[accounts_struct] => Some(accounts_struct.clone()),
 		_ => None,
 	}
 }
 
+/// The distinct accounts structs one match arm converts `accounts` into.
+#[derive(Default)]
+struct AccountsConversions {
+	structs: Vec<String>,
+}
+
+impl<'ast> Visit<'ast> for AccountsConversions {
+	fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+		if let Some(accounts_struct) = extract_accounts_struct_from_call(call)
+			&& !self.structs.contains(&accounts_struct)
+		{
+			self.structs.push(accounts_struct);
+		}
+
+		syn::visit::visit_expr_call(self, call);
+	}
+}
+
+/// Read the struct name from one supported conversion call:
+/// `StructName::try_from(accounts)` or the canonical
+/// `StructName::try_from((program_id, accounts))`.
 fn extract_accounts_struct_from_call(call: &syn::ExprCall) -> Option<String> {
 	let Expr::Path(path) = &*call.func else {
 		return None;
@@ -540,6 +569,103 @@ mod tests {
 		assert_eq!(dispatch[0].accounts_struct, None);
 		assert_eq!(dispatch[1].variant, "HelperProcess");
 		assert_eq!(dispatch[1].accounts_struct, None);
+	}
+
+	/// Parse a single-arm `process_instruction` and return the accounts struct
+	/// the extractor reads for that arm.
+	fn accounts_struct_for_arm(arm_body: &str) -> Option<String> {
+		let source = format!(
+			r#"
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &mut [AccountView],
+					data: &[u8],
+				) -> ProgramResult {{
+					match parse_instruction(program_id, &ID, data)? {{
+						WalkInstruction::Update => {arm_body},
+					}}
+				}}
+			"#
+		);
+		let file = syn::parse_file(&source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let dispatch = extract_dispatch_map(&file);
+		assert_eq!(dispatch.len(), 1);
+		assert_eq!(dispatch[0].variant, "Update");
+
+		dispatch[0].accounts_struct.clone()
+	}
+
+	#[test]
+	fn extracts_versioned_dispatch_entries() {
+		// The form the migration guide gives a hand-written dispatcher: the
+		// conversion is an argument of the generated `process_versioned`, not
+		// the receiver of `.process(data)`.
+		assert_eq!(
+			accounts_struct_for_arm(
+				"UpdateInstruction::process_versioned(
+					UpdateAccounts::try_from((program_id, accounts))?,
+					data,
+				)"
+			),
+			Some("UpdateAccounts".to_owned())
+		);
+	}
+
+	#[test]
+	fn extracts_dispatch_through_a_bound_accounts_local() {
+		assert_eq!(
+			accounts_struct_for_arm(
+				"{
+					let parsed_accounts = UpdateAccounts::try_from((program_id, accounts))?;
+
+					UpdateInstruction::process_versioned(parsed_accounts, data)
+				}"
+			),
+			Some("UpdateAccounts".to_owned())
+		);
+		assert_eq!(
+			accounts_struct_for_arm(
+				"{
+					let parsed_accounts = UpdateAccounts::try_from(accounts)?;
+
+					parsed_accounts.process(data)
+				}"
+			),
+			Some("UpdateAccounts".to_owned())
+		);
+	}
+
+	#[test]
+	fn one_struct_converted_twice_is_still_one_accounts_layout() {
+		assert_eq!(
+			accounts_struct_for_arm(
+				"if data.is_empty() {
+					UpdateAccounts::try_from((program_id, accounts))?.process(data)
+				} else {
+					UpdateInstruction::process_versioned(
+						UpdateAccounts::try_from((program_id, accounts))?,
+						data,
+					)
+				}"
+			),
+			Some("UpdateAccounts".to_owned())
+		);
+	}
+
+	#[test]
+	fn conflicting_conversions_leave_the_arm_without_accounts() {
+		// Two structs describe two account layouts, and one instruction node
+		// can carry only one.
+		assert_eq!(
+			accounts_struct_for_arm(
+				"if data.is_empty() {
+					UpdateAccounts::try_from((program_id, accounts))?.process(data)
+				} else {
+					ResetAccounts::try_from((program_id, accounts))?.process(data)
+				}"
+			),
+			None
+		);
 	}
 
 	#[test]
