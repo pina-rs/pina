@@ -33,12 +33,25 @@ pub(crate) fn append_generated_paths(root: &Path, added: &[PathBuf]) -> std::io:
 	);
 
 	let payload = serde_json::to_string_pretty(&serde_json::json!({
-		"paths": paths.iter().map(|path| path.to_string_lossy()).collect::<Vec<_>>(),
+		"paths": paths.iter().map(|path| manifest_entry(path)).collect::<Vec<_>>(),
 	}))
 	.map_err(std::io::Error::other)?;
 
 	fs::create_dir_all(root)?;
 	fs::write(root.join(MANIFEST_FILE), format!("{payload}\n"))
+}
+
+/// Spell a tracked path with forward slashes, as every platform reads it.
+///
+/// The render script records its paths that way, and the manifest is
+/// committed with the client. A native Windows spelling would name one oddly
+/// named file, not a nested one, when the manifest is read on another
+/// platform.
+fn manifest_entry(path: &Path) -> String {
+	path.components()
+		.map(|component| component.as_os_str().to_string_lossy())
+		.collect::<Vec<_>>()
+		.join("/")
 }
 
 /// The files under `root` before and after a step, so the step's new files
@@ -149,6 +162,24 @@ mod tests {
 		assert!(
 			!contents.contains("escape"),
 			"untrusted entries are dropped"
+		);
+	}
+
+	#[test]
+	fn entries_are_recorded_with_forward_slashes_on_every_platform() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+		// Joined components carry the platform's own separator, as the paths a
+		// file snapshot reports do.
+		let nested = Path::new("src").join("generated").join("mod.rs");
+
+		append_generated_paths(root, &[nested])
+			.unwrap_or_else(|error| panic!("append failed: {error}"));
+
+		assert!(
+			fs::read_to_string(root.join(MANIFEST_FILE))
+				.unwrap_or_else(|error| panic!("read failed: {error}"))
+				.contains("\"src/generated/mod.rs\"")
 		);
 	}
 

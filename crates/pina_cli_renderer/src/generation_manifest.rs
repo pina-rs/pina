@@ -83,13 +83,25 @@ impl GenerationManifest {
 /// Record `paths` (relative to `root`) as the client's tracked files.
 pub(crate) fn write(root: &Path, paths: &BTreeSet<PathBuf>) -> Result<()> {
 	let payload = serde_json::to_string_pretty(&serde_json::json!({
-		"paths": paths.iter().map(|path| path.to_string_lossy()).collect::<Vec<_>>(),
+		"paths": paths.iter().map(|path| manifest_entry(path)).collect::<Vec<_>>(),
 	}))
 	.map_err(|source| write_file_error(&root.join(MANIFEST_FILE), std::io::Error::other(source)))?;
 
 	fs::create_dir_all(root).map_err(|source| write_file_error(root, source))?;
 	fs::write(root.join(MANIFEST_FILE), format!("{payload}\n"))
 		.map_err(|source| write_file_error(&root.join(MANIFEST_FILE), source))
+}
+
+/// Spell a tracked path with forward slashes, as every platform reads it.
+///
+/// The manifest is committed with the client, so it must not depend on where
+/// it was written. A native Windows spelling would name one oddly named file,
+/// not a nested one, when the manifest is read on another platform.
+fn manifest_entry(path: &Path) -> String {
+	path.components()
+		.map(|component| component.as_os_str().to_string_lossy())
+		.collect::<Vec<_>>()
+		.join("/")
 }
 
 /// Return whether `path` is a plain relative entry a manifest may record.
@@ -125,6 +137,23 @@ mod tests {
 		GenerationManifest {
 			paths: paths.iter().map(PathBuf::from).collect(),
 		}
+	}
+
+	#[test]
+	fn entries_are_recorded_with_forward_slashes_on_every_platform() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+		// Joined components carry the platform's own separator.
+		let nested = Path::new("src").join("generated").join("mod.rs");
+
+		write(root, &BTreeSet::from([nested]))
+			.unwrap_or_else(|error| panic!("write failed: {error}"));
+
+		assert!(
+			fs::read_to_string(root.join(MANIFEST_FILE))
+				.unwrap_or_else(|error| panic!("read failed: {error}"))
+				.contains("\"src/generated/mod.rs\"")
+		);
 	}
 
 	#[test]
