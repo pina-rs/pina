@@ -1,0 +1,11 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/instructions/allocate.rs",
+		"src/generated/instructions/fill.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

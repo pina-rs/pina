@@ -1,0 +1,18 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/errors/custom_errors_program.rs",
+		"src/generated/errors/mod.rs",
+		"src/generated/instructions/hello.rs",
+		"src/generated/instructions/hello_next.rs",
+		"src/generated/instructions/hello_no_msg.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/require_eq.rs",
+		"src/generated/instructions/require_gt.rs",
+		"src/generated/instructions/require_gte.rs",
+		"src/generated/instructions/require_neq.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

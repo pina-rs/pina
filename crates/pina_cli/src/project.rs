@@ -940,6 +940,48 @@ fn discover_git_root(start: &Path) -> Option<PathBuf> {
 	None
 }
 
+/// The root that configured client outputs must stay within.
+///
+/// A `pina.toml` file ships with the repository, so its outputs are
+/// repository data: they may write anywhere inside the repository's own
+/// working tree, and an operator picks a destination outside it with the
+/// `--output` flag. The root is the Git working tree that owns
+/// `project_root` — the same boundary the `{{root}}` anchor resolves to —
+/// falling back to `project_root` itself outside a repository. A discovered
+/// root that also contains the user's home directory (a `git init ~`
+/// configuration) is rejected in favor of `project_root`, because
+/// containment to `$HOME` would contain nothing.
+pub(crate) fn generation_containment_root(project_root: &Path) -> PathBuf {
+	let home = ["HOME", "USERPROFILE"]
+		.into_iter()
+		.find_map(std::env::var_os)
+		.map(PathBuf::from);
+
+	containment_root(
+		discover_git_root(project_root),
+		project_root,
+		home.as_deref(),
+	)
+}
+
+fn containment_root(
+	discovered: Option<PathBuf>,
+	project_root: &Path,
+	home: Option<&Path>,
+) -> PathBuf {
+	let Some(root) = discovered else {
+		return project_root.to_path_buf();
+	};
+
+	if let Some(home) = home
+		&& home.starts_with(&root)
+	{
+		return project_root.to_path_buf();
+	}
+
+	root
+}
+
 fn sanitize_git_environment(command: &mut Command) {
 	for variable in [
 		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
@@ -2141,6 +2183,51 @@ mode = "overwrite"
 			package_for_manifest(&metadata, &manifest_path, &root),
 			Err(ProjectError::CargoMetadata { .. })
 		));
+	}
+
+	#[test]
+	fn containment_root_uses_the_repository_and_rejects_homes() {
+		let project = Path::new("/work/repo/program");
+		let repository = Path::new("/work/repo");
+		let home = Path::new("/Users/dev");
+
+		assert_eq!(containment_root(None, project, None), project);
+		assert_eq!(containment_root(None, project, Some(home)), project);
+		assert_eq!(
+			containment_root(Some(repository.to_path_buf()), project, None),
+			repository
+		);
+		// A repository that contains the home directory would contain
+		// everything, so the project directory is the boundary instead.
+		assert_eq!(
+			containment_root(Some(home.to_path_buf()), project, Some(home)),
+			project
+		);
+		assert_eq!(
+			containment_root(Some(Path::new("/").to_path_buf()), project, Some(home)),
+			project
+		);
+		// A repository beside or below the home directory contains nothing
+		// special, so it stays the containment root.
+		assert_eq!(
+			containment_root(
+				Some(Path::new("/Users/dev/code/repo").to_path_buf()),
+				project,
+				Some(home)
+			),
+			Path::new("/Users/dev/code/repo")
+		);
+	}
+
+	#[test]
+	fn generation_containment_root_falls_back_to_the_project_directory() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let project = temp.path().join("program");
+		fs::create_dir_all(&project).unwrap_or_else(|error| panic!("{error}"));
+
+		// The temporary directory sits outside any repository, so discovery
+		// finds nothing and the project directory is the containment root.
+		assert_eq!(generation_containment_root(&project), project);
 	}
 
 	#[test]

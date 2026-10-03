@@ -1,0 +1,13 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/errors/mod.rs",
+		"src/generated/errors/transfer_sol_program.rs",
+		"src/generated/instructions/cpi_transfer.rs",
+		"src/generated/instructions/direct_transfer.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

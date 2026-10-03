@@ -1,0 +1,15 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/state.rs",
+		"src/generated/instructions/create_pda.rs",
+		"src/generated/instructions/forward_rotate_with_pda.rs",
+		"src/generated/instructions/forward_rotate_with_signer.rs",
+		"src/generated/instructions/hello.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

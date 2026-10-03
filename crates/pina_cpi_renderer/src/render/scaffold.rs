@@ -28,6 +28,8 @@ pub(crate) fn open_crate_dir(crate_dir: &Path) -> Result<Dir> {
 ///
 /// Creates `src/lib.rs` and `Cargo.toml` when they do not exist yet and never
 /// overwrites either file, so consumers can pin dependencies themselves.
+/// Returns the scaffold's paths relative to the crate root, whether or not
+/// they already existed, because Pina owns those locations either way.
 pub(crate) fn ensure_crate_scaffold(
 	crate_dir: &Dir,
 	crate_path: &Path,
@@ -35,7 +37,7 @@ pub(crate) fn ensure_crate_scaffold(
 	package_name: Option<&str>,
 	generated_folder: &Path,
 	dependency: ScaffoldDependency,
-) -> Result<()> {
+) -> Result<Vec<PathBuf>> {
 	ensure_relative_directory(crate_dir, crate_path, Path::new("src"))?;
 
 	let generated_module = generated_folder
@@ -86,7 +88,12 @@ pub(crate) fn ensure_crate_scaffold(
 		String::new(),
 	]
 	.join("\n");
-	create_scaffold_file(crate_dir, crate_path, Path::new("Cargo.toml"), &cargo_toml)
+	create_scaffold_file(crate_dir, crate_path, Path::new("Cargo.toml"), &cargo_toml)?;
+
+	Ok(vec![
+		PathBuf::from("src/lib.rs"),
+		PathBuf::from("Cargo.toml"),
+	])
 }
 
 /// Writes the generated file map relative to the pinned crate directory.

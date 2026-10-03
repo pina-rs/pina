@@ -1,0 +1,15 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/journal.rs",
+		"src/generated/accounts/mod.rs",
+		"src/generated/instructions/initialize.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/rename.rs",
+		"src/generated/instructions/resize.rs",
+		"src/generated/instructions/write.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

@@ -1,0 +1,18 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/claim.ts",
+		"src/commands/deposit.ts",
+		"src/commands/initialize_pool.ts",
+		"src/commands/open_position.ts",
+		"src/commands/set_reward_index.ts",
+		"src/commands/withdraw.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/fetch.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

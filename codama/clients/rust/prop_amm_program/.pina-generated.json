@@ -1,0 +1,17 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/oracle_state.rs",
+		"src/generated/errors/mod.rs",
+		"src/generated/errors/prop_amm_program.rs",
+		"src/generated/instructions/initialize.rs",
+		"src/generated/instructions/migrate.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/rotate_authority.rs",
+		"src/generated/instructions/update.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

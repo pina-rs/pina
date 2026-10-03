@@ -1,0 +1,15 @@
+{
+	"paths": [
+		".pina-generated.json",
+		"src/generated/accounts/floatDataAccount.ts",
+		"src/generated/accounts/index.ts",
+		"src/generated/errors/floatAccountsProgram.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/create.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/update.ts",
+		"src/generated/programs/floatAccountsProgram.ts",
+		"src/generated/programs/index.ts"
+	]
+}

@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 mod error;
+mod generation_manifest;
 mod render;
 
 use std::collections::BTreeMap;
@@ -90,12 +91,15 @@ pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> 
 ///
 /// Honors [`RenderConfig::mode`] against the destination current state, writes the
 /// generated sources, and scaffolds manifests when [`RenderConfig::scaffold`] is set.
+/// Cleanup is bounded by the tracked-files manifest at `crate_dir`: only files
+/// a previous render recorded are removed.
 pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
 	validate_output_path_components(crate_dir)?;
 	let mode = resolve_render_mode(crate_dir, config.mode)?;
+	let manifest = generation_manifest::GenerationManifest::load(crate_dir);
 
 	if mode == RenderMode::Overwrite {
-		remove_crate_dir(crate_dir)?;
+		remove_tracked_crate(crate_dir, manifest.as_ref())?;
 	}
 
 	let generated_dir = validate_generated_dir(crate_dir, &config.generated_folder)?;
@@ -103,21 +107,42 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	validate_generated_sources(&files)?;
 	validate_existing_generated_dir(&generated_dir, config.delete_folder_before_rendering)?;
 
+	let mut tracked = std::collections::BTreeSet::new();
+
 	if config.scaffold {
 		let uses_compact_accounts = root.program.accounts.iter().any(is_compact_account);
-		ensure_crate_scaffold(crate_dir, root.program.name.as_ref(), uses_compact_accounts)?;
+		tracked.extend(ensure_crate_scaffold(
+			crate_dir,
+			root.program.name.as_ref(),
+			uses_compact_accounts,
+		)?);
 	}
 
 	if config.delete_folder_before_rendering && generated_dir.exists() {
-		fs::remove_dir_all(&generated_dir).map_err(|source| {
-			RenderError::WriteFile {
-				path: generated_dir.clone(),
-				source,
-			}
-		})?;
+		match &manifest {
+			// Only files the previous render recorded are removed, so a
+			// file the developer dropped into the generated tree survives.
+			Some(previous) => previous.remove_under(crate_dir, &config.generated_folder)?,
+			// Trees older than tracked manifests keep the historical
+			// whole-directory replacement so stale files do not linger.
+			None => remove_generated_dir(&generated_dir)?,
+		}
 	}
 
-	write_files(&generated_dir, files)
+	tracked.extend(
+		files
+			.keys()
+			.map(|path| config.generated_folder.join(path))
+			.collect::<Vec<_>>(),
+	);
+
+	write_files(&generated_dir, files)?;
+	generation_manifest::write(crate_dir, &tracked)
+}
+
+/// Remove a generated tree as a whole.
+fn remove_generated_dir(path: &Path) -> Result<()> {
+	fs::remove_dir_all(path).map_err(|source| write_file_error(path, source))
 }
 
 fn resolve_render_mode(crate_dir: &Path, requested: RenderMode) -> Result<RenderMode> {
@@ -171,10 +196,29 @@ fn resolve_render_mode(crate_dir: &Path, requested: RenderMode) -> Result<Render
 	}
 }
 
-fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
+/// Remove a crate directory's tracked files for `overwrite`.
+///
+/// A nonempty destination without a manifest predates tracked cleanup, and
+/// removing it wholesale could delete files Pina never wrote, so the render
+/// is refused with a remedy instead. The historical guards still apply even
+/// though deletion is manifest-bounded: filesystem roots, the working
+/// directory, repository trees, and symlinked components are refused.
+fn remove_tracked_crate(
+	crate_dir: &Path,
+	manifest: Option<&generation_manifest::GenerationManifest>,
+) -> Result<()> {
 	if !crate_dir.exists() {
 		return Ok(());
 	}
+
+	let Some(tracked) = manifest else {
+		return Err(RenderError::InvalidGenerationState {
+			path: crate_dir.to_path_buf(),
+			mode: "overwrite",
+			reason: "the destination predates tracked manifests; remove it by hand, or generate \
+				once without `overwrite` to record its files",
+		});
+	};
 
 	validate_output_path_components(crate_dir)?;
 
@@ -196,7 +240,7 @@ fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
 	}
 
 	validate_tree_has_no_symlinks(crate_dir)?;
-	fs::remove_dir_all(crate_dir).map_err(|source| write_file_error(crate_dir, source))
+	tracked.remove_under(crate_dir, Path::new(""))
 }
 
 fn validate_output_path_components(path: &Path) -> Result<()> {

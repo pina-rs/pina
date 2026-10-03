@@ -1,0 +1,16 @@
+{
+	"paths": [
+		".pina-generated.json",
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/todoState.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initialize.ts",
+		"src/generated/instructions/toggleCompleted.ts",
+		"src/generated/instructions/updateDigest.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/todo.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/todoProgram.ts"
+	]
+}

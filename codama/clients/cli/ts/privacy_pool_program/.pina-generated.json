@@ -1,0 +1,25 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/approve_disclosure.ts",
+		"src/commands/cancel_disclosure.ts",
+		"src/commands/challenge_disclosure.ts",
+		"src/commands/deposit.ts",
+		"src/commands/grant_disclosure.ts",
+		"src/commands/initialize.ts",
+		"src/commands/register_requester.ts",
+		"src/commands/request_disclosure.ts",
+		"src/commands/resolve_challenge.ts",
+		"src/commands/set_custodians.ts",
+		"src/commands/set_verification_key.ts",
+		"src/commands/transfer.ts",
+		"src/commands/withdraw.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/fetch.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

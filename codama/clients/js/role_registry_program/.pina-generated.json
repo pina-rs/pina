@@ -1,0 +1,22 @@
+{
+	"paths": [
+		".pina-generated.json",
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/registryConfig.ts",
+		"src/generated/accounts/roleEntry.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/errors/roleRegistryProgram.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/addRole.ts",
+		"src/generated/instructions/deactivateRole.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initialize.ts",
+		"src/generated/instructions/rotateAdmin.ts",
+		"src/generated/instructions/updateRole.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/registryConfig.ts",
+		"src/generated/pdas/roleEntry.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/roleRegistryProgram.ts"
+	]
+}

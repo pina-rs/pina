@@ -1,0 +1,12 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/validate_external_program.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

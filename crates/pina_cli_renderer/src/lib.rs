@@ -9,6 +9,7 @@
 #![allow(missing_docs)]
 mod emit;
 mod error;
+mod generation_manifest;
 mod model;
 
 #[cfg(test)]
@@ -135,8 +136,10 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 		});
 	}
 
+	let manifest = generation_manifest::GenerationManifest::load(crate_dir);
+
 	if mode == RenderMode::Overwrite {
-		remove_crate_dir(crate_dir)?;
+		remove_tracked_crate(crate_dir, manifest.as_ref())?;
 	}
 
 	validate_tree_has_no_symlinks(crate_dir)?;
@@ -146,12 +149,25 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	fs::write(crate_dir.join(MARKER_FILE), MARKER_CONTENT)
 		.map_err(|source| write_file_error(&crate_dir.join(MARKER_FILE), source))?;
 
-	if config.scaffold && mode != RenderMode::Update {
-		let scaffold = emit::render_scaffold(&model, &config.client_package, &config.client_path);
+	// An update leaves the scaffold as the developer has it, but the scaffold
+	// stays tracked: it is still a file this renderer created.
+	let scaffold = if config.scaffold {
+		emit::render_scaffold(&model, &config.client_package, &config.client_path)
+	} else {
+		BTreeMap::new()
+	};
+
+	if mode != RenderMode::Update {
 		write_missing_files(crate_dir, &scaffold)?;
 	}
 
-	Ok(())
+	// Every path this renderer owns, whether this run wrote it or an earlier
+	// one did, so the next overwrite removes exactly these files.
+	let mut tracked = std::collections::BTreeSet::from([PathBuf::from(MARKER_FILE)]);
+	tracked.extend(files.keys().map(PathBuf::from));
+	tracked.extend(scaffold.keys().map(PathBuf::from));
+
+	generation_manifest::write(crate_dir, &tracked)
 }
 
 fn resolve_render_mode(crate_dir: &Path, requested: RenderMode) -> Result<RenderMode> {
@@ -205,10 +221,29 @@ fn resolve_render_mode(crate_dir: &Path, requested: RenderMode) -> Result<Render
 	}
 }
 
-fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
+/// Remove a crate directory's tracked files for `overwrite`.
+///
+/// A nonempty destination without a manifest predates tracked cleanup, and
+/// removing it wholesale could delete files Pina never wrote, so the render
+/// is refused with a remedy instead. The historical guards still apply even
+/// though deletion is manifest-bounded: filesystem roots, the working
+/// directory, repository trees, and symlinked components are refused.
+fn remove_tracked_crate(
+	crate_dir: &Path,
+	manifest: Option<&generation_manifest::GenerationManifest>,
+) -> Result<()> {
 	if !crate_dir.exists() {
 		return Ok(());
 	}
+
+	let Some(tracked) = manifest else {
+		return Err(RenderError::InvalidGenerationState {
+			path: crate_dir.to_path_buf(),
+			mode: "overwrite",
+			reason: "the destination predates tracked manifests; remove it by hand, or generate \
+				once without `overwrite` to record its files",
+		});
+	};
 
 	validate_output_path_components(crate_dir)?;
 
@@ -230,7 +265,7 @@ fn remove_crate_dir(crate_dir: &Path) -> Result<()> {
 	}
 
 	validate_tree_has_no_symlinks(crate_dir)?;
-	fs::remove_dir_all(crate_dir).map_err(|source| write_file_error(crate_dir, source))
+	tracked.remove_under(crate_dir, Path::new(""))
 }
 
 fn validate_output_path_components(path: &Path) -> Result<()> {

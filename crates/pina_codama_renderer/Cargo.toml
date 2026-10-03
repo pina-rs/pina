@@ -20,6 +20,7 @@ thiserror = { workspace = true, default-features = true }
 
 [dev-dependencies]
 insta = { workspace = true, default-features = true }
+tempfile = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

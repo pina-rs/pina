@@ -1,0 +1,262 @@
+//! Host-side updates to the generated-client tracked-files manifests.
+//!
+//! The render script and the Rust renderers write `.pina-generated.json` at
+//! each client root; the post-render hardening steps (JavaScript helper
+//! modules, Dart package barrels) add files of their own afterwards. This
+//! module appends those paths to the manifest the renderer wrote, so the
+//! next bounded cleanup knows about every file Pina owns. Entries are
+//! validated with the same rules the renderers enforce: plain relative
+//! paths only, so a committed manifest cannot direct deletion outside its
+//! root or through parent directories.
+
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::Component;
+use std::path::Path;
+use std::path::PathBuf;
+
+/// The tracked-files record read and written at each generated client root.
+pub(crate) const MANIFEST_FILE: &str = ".pina-generated.json";
+
+/// Add `added` (relative to `root`) to the manifest at `root`.
+///
+/// A missing or malformed manifest starts a fresh record; existing entries
+/// survive. Untrusted entries — absolute paths, `..` components — are
+/// dropped rather than honored.
+pub(crate) fn append_generated_paths(root: &Path, added: &[PathBuf]) -> std::io::Result<()> {
+	let mut paths = load(root);
+	paths.extend(
+		added
+			.iter()
+			.filter(|path| is_tracked_entry(path))
+			.map(PathBuf::from),
+	);
+
+	let manifest = serde_json::json!({
+		"paths": paths.iter().map(|path| manifest_entry(path)).collect::<Vec<_>>(),
+	});
+
+	fs::create_dir_all(root)?;
+	// `{:#}` pretty-prints a JSON value, and formatting one cannot fail.
+	fs::write(root.join(MANIFEST_FILE), format!("{manifest:#}\n"))
+}
+
+/// Spell a tracked path with forward slashes, as every platform reads it.
+///
+/// The render script records its paths that way, and the manifest is
+/// committed with the client. A native Windows spelling would name one oddly
+/// named file, not a nested one, when the manifest is read on another
+/// platform.
+fn manifest_entry(path: &Path) -> String {
+	path.components()
+		.map(|component| component.as_os_str().to_string_lossy())
+		.collect::<Vec<_>>()
+		.join("/")
+}
+
+/// The files under `root` before and after a step, so the step's new files
+/// can be recorded without threading a writer through it.
+pub(crate) struct FileSnapshot {
+	files: BTreeSet<PathBuf>,
+}
+
+impl FileSnapshot {
+	/// Record every regular file under `root`, relative to `root`.
+	///
+	/// A missing root is an empty snapshot: the renderer creates the tree
+	/// after the snapshot is taken, and its own errors surface first.
+	pub(crate) fn take(root: &Path) -> std::io::Result<Self> {
+		let mut files = BTreeSet::new();
+
+		match fs::read_dir(root) {
+			Ok(_) => Self::walk(root, root, &mut files)?,
+			Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
+			Err(source) => return Err(source),
+		}
+
+		Ok(Self { files })
+	}
+
+	/// The files that appeared since the snapshot, relative to `root`.
+	pub(crate) fn added_since(self, root: &Path) -> std::io::Result<Vec<PathBuf>> {
+		let mut current = BTreeSet::new();
+		Self::walk(root, root, &mut current)?;
+
+		Ok(current
+			.into_iter()
+			.filter(|path| !self.files.contains(path))
+			.collect())
+	}
+
+	fn walk(root: &Path, directory: &Path, files: &mut BTreeSet<PathBuf>) -> std::io::Result<()> {
+		for entry in fs::read_dir(directory)? {
+			let entry = entry?;
+			let metadata = entry.metadata()?;
+
+			if metadata.is_dir() {
+				Self::walk(root, &entry.path(), files)?;
+			} else if metadata.is_file() {
+				files.insert(
+					entry
+						.path()
+						.strip_prefix(root)
+						.unwrap_or(&entry.path())
+						.to_path_buf(),
+				);
+			}
+		}
+
+		Ok(())
+	}
+}
+
+fn load(root: &Path) -> BTreeSet<PathBuf> {
+	fs::read_to_string(root.join(MANIFEST_FILE))
+		.ok()
+		.and_then(|contents| serde_json::from_str::<serde_json::Value>(&contents).ok())
+		.and_then(|parsed| {
+			parsed
+				.get("paths")
+				.and_then(|paths| paths.as_array().cloned())
+		})
+		.map(|entries| {
+			entries
+				.iter()
+				.filter_map(|entry| entry.as_str())
+				.filter(|entry| is_tracked_entry(Path::new(entry)))
+				.map(PathBuf::from)
+				.collect()
+		})
+		.unwrap_or_default()
+}
+
+/// Renders record plain file paths, so `.` is as illegitimate as `..`: on its
+/// own it names the client root.
+fn is_tracked_entry(path: &Path) -> bool {
+	!path.as_os_str().is_empty()
+		&& path
+			.components()
+			.all(|component| matches!(component, Component::Normal(_)))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// Write `contents` to `path`, creating its parent directories.
+	fn put(path: &Path, contents: &str) {
+		let parent = path.parent().expect("the fixture path has a parent");
+
+		fs::create_dir_all(parent).unwrap_or_else(|e| panic!("mkdir {}: {e}", parent.display()));
+		fs::write(path, contents).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+	}
+
+	fn read_manifest(root: &Path) -> String {
+		fs::read_to_string(root.join(MANIFEST_FILE)).unwrap_or_else(|e| panic!("read failed: {e}"))
+	}
+
+	fn append(root: &Path, added: &[PathBuf]) {
+		append_generated_paths(root, added).unwrap_or_else(|e| panic!("append failed: {e}"));
+	}
+
+	#[test]
+	fn appending_extends_the_record_and_survives_untrusted_entries() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+
+		append(root, &[PathBuf::from("src/generated/mod.rs")]);
+		append(
+			root,
+			&[
+				PathBuf::from("lib/barrel.dart"),
+				PathBuf::from("../escape"),
+				PathBuf::from("./escape"),
+			],
+		);
+
+		let contents = read_manifest(root);
+
+		assert!(contents.contains("src/generated/mod.rs"));
+		assert!(contents.contains("lib/barrel.dart"));
+		assert!(
+			!contents.contains("escape"),
+			"untrusted entries are dropped"
+		);
+	}
+
+	#[test]
+	fn entries_are_recorded_with_forward_slashes_on_every_platform() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+		// Joined components carry the platform's own separator, as the paths a
+		// file snapshot reports do.
+		let nested = Path::new("src").join("generated").join("mod.rs");
+
+		append(root, &[nested]);
+
+		assert_eq!(
+			read_manifest(root),
+			"{\n  \"paths\": [\n    \"src/generated/mod.rs\"\n  ]\n}\n"
+		);
+	}
+
+	#[test]
+	fn appending_over_a_malformed_manifest_starts_a_clean_record() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+		put(&root.join(MANIFEST_FILE), "not json");
+
+		append(root, &[PathBuf::from("helpers.ts")]);
+
+		let contents = read_manifest(root);
+		assert!(contents.contains("helpers.ts"));
+		assert!(!contents.contains("not json"));
+	}
+
+	#[test]
+	fn snapshots_report_only_new_files_under_the_root() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path().join("client");
+		put(&root.join("src/generated/index.ts"), "old");
+
+		let snapshot = FileSnapshot::take(&root).unwrap_or_else(|e| panic!("snapshot failed: {e}"));
+		put(&root.join("src/generated/pinaPodCodecs.ts"), "new");
+
+		let added =
+			FileSnapshot::added_since(snapshot, &root).unwrap_or_else(|e| panic!("diff: {e}"));
+
+		assert_eq!(added, vec![PathBuf::from("src/generated/pinaPodCodecs.ts")]);
+	}
+
+	#[test]
+	fn a_missing_root_is_an_empty_snapshot_and_an_unreadable_one_fails() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path().join("client");
+
+		let snapshot = FileSnapshot::take(&root).unwrap_or_else(|e| panic!("snapshot failed: {e}"));
+		put(&root.join("index.ts"), "new");
+		let added =
+			FileSnapshot::added_since(snapshot, &root).unwrap_or_else(|e| panic!("diff: {e}"));
+
+		assert_eq!(added, vec![PathBuf::from("index.ts")]);
+		// A regular file where the client root belongs cannot be listed, and
+		// that is not the same as a root the renderer has yet to create.
+		assert!(FileSnapshot::take(&root.join("index.ts")).is_err());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn snapshots_skip_entries_that_are_neither_files_nor_directories() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path().join("client");
+		let link = root.join("link.ts");
+
+		let snapshot = FileSnapshot::take(&root).unwrap_or_else(|e| panic!("snapshot failed: {e}"));
+		put(&root.join("index.ts"), "file");
+		std::os::unix::fs::symlink("index.ts", &link).unwrap_or_else(|e| panic!("symlink: {e}"));
+		let added =
+			FileSnapshot::added_since(snapshot, &root).unwrap_or_else(|e| panic!("diff: {e}"));
+
+		assert_eq!(added, vec![PathBuf::from("index.ts")]);
+	}
+}

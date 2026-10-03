@@ -1,0 +1,16 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/store_state.rs",
+		"src/generated/instructions/init.rs",
+		"src/generated/instructions/inspect.rs",
+		"src/generated/instructions/migrate.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/note.rs",
+		"src/generated/instructions/touch.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

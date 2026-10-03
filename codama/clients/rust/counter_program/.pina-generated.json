@@ -1,0 +1,14 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/counter_state.rs",
+		"src/generated/accounts/mod.rs",
+		"src/generated/instructions/increment.rs",
+		"src/generated/instructions/initialize.rs",
+		"src/generated/instructions/migrate.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

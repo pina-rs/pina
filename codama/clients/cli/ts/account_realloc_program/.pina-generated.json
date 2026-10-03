@@ -1,0 +1,15 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/initialize.ts",
+		"src/commands/realloc.ts",
+		"src/commands/realloc2.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/fetch.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

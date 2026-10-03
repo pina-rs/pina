@@ -1,0 +1,33 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/custodian_registry.rs",
+		"src/generated/accounts/disclosure_log.rs",
+		"src/generated/accounts/disclosure_request.rs",
+		"src/generated/accounts/merkle_tree.rs",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/note_commitment.rs",
+		"src/generated/accounts/nullifier_set.rs",
+		"src/generated/accounts/pool_config.rs",
+		"src/generated/accounts/pool_vault.rs",
+		"src/generated/accounts/requester_registry.rs",
+		"src/generated/accounts/verifying_key_account.rs",
+		"src/generated/instructions/approve_disclosure.rs",
+		"src/generated/instructions/cancel_disclosure.rs",
+		"src/generated/instructions/challenge_disclosure.rs",
+		"src/generated/instructions/deposit.rs",
+		"src/generated/instructions/grant_disclosure.rs",
+		"src/generated/instructions/initialize.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/register_requester.rs",
+		"src/generated/instructions/request_disclosure.rs",
+		"src/generated/instructions/resolve_challenge.rs",
+		"src/generated/instructions/set_custodians.rs",
+		"src/generated/instructions/set_verification_key.rs",
+		"src/generated/instructions/transfer.rs",
+		"src/generated/instructions/withdraw.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

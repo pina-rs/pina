@@ -1,0 +1,14 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/allows_duplicate_mutable.ts",
+		"src/commands/allows_duplicate_readonly.ts",
+		"src/commands/fails_duplicate_mutable.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

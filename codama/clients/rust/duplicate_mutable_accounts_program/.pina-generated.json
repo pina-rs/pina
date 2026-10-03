@@ -1,0 +1,14 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/errors/duplicate_mutable_accounts_program.rs",
+		"src/generated/errors/mod.rs",
+		"src/generated/instructions/allows_duplicate_mutable.rs",
+		"src/generated/instructions/allows_duplicate_readonly.rs",
+		"src/generated/instructions/fails_duplicate_mutable.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

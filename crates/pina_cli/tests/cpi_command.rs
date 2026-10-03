@@ -117,7 +117,7 @@ fn cpi_command_exposes_source_only_and_destination_modes() {
 		"update failed: {}",
 		String::from_utf8_lossy(&update.stderr)
 	);
-	fs::write(output_dir.join("remove.txt"), "remove")
+	fs::write(output_dir.join("keep.txt"), "keep")
 		.unwrap_or_else(|error| panic!("sentinel write failed: {error}"));
 
 	let overwrite = command("overwrite");
@@ -126,7 +126,10 @@ fn cpi_command_exposes_source_only_and_destination_modes() {
 		"overwrite failed: {}",
 		String::from_utf8_lossy(&overwrite.stderr)
 	);
-	assert!(!output_dir.join("remove.txt").exists());
+	// Untracked files survive: overwrite removes only the paths the
+	// tracked-files manifest records.
+	assert!(output_dir.join("keep.txt").exists());
+	assert!(output_dir.join("src/generated/mod.rs").is_file());
 }
 
 #[cfg(unix)]

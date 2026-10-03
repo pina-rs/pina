@@ -1,0 +1,16 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/init.ts",
+		"src/commands/inspect.ts",
+		"src/commands/note.ts",
+		"src/commands/touch.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/fetch.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

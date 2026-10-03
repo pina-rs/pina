@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -24,7 +25,10 @@ use crate::dart_client::validate_dart_client_idls;
 use crate::dart_client::write_dart_package_barrels;
 use crate::error::CodamaError;
 use crate::generate_idl;
+use crate::generation_manifest::FileSnapshot;
+use crate::generation_manifest::append_generated_paths;
 use crate::js_client::harden_generated_clients;
+use crate::npm_isolation::isolate_package_child;
 use crate::project::ClientLanguage;
 use crate::project::GenerationMode;
 use crate::project::Project;
@@ -45,12 +49,11 @@ const MINIMUM_GENERATED_KIT_MAJOR: u16 = 8;
 const CLIENT_RENDER_SCRIPT: &str = r#"
 import {
 	copyFileSync,
-	cpSync,
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
-	renameSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -127,6 +130,8 @@ if (!renderer || !outputRoot || !clientRoot || !requestedMode || !scaffoldValue)
 const scaffold = scaffoldValue === "true";
 const names = idlPaths.map((path) => basename(path, ".json")).sort();
 const stagingRoot = mkdtempSync(join(tmpdir(), "pina-clients-"));
+const MANIFEST_FILE = ".pina-generated.json";
+const manifests = new Map();
 
 try {
 	for (const idlPath of idlPaths.sort()) {
@@ -185,13 +190,22 @@ try {
 		}
 	} else if (renderer === "cli-ts") {
 		for (const name of names) {
-			publishDirectory(join(stagingRoot, name), join(outputRoot, name));
+			if (requestedMode === "overwrite") {
+				refuseUntrackedOverwrite(join(outputRoot, name));
+			}
+			publishDirectory(
+				join(outputRoot, name),
+				join(stagingRoot, name),
+				join(outputRoot, name),
+			);
 		}
 	} else if (renderer === "cli-dart") {
 		publishDartCli();
 	} else {
 		publishDart();
 	}
+
+	writeManifests();
 } finally {
 	rmSync(stagingRoot, { force: true, recursive: true });
 }
@@ -213,16 +227,142 @@ function sanitizeDocs(json) {
 	});
 }
 
+// Cleanup is bounded by a tracked-files manifest (`.pina-generated.json`)
+// at each published root: regeneration removes only the paths a previous run
+// recorded, so files the developer added survive, and `overwrite` refuses a
+// directory Pina never generated instead of removing it. A committed
+// manifest is untrusted input: only plain relative entries are honored, and
+// a path whose lookup finds a symbolic link is skipped rather than followed.
+function loadTracked(root) {
+	const manifestPath = join(root, MANIFEST_FILE);
+	if (!existsSync(manifestPath)) {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(readFileSync(manifestPath, "utf8"));
+		if (!Array.isArray(parsed?.paths)) {
+			return null;
+		}
+		const tracked = new Set();
+		for (const entry of parsed.paths) {
+			if (typeof entry === "string" && isTrackedEntry(entry)) {
+				tracked.add(entry);
+			}
+		}
+		return tracked;
+	} catch {
+		return null;
+	}
+}
+
+function isTrackedEntry(entry) {
+	if (!entry || entry.startsWith("/") || entry.startsWith("\\")) {
+		return false;
+	}
+	if (/^[A-Za-z]:[\\/]/.test(entry)) {
+		return false;
+	}
+	// Renders record plain file paths, so `.` is never legitimate: on its own it
+	// names the client root, which a removal would then take as a whole.
+	return !entry.split(/[\\/]/).some((part) => part === ".." || part === "." || part === "");
+}
+
+function record(root, path) {
+	if (!manifests.has(root)) {
+		manifests.set(root, new Set());
+	}
+	manifests.get(root).add(relative(root, path).split(sep).join("/"));
+}
+
+function writeManifests() {
+	for (const [root, paths] of manifests) {
+		// The record is cumulative: files an earlier run tracked but this
+		// one did not rewrite (a scaffold manifest, another program's
+		// entrypoints in a shared CLI package) stay tracked.
+		const merged = new Set([...(loadTracked(root) ?? new Set()), ...paths]);
+		mkdirSync(root, { recursive: true });
+		writeFileSync(
+			join(root, MANIFEST_FILE),
+			`${JSON.stringify({ paths: [...merged].sort() }, null, 2)}\n`,
+			"utf8",
+		);
+	}
+}
+
+function refuseUntrackedOverwrite(directory) {
+	if (loadTracked(directory) !== null) {
+		return;
+	}
+	if (!existsSync(directory) || readdirSync(directory).length === 0) {
+		return;
+	}
+	throw new Error(
+		`cannot overwrite ${directory}: it was not generated with tracked manifests; remove it by hand, or generate once without overwrite to record its files`,
+	);
+}
+
+// Remove every tracked entry under `scope` inside `root`, pruning
+// directories the removals left empty. Returns whether a manifest existed.
+function removeTrackedUnder(root, scope) {
+	const tracked = loadTracked(root);
+	if (tracked === null) {
+		return false;
+	}
+	const prefix = relative(root, scope).split(sep).join("/");
+
+	for (const entry of tracked) {
+		if (prefix !== "" && !(entry === prefix || entry.startsWith(`${prefix}/`))) {
+			continue;
+		}
+		const target = join(root, entry);
+		let metadata;
+		try {
+			metadata = lstatSync(target);
+		} catch {
+			continue;
+		}
+		// Renders record files only. A directory here comes from a manifest
+		// Pina did not write, and removing it would take the files a developer
+		// keeps inside it.
+		if (metadata.isSymbolicLink() || metadata.isDirectory()) {
+			continue;
+		}
+		rmSync(target, { force: true });
+		pruneEmptyParents(root, dirname(target));
+	}
+
+	return true;
+}
+
+function pruneEmptyParents(root, directory) {
+	let current = directory;
+	// The `root + sep` prefix keeps a sibling such as `${root}X` from
+	// matching, so pruning can never climb past the manifest's own root.
+	while (current.startsWith(`${root}${sep}`)) {
+		try {
+			if (readdirSync(current).length !== 0) {
+				return;
+			}
+			rmSync(current);
+		} catch {
+			return;
+		}
+		current = dirname(current);
+	}
+}
+
 function publishTypescript(name) {
 	const destination = join(outputRoot, name);
 	const staged = join(stagingRoot, name);
 	const mode = resolveMode(destination);
 
 	if (mode === "overwrite") {
-		rmSync(destination, { force: true, recursive: true });
+		refuseUntrackedOverwrite(destination);
+		removeTrackedUnder(destination, destination);
 	}
 
 	publishDirectory(
+		destination,
 		join(staged, "src", "generated"),
 		join(destination, "src", "generated"),
 	);
@@ -230,7 +370,8 @@ function publishTypescript(name) {
 	const manifest = join(destination, "package.json");
 	if (scaffold && !existsSync(manifest)) {
 		mkdirSync(destination, { recursive: true });
-		cpSync(join(staged, "package.json"), manifest);
+		copyFileSync(join(staged, "package.json"), manifest);
+		record(destination, manifest);
 	}
 }
 
@@ -238,11 +379,13 @@ function publishDart() {
 	const mode = resolveMode(outputRoot);
 
 	if (mode === "overwrite") {
-		rmSync(outputRoot, { force: true, recursive: true });
+		refuseUntrackedOverwrite(outputRoot);
+		removeTrackedUnder(outputRoot, outputRoot);
 	}
 
 	for (const name of names) {
 		publishDirectory(
+			outputRoot,
 			join(stagingRoot, "lib", "src", "generated", name),
 			join(outputRoot, "lib", "src", "generated", name),
 		);
@@ -252,22 +395,39 @@ function publishDart() {
 	if (scaffold && !existsSync(manifest)) {
 		mkdirSync(outputRoot, { recursive: true });
 		writeFileSync(manifest, dartManifest(), "utf8");
+		record(outputRoot, manifest);
 	}
 }
 
-function publishDirectory(staged, destination) {
-	const parent = dirname(destination);
-	const next = `${destination}.pina-next`;
-	mkdirSync(parent, { recursive: true });
-	rmSync(next, { force: true, recursive: true });
-	cpSync(staged, next, { recursive: true });
-	rmSync(destination, { force: true, recursive: true });
-	renameSync(next, destination);
+function publishDirectory(root, staged, destination) {
+	if (!removeTrackedUnder(root, destination)) {
+		// A destination from before tracked manifests keeps the historical
+		// whole-directory replacement so stale files do not linger.
+		rmSync(destination, { force: true, recursive: true });
+	}
+
+	mkdirSync(destination, { recursive: true });
+	copyTree(staged, destination, root);
+}
+
+function copyTree(staged, destination, root) {
+	for (const entry of readdirSync(staged, { withFileTypes: true })) {
+		const from = join(staged, entry.name);
+		const to = join(destination, entry.name);
+		if (entry.isDirectory()) {
+			mkdirSync(to, { recursive: true });
+			copyTree(from, to, root);
+		} else if (entry.isFile()) {
+			copyFileSync(from, to);
+			record(root, to);
+		}
+	}
 }
 
 function publishDartCli() {
 	for (const name of names) {
 		publishDirectory(
+			outputRoot,
 			join(stagingRoot, "lib", "src", name),
 			join(outputRoot, "lib", "src", name),
 		);
@@ -275,15 +435,18 @@ function publishDartCli() {
 		// whole staged bin directory would drop the entrypoints of programs
 		// that are not part of this invocation.
 		publishFile(
+			outputRoot,
 			join(stagingRoot, "bin", `${name}.dart`),
 			join(outputRoot, "bin", `${name}.dart`),
 		);
 	}
 	publishFile(
+		outputRoot,
 		join(stagingRoot, "lib", "src", "endpoint_guard.dart"),
 		join(outputRoot, "lib", "src", "endpoint_guard.dart"),
 	);
 	publishFile(
+		outputRoot,
 		join(stagingRoot, "test", "endpoint_guard_test.dart"),
 		join(outputRoot, "test", "endpoint_guard_test.dart"),
 	);
@@ -292,12 +455,14 @@ function publishDartCli() {
 	if (scaffold && !existsSync(manifest)) {
 		mkdirSync(outputRoot, { recursive: true });
 		writeFileSync(manifest, dartCliManifest(), "utf8");
+		record(outputRoot, manifest);
 	}
 }
 
-function publishFile(staged, destination) {
+function publishFile(root, staged, destination) {
 	mkdirSync(dirname(destination), { recursive: true });
 	copyFileSync(staged, destination);
+	record(root, destination);
 }
 
 function dartCliManifest() {
@@ -395,6 +560,14 @@ pub struct ProjectGenerateOptions {
 	pub npx: String,
 }
 
+/// One generated client's resolved destination and lifecycle mode.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GeneratedClientTarget {
+	pub language: ClientLanguage,
+	pub path: PathBuf,
+	pub mode: GenerationMode,
+}
+
 /// Outputs produced by project-aware client generation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectGenerateOutput {
@@ -402,6 +575,9 @@ pub struct ProjectGenerateOutput {
 	pub idl: PathBuf,
 	pub clients_dir: PathBuf,
 	pub clients: Vec<ClientLanguage>,
+	/// The resolved destination and mode of every generated client, in
+	/// generation order.
+	pub targets: Vec<GeneratedClientTarget>,
 }
 
 #[derive(Debug)]
@@ -422,6 +598,21 @@ struct GenerationPlan {
 	clients: BTreeSet<ClientLanguage>,
 	generation: BTreeMap<ClientLanguage, GenerationSettings>,
 	npx: String,
+	/// The project directory the workspace root is discovered from. The
+	/// discovery spawns `git`, so it runs lazily: a native-renderer run with
+	/// `--output` never needs the boundary.
+	project_root: PathBuf,
+	/// The root configured outputs must stay within, and the boundary the
+	/// renderer children's `PATH` is scrubbed against.
+	workspace_root: std::cell::OnceCell<PathBuf>,
+}
+
+impl GenerationPlan {
+	/// The workspace root, discovered on first use.
+	fn workspace_root(&self) -> &Path {
+		self.workspace_root
+			.get_or_init(|| crate::project::generation_containment_root(&self.project_root))
+	}
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -442,6 +633,11 @@ struct BoundedOutput {
 /// The output override is resolved from the process working directory, matching
 /// normal command-line path behavior.
 ///
+/// Configured outputs must resolve inside the project's Git working tree; only
+/// the `--output` flag
+/// publishes elsewhere. `pina.toml` cannot select `overwrite`: destructive
+/// regeneration is an operator decision, requested with `--mode overwrite`.
+///
 /// # Errors
 ///
 /// Returns an error when project discovery, IDL generation, or a selected
@@ -461,24 +657,46 @@ pub fn generate_project_clients(
 		.clone()
 		.unwrap_or_else(|| project.clients_dir.clone());
 	validate_render_target(&clients_dir)?;
-	let client_target = |language: ClientLanguage| {
-		let configured = &project.client_generation[&language];
+	// A per-client output is joined onto the clients directory and may climb
+	// back out of it with `..`, so every destination is resolved once, here,
+	// and the plan, the report, and the containment check share the result.
+	let mut outputs = BTreeMap::new();
+	for (language, configured) in &project.client_generation {
+		let joined = clients_dir.join(&configured.output);
 
-		clients_dir.join(&configured.output)
-	};
+		outputs.insert(*language, absolute_path(&joined)?);
+	}
+	let client_target = |language: ClientLanguage| outputs[&language].clone();
 	let generation = project
 		.client_generation
 		.iter()
 		.map(|(language, configured)| {
-			(
+			if clients.contains(language)
+				&& options.mode.is_none()
+				&& configured.mode == GenerationMode::Overwrite
+			{
+				return Err(CodamaError::ConfiguredOverwrite {
+					language: language.as_str(),
+				});
+			}
+
+			Ok((
 				*language,
 				GenerationSettings {
 					mode: options.mode.unwrap_or(configured.mode),
 					scaffold: options.scaffold.unwrap_or(configured.scaffold),
 				},
-			)
+			))
 		})
-		.collect();
+		.collect::<Result<BTreeMap<_, _>, _>>()?;
+	let mut targets = Vec::with_capacity(clients.len());
+	for language in &clients {
+		targets.push(GeneratedClientTarget {
+			language: *language,
+			path: client_target(*language),
+			mode: generation[language].mode,
+		});
+	}
 	let plan = GenerationPlan {
 		programs: vec![(project.library_name.clone(), project.program_dir.clone())],
 		override_idl_names: true,
@@ -497,7 +715,16 @@ pub fn generate_project_clients(
 		clients: clients.clone(),
 		generation,
 		npx: options.npx.clone(),
+		project_root: project.root.clone(),
+		workspace_root: std::cell::OnceCell::new(),
 	};
+
+	if options.output.is_none() {
+		// `workspace_root()` primes the plan's cache, so the renderer
+		// children's `PATH` scrub reuses this discovery instead of
+		// spawning `git` a second time.
+		reject_outside_workspace(plan.workspace_root(), &targets)?;
+	}
 
 	let idl_paths = generate_plan(&plan)?;
 	let idl = idl_paths
@@ -510,7 +737,34 @@ pub fn generate_project_clients(
 		idl,
 		clients_dir,
 		clients: clients.into_iter().collect(),
+		targets,
 	})
+}
+
+/// Refuse configured client outputs that resolve outside the workspace root.
+///
+/// `pina.toml` ships with the repository, so a configured escape would let a
+/// malicious project write — and, with `overwrite`, delete — anywhere the
+/// developer can write. The operator opts into an outside destination with
+/// the `--output` flag, which skips this check.
+fn reject_outside_workspace(
+	workspace_root: &Path,
+	targets: &[GeneratedClientTarget],
+) -> Result<(), CodamaError> {
+	for target in targets {
+		if !target.path.starts_with(workspace_root) {
+			return Err(CodamaError::UnsafeOutput {
+				path: target.path.clone(),
+				reason: format!(
+					"configured client outputs must stay inside the Git worktree {}; pass \
+					 `--output` to publish outside it",
+					workspace_root.display()
+				),
+			});
+		}
+	}
+
+	Ok(())
 }
 
 /// Add each selected CLI's base client and warn when several CLIs are picked.
@@ -671,8 +925,14 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			verify_typescript_scaffold_kit_major(&plan.typescript_out.join(example), settings)?;
 		}
 
+		let roots = examples
+			.iter()
+			.map(|example| plan.typescript_out.join(example))
+			.collect::<Vec<_>>();
+		let snapshots = snapshot_client_trees(&roots, harden_javascript_error)?;
 		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
 		harden_generated_clients(&plan.typescript_out, &examples, &idl_paths)?;
+		record_added_files(&roots, snapshots, harden_javascript_error)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::Dart) {
@@ -685,9 +945,12 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		}
 
 		validate_dart_client_idls(&plan.dart_out, &examples, &idl_paths)?;
+		let roots = std::slice::from_ref(&plan.dart_out);
+		let snapshots = snapshot_client_trees(roots, dart_client_error)?;
 		run_client_generation(plan, ClientLanguage::Dart, &idl_paths)?;
 		harden_generated_dart_clients(&plan.dart_out, &examples, &idl_paths)?;
 		write_dart_package_barrels(&plan.dart_out, &examples)?;
+		record_added_files(roots, snapshots, dart_client_error)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::CliRust) {
@@ -734,6 +997,55 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	Ok(idl_paths)
+}
+
+/// How a post-render step reports a client root it could not read or record.
+type ClientRootError = fn(&Path, std::io::Error) -> CodamaError;
+
+fn harden_javascript_error(path: &Path, source: std::io::Error) -> CodamaError {
+	CodamaError::HardenJavaScript {
+		path: path.to_path_buf(),
+		source,
+	}
+}
+
+fn dart_client_error(path: &Path, source: std::io::Error) -> CodamaError {
+	CodamaError::DartClient {
+		path: path.to_path_buf(),
+		source: Box::new(source),
+	}
+}
+
+/// Snapshot each client tree before a post-render step so the files the step
+/// adds can be recorded in its manifest afterwards.
+fn snapshot_client_trees(
+	roots: &[PathBuf],
+	error: ClientRootError,
+) -> Result<Vec<FileSnapshot>, CodamaError> {
+	let mut snapshots = Vec::with_capacity(roots.len());
+
+	for root in roots {
+		snapshots.push(FileSnapshot::take(root).map_err(|source| error(root, source))?);
+	}
+
+	Ok(snapshots)
+}
+
+/// Record the files post-render steps added in each client root's manifest.
+fn record_added_files(
+	roots: &[PathBuf],
+	snapshots: Vec<FileSnapshot>,
+	error: ClientRootError,
+) -> Result<(), CodamaError> {
+	for (root, snapshot) in roots.iter().zip(snapshots) {
+		let added = snapshot
+			.added_since(root)
+			.map_err(|source| error(root, source))?;
+
+		append_generated_paths(root, &added).map_err(|source| error(root, source))?;
+	}
+
+	Ok(())
 }
 
 /// Read the package name of a generated Rust client crate, falling back to
@@ -1325,15 +1637,13 @@ fn run_client_generation(
 	} else {
 		match run_client_generation_with_npx(plan, renderer, idl_paths) {
 			Ok(output) => output,
-			Err(source) if source.kind() == std::io::ErrorKind::NotFound && plan.npx == "npx" => {
+			Err(CodamaError::RunCommand {
+				ref source,
+				ref cmd,
+			}) if source.kind() == std::io::ErrorKind::NotFound && *cmd == "npx" => {
 				run_client_generation_with_pnpm(plan, renderer, idl_paths)?
 			}
-			Err(source) => {
-				return Err(CodamaError::RunCommand {
-					cmd: plan.npx.clone(),
-					source,
-				});
-			}
+			Err(source) => return Err(source),
 		}
 	};
 
@@ -1385,11 +1695,66 @@ fn diagnostic_text(bytes: &[u8]) -> String {
 		})
 }
 
+/// Absolutize a path against the process working directory and resolve its
+/// `..` components, without touching the filesystem.
+///
+/// The npx and pnpm children run from an isolated temporary directory, so a
+/// relative renderer output, client root, or IDL path would resolve against
+/// that directory instead of the project the paths were computed from.
+///
+/// The containment check compares components, so `..` has to be resolved
+/// before it runs: left as written, `clients/../../outside` still starts with
+/// the worktree it leaves. Symbolic links cannot make the resolved spelling
+/// lie, because configured paths and render targets refuse them.
+fn absolute_path(path: &Path) -> Result<PathBuf, CodamaError> {
+	let absolute = std::path::absolute(path).map_err(|source| create_dir_error(path, source))?;
+	let mut resolved = PathBuf::new();
+
+	for component in absolute.components() {
+		match component {
+			// `..` at the root stays at the root, as the filesystem resolves it.
+			Component::ParentDir => {
+				resolved.pop();
+			}
+			other => resolved.push(other),
+		}
+	}
+
+	Ok(resolved)
+}
+
+/// Label an I/O failure with the command that hit it.
+fn run_error(cmd: &str) -> impl Fn(std::io::Error) -> CodamaError + '_ {
+	move |source| {
+		CodamaError::RunCommand {
+			cmd: cmd.to_string(),
+			source,
+		}
+	}
+}
+
+/// Run the render script through a package runner that fetches the pinned
+/// packages, from a directory where no project package can shadow them.
+fn run_isolated_renderer(
+	mut command: Command,
+	plan: &GenerationPlan,
+	cmd: &str,
+) -> Result<BoundedOutput, CodamaError> {
+	let root = plan.workspace_root();
+	let script = Some(CLIENT_RENDER_SCRIPT.as_bytes());
+	// The isolated directory must outlive the child.
+	let isolated = isolate_package_child(&mut command, root).map_err(run_error(cmd))?;
+	let output = run_bounded(&mut command, script).map_err(run_error(cmd))?;
+	drop(isolated);
+
+	Ok(output)
+}
+
 fn run_client_generation_with_npx(
 	plan: &GenerationPlan,
 	renderer: ClientLanguage,
 	idl_paths: &[PathBuf],
-) -> std::io::Result<BoundedOutput> {
+) -> Result<BoundedOutput, CodamaError> {
 	let mut command = Command::new(&plan.npx);
 
 	command.arg("-y").arg("-p").arg(CODAMA_PACKAGE);
@@ -1399,15 +1764,15 @@ fn run_client_generation_with_npx(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_output(plan, renderer))
-		.arg(client_root(plan, renderer));
+		.arg(absolute_path(renderer_output(plan, renderer))?)
+		.arg(absolute_path(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(idl_path);
+		command.arg(absolute_path(idl_path)?);
 	}
 
-	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes()))
+	run_isolated_renderer(command, plan, &plan.npx)
 }
 
 fn run_client_generation_with_pnpm(
@@ -1423,22 +1788,23 @@ fn run_client_generation_with_pnpm(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_output(plan, renderer))
-		.arg(client_root(plan, renderer));
+		.arg(absolute_path(renderer_output(plan, renderer))?)
+		.arg(absolute_path(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(idl_path);
+		command.arg(absolute_path(idl_path)?);
 	}
 
-	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
-		CodamaError::RunCommand {
-			cmd: "pnpm".to_string(),
-			source,
-		}
-	})
+	run_isolated_renderer(command, plan, "pnpm")
 }
 
+/// Run the render script through a Node executable the operator selected.
+///
+/// This is the documented project-package mode: the child keeps the project
+/// working directory and `PATH` so the script resolves packages from the
+/// project on purpose, which is why it skips
+/// [`crate::npm_isolation::isolate_package_child`].
 fn run_client_generation_with_node(
 	plan: &GenerationPlan,
 	renderer: ClientLanguage,
@@ -1450,20 +1816,15 @@ fn run_client_generation_with_node(
 		.arg("--input-type=module")
 		.arg("-")
 		.arg(renderer.as_str())
-		.arg(renderer_output(plan, renderer))
-		.arg(client_root(plan, renderer));
+		.arg(absolute_path(renderer_output(plan, renderer))?)
+		.arg(absolute_path(client_root(plan, renderer))?);
 	add_generation_arguments(&mut command, plan.generation[&renderer]);
 
 	for idl_path in idl_paths {
-		command.arg(idl_path);
+		command.arg(absolute_path(idl_path)?);
 	}
 
-	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(|source| {
-		CodamaError::RunCommand {
-			cmd: "node".to_string(),
-			source,
-		}
-	})
+	run_bounded(&mut command, Some(CLIENT_RENDER_SCRIPT.as_bytes())).map_err(run_error("node"))
 }
 
 fn add_generation_arguments(command: &mut Command, settings: GenerationSettings) {
@@ -1714,6 +2075,8 @@ mod tests {
 			clients: BTreeSet::new(),
 			generation: default_generation_settings(),
 			npx: npx.into(),
+			project_root: PathBuf::from("workspace"),
+			workspace_root: std::cell::OnceCell::new(),
 		}
 	}
 
@@ -1726,6 +2089,105 @@ mod tests {
 		let path = dir.join(name);
 		let written = std::fs::write(path, contents);
 		written.unwrap_or_else(|error| panic!("failed to write manifest: {error}"));
+	}
+
+	#[test]
+	fn configured_outputs_outside_the_workspace_are_refused_per_language() {
+		// The worktree root Git reports is absolute, drive included on Windows,
+		// and each target is absolutized the same way.
+		let workspace = absolute_path(Path::new("/work/repo")).unwrap_or_else(|e| panic!("{e}"));
+		let target = |path: PathBuf| {
+			GeneratedClientTarget {
+				language: ClientLanguage::Typescript,
+				path,
+				mode: GenerationMode::Auto,
+			}
+		};
+		let inside = [target(workspace.join("clients/typescript"))];
+		let outside = [target(workspace.with_file_name("other").join("typescript"))];
+
+		reject_outside_workspace(&workspace, &inside).unwrap_or_else(|e| panic!("inside: {e}"));
+		let error = reject_outside_workspace(&workspace, &outside)
+			.expect_err("a target outside the workspace must be refused");
+		assert!(matches!(error, CodamaError::UnsafeOutput { ref reason, .. }
+				if reason.contains("Git worktree") && reason.contains("--output")));
+	}
+
+	#[test]
+	fn paths_are_absolutized_against_the_working_directory() {
+		let current = std::env::current_dir().unwrap_or_else(|error| panic!("{error}"));
+		let relative = Path::new("codama/clients/typescript");
+
+		let resolved = absolute_path(relative).unwrap_or_else(|error| panic!("{error}"));
+
+		assert_eq!(resolved, current.join(relative));
+		// A path that climbs out of a directory resolves to where it lands, so
+		// a containment check sees the destination and not the detour.
+		assert_eq!(
+			absolute_path(&current.join("clients/../../outside")).unwrap_or_else(|e| panic!("{e}")),
+			current.with_file_name("outside")
+		);
+		// An empty path names nothing to resolve.
+		assert!(matches!(
+			absolute_path(Path::new("")),
+			Err(CodamaError::CreateDir { .. })
+		));
+	}
+
+	fn snapshots(roots: &[PathBuf]) -> Vec<FileSnapshot> {
+		snapshot_client_trees(roots, dart_client_error).unwrap_or_else(|e| panic!("{e}"))
+	}
+
+	#[test]
+	fn post_render_additions_are_recorded_in_each_client_manifest() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let roots = [temp.path().join("client")];
+		let manifest = roots[0].join(".pina-generated.json");
+
+		let before = snapshots(&roots);
+		std::fs::create_dir_all(&roots[0]).unwrap_or_else(|error| panic!("{error}"));
+		std::fs::write(roots[0].join("helpers.ts"), "").unwrap_or_else(|error| panic!("{error}"));
+		record_added_files(&roots, before, dart_client_error).unwrap_or_else(|e| panic!("{e}"));
+
+		let recorded = std::fs::read_to_string(&manifest).unwrap_or_else(|error| panic!("{error}"));
+		assert!(
+			recorded.contains("\"helpers.ts\""),
+			"unexpected record: {recorded}"
+		);
+	}
+
+	#[test]
+	fn unreadable_client_roots_fail_as_the_step_that_needed_them() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		// A regular file where a client root belongs cannot be listed.
+		let roots = [temp.path().join("client")];
+		std::fs::write(&roots[0], "").unwrap_or_else(|error| panic!("{error}"));
+
+		let javascript = snapshot_client_trees(&roots, harden_javascript_error);
+		let dart = snapshot_client_trees(&roots, dart_client_error);
+
+		assert!(matches!(
+			javascript,
+			Err(CodamaError::HardenJavaScript { .. })
+		));
+		assert!(matches!(dart, Err(CodamaError::DartClient { .. })));
+	}
+
+	#[test]
+	fn additions_that_cannot_be_listed_or_recorded_fail_generation() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let vanished = [temp.path().join("vanished")];
+		let blocked = [temp.path().join("blocked")];
+		// A directory where the manifest file belongs makes the record fail.
+		let blocker = blocked[0].join(".pina-generated.json");
+		std::fs::create_dir_all(&blocker).unwrap_or_else(|error| panic!("{error}"));
+
+		// The first root never appears, so its additions cannot be listed.
+		let unlisted = record_added_files(&vanished, snapshots(&vanished), dart_client_error);
+		let unrecorded = record_added_files(&blocked, snapshots(&blocked), dart_client_error);
+
+		assert!(matches!(unlisted, Err(CodamaError::DartClient { .. })));
+		assert!(matches!(unrecorded, Err(CodamaError::DartClient { .. })));
 	}
 
 	fn write_kit_manifest(dir: &Path, kit_range: &str) {
@@ -2282,6 +2744,8 @@ mod tests {
 			.collect(),
 			generation: default_generation_settings(),
 			npx: "npx".to_owned(),
+			project_root: PathBuf::from("workspace"),
+			workspace_root: std::cell::OnceCell::new(),
 		};
 
 		assert_eq!(

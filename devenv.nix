@@ -1038,9 +1038,13 @@ in
         set -euo pipefail
 
         # `cargo-build-sbf` resolves its platform-tools cache through `$HOME`,
-        # which the nix shell does not export on every runner.
+        # which the nix shell does not export on every runner. The stand-in
+        # sits outside the repository: `pina generate` keeps configured outputs
+        # inside the Git worktree and refuses a worktree that holds the home
+        # directory.
         if [ -z "''${HOME:-}" ]; then
-          export HOME="$DEVENV_ROOT/.cache/home"
+          HOME="$(mktemp -d "''${TMPDIR:-/tmp}/pina-home-XXXXXX")"
+          export HOME
         fi
         mkdir -p "$HOME"
 

@@ -1,0 +1,14 @@
+{
+	"paths": [
+		".pina-generated.json",
+		"src/generated/errors/duplicateMutableAccountsProgram.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/allowsDuplicateMutable.ts",
+		"src/generated/instructions/allowsDuplicateReadonly.ts",
+		"src/generated/instructions/failsDuplicateMutable.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/programs/duplicateMutableAccountsProgram.ts",
+		"src/generated/programs/index.ts"
+	]
+}

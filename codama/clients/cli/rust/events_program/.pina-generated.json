@@ -1,0 +1,13 @@
+{
+	"paths": [
+		".pina-generated",
+		"Cargo.toml",
+		"README.md",
+		"src/commands/initialize.rs",
+		"src/commands/mod.rs",
+		"src/commands/test_event.rs",
+		"src/commands/test_event_cpi.rs",
+		"src/context.rs",
+		"src/main.rs"
+	]
+}

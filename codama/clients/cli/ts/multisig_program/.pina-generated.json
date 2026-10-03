@@ -1,0 +1,27 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/config_authority_execute.ts",
+		"src/commands/config_execute.ts",
+		"src/commands/config_initialize.ts",
+		"src/commands/config_update.ts",
+		"src/commands/multisig_create.ts",
+		"src/commands/multisig_import.ts",
+		"src/commands/proposal_activate.ts",
+		"src/commands/proposal_approve.ts",
+		"src/commands/proposal_cancel.ts",
+		"src/commands/proposal_close.ts",
+		"src/commands/proposal_create.ts",
+		"src/commands/proposal_reject.ts",
+		"src/commands/proposal_revoke.ts",
+		"src/commands/spending_limit_use.ts",
+		"src/commands/vault_execute.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/fetch.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

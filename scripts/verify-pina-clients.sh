@@ -66,8 +66,12 @@ trap '
 	fi
 ' EXIT
 
+# `pina generate` keeps configured outputs inside the Git worktree, and it
+# refuses a worktree that holds the home directory, so a stand-in home has to
+# sit outside the repository.
 if [[ -z "${HOME:-}" ]]; then
-	export HOME="$ROOT/.cache/home"
+	HOME="$(mktemp -d "${TMPDIR:-/tmp}/pina-home-XXXXXX")"
+	export HOME
 fi
 mkdir -p "$HOME"
 echo "Installing pnpm workspace dependencies..."

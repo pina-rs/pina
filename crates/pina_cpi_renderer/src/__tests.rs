@@ -353,7 +353,7 @@ fn generation_modes_create_update_and_overwrite_destinations() {
 		"# consumer manifest\n"
 	);
 
-	fs::write(crate_dir.join("sentinel.txt"), "remove")
+	fs::write(crate_dir.join("sentinel.txt"), "keep")
 		.unwrap_or_else(|error| panic!("sentinel write failed: {error}"));
 	let overwrite = RenderConfig {
 		mode: RenderMode::Overwrite,
@@ -361,7 +361,9 @@ fn generation_modes_create_update_and_overwrite_destinations() {
 	};
 	render_root_node(&root, &crate_dir, &overwrite)
 		.unwrap_or_else(|error| panic!("overwrite failed: {error}"));
-	assert!(!crate_dir.join("sentinel.txt").exists());
+	// The sentinel is not tracked by the manifest, so overwrite keeps it;
+	// only the scaffold and generated sources the renderer owns are redone.
+	assert!(crate_dir.join("sentinel.txt").exists());
 	assert!(crate_dir.join("Cargo.toml").is_file());
 
 	fs::remove_dir_all(crate_dir)
@@ -451,8 +453,18 @@ fn generation_modes_reject_unsafe_destination_trees_and_unreadable_paths() {
 	let git_tree = output.join("git-tree");
 	fs::create_dir_all(git_tree.join(".git"))
 		.unwrap_or_else(|error| panic!("failed to create Git marker: {error}"));
+	// A tracked tree that contains a repository is still refused even though
+	// deletion is manifest-bounded.
+	crate::generation_manifest::write(
+		&git_tree,
+		&std::collections::BTreeSet::from([PathBuf::from("src/generated/mod.rs")]),
+	)
+	.unwrap_or_else(|error| panic!("manifest write failed: {error}"));
 	assert!(matches!(
-		remove_crate_dir(&git_tree),
+		remove_tracked_crate(
+			&git_tree,
+			crate::generation_manifest::GenerationManifest::load(&git_tree).as_ref()
+		),
 		Err(RenderError::UnsafeOutputPath { .. })
 	));
 
@@ -461,11 +473,34 @@ fn generation_modes_reject_unsafe_destination_trees_and_unreadable_paths() {
 		.unwrap_or_else(|error| panic!("failed to create linked tree: {error}"));
 	symlink(&real, linked_tree.join("child"))
 		.unwrap_or_else(|error| panic!("failed to create nested symlink: {error}"));
+	crate::generation_manifest::write(
+		&linked_tree,
+		&std::collections::BTreeSet::from([PathBuf::from("src/generated/mod.rs")]),
+	)
+	.unwrap_or_else(|error| panic!("manifest write failed: {error}"));
 	assert!(matches!(
-		remove_crate_dir(&linked_tree),
+		remove_tracked_crate(
+			&linked_tree,
+			crate::generation_manifest::GenerationManifest::load(&linked_tree).as_ref()
+		),
 		Err(RenderError::UnsafeOutputPath { .. })
 	));
-	assert!(remove_crate_dir(&output.join("missing")).is_ok());
+	assert!(remove_tracked_crate(&output.join("missing"), None).is_ok());
+
+	// A nonempty destination Pina never generated is refused rather than
+	// removed, and the refusal names the remedy.
+	let foreign = output.join("foreign");
+	fs::create_dir_all(&foreign)
+		.unwrap_or_else(|error| panic!("failed to create foreign tree: {error}"));
+	fs::write(foreign.join("user.txt"), "precious")
+		.unwrap_or_else(|error| panic!("failed to create user file: {error}"));
+	let refusal = remove_tracked_crate(&foreign, None)
+		.expect_err("overwrite must refuse an untracked nonempty destination");
+	assert!(matches!(
+		refusal,
+		RenderError::InvalidGenerationState { .. }
+	));
+	assert!(foreign.join("user.txt").is_file());
 
 	let blocked_parent = output.join("blocked-parent");
 	fs::create_dir_all(&blocked_parent)
