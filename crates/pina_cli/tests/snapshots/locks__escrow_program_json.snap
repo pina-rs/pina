@@ -1,0 +1,471 @@
+---
+source: crates/pina_cli/tests/locks.rs
+expression: report
+---
+{
+  "schemaVersion": 1,
+  "program": "escrow_program",
+  "programId": "4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT",
+  "nodes": [
+    {
+      "id": "caller:make.maker",
+      "name": "maker",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:make.mint_a",
+      "name": "mint_a",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:make.mint_b",
+      "name": "mint_b",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:make.maker_ata_a",
+      "name": "maker_ata_a",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:escrow",
+      "name": "escrow",
+      "class": "keyed",
+      "address": null,
+      "pda": "escrow",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "657363726f77",
+          "text": "escrow"
+        },
+        {
+          "kind": "variable",
+          "name": "maker",
+          "type": "Address"
+        },
+        {
+          "kind": "variable",
+          "name": "seed",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "id": "caller:make.vault",
+      "name": "vault",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "address:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "name": "associated_token_program",
+      "class": "fixed",
+      "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "address:11111111111111111111111111111111",
+      "name": "system_program",
+      "class": "fixed",
+      "address": "11111111111111111111111111111111",
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:make.token_program",
+      "name": "token_program",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.taker",
+      "name": "taker",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.mint_a",
+      "name": "mint_a",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.mint_b",
+      "name": "mint_b",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.taker_ata_a",
+      "name": "taker_ata_a",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.taker_ata_b",
+      "name": "taker_ata_b",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.maker",
+      "name": "maker",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.maker_ata_b",
+      "name": "maker_ata_b",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.vault",
+      "name": "vault",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:take.token_program",
+      "name": "token_program",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:cancel.maker",
+      "name": "maker",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:cancel.mint_a",
+      "name": "mint_a",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:cancel.maker_ata_a",
+      "name": "maker_ata_a",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:cancel.vault",
+      "name": "vault",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:cancel.token_program",
+      "name": "token_program",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    }
+  ],
+  "instructions": [
+    {
+      "name": "make",
+      "writes": [
+        {
+          "node": "caller:make.maker",
+          "slot": "maker",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:make.maker_ata_a",
+          "slot": "maker_ata_a",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:escrow",
+          "slot": "escrow",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:make.vault",
+          "slot": "vault",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:make.mint_a",
+          "slot": "mint_a",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:make.mint_b",
+          "slot": "mint_b",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "slot": "associated_token_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:make.token_program",
+          "slot": "token_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "take",
+      "writes": [
+        {
+          "node": "caller:take.taker",
+          "slot": "taker",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:take.taker_ata_a",
+          "slot": "taker_ata_a",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:take.taker_ata_b",
+          "slot": "taker_ata_b",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:take.maker",
+          "slot": "maker",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:take.maker_ata_b",
+          "slot": "maker_ata_b",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:escrow",
+          "slot": "escrow",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:take.vault",
+          "slot": "vault",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:take.mint_a",
+          "slot": "mint_a",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:take.mint_b",
+          "slot": "mint_b",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:take.token_program",
+          "slot": "token_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "slot": "associated_token_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "cancel",
+      "writes": [
+        {
+          "node": "caller:cancel.maker",
+          "slot": "maker",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:cancel.maker_ata_a",
+          "slot": "maker_ata_a",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:escrow",
+          "slot": "escrow",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:cancel.vault",
+          "slot": "vault",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:cancel.mint_a",
+          "slot": "mint_a",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:cancel.token_program",
+          "slot": "token_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+          "slot": "associated_token_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "instructions": [
+        "make",
+        "make"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:escrow"
+      ]
+    },
+    {
+      "instructions": [
+        "make",
+        "take"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:escrow"
+      ]
+    },
+    {
+      "instructions": [
+        "make",
+        "cancel"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:escrow"
+      ]
+    },
+    {
+      "instructions": [
+        "take",
+        "take"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:escrow"
+      ]
+    },
+    {
+      "instructions": [
+        "take",
+        "cancel"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:escrow"
+      ]
+    },
+    {
+      "instructions": [
+        "cancel",
+        "cancel"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:escrow"
+      ]
+    }
+  ],
+  "hotspots": []
+}

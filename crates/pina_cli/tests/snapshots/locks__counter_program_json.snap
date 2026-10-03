@@ -1,0 +1,133 @@
+---
+source: crates/pina_cli/tests/locks.rs
+expression: report
+---
+{
+  "schemaVersion": 1,
+  "program": "counter_program",
+  "programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+  "nodes": [
+    {
+      "id": "caller:initialize.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:counter",
+      "name": "counter",
+      "class": "keyed",
+      "address": null,
+      "pda": "counter",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "636f756e746572",
+          "text": "counter"
+        },
+        {
+          "kind": "variable",
+          "name": "authority",
+          "type": "Address"
+        }
+      ]
+    },
+    {
+      "id": "address:11111111111111111111111111111111",
+      "name": "system_program",
+      "class": "fixed",
+      "address": "11111111111111111111111111111111",
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:increment.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    }
+  ],
+  "instructions": [
+    {
+      "name": "initialize",
+      "writes": [
+        {
+          "node": "caller:initialize.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:counter",
+          "slot": "counter",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "increment",
+      "writes": [
+        {
+          "node": "pda:counter",
+          "slot": "counter",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:increment.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        }
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "instructions": [
+        "initialize",
+        "initialize"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:counter"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "increment"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:counter"
+      ]
+    },
+    {
+      "instructions": [
+        "increment",
+        "increment"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:counter"
+      ]
+    }
+  ],
+  "hotspots": []
+}

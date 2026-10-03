@@ -301,6 +301,80 @@
 		},
 		{
 			"path": [
+				"locks"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Report which instructions can never run in parallel",
+			"description": "Report which instructions can never run in parallel.\n\nSolana runs two transactions in parallel only when neither write-locks an account the other locks. Pina reads the program source, sorts every instruction account into fixed, keyed, and caller-chosen addresses, and reports hotspots: fixed accounts, such as a PDA whose seeds are all constants, that serialize every instruction writing them.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the project to discover. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit a stable machine-readable JSON document",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--deny-hotspots"
+					],
+					"canonical_name": "--deny-hotspots",
+					"hidden": false,
+					"global": false,
+					"summary": "Exit with status 1 when a hotspot is not listed in `[locks] allow`",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
 				"migrations"
 			],
 			"hidden": false,

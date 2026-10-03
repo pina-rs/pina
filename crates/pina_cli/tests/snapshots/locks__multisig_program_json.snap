@@ -1,0 +1,1606 @@
+---
+source: crates/pina_cli/tests/locks.rs
+expression: report
+---
+{
+  "schemaVersion": 1,
+  "program": "multisig_program",
+  "programId": "5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc",
+  "nodes": [
+    {
+      "id": "caller:config_initialize.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:program_config",
+      "name": "program_config",
+      "class": "fixed",
+      "address": "GyAudv6F9kQirHntXGVdYdBDMr2fbrdrgakYyN74gbV8",
+      "pda": "program_config",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "6d756c74697369672d70726f6772616d2d636f6e666967",
+          "text": "multisig-program-config"
+        }
+      ]
+    },
+    {
+      "id": "address:11111111111111111111111111111111",
+      "name": "system_program",
+      "class": "fixed",
+      "address": "11111111111111111111111111111111",
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_update.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:multisig_create.create_key",
+      "name": "create_key",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:multisig",
+      "name": "multisig",
+      "class": "keyed",
+      "address": null,
+      "pda": "multisig",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "6d756c7469736967",
+          "text": "multisig"
+        },
+        {
+          "kind": "variable",
+          "name": "create_key",
+          "type": "Address"
+        }
+      ]
+    },
+    {
+      "id": "caller:multisig_create.rent_payer",
+      "name": "rent_payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:multisig_create.treasury",
+      "name": "treasury",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:multisig_create.member_accounts",
+      "name": "member_accounts",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:multisig_import.legacy_multisig",
+      "name": "legacy_multisig",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:multisig_import.legacy_create_key",
+      "name": "legacy_create_key",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:multisig_import.create_key",
+      "name": "create_key",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:multisig_import.rent_payer",
+      "name": "rent_payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:multisig_import.treasury",
+      "name": "treasury",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_create.multisig",
+      "name": "multisig",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:proposal",
+      "name": "proposal",
+      "class": "keyed",
+      "address": null,
+      "pda": "proposal",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "70726f706f73616c",
+          "text": "proposal"
+        },
+        {
+          "kind": "variable",
+          "name": "multisig",
+          "type": "Address"
+        },
+        {
+          "kind": "variable",
+          "name": "index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "id": "caller:proposal_create.creator",
+      "name": "creator",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_create.rent_payer",
+      "name": "rent_payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_create.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_activate.proposal",
+      "name": "proposal",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_activate.member",
+      "name": "member",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_activate.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_approve.proposal",
+      "name": "proposal",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_approve.member",
+      "name": "member",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_approve.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_reject.proposal",
+      "name": "proposal",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_reject.member",
+      "name": "member",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_reject.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_revoke.proposal",
+      "name": "proposal",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_revoke.member",
+      "name": "member",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_revoke.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_cancel.proposal",
+      "name": "proposal",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_cancel.member",
+      "name": "member",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_cancel.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:vault_execute.member",
+      "name": "member",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:vault_execute.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:vault_execute.message_accounts",
+      "name": "message_accounts",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_execute.member",
+      "name": "member",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_execute.rent_payer",
+      "name": "rent_payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_execute.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_execute.rent_collector",
+      "name": "rent_collector",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_execute.spending_limit_accounts",
+      "name": "spending_limit_accounts",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_authority_execute.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_authority_execute.rent_payer",
+      "name": "rent_payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_authority_execute.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_authority_execute.rent_collector",
+      "name": "rent_collector",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:config_authority_execute.spending_limit_accounts",
+      "name": "spending_limit_accounts",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:spending_limit_use.multisig",
+      "name": "multisig",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:spending_limit",
+      "name": "spending_limit",
+      "class": "keyed",
+      "address": null,
+      "pda": "spending_limit",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "7370656e64696e672d6c696d6974",
+          "text": "spending-limit"
+        },
+        {
+          "kind": "variable",
+          "name": "multisig",
+          "type": "Address"
+        },
+        {
+          "kind": "variable",
+          "name": "create_key",
+          "type": "Address"
+        }
+      ]
+    },
+    {
+      "id": "caller:spending_limit_use.member",
+      "name": "member",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:spending_limit_use.vault",
+      "name": "vault",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:spending_limit_use.destination",
+      "name": "destination",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:spending_limit_use.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:spending_limit_use.vault_token_account",
+      "name": "vault_token_account",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:spending_limit_use.mint",
+      "name": "mint",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "address:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "name": "token_program",
+      "class": "fixed",
+      "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_close.multisig",
+      "name": "multisig",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_close.proposal",
+      "name": "proposal",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_close.rent_collector",
+      "name": "rent_collector",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:proposal_close.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    }
+  ],
+  "instructions": [
+    {
+      "name": "config_initialize",
+      "writes": [
+        {
+          "node": "caller:config_initialize.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:program_config",
+          "slot": "program_config",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "config_update",
+      "writes": [
+        {
+          "node": "pda:program_config",
+          "slot": "program_config",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:config_update.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "multisig_create",
+      "writes": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:multisig_create.rent_payer",
+          "slot": "rent_payer",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:multisig_create.treasury",
+          "slot": "treasury",
+          "signer": false,
+          "optional": true
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:program_config",
+          "slot": "program_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:multisig_create.create_key",
+          "slot": "create_key",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:multisig_create.member_accounts",
+          "slot": "member_accounts",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "multisig_import",
+      "writes": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:multisig_import.rent_payer",
+          "slot": "rent_payer",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:multisig_import.treasury",
+          "slot": "treasury",
+          "signer": false,
+          "optional": true
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:multisig_import.legacy_multisig",
+          "slot": "legacy_multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:multisig_import.legacy_create_key",
+          "slot": "legacy_create_key",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:program_config",
+          "slot": "program_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:multisig_import.create_key",
+          "slot": "create_key",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "proposal_create",
+      "writes": [
+        {
+          "node": "caller:proposal_create.multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_create.rent_payer",
+          "slot": "rent_payer",
+          "signer": true,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:proposal_create.creator",
+          "slot": "creator",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_create.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "proposal_activate",
+      "writes": [
+        {
+          "node": "caller:proposal_activate.proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_activate.member",
+          "slot": "member",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_activate.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "proposal_approve",
+      "writes": [
+        {
+          "node": "caller:proposal_approve.proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_approve.member",
+          "slot": "member",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_approve.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "proposal_reject",
+      "writes": [
+        {
+          "node": "caller:proposal_reject.proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_reject.member",
+          "slot": "member",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_reject.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "proposal_revoke",
+      "writes": [
+        {
+          "node": "caller:proposal_revoke.proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_revoke.member",
+          "slot": "member",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_revoke.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "proposal_cancel",
+      "writes": [
+        {
+          "node": "caller:proposal_cancel.proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_cancel.member",
+          "slot": "member",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_cancel.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "vault_execute",
+      "writes": [
+        {
+          "node": "pda:proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:vault_execute.member",
+          "slot": "member",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:vault_execute.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:vault_execute.message_accounts",
+          "slot": "message_accounts",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "config_execute",
+      "writes": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:config_execute.rent_payer",
+          "slot": "rent_payer",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:config_execute.rent_collector",
+          "slot": "rent_collector",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:config_execute.spending_limit_accounts",
+          "slot": "spending_limit_accounts",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:config_execute.member",
+          "slot": "member",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:config_execute.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "config_authority_execute",
+      "writes": [
+        {
+          "node": "pda:multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:config_authority_execute.rent_payer",
+          "slot": "rent_payer",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:config_authority_execute.rent_collector",
+          "slot": "rent_collector",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:config_authority_execute.spending_limit_accounts",
+          "slot": "spending_limit_accounts",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:config_authority_execute.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:config_authority_execute.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "spending_limit_use",
+      "writes": [
+        {
+          "node": "pda:spending_limit",
+          "slot": "spending_limit",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:spending_limit_use.vault",
+          "slot": "vault",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:spending_limit_use.destination",
+          "slot": "destination",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:spending_limit_use.vault_token_account",
+          "slot": "vault_token_account",
+          "signer": false,
+          "optional": true
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:spending_limit_use.multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:spending_limit_use.member",
+          "slot": "member",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:spending_limit_use.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:spending_limit_use.mint",
+          "slot": "mint",
+          "signer": false,
+          "optional": true
+        },
+        {
+          "node": "address:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "slot": "token_program",
+          "signer": false,
+          "optional": true
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "name": "proposal_close",
+      "writes": [
+        {
+          "node": "caller:proposal_close.proposal",
+          "slot": "proposal",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_close.rent_collector",
+          "slot": "rent_collector",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:proposal_close.multisig",
+          "slot": "multisig",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:proposal_close.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "instructions": [
+        "config_initialize",
+        "config_initialize"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:program_config"
+      ]
+    },
+    {
+      "instructions": [
+        "config_initialize",
+        "config_update"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:program_config"
+      ]
+    },
+    {
+      "instructions": [
+        "config_initialize",
+        "multisig_create"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:program_config"
+      ]
+    },
+    {
+      "instructions": [
+        "config_initialize",
+        "multisig_import"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:program_config"
+      ]
+    },
+    {
+      "instructions": [
+        "config_update",
+        "config_update"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:program_config"
+      ]
+    },
+    {
+      "instructions": [
+        "config_update",
+        "multisig_create"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:program_config"
+      ]
+    },
+    {
+      "instructions": [
+        "config_update",
+        "multisig_import"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:program_config"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "multisig_create"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "multisig_import"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "proposal_activate"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "proposal_approve"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "proposal_reject"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "proposal_revoke"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "proposal_cancel"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "vault_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_create",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "multisig_import"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "proposal_activate"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "proposal_approve"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "proposal_reject"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "proposal_revoke"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "proposal_cancel"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "vault_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "multisig_import",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_create",
+        "proposal_create"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:proposal"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_create",
+        "vault_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:proposal"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_create",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:proposal"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_activate",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_activate",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_approve",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_approve",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_reject",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_reject",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_revoke",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_revoke",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_cancel",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "proposal_cancel",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "vault_execute",
+        "vault_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:proposal"
+      ]
+    },
+    {
+      "instructions": [
+        "vault_execute",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig",
+        "pda:proposal"
+      ]
+    },
+    {
+      "instructions": [
+        "vault_execute",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "config_execute",
+        "config_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig",
+        "pda:proposal"
+      ]
+    },
+    {
+      "instructions": [
+        "config_execute",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "config_authority_execute",
+        "config_authority_execute"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:multisig"
+      ]
+    },
+    {
+      "instructions": [
+        "spending_limit_use",
+        "spending_limit_use"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:spending_limit"
+      ]
+    }
+  ],
+  "hotspots": [
+    {
+      "node": "pda:program_config",
+      "name": "program_config",
+      "writers": [
+        "config_initialize",
+        "config_update"
+      ],
+      "readers": [
+        "multisig_create",
+        "multisig_import"
+      ],
+      "allowed": false
+    }
+  ]
+}

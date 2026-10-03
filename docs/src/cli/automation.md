@@ -42,6 +42,12 @@ pina explain --help
 pina keys --help
 ```
 
+For write-lock contention between instructions:
+
+```bash
+pina locks --help
+```
+
 For framework and extractor constraints:
 
 ```bash
@@ -82,6 +88,14 @@ Diff the current build against a saved baseline; the exit status is 2 when a tot
 ```bash
 pina profile compare /tmp/profile.json --json > /tmp/comparison.json
 jq -e '.status == "unchanged" or .status == "improved"' /tmp/comparison.json
+```
+
+Report write-lock contention through the versioned JSON contract, and gate CI on hotspots that `[locks] allow` does not accept:
+
+```bash
+pina locks --json > /tmp/pina-locks.json
+jq -e '.hotspots | map(select(.allowed | not)) | length == 0' /tmp/pina-locks.json
+pina locks --deny-hotspots
 ```
 
 Diagnose project readiness through the versioned JSON contract:

@@ -149,6 +149,18 @@ struct ProjectConfig {
 	migrations: MigrationsConfig,
 	#[serde(default)]
 	lints: LintsConfig,
+	#[serde(default)]
+	locks: LocksConfig,
+}
+
+/// Write-lock settings from the `[locks]` table, read by `pina locks`.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
+pub struct LocksConfig {
+	/// Hotspots the program keeps on purpose, by account name, such as an
+	/// admin configuration only admin instructions write.
+	pub allow: Vec<String>,
 }
 
 /// Lint level overrides configured through the `[lints]` table.
@@ -426,22 +438,30 @@ impl Project {
 		Self::from_cargo_metadata(&start)
 	}
 
+	/// Read the `[locks]` table from the project's configuration file.
+	///
+	/// A project discovered without a configuration file uses the defaults.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the configuration file cannot be read or parsed.
+	pub fn locks_config(&self) -> Result<LocksConfig, ProjectError> {
+		let Some(config_path) = [CONFIG_FILE_NAME, LEGACY_CONFIG_FILE_NAME]
+			.iter()
+			.map(|name| self.root.join(name))
+			.find(|path| path.is_file())
+		else {
+			return Ok(LocksConfig::default());
+		};
+
+		Ok(read_project_config(&config_path)?.locks)
+	}
+
 	fn from_config(config_path: &Path) -> Result<Self, ProjectError> {
 		let root = config_path
 			.parent()
 			.map_or_else(|| PathBuf::from("."), Path::to_path_buf);
-		let source = std::fs::read_to_string(config_path).map_err(|source| {
-			ProjectError::ReadFile {
-				path: config_path.to_path_buf(),
-				source,
-			}
-		})?;
-		let config: ProjectConfig = toml::from_str(&source).map_err(|source| {
-			ProjectError::ParseToml {
-				path: config_path.to_path_buf(),
-				source,
-			}
-		})?;
+		let config = read_project_config(config_path)?;
 		let templates = PathTemplates::new(root.clone(), config.project.paths.clone())?;
 		let configured_program =
 			templates.resolve_dir(&root, "project.program", &config.project.program)?;
@@ -1066,6 +1086,22 @@ fn resolve_lint_levels(
 	Ok(levels)
 }
 
+fn read_project_config(config_path: &Path) -> Result<ProjectConfig, ProjectError> {
+	let source = std::fs::read_to_string(config_path).map_err(|source| {
+		ProjectError::ReadFile {
+			path: config_path.to_path_buf(),
+			source,
+		}
+	})?;
+
+	toml::from_str(&source).map_err(|source| {
+		ProjectError::ParseToml {
+			path: config_path.to_path_buf(),
+			source,
+		}
+	})
+}
+
 /// Refuse the migration keys the manifest now owns, naming the flag and the
 /// value that record the same setting.
 fn reject_retired_migration_settings(config: &MigrationsConfig) -> Result<(), ProjectError> {
@@ -1319,6 +1355,80 @@ crate-type = ["cdylib", "lib"]
 				scaffold: true,
 			}
 		);
+	}
+
+	/// Write `contents` to `path`, failing the test on error.
+	fn write_file(path: &Path, contents: &[u8]) {
+		let written = fs::write(path, contents);
+		written.unwrap_or_else(|error| panic!("failed to write {}: {error}", path.display()));
+	}
+
+	/// The `[locks]` table of the project discovered at `path`.
+	fn discovered_locks(path: &Path) -> LocksConfig {
+		let project = Project::discover(path);
+		let project = project.unwrap_or_else(|error| panic!("discovery failed: {error}"));
+		let locks = project.locks_config();
+		locks.unwrap_or_else(|error| panic!("locks config failed: {error}"))
+	}
+
+	#[test]
+	fn locks_config_reads_the_allow_list() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "config-program");
+		write_file(
+			&temp.path().join(CONFIG_FILE_NAME),
+			b"[locks]\nallow = [\"program_config\", \"fee_vault\"]\n",
+		);
+
+		let locks = discovered_locks(temp.path());
+
+		assert_eq!(locks.allow, ["program_config", "fee_vault"]);
+	}
+
+	#[test]
+	fn locks_config_reads_the_legacy_config_file() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "legacy-program");
+		write_file(
+			&temp.path().join(LEGACY_CONFIG_FILE_NAME),
+			b"[locks]\nallow = [\"state\"]\n",
+		);
+
+		let locks = discovered_locks(temp.path());
+
+		assert_eq!(locks.allow, ["state"]);
+	}
+
+	#[test]
+	fn locks_config_defaults_without_a_config_file() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "bare-program");
+
+		let locks = discovered_locks(temp.path());
+
+		assert_eq!(locks, LocksConfig::default());
+	}
+
+	#[test]
+	fn locks_config_rejects_unknown_fields_and_reports_unreadable_files() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "typo-program");
+		let config_path = temp.path().join(CONFIG_FILE_NAME);
+		write_file(&config_path, b"[locks]\nallowed = [\"state\"]\n");
+
+		let error = Project::discover(temp.path())
+			.expect_err("an unknown `[locks]` field must fail discovery");
+		assert!(matches!(error, ProjectError::ParseToml { .. }), "{error}");
+
+		write_file(&config_path, b"");
+		let project = Project::discover(temp.path());
+		let project = project.unwrap_or_else(|error| panic!("discovery failed: {error}"));
+		write_file(&config_path, &[0xff, 0xfe]);
+		let error = project
+			.locks_config()
+			.expect_err("a config that is not UTF-8 cannot be read");
+
+		assert!(matches!(error, ProjectError::ReadFile { .. }), "{error}");
 	}
 
 	#[test]
