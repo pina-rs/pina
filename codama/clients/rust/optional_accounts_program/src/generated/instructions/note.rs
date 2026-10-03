@@ -9,6 +9,14 @@
 )]
 
 pub const NOTE_DISCRIMINATOR: u8 = 3u8;
+/// Compute units `Note` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const NOTE_MEASURED_COMPUTE_UNITS: u32 = 175;
+/// Compute unit limit to request for a transaction carrying `Note`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const NOTE_COMPUTE_UNIT_LIMIT: u32 = 600;
 
 /// Accounts.
 #[derive(Clone, Debug)]

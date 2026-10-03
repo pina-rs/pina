@@ -1,0 +1,19 @@
+{
+	"schemaVersion": 1,
+	"measurement": "surfpool-simulation-max",
+	"artifactSha256": "07abd41b6b5b039f16807ab5e089ce76eb4fcb3310ef1e1cf779cb225228ba24",
+	"instructions": {
+		"initialize": {
+			"computeUnits": 264,
+			"samples": 1
+		},
+		"testEvent": {
+			"computeUnits": 264,
+			"samples": 1
+		},
+		"testEventCpi": {
+			"computeUnits": 263,
+			"samples": 1
+		}
+	}
+}

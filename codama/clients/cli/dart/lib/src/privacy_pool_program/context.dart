@@ -17,6 +17,7 @@ import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
     hide TransactionVersion;
 import 'package:solana_kit_transaction_messages/solana_kit_transaction_messages.dart';
 
+import '../compute_budget.dart';
 import '../endpoint_guard.dart';
 import 'package:solana_kit_transactions/solana_kit_transactions.dart';
 
@@ -45,6 +46,7 @@ class CliContext {
     required this.programAddress,
     required this.simulate,
     required this.json,
+    required this.computeUnitLimit,
     required this.cluster,
   });
 
@@ -54,12 +56,25 @@ class CliContext {
   final bool simulate;
   final bool json;
 
+  /// `--compute-unit-limit`, which replaces every instruction's recorded limit.
+  final int? computeUnitLimit;
+
   /// Explorer cluster selector for [programAddress]'s endpoint, or empty.
   final String cluster;
 
   Address get payerAddress => getAddressFromPublicKey(payer.publicKey);
 
-  Future<void> send(Iterable<Instruction> instructions) async {
+  /// Sends or simulates [instructions], printing the result.
+  ///
+  /// [recordedLimit] is the compute unit limit the IDL records for the
+  /// command's instruction. `--compute-unit-limit` replaces it; with
+  /// neither, the transaction requests no limit and the runtime default
+  /// applies.
+  Future<void> send(
+    Iterable<Instruction> instructions, {
+    int? recordedLimit,
+  }) async {
+    final requestedLimit = computeUnitLimit ?? recordedLimit;
     final blockhashResponse = await rpc.getLatestBlockhashValue().send();
     final blockhashValue = blockhashResponse.value;
 
@@ -68,10 +83,10 @@ class CliContext {
         blockhash: blockhashValue.blockhash.value,
         lastValidBlockHeight: blockhashValue.lastValidBlockHeight,
       ),
-      TransactionMessage(
-        version: TransactionVersion.legacy,
-        instructions: instructions.toList(),
+      budgetedTransactionMessage(
         feePayer: payerAddress,
+        instructions: instructions,
+        computeUnitLimit: requestedLimit,
       ),
     );
     final compiled = compileTransactionMessage(message);
@@ -103,7 +118,11 @@ class CliContext {
           .toList();
       if (json) {
         stdout.writeln(
-          jsonEncode({'logs': logs, 'unitsConsumed': result['unitsConsumed']}),
+          jsonEncode({
+            'logs': logs,
+            'unitsConsumed': result['unitsConsumed'],
+            'computeUnitLimit': requestedLimit,
+          }),
         );
       } else {
         for (final log in logs) {
@@ -111,7 +130,7 @@ class CliContext {
         }
         final units = result['unitsConsumed'];
         if (units != null) {
-          stdout.writeln('Consumed ${units.toString()} compute units');
+          stdout.writeln(consumptionSummary(units, requestedLimit));
         }
       }
       if (result['err'] != null) {
@@ -261,9 +280,21 @@ Future<CliContext> createContext(ArgResults globals) {
           : Address("DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D"),
       simulate: globals['simulate'] as bool? ?? false,
       json: globals['json'] as bool? ?? false,
+      computeUnitLimit: computeUnitLimitOption(
+        globals['compute-unit-limit'] as String?,
+      ),
       cluster: clusterOf(endpoint),
     );
   });
+}
+
+/// The `--compute-unit-limit` override, reported as a [CliError] when invalid.
+int? computeUnitLimitOption(String? value) {
+  try {
+    return parseComputeUnitLimit(value);
+  } on FormatException catch (error) {
+    throw CliError(error.message);
+  }
 }
 
 void printFields(

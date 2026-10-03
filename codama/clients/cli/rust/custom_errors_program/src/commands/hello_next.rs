@@ -28,5 +28,5 @@ pub(crate) fn run(context: &CliContext, _args: HelloNextArgs) -> Result<(), CliE
 
 	let accounts = HelloNext {};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

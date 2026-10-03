@@ -58,5 +58,8 @@ pub(crate) fn run(context: &CliContext, args: SetRewardIndexArgs) -> Result<(), 
 		reward_vault,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(staking_rewards_program_client::instructions::SET_REWARD_INDEX_COMPUTE_UNIT_LIMIT),
+	)
 }

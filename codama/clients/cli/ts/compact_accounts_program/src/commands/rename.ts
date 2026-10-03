@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getRenameInstructionAsync } from "../client";
+import {
+	getRenameInstructionAsync,
+	RENAME_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -39,5 +42,5 @@ export const renameCommand = registerGlobals(new Command("rename"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, RENAME_COMPUTE_UNIT_LIMIT);
 	});

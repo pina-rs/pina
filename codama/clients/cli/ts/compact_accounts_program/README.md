@@ -15,5 +15,8 @@ Global flags:
 - `-u, --url <URL>`: `mainnet`, `devnet`, `testnet`, `localhost`, or an https URL (`SOLANA_URL`)
 - `-k, --keypair <PATH>`: payer keypair file (`PINA_KEYPAIR`, default `~/.config/solana/id.json`)
 - `--program-id <ADDRESS>`: override the on-chain program address
-- `--simulate`: simulate instead of sending
+- `--simulate`: simulate instead of sending, and report the compute units consumed against the limit requested
 - `--json`: machine-readable output
+- `--compute-unit-limit <UNITS>`: request this compute unit limit instead of the one recorded for the instruction
+
+Commands for instructions with a recorded measurement request its compute unit limit automatically; the others request none, so the runtime default applies.

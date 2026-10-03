@@ -35,5 +35,8 @@ pub(crate) fn run(context: &CliContext, args: AllocateArgs) -> Result<(), CliErr
 
 	let accounts = Allocate {};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(heap_alloc_program_client::instructions::ALLOCATE_COMPUTE_UNIT_LIMIT),
+	)
 }

@@ -52,5 +52,8 @@ pub(crate) fn run(context: &CliContext, args: RegisterRequesterArgs) -> Result<(
 		requester_registry,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT),
+	)
 }

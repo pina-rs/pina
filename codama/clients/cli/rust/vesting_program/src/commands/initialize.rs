@@ -98,5 +98,8 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		token_program,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(vesting_program_client::instructions::INITIALIZE_COMPUTE_UNIT_LIMIT),
+	)
 }

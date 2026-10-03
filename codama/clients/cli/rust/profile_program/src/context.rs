@@ -30,6 +30,13 @@ const DEVNET_ENDPOINT: &str = "https://api.devnet.solana.com";
 const TESTNET_ENDPOINT: &str = "https://api.testnet.solana.com";
 const LOCALNET_ENDPOINT: &str = "http://localhost:8899";
 
+/// The Compute Budget program, which sets a transaction's compute unit limit.
+const COMPUTE_BUDGET_PROGRAM_ID: Pubkey =
+	Pubkey::from_str_const("ComputeBudget111111111111111111111111111111");
+
+/// `SetComputeUnitLimit`'s instruction tag in the Compute Budget program.
+const SET_COMPUTE_UNIT_LIMIT_TAG: u8 = 2;
+
 /// Errors surfaced by every generated command. Programs without
 /// accounts or byte flags never construct some variants; the blanket
 /// allow keeps the emitted file warning-free under `-D warnings`.
@@ -100,6 +107,8 @@ pub struct CliContext {
 	pub program_address: Pubkey,
 	pub simulate: bool,
 	pub json: bool,
+	/// `--compute-unit-limit`, which replaces every instruction's recorded limit.
+	pub compute_unit_limit: Option<u32>,
 	cluster: &'static str,
 }
 
@@ -111,6 +120,7 @@ impl CliContext {
 		program_address: Pubkey,
 		simulate: bool,
 		json: bool,
+		compute_unit_limit: Option<u32>,
 	) -> Result<Self, CliError> {
 		let (endpoint, cluster) = resolve_endpoint(url)?;
 		let payer = load_keypair(keypair)?;
@@ -121,6 +131,7 @@ impl CliContext {
 			program_address,
 			simulate,
 			json,
+			compute_unit_limit,
 			cluster,
 		})
 	}
@@ -170,19 +181,29 @@ impl CliContext {
 	}
 
 	/// Send or simulate one instruction, printing the result.
-	pub fn send(&self, instruction: Instruction) -> Result<(), CliError> {
+	///
+	/// `recorded_limit` is the compute unit limit the IDL records for the
+	/// instruction. `--compute-unit-limit` replaces it; with neither, the
+	/// transaction requests no limit and the runtime default applies.
+	pub fn send(
+		&self,
+		instruction: Instruction,
+		recorded_limit: Option<u32>,
+	) -> Result<(), CliError> {
 		let mut instruction = instruction;
 		instruction.program_id = self.program_address;
+		let compute_unit_limit =
+			requested_compute_unit_limit(self.compute_unit_limit, recorded_limit);
 		let blockhash = self.rpc.get_latest_blockhash()?;
 		let transaction = Transaction::new_signed_with_payer(
-			&[instruction],
+			&transaction_instructions(instruction, compute_unit_limit),
 			Some(&self.payer.pubkey()),
 			&[&self.payer],
 			blockhash,
 		);
 
 		if self.simulate {
-			return self.simulate(&transaction);
+			return self.simulate(&transaction, compute_unit_limit);
 		}
 
 		let signature = self
@@ -203,7 +224,11 @@ impl CliContext {
 		Ok(())
 	}
 
-	fn simulate(&self, transaction: &Transaction) -> Result<(), CliError> {
+	fn simulate(
+		&self,
+		transaction: &Transaction,
+		compute_unit_limit: Option<u32>,
+	) -> Result<(), CliError> {
 		let simulation = self.rpc.simulate_transaction(transaction)?.value;
 		let logs = simulation.logs.clone();
 		let consumed = simulation.units_consumed;
@@ -211,14 +236,18 @@ impl CliContext {
 		if self.json {
 			println!(
 				"{}",
-				serde_json::json!({ "logs": logs, "unitsConsumed": consumed })
+				serde_json::json!({
+					"logs": logs,
+					"unitsConsumed": consumed,
+					"computeUnitLimit": compute_unit_limit,
+				})
 			);
 		} else {
 			for log in logs.iter().flatten() {
 				println!("{log}");
 			}
 			if let Some(consumed) = consumed {
-				println!("Consumed {consumed} compute units");
+				println!("{}", consumption_summary(consumed, compute_unit_limit));
 			}
 		}
 
@@ -240,6 +269,112 @@ impl CliContext {
 			});
 		}
 		Ok(account.data)
+	}
+}
+
+/// The limit a command's transaction requests: `--compute-unit-limit` when
+/// given, otherwise the instruction's recorded limit, otherwise none.
+#[must_use]
+pub fn requested_compute_unit_limit(
+	override_limit: Option<u32>,
+	recorded_limit: Option<u32>,
+) -> Option<u32> {
+	override_limit.or(recorded_limit)
+}
+
+/// The instructions a command's transaction carries: one `SetComputeUnitLimit`
+/// first when a limit is requested, then the command's instruction.
+#[must_use]
+pub fn transaction_instructions(
+	instruction: Instruction,
+	compute_unit_limit: Option<u32>,
+) -> Vec<Instruction> {
+	let mut instructions = Vec::with_capacity(2);
+
+	if let Some(units) = compute_unit_limit {
+		let mut data = Vec::with_capacity(5);
+		data.push(SET_COMPUTE_UNIT_LIMIT_TAG);
+		data.extend_from_slice(&units.to_le_bytes());
+		instructions.push(Instruction {
+			program_id: COMPUTE_BUDGET_PROGRAM_ID,
+			accounts: Vec::new(),
+			data,
+		});
+	}
+
+	instructions.push(instruction);
+	instructions
+}
+
+/// How much of the requested budget a simulation consumed.
+#[must_use]
+pub fn consumption_summary(consumed: u64, compute_unit_limit: Option<u32>) -> String {
+	match compute_unit_limit {
+		Some(limit) => format!("Consumed {consumed} of {limit} requested compute units"),
+		None => {
+			format!(
+				"Consumed {consumed} compute units (no limit requested; the runtime default applies)"
+			)
+		}
+	}
+}
+
+#[cfg(test)]
+mod compute_unit_limit_tests {
+	use solana_sdk::instruction::AccountMeta;
+	use solana_sdk::instruction::Instruction;
+	use solana_sdk::pubkey::Pubkey;
+
+	use super::COMPUTE_BUDGET_PROGRAM_ID;
+	use super::consumption_summary;
+	use super::requested_compute_unit_limit;
+	use super::transaction_instructions;
+
+	fn program_instruction() -> Instruction {
+		Instruction {
+			program_id: Pubkey::new_from_array([7; 32]),
+			accounts: vec![AccountMeta::new(Pubkey::new_from_array([8; 32]), true)],
+			data: vec![1],
+		}
+	}
+
+	#[test]
+	fn prepends_exactly_one_limit_instruction() {
+		let instructions = transaction_instructions(program_instruction(), Some(800));
+
+		assert_eq!(instructions.len(), 2);
+		assert_eq!(instructions[0].program_id, COMPUTE_BUDGET_PROGRAM_ID);
+		assert!(instructions[0].accounts.is_empty());
+		assert_eq!(instructions[0].data, [2, 0x20, 0x03, 0, 0]);
+		assert_eq!(instructions[1], program_instruction());
+	}
+
+	#[test]
+	fn sends_the_instruction_alone_without_a_limit() {
+		assert_eq!(
+			transaction_instructions(program_instruction(), None),
+			[program_instruction()]
+		);
+	}
+
+	#[test]
+	fn the_override_replaces_the_recorded_limit() {
+		assert_eq!(
+			requested_compute_unit_limit(Some(5_000), Some(800)),
+			Some(5_000)
+		);
+		assert_eq!(requested_compute_unit_limit(None, Some(800)), Some(800));
+		assert_eq!(requested_compute_unit_limit(Some(5_000), None), Some(5_000));
+		assert_eq!(requested_compute_unit_limit(None, None), None);
+	}
+
+	#[test]
+	fn summarizes_consumption_against_the_requested_limit() {
+		assert_eq!(
+			consumption_summary(529, Some(800)),
+			"Consumed 529 of 800 requested compute units"
+		);
+		assert!(consumption_summary(379, None).contains("runtime default"));
 	}
 }
 

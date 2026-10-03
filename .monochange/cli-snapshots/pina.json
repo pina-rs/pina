@@ -3,7 +3,7 @@
 	"kind": "cli-surface",
 	"tool": {
 		"name": "pina",
-		"version": "0.21.0"
+		"version": "0.22.0"
 	},
 	"provenance": {
 		"extractor": "clap",
@@ -660,6 +660,36 @@
 						},
 						{
 							"names": [
+								"--auto"
+							],
+							"canonical_name": "--auto",
+							"hidden": false,
+							"global": false,
+							"summary": "Record which contract kinds are tracked without a per-item `migrations` token: `true`, `false`, or a comma-separated list of `accounts`, `events`, and `instructions`. The policy lives in migrations/manifest.json; omit the flag to keep the recorded one",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--version-type"
+							],
+							"canonical_name": "--version-type",
+							"hidden": false,
+							"global": false,
+							"summary": "Record the version envelope width: `u8` (the default), `u16`, or `u32`. It can change only while nothing is published",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
 								"--json"
 							],
 							"canonical_name": "--json",
@@ -831,6 +861,25 @@
 							"hidden": false,
 							"global": false,
 							"summary": "Convert the pending deployment into an abandoned receipt. The pinned versions stay frozen because the deployment may still have gone live",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--pin-legacy"
+							],
+							"canonical_name": "--pin-legacy",
+							"hidden": false,
+							"global": false,
+							"summary": "Pin receipts a 0.20 ledger records without their schema hashes to what migrations/manifest.json records now. Run it only after confirming with version control that the manifest still describes what those receipts made live",
 							"value": {
 								"kind": "flag",
 								"required": false,
@@ -2509,7 +2558,7 @@
 			"hidden": false,
 			"max_bump": "major",
 			"summary": "Test a Pina program with fast native tests or an isolated Surfpool instance",
-			"description": "Test a Pina program with fast native tests or an isolated Surfpool instance.\n\nThe default workflow builds the actual SBF shared object, verifies that it exists, and runs the project's isolated `tests/surfpool` test package. That package owns an embedded Surfpool instance, so parallel runs use separate ports and teardown remains deterministic. Use --unit for native Rust and Mollusk tests only.",
+			"description": "Test a Pina program with fast native tests or an isolated Surfpool instance.\n\nThe default workflow builds the actual SBF shared object, verifies that it exists, and runs the project's isolated `tests/surfpool` test package. That package owns an embedded Surfpool instance, so parallel runs use separate ports and teardown remains deterministic. Use --unit for native Rust and Mollusk tests only. Use --record-compute-units to measure every instruction for the compute unit limits generated clients request.",
 			"parser": {
 				"flags_are_posix_noncompliant": false,
 				"options_must_precede_arguments": false,
@@ -2588,6 +2637,25 @@
 						"required": false,
 						"repeatable": true,
 						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--record-compute-units"
+					],
+					"canonical_name": "--record-compute-units",
+					"hidden": false,
+					"global": false,
+					"summary": "Measure every instruction in the complete Surfpool suite and write compute-units.json",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
 					}
 				}
 			]

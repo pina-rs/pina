@@ -2021,6 +2021,7 @@ dependencies = [
 name = "counter-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "counter-program-client",
  "pina",
  "pina_test",
 ]

@@ -9,6 +9,14 @@
 )]
 
 pub const TEST_EVENT_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `TestEvent` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const TEST_EVENT_MEASURED_COMPUTE_UNITS: u32 = 264;
+/// Compute unit limit to request for a transaction carrying `TestEvent`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const TEST_EVENT_COMPUTE_UNIT_LIMIT: u32 = 700;
 
 /// Accounts.
 #[derive(Clone, Debug)]

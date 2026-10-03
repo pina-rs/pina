@@ -9,6 +9,14 @@
 )]
 
 pub const MAKE_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `Make` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const MAKE_MEASURED_COMPUTE_UNITS: u32 = 34881;
+/// Compute unit limit to request for a transaction carrying `Make`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const MAKE_COMPUTE_UNIT_LIMIT: u32 = 42200;
 
 /// Accounts.
 #[derive(Clone, Debug)]

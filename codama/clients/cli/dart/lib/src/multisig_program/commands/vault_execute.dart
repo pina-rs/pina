@@ -48,6 +48,8 @@ final class VaultExecuteCommand extends Command<void> {
       clock: clock,
       messageAccounts: messageAccounts,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: vaultExecuteComputeUnitLimit);
   }
 }

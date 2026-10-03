@@ -63,5 +63,8 @@ pub(crate) fn run(context: &CliContext, args: ApproveDisclosureArgs) -> Result<(
 		clock,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT),
+	)
 }

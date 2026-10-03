@@ -69,6 +69,7 @@ function authorityHost(authority: string): string {
 const CONTEXT = `${HEADER}
 import {
 	type Address,
+	type BlockhashLifetimeConstraint,
 	type Instruction,
 	type KeyPairSigner,
 	appendTransactionMessageInstructions,
@@ -77,6 +78,7 @@ import {
 	getBase64EncodedWireTransaction,
 	isAddress,
 	pipe,
+	setTransactionMessageComputeUnitLimit,
 	setTransactionMessageFeePayerSigner,
 	setTransactionMessageLifetimeUsingBlockhash,
 	getBase58Decoder,
@@ -104,7 +106,11 @@ export interface GlobalOptions {
 	programId?: string;
 	simulate?: boolean;
 	json?: boolean;
+	computeUnitLimit?: string;
 }
+
+/** The most compute units a transaction may request. */
+export const MAX_COMPUTE_UNIT_LIMIT = 1_400_000;
 
 /** Registers the shared global options on one commander command. */
 export function registerGlobals(command: Command): Command {
@@ -113,7 +119,8 @@ export function registerGlobals(command: Command): Command {
 		.option("-k, --keypair <path>", "Payer keypair JSON file.")
 		.option("--program-id <address>", "Override the on-chain program address.")
 		.option("--simulate", "Simulate the transaction and print logs instead of sending.")
-		.option("--json", "Print machine-readable JSON output.");
+		.option("--json", "Print machine-readable JSON output.")
+		.option("--compute-unit-limit <units>", "Compute unit limit to request instead of the one recorded for the instruction.");
 }
 
 export class CliError extends Error {}
@@ -124,6 +131,8 @@ export class CliContext {
 	readonly programAddress: Address;
 	readonly simulate: boolean;
 	readonly json: boolean;
+	/** \`--compute-unit-limit\`, which replaces every instruction's recorded limit. */
+	readonly computeUnitLimit: number | undefined;
 	private readonly cluster: string;
 
 	private constructor(
@@ -132,6 +141,7 @@ export class CliContext {
 		programAddress: Address,
 		simulate: boolean,
 		json: boolean,
+		computeUnitLimit: number | undefined,
 		cluster: string,
 	) {
 		this.rpc = rpc;
@@ -139,6 +149,7 @@ export class CliContext {
 		this.programAddress = programAddress;
 		this.simulate = simulate;
 		this.json = json;
+		this.computeUnitLimit = computeUnitLimit;
 		this.cluster = cluster;
 	}
 
@@ -151,19 +162,23 @@ export class CliContext {
 		const programAddress = options.programId
 			? pubkey("--program-id", options.programId)
 			: (PROGRAM_ADDRESS as Address);
-		return new CliContext(rpc, payer, programAddress, options.simulate ?? false, options.json ?? false, clusterOf(endpoint));
+		const computeUnitLimit = parseComputeUnitLimit(options.computeUnitLimit);
+		return new CliContext(rpc, payer, programAddress, options.simulate ?? false, options.json ?? false, computeUnitLimit, clusterOf(endpoint));
 	}
 
-	async send(instruction: Instruction): Promise<void> {
+	/**
+	 * Send or simulate one instruction, printing the result.
+	 *
+	 * \`recordedLimit\` is the compute unit limit the IDL records for the
+	 * instruction. \`--compute-unit-limit\` replaces it; with neither, the
+	 * transaction requests no limit and the runtime default applies.
+	 */
+	async send(instruction: Instruction, recordedLimit?: number): Promise<void> {
+		const computeUnitLimit = this.computeUnitLimit ?? recordedLimit;
 		const { value: latestBlockhash } = await this.rpc
 			.getLatestBlockhash()
 			.send();
-		const message = pipe(
-			createTransactionMessage({ version: 0 }),
-			(m) => setTransactionMessageFeePayerSigner(this.payer, m),
-			(m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
-			(m) => appendTransactionMessageInstructions([instruction], m),
-		);
+		const message = buildTransactionMessage(this.payer, latestBlockhash, instruction, computeUnitLimit);
 
 		if (this.simulate) {
 			const transaction = await signTransactionMessageWithSigners(message);
@@ -177,14 +192,17 @@ export class CliContext {
 				.send();
 			const result = simulation.value;
 			const logs = result.logs ?? [];
+			// The RPC reports consumption as a bigint, which JSON cannot encode;
+			// it never exceeds the transaction limit, so a number is exact.
+			const unitsConsumed = result.unitsConsumed === undefined ? null : Number(result.unitsConsumed);
 			if (this.json) {
-				console.log(JSON.stringify({ logs, unitsConsumed: result.unitsConsumed }));
+				console.log(JSON.stringify({ logs, unitsConsumed, computeUnitLimit: computeUnitLimit ?? null }));
 			} else {
 				for (const log of logs) {
 					console.log(log);
 				}
-				if (result.unitsConsumed != null) {
-					console.log(\`Consumed \${result.unitsConsumed} compute units\`);
+				if (unitsConsumed !== null) {
+					console.log(consumptionSummary(unitsConsumed, computeUnitLimit));
 				}
 			}
 			if (result.err != null) {
@@ -205,6 +223,49 @@ export class CliContext {
 			console.log(\`https://explorer.solana.com/tx/\${signature58}\${suffix}\`);
 		}
 	}
+}
+
+/**
+ * The transaction message a command sends: one \`SetComputeUnitLimit\` first
+ * when a limit is requested, then the command's instruction.
+ */
+export function buildTransactionMessage(
+	payer: KeyPairSigner,
+	latestBlockhash: BlockhashLifetimeConstraint,
+	instruction: Instruction,
+	computeUnitLimit: number | undefined,
+) {
+	return pipe(
+		createTransactionMessage({ version: 0 }),
+		(m) => setTransactionMessageFeePayerSigner(payer, m),
+		(m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+		(m) => setTransactionMessageComputeUnitLimit(computeUnitLimit, m),
+		(m) => appendTransactionMessageInstructions([instruction], m),
+	);
+}
+
+/**
+ * Parse \`--compute-unit-limit\`: a whole number of compute units from 1 to
+ * the transaction maximum, or \`undefined\` when the flag is absent.
+ */
+export function parseComputeUnitLimit(value: string | undefined): number | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	const units = Number(value);
+	if (!/^[0-9]+$/.test(value) || units < 1 || units > MAX_COMPUTE_UNIT_LIMIT) {
+		throw new CliError(
+			\`--compute-unit-limit must be a whole number from 1 to \${MAX_COMPUTE_UNIT_LIMIT}\`,
+		);
+	}
+	return units;
+}
+
+/** How much of the requested budget a simulation consumed. */
+export function consumptionSummary(consumed: number, computeUnitLimit: number | undefined): string {
+	return computeUnitLimit === undefined
+		? \`Consumed \${consumed} compute units (no limit requested; the runtime default applies)\`
+		: \`Consumed \${consumed} of \${computeUnitLimit} requested compute units\`;
 }
 
 export function pubkey(flag: string, value: string): Address {
@@ -411,12 +472,24 @@ function renderCommand(instruction: InstructionModel): string {
 	const inputObject = inputEntries.length > 0
 		? `const input = {\n${inputEntries.join("\n")}\n\t};`
 		: "const input = null;";
+	// The generated client exports the recorded limit under the IDL name in
+	// constant case; the CLI requests it and never recomputes a margin.
+	const computeUnitLimit = instruction.computeUnitLimitName === undefined
+		? null
+		: `${
+			instruction.computeUnitLimitName.replace(/(?<!^)([A-Z])/g, "_$1")
+				.toUpperCase()
+		}_COMPUTE_UNIT_LIMIT`;
+	const clientImports = [
+		`get${instruction.pascal}Instruction${
+			instruction.hasAsyncBuilder ? "Async" : ""
+		}`,
+		...(computeUnitLimit === null ? [] : [computeUnitLimit]),
+	].join(", ");
 
 	return `${HEADER}
 import { Command } from "commander";
-import { get${instruction.pascal}Instruction${
-		instruction.hasAsyncBuilder ? "Async" : ""
-	} } from "../client";
+import { ${clientImports} } from "../client";
 import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
 
 export const ${instruction.camel}Command = registerGlobals(new Command("${instruction.snake}"))
@@ -433,7 +506,9 @@ ${inputObject}
 			...${inputEntries.length > 0 ? "[input]" : "[]"},
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction${
+		computeUnitLimit === null ? "" : `, ${computeUnitLimit}`
+	});
 	});
 `;
 }
@@ -673,8 +748,12 @@ Global flags:
 - \`-u, --url <URL>\`: \`mainnet\`, \`devnet\`, \`testnet\`, \`localhost\`, or an https URL (\`SOLANA_URL\`)
 - \`-k, --keypair <PATH>\`: payer keypair file (\`PINA_KEYPAIR\`, default \`~/.config/solana/id.json\`)
 - \`--program-id <ADDRESS>\`: override the on-chain program address
-- \`--simulate\`: simulate instead of sending
+- \`--simulate\`: simulate instead of sending, and report the compute units consumed against the limit requested
 - \`--json\`: machine-readable output
+- \`--compute-unit-limit <UNITS>\`: request this compute unit limit instead of the one recorded for the instruction
+
+Commands for instructions with a recorded measurement request its compute unit
+limit automatically; the others request none, so the runtime default applies.
 `,
 	);
 

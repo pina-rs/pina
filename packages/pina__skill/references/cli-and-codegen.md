@@ -67,6 +67,25 @@ TypeScript, Dart, `cli-ts`, and `cli-dart` generation runs the version-pinned Co
 
 The IDL follows the migration policy recorded in `migrations/manifest.json`, the same one the macros expand against, so the program and its clients agree on every envelope. Without a manifest there is no policy, so nothing carries a version byte; record the baseline with `pina migrations create --auto true` before generating clients you intend to keep, because adding the policy later changes their wire format.
 
+## Compute unit budgets
+
+Priority fees are charged per requested compute unit, so clients should request a limit close to what the transaction uses. Record what each instruction costs, then regenerate:
+
+```sh
+pina test --record-compute-units
+pina generate
+```
+
+`pina test --record-compute-units` runs the complete Surfpool suite (it conflicts with `--unit` and `--filter`) and writes `compute-units.json` beside the program's `Cargo.toml`: the most compute units each instruction consumed in a successful simulation, keyed by IDL name, plus the SHA-256 of the measured build. Failed transactions never count. An instruction no successful test sent is left out and named in a warning; send it through `ProgramTest::send`, `send_instruction`, `send_with_signers`, or `send_transaction` in a passing test to measure it. Commit the file with the clients it produced.
+
+IDL generation attaches each measurement as a `pinaComputeUnits` plugin with `{ "measured": n, "limit": m }`, where `limit = round_up_to_100(measured × (100 + margin_percent) / 100) + 300`. `[compute_units] margin_percent` in `pina.toml` defaults to `20`; the 300 units cover `SetComputeUnitLimit` and `SetComputeUnitPrice` (150 each). Generators copy the limit and never recompute it:
+
+- Rust: `<NAME>_MEASURED_COMPUTE_UNITS`, `<NAME>_COMPUTE_UNIT_LIMIT`, and `set_compute_unit_limit_instruction(units)`.
+- TypeScript and Dart: the same constants and `get<Program>ComputeUnitLimit(instructions)`, which sums the program's instructions and returns no limit when one is unmeasured. Pass the result to `setTransactionMessageComputeUnitLimit`. The sum is conservative and ignores other programs' instructions.
+- CLIs: every command requests its instruction's limit; `--compute-unit-limit <UNITS>` overrides it and `--simulate` prints consumption against the limit requested.
+
+Re-record after changing the program. `pina generate` warns when `target/deploy/<library-name>.so` differs from the recorded build, and fails when `compute-units.json` names an instruction the program no longer declares; re-record or delete the stale entry. `pina build`, `pina idl`, and `pina test` warn about stale entries and ignore them, and the recording run never reads the file it replaces.
+
 ## Project diagnostics and identity
 
 Use the versioned diagnostic report before changing a project:

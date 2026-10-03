@@ -39,5 +39,8 @@ pub(crate) fn run(context: &CliContext, args: UpdateArgs) -> Result<(), CliError
 
 	let accounts = Update { oracle, authority };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(prop_amm_program_client::instructions::UPDATE_COMPUTE_UNIT_LIMIT),
+	)
 }

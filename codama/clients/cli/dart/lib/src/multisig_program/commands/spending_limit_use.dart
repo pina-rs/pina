@@ -99,6 +99,8 @@ final class SpendingLimitUseCommand extends Command<void> {
       amount: amountValue,
       decimals: decimalsValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: spendingLimitUseComputeUnitLimit);
   }
 }

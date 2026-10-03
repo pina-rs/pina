@@ -56,6 +56,16 @@ exit_code: 0
               }
             }
           }
+        ],
+        "plugins": [
+          {
+            "kind": "pluginNode",
+            "name": "pinaComputeUnits",
+            "payload": {
+              "limit": 400,
+              "measured": 33
+            }
+          }
         ]
       }
     ]

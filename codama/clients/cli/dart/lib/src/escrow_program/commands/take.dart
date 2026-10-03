@@ -89,6 +89,6 @@ final class TakeCommand extends Command<void> {
       ),
       systemProgram: Address("11111111111111111111111111111111"),
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: takeComputeUnitLimit);
   }
 }

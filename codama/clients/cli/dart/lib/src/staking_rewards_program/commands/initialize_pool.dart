@@ -91,6 +91,8 @@ final class InitializePoolCommand extends Command<void> {
       tokenProgram: tokenProgram,
       bump: bumpValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializePoolComputeUnitLimit);
   }
 }

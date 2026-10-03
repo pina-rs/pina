@@ -21,9 +21,11 @@ use super::helpers::canonical_pubkey;
 use super::helpers::pascal;
 use super::helpers::program_id_const_name;
 use super::helpers::render_docs;
+use super::helpers::shouty;
 use super::helpers::snake;
 use super::seeds::render_constant_seed_expression;
 use super::types::render_type_for_pod;
+use crate::compute_units::ComputeUnitBudget;
 use crate::error::RenderError;
 use crate::error::Result;
 
@@ -56,6 +58,34 @@ pub(crate) fn render_instructions_mod(
 	}
 
 	lines.join("\n")
+}
+
+/// The recorded measurement and the limit to request for one instruction.
+///
+/// Both numbers are copied from the IDL's `pinaComputeUnits` plugin, which
+/// `pina_cli` computed; the renderer adds no margin of its own.
+fn render_compute_unit_constants(instruction_name: &str, budget: ComputeUnitBudget) -> Vec<String> {
+	let prefix = shouty(instruction_name);
+
+	vec![
+		format!("/// Compute units `{instruction_name}` consumed in its most expensive recorded"),
+		"/// Surfpool simulation.".to_string(),
+		format!(
+			"pub const {prefix}_MEASURED_COMPUTE_UNITS: u32 = {};",
+			budget.measured
+		),
+		format!(
+			"/// Compute unit limit to request for a transaction carrying `{instruction_name}`:"
+		),
+		"/// the measurement plus the project's margin and the cost of the compute budget"
+			.to_string(),
+		"/// instructions. Pass it, or the sum for several instructions, to".to_string(),
+		"/// `set_compute_unit_limit_instruction`.".to_string(),
+		format!(
+			"pub const {prefix}_COMPUTE_UNIT_LIMIT: u32 = {};",
+			budget.limit
+		),
+	]
 }
 
 pub(crate) fn render_instruction_page(
@@ -112,6 +142,9 @@ pub(crate) fn render_instruction_page(
 			"pub const {}: {} = {};",
 			constant.name, constant.ty, constant.value
 		));
+	}
+	if let Some(budget) = ComputeUnitBudget::from_instruction(instruction)? {
+		lines.extend(render_compute_unit_constants(&instruction_name, budget));
 	}
 	lines.push(String::new());
 	lines.push("/// Accounts.".to_string());

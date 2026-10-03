@@ -39,5 +39,5 @@ pub(crate) fn run(context: &CliContext, args: InspectArgs) -> Result<(), CliErro
 		witness: Some(witness),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

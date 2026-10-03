@@ -13,6 +13,14 @@ expression: content
 )]
 
 pub const TAKE_DISCRIMINATOR: u8 = 2u8;
+/// Compute units `Take` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const TAKE_MEASURED_COMPUTE_UNITS: u32 = 31507;
+/// Compute unit limit to request for a transaction carrying `Take`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const TAKE_COMPUTE_UNIT_LIMIT: u32 = 38200;
 
 /// Accounts.
 #[derive(Clone, Debug)]

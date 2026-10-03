@@ -29,16 +29,16 @@ const PROGRAM_SO: &str = "target/surfpool/examples/counter_program.so";
 #[test]
 fn cli_initializes_increments_and_fetches_against_surfpool()
 -> Result<(), Box<dyn std::error::Error>> {
-	// Boot a surfnet with the counter program deployed at its declared ID.
-	let mut surfnet = spawn_surfnet()?;
-	let rpc_url = wait_for_ready(&mut surfnet)?;
-
-	// A fresh payer keypair, airdropped by the offline surfnet.
+	// A fresh payer keypair, funded by the bootstrap once the surfnet is up.
 	let payer = Keypair::new();
 	let keypair_path = write_keypair_file(&payer)?;
 
+	// Boot a surfnet with the counter program deployed at its declared ID.
+	let mut bootstrap = spawn_surfnet(&payer.pubkey())?;
+	let rpc_url = wait_for_ready(&mut bootstrap)?;
+
 	// Canonical bump for the counter PDA, derived from the payer's authority.
-	let (counter, bump) = counter_pda(payer.pubkey());
+	let (_, bump) = counter_pda(payer.pubkey());
 
 	// counter-program-cli initialize --url <surfnet> --keypair <payer> \
 	//     [--bump 254]                       # counter PDA is derived automatically
@@ -50,6 +50,32 @@ fn cli_initializes_increments_and_fetches_against_surfpool()
 
 	// counter-program-cli increment --url <surfnet> --keypair <payer>
 	cli(&rpc_url, &keypair_path)?.arg("increment").run()?;
+
+	// counter-program-cli increment --simulate --url <surfnet> --keypair <payer>
+	//
+	// Every command requests the compute unit limit recorded for its
+	// instruction, and a simulation reports what it consumed against it.
+	let limit = counter_program_client::instructions::INCREMENT_COMPUTE_UNIT_LIMIT;
+	let simulated = cli(&rpc_url, &keypair_path)?
+		.args(&["increment", "--simulate"])
+		.run()?;
+	assert!(
+		simulated.contains(&format!(" of {limit} requested compute units")),
+		"simulate must report consumption against the recorded limit, got: {simulated}"
+	);
+
+	// counter-program-cli increment --simulate --compute-unit-limit 200 ...
+	//
+	// The flag replaces the recorded limit, so a budget below what the
+	// instruction needs exhausts the meter.
+	let starved = cli(&rpc_url, &keypair_path)?
+		.args(&["increment", "--simulate", "--compute-unit-limit", "200"])
+		.run()
+		.expect_err("a 200 unit budget cannot cover increment");
+	assert!(
+		starved.to_string().contains("exceeded CUs meter"),
+		"the override must reach the transaction, got: {starved}"
+	);
 
 	// counter-program-cli fetch counter-state --url <surfnet> --keypair <payer> \
 	//     --authority <payer pubkey> --json
@@ -67,18 +93,25 @@ fn cli_initializes_increments_and_fetches_against_surfpool()
 		output.contains("\"count\": 1"),
 		"fetch must report one increment after initialize + increment, got: {output}"
 	);
+	// The counter stores no authority field: `--authority` seeds the PDA the
+	// fetch derives, so finding the account already proves whose it is.
 	assert!(
 		output.contains(&format!("\"bump\": {bump}")),
 		"fetch must report the canonical bump {bump}, got: {output}"
 	);
-	assert!(
-		output.contains(&format!("\"authority\": \"{}\"", payer.pubkey())),
-		"fetch must report the counter authority, got: {output}"
-	);
 
-	let _ = surfnet.kill();
-	let _ = surfnet.wait();
 	Ok(())
+}
+
+/// The bootstrap process. It is killed when the test ends, pass or fail, so a
+/// failed assertion or early return cannot leak a running surfnet.
+struct Bootstrap(std::process::Child);
+
+impl Drop for Bootstrap {
+	fn drop(&mut self) {
+		let _ = self.0.kill();
+		let _ = self.0.wait();
+	}
 }
 
 /// A pending CLI invocation: global flags first, subcommand + args after.
@@ -119,7 +152,7 @@ fn cli(rpc_url: &str, keypair_path: &str) -> Result<Cli, Box<dyn std::error::Err
 	Ok(Cli { command })
 }
 
-fn spawn_surfnet() -> Result<std::process::Child, Box<dyn std::error::Error>> {
+fn spawn_surfnet(payer: &Pubkey) -> Result<Bootstrap, Box<dyn std::error::Error>> {
 	let so_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
 		.ancestors()
 		.find(|ancestor| ancestor.join(".git").exists())
@@ -130,17 +163,18 @@ fn spawn_surfnet() -> Result<std::process::Child, Box<dyn std::error::Error>> {
 		.arg(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/surfpool.mjs"))
 		.arg(&so_path)
 		.arg(COUNTER_PROGRAM_ID)
+		.arg(payer.to_string())
 		.current_dir(std::env::temp_dir())
 		.stdout(Stdio::piped())
-		.stderr(Stdio::null())
+		// A bootstrap failure, such as an RPC that never answers, explains
+		// itself on stderr.
+		.stderr(Stdio::inherit())
 		.spawn()?;
-	Ok(child)
+	Ok(Bootstrap(child))
 }
 
 fn counter_pda(authority: Pubkey) -> (Pubkey, u8) {
-	let program = COUNTER_PROGRAM_ID
-		.parse::<Pubkey>()
-		.expect("counter program id is valid");
+	let program = Pubkey::from_str_const(COUNTER_PROGRAM_ID);
 	Pubkey::find_program_address(&[b"counter", authority.as_ref()], &program)
 }
 
@@ -159,11 +193,12 @@ fn write_keypair_file(payer: &Keypair) -> Result<String, Box<dyn std::error::Err
 	Ok(path.to_string_lossy().into_owned())
 }
 
-/// Reads the `READY <url>` line the bootstrap script prints once the surfnet
-/// is live and the program is deployed. Lines are consumed incrementally so a
-/// URL is acted on the moment it appears instead of after the process exits.
-fn wait_for_ready(child: &mut std::process::Child) -> Result<String, Box<dyn std::error::Error>> {
-	let mut reader = std::io::BufReader::new(child.stdout.as_mut().expect("piped stdout"));
+/// Reads the `READY <url>` line the bootstrap script prints once the program
+/// is deployed, the payer funded, and the RPC has answered a request. Lines
+/// are consumed incrementally so a URL is acted on the moment it appears
+/// instead of after the process exits.
+fn wait_for_ready(bootstrap: &mut Bootstrap) -> Result<String, Box<dyn std::error::Error>> {
+	let mut reader = std::io::BufReader::new(bootstrap.0.stdout.as_mut().expect("piped stdout"));
 	let mut line = String::new();
 	loop {
 		line.clear();

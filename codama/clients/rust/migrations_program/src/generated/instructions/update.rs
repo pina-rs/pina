@@ -10,6 +10,14 @@
 
 pub const UPDATE_DISCRIMINATOR: u8 = 0u8;
 pub const UPDATE_MIGRATION_VERSION: u8 = 1u8;
+/// Compute units `Update` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const UPDATE_MEASURED_COMPUTE_UNITS: u32 = 365;
+/// Compute unit limit to request for a transaction carrying `Update`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const UPDATE_COMPUTE_UNIT_LIMIT: u32 = 800;
 
 /// Accounts.
 #[derive(Clone, Debug)]

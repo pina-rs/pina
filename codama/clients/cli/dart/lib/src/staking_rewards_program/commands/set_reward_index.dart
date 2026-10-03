@@ -72,6 +72,8 @@ final class SetRewardIndexCommand extends Command<void> {
       rewardVault: rewardVault,
       newIndex: newIndexValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: setRewardIndexComputeUnitLimit);
   }
 }

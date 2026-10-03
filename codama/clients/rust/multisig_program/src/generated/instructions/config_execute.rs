@@ -9,6 +9,14 @@
 )]
 
 pub const CONFIG_EXECUTE_DISCRIMINATOR: u8 = 11u8;
+/// Compute units `ConfigExecute` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const CONFIG_EXECUTE_MEASURED_COMPUTE_UNITS: u32 = 13025;
+/// Compute unit limit to request for a transaction carrying `ConfigExecute`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const CONFIG_EXECUTE_COMPUTE_UNIT_LIMIT: u32 = 16000;
 
 /// Accounts.
 #[derive(Clone, Debug)]

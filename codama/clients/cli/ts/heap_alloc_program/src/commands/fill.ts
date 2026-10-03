@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getFillInstruction } from "../client";
+import { FILL_COMPUTE_UNIT_LIMIT, getFillInstruction } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -31,5 +31,5 @@ export const fillCommand = registerGlobals(new Command("fill"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, FILL_COMPUTE_UNIT_LIMIT);
 	});

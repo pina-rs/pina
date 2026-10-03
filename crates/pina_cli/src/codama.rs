@@ -19,11 +19,14 @@ use pina_cpi_renderer::RenderMode as CpiRenderMode;
 use pina_cpi_renderer::ScaffoldDependency as CpiScaffoldDependency;
 use pina_cpi_renderer::render_idl_file as render_cpi_idl_file;
 
+use crate::compute_units::MeasurementUse;
+use crate::compute_units::stale_measurement_warning;
 use crate::dart_client::harden_generated_dart_clients;
 use crate::dart_client::validate_dart_client_idls;
 use crate::dart_client::write_dart_package_barrels;
 use crate::error::CodamaError;
-use crate::generate_idl;
+use crate::error::IdlError;
+use crate::generate_idl_with;
 use crate::js_client::harden_generated_clients;
 use crate::project::ClientLanguage;
 use crate::project::GenerationMode;
@@ -279,14 +282,16 @@ function publishDartCli() {
 			join(outputRoot, "bin", `${name}.dart`),
 		);
 	}
-	publishFile(
-		join(stagingRoot, "lib", "src", "endpoint_guard.dart"),
-		join(outputRoot, "lib", "src", "endpoint_guard.dart"),
-	);
-	publishFile(
-		join(stagingRoot, "test", "endpoint_guard_test.dart"),
-		join(outputRoot, "test", "endpoint_guard_test.dart"),
-	);
+	for (const shared of ["endpoint_guard", "compute_budget"]) {
+		publishFile(
+			join(stagingRoot, "lib", "src", `${shared}.dart`),
+			join(outputRoot, "lib", "src", `${shared}.dart`),
+		);
+		publishFile(
+			join(stagingRoot, "test", `${shared}_test.dart`),
+			join(outputRoot, "test", `${shared}_test.dart`),
+		);
+	}
 
 	const manifest = join(outputRoot, "pubspec.yaml");
 	if (scaffold && !existsSync(manifest)) {
@@ -450,6 +455,7 @@ pub fn generate_project_clients(
 	options: &ProjectGenerateOptions,
 ) -> Result<ProjectGenerateOutput, CodamaError> {
 	let project = Project::discover(&options.project_dir).map_err(CodamaError::Project)?;
+	warn_about_stale_compute_units(&project)?;
 	let clients = if options.clients.is_empty() {
 		project.clients.clone()
 	} else {
@@ -511,6 +517,29 @@ pub fn generate_project_clients(
 		clients_dir,
 		clients: clients.into_iter().collect(),
 	})
+}
+
+/// Warn when `compute-units.json` was measured against a different build of
+/// the program than the one `pina build` last published.
+///
+/// The limits still generate: a rebuild that changes nothing material keeps
+/// them valid, and the margin absorbs small drift. The warning names the
+/// command that measures the current build.
+fn warn_about_stale_compute_units(project: &Project) -> Result<(), CodamaError> {
+	let warning = stale_measurement_warning(&project.program_dir, &project.sbf_artifact())
+		.map_err(|error| {
+			CodamaError::GenerateIdl {
+				example: project.library_name.clone(),
+				path: project.program_dir.clone(),
+				source: IdlError::Other(error.to_string()),
+			}
+		})?;
+
+	if let Some(warning) = warning {
+		eprintln!("warning: {warning}");
+	}
+
+	Ok(())
 }
 
 /// Add each selected CLI's base client and warn when several CLIs are picked.
@@ -599,13 +628,17 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	let mut idl_paths = Vec::with_capacity(plan.programs.len());
 	for (example, program_path) in &plan.programs {
 		let name_override = plan.override_idl_names.then_some(example.as_str());
-		let idl = generate_idl(program_path, name_override).map_err(|source| {
-			CodamaError::GenerateIdl {
-				example: example.clone(),
-				path: program_path.clone(),
-				source,
-			}
-		})?;
+		// Generated clients are committed, so a measurement for an undeclared
+		// instruction fails here instead of silently losing its budget.
+		let idl = generate_idl_with(program_path, name_override, MeasurementUse::Strict).map_err(
+			|source| {
+				CodamaError::GenerateIdl {
+					example: example.clone(),
+					path: program_path.clone(),
+					source,
+				}
+			},
+		)?;
 		let idl_json = serde_json::to_string_pretty(&idl).map_err(|source| {
 			CodamaError::SerializeIdl {
 				example: example.clone(),

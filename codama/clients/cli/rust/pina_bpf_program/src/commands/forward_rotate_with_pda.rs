@@ -60,5 +60,5 @@ pub(crate) fn run(context: &CliContext, args: ForwardRotateWithPdaArgs) -> Resul
 		prop_amm_program,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

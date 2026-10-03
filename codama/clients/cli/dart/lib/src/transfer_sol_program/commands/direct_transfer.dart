@@ -42,6 +42,8 @@ final class DirectTransferCommand extends Command<void> {
       recipient: recipient,
       amount: amountValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: directTransferComputeUnitLimit);
   }
 }

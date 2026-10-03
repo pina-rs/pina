@@ -40,5 +40,8 @@ pub(crate) fn run(context: &CliContext, args: RotateAuthorityArgs) -> Result<(),
 
 	let accounts = RotateAuthority { oracle, authority };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(prop_amm_program_client::instructions::ROTATE_AUTHORITY_COMPUTE_UNIT_LIMIT),
+	)
 }

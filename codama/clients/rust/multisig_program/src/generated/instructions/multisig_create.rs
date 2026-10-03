@@ -9,6 +9,14 @@
 )]
 
 pub const MULTISIG_CREATE_DISCRIMINATOR: u8 = 2u8;
+/// Compute units `MultisigCreate` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const MULTISIG_CREATE_MEASURED_COMPUTE_UNITS: u32 = 4057;
+/// Compute unit limit to request for a transaction carrying `MultisigCreate`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const MULTISIG_CREATE_COMPUTE_UNIT_LIMIT: u32 = 5200;
 
 /// Accounts.
 #[derive(Clone, Debug)]

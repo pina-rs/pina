@@ -11,6 +11,14 @@
 /// Instruction data for `Increment`. No extra payload beyond the
 /// discriminator byte.
 pub const INCREMENT_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `Increment` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const INCREMENT_MEASURED_COMPUTE_UNITS: u32 = 379;
+/// Compute unit limit to request for a transaction carrying `Increment`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const INCREMENT_COMPUTE_UNIT_LIMIT: u32 = 800;
 
 /// Accounts.
 #[derive(Clone, Debug)]

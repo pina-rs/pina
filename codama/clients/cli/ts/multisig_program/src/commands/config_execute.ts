@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getConfigExecuteInstruction } from "../client";
+import {
+	CONFIG_EXECUTE_COMPUTE_UNIT_LIMIT,
+	getConfigExecuteInstruction,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -47,5 +50,5 @@ export const configExecuteCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, CONFIG_EXECUTE_COMPUTE_UNIT_LIMIT);
 	});
