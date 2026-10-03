@@ -11,6 +11,7 @@ description = "Static CU profiler for Solana SBF programs"
 
 [dependencies]
 object = { default-features = false, features = ["read", "elf", "std"], workspace = true }
+rustc-demangle = { workspace = true }
 serde = { workspace = true, features = ["derive"], default-features = true }
 serde_json = { workspace = true, default-features = true }
 thiserror = { workspace = true, default-features = true }

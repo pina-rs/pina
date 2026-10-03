@@ -6505,6 +6505,7 @@ name = "pina_profile"
 version = "0.22.0"
 dependencies = [
  "object 0.40.0",
+ "rustc-demangle",
  "serde",
  "serde_json",
  "tempfile",

@@ -29,6 +29,10 @@ The positional path remains supported for scripts and custom artifacts. When it 
 
 JSON includes program and binary metadata, aggregate instruction/syscall/CU counts, and a per-function array with offsets, sizes, and estimates.
 
+### Function names
+
+Function names are demangled Rust paths without the legacy `::h<hash>` suffix, so a function keeps its name across rebuilds and `compare` can match it. The deployed artifact is stripped down to its exported symbols, so when the profiled file sits in a directory directly below the Cargo target directory (such as `target/deploy/`), Pina reads function names from the unstripped linker output `cargo build-sbf` leaves at `target/sbpf-solana-solana/release/<lib-target>.so`. That file is only used when its `.text` section is byte-identical to the profiled one. Without it, the report falls back to the exported symbols, which is usually just `entrypoint`. A release profile with `strip = true` strips the intermediate too.
+
 ## Estimation model
 
 The profiler reads the ELF text section, decodes SBF instructions, discovers functions, and applies the repository's static cost model. Regular instructions cost 1 estimated CU and recognized syscalls cost 100 estimated CU.

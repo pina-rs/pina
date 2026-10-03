@@ -31,6 +31,11 @@ pub use output::OutputFormat;
 /// Returns a [`ProgramProfile`] containing per-function CU estimates and
 /// binary metadata.
 ///
+/// A stripped artifact (such as `target/deploy/<lib>.so`) only exports
+/// `entrypoint`, so its function names are recovered from the unstripped
+/// `cargo build-sbf` intermediate when that file's `.text` is byte-identical;
+/// see [`elf::unstripped_symbols`]. Otherwise the exported symbols are used.
+///
 /// # Errors
 ///
 /// Returns a [`ProfileError`] if the file cannot be read, is not a valid ELF,
@@ -45,7 +50,15 @@ pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
 	})?;
 
 	// Parse ELF and analyze functions
-	let elf_info = elf::parse_elf(&data, path)?;
+	let mut elf_info = elf::parse_elf(&data, path)?;
+
+	if elf_info.symbol_table == elf::SymbolTable::Dynamic
+		&& let Some(symbols) = elf::unstripped_symbols(path, &elf_info)
+	{
+		elf_info.symbols = symbols;
+		elf_info.symbol_table = elf::SymbolTable::Full;
+	}
+
 	let functions = sbf::analyze_functions(&elf_info);
 
 	// Calculate totals
@@ -65,7 +78,11 @@ pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
 }
 
 /// Errors produced during profiling.
+///
+/// New variants can be added in a minor release, so a `match` needs a
+/// wildcard arm.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ProfileError {
 	#[error("IO error at {path}: {source}")]
 	Io {

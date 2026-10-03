@@ -37,9 +37,11 @@ Solana's SBF instruction set has deterministic CU costs. This tool:
    - Syscall instructions (`call imm` with src_reg=0): 100 CU each
 4. Outputs a summary (text or JSON) with per-function breakdowns
 
+Function names are demangled without the legacy `::h<hash>` suffix, so a function keeps its name across rebuilds. The stripped copy `cargo build-sbf --sbf-out-dir` publishes keeps only exported symbols, so the profiler borrows the full symbol table from the unstripped linker output under `<target>/sbpf-solana-solana/release/` when its `.text` is byte-identical, and otherwise falls back to the exported `.dynsym` entries.
+
 ## Limitations
 
 - **Static analysis only** — does not account for runtime branching or loops
 - **Flat syscall cost** — all syscalls estimated at 100 CU regardless of actual cost
-- **Best-effort symbol resolution** — works best with unstripped binaries
+- **Best-effort symbol resolution** — a stripped binary without its unstripped intermediate reports only its exported symbols (usually `entrypoint`)
 - **No path analysis** — CU is the sum of all instructions, not worst-case path
