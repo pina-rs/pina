@@ -338,7 +338,8 @@ fn docs_reduce_a_traversing_topic_to_its_file_name() {
 #[test]
 fn docs_load_bundled_and_custom_topics() {
 	for (topic, expected) in [
-		("pina-overview", "Pina"),
+		("pina-idl", "Pina IDL"),
+		("pina-overview", "Pina Overview"),
 		("pina-validation", "Pina Validation"),
 	] {
 		let bundled = Command::new(env!("CARGO_BIN_EXE_pina"))
@@ -359,6 +360,33 @@ fn docs_load_bundled_and_custom_topics() {
 		.unwrap_or_else(|error| panic!("failed to load custom docs: {error}"));
 	assert!(custom.status.success());
 	assert!(String::from_utf8_lossy(&custom.stdout).contains("Local Pina docs"));
+}
+
+/// Bundled topics are mdt consumers of the repository's `templates/*.t.md`
+/// providers. mdt ignores a provider block outside a `*.t.md` file, so a topic
+/// that declares one is a hand-maintained copy `docs:check` cannot see.
+#[test]
+fn bundled_docs_consume_the_repository_templates() {
+	for (topic, source) in [
+		("pina-idl", include_str!("../templates/pina-idl.md")),
+		(
+			"pina-overview",
+			include_str!("../templates/pina-overview.md"),
+		),
+		(
+			"pina-validation",
+			include_str!("../templates/pina-validation.md"),
+		),
+	] {
+		assert!(
+			source.contains("<!-- {="),
+			"`{topic}` has no consumer block"
+		);
+		assert!(
+			!source.contains("<!-- {@"),
+			"`{topic}` declares a provider block"
+		);
+	}
 }
 
 #[test]
