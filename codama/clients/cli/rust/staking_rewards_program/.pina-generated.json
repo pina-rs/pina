@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/claim.rs",
 		"src/commands/deposit.rs",
 		"src/commands/initialize_pool.rs",

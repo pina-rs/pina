@@ -149,14 +149,17 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	fs::write(crate_dir.join(MARKER_FILE), MARKER_CONTENT)
 		.map_err(|source| write_file_error(&crate_dir.join(MARKER_FILE), source))?;
 
-	let scaffold = if config.scaffold && mode != RenderMode::Update {
-		let scaffold = emit::render_scaffold(&model, &config.client_package, &config.client_path);
-		write_missing_files(crate_dir, &scaffold)?;
-
-		scaffold
+	// An update leaves the scaffold as the developer has it, but the scaffold
+	// stays tracked: it is still a file this renderer created.
+	let scaffold = if config.scaffold {
+		emit::render_scaffold(&model, &config.client_package, &config.client_path)
 	} else {
 		BTreeMap::new()
 	};
+
+	if mode != RenderMode::Update {
+		write_missing_files(crate_dir, &scaffold)?;
+	}
 
 	// Every path this renderer owns, whether this run wrote it or an earlier
 	// one did, so the next overwrite removes exactly these files.

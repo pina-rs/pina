@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/create_pda.rs",
 		"src/commands/forward_rotate_with_pda.rs",
 		"src/commands/forward_rotate_with_signer.rs",

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -189,6 +190,9 @@ try {
 		}
 	} else if (renderer === "cli-ts") {
 		for (const name of names) {
+			if (requestedMode === "overwrite") {
+				refuseUntrackedOverwrite(join(outputRoot, name));
+			}
 			publishDirectory(
 				join(outputRoot, name),
 				join(stagingRoot, name),
@@ -258,7 +262,9 @@ function isTrackedEntry(entry) {
 	if (/^[A-Za-z]:[\\/]/.test(entry)) {
 		return false;
 	}
-	return !entry.split(/[\\/]/).some((part) => part === ".." || part === "");
+	// Renders record plain file paths, so `.` is never legitimate: on its own it
+	// names the client root, which a removal would then take as a whole.
+	return !entry.split(/[\\/]/).some((part) => part === ".." || part === "." || part === "");
 }
 
 function record(root, path) {
@@ -315,10 +321,13 @@ function removeTrackedUnder(root, scope) {
 		} catch {
 			continue;
 		}
-		if (metadata.isSymbolicLink()) {
+		// Renders record files only. A directory here comes from a manifest
+		// Pina did not write, and removing it would take the files a developer
+		// keeps inside it.
+		if (metadata.isSymbolicLink() || metadata.isDirectory()) {
 			continue;
 		}
-		rmSync(target, { force: true, recursive: true });
+		rmSync(target, { force: true });
 		pruneEmptyParents(root, dirname(target));
 	}
 
@@ -648,11 +657,16 @@ pub fn generate_project_clients(
 		.clone()
 		.unwrap_or_else(|| project.clients_dir.clone());
 	validate_render_target(&clients_dir)?;
-	let client_target = |language: ClientLanguage| {
-		let configured = &project.client_generation[&language];
+	// A per-client output is joined onto the clients directory and may climb
+	// back out of it with `..`, so every destination is resolved once, here,
+	// and the plan, the report, and the containment check share the result.
+	let mut outputs = BTreeMap::new();
+	for (language, configured) in &project.client_generation {
+		let joined = clients_dir.join(&configured.output);
 
-		clients_dir.join(&configured.output)
-	};
+		outputs.insert(*language, absolute_path(&joined)?);
+	}
+	let client_target = |language: ClientLanguage| outputs[&language].clone();
 	let generation = project
 		.client_generation
 		.iter()
@@ -679,7 +693,7 @@ pub fn generate_project_clients(
 	for language in &clients {
 		targets.push(GeneratedClientTarget {
 			language: *language,
-			path: absolute_path(&client_target(*language))?,
+			path: client_target(*language),
 			mode: generation[language].mode,
 		});
 	}
@@ -1681,14 +1695,32 @@ fn diagnostic_text(bytes: &[u8]) -> String {
 		})
 }
 
-/// Absolutize a path against the process working directory.
+/// Absolutize a path against the process working directory and resolve its
+/// `..` components, without touching the filesystem.
 ///
 /// The npx and pnpm children run from an isolated temporary directory, so a
 /// relative renderer output, client root, or IDL path would resolve against
-/// that directory instead of the project the paths were computed from. The
-/// containment check compares the same spelling of each client target.
+/// that directory instead of the project the paths were computed from.
+///
+/// The containment check compares components, so `..` has to be resolved
+/// before it runs: left as written, `clients/../../outside` still starts with
+/// the worktree it leaves. Symbolic links cannot make the resolved spelling
+/// lie, because configured paths and render targets refuse them.
 fn absolute_path(path: &Path) -> Result<PathBuf, CodamaError> {
-	std::path::absolute(path).map_err(|source| create_dir_error(path, source))
+	let absolute = std::path::absolute(path).map_err(|source| create_dir_error(path, source))?;
+	let mut resolved = PathBuf::new();
+
+	for component in absolute.components() {
+		match component {
+			// `..` at the root stays at the root, as the filesystem resolves it.
+			Component::ParentDir => {
+				resolved.pop();
+			}
+			other => resolved.push(other),
+		}
+	}
+
+	Ok(resolved)
 }
 
 /// Label an I/O failure with the command that hit it.
@@ -2089,6 +2121,12 @@ mod tests {
 		let resolved = absolute_path(relative).unwrap_or_else(|error| panic!("{error}"));
 
 		assert_eq!(resolved, current.join(relative));
+		// A path that climbs out of a directory resolves to where it lands, so
+		// a containment check sees the destination and not the detour.
+		assert_eq!(
+			absolute_path(&current.join("clients/../../outside")).unwrap_or_else(|e| panic!("{e}")),
+			current.with_file_name("outside")
+		);
 		// An empty path names nothing to resolve.
 		assert!(matches!(
 			absolute_path(Path::new("")),

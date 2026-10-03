@@ -50,8 +50,8 @@ impl GenerationManifest {
 	/// Entries are re-validated here as well as at load time, so a manifest
 	/// constructed without [`GenerationManifest::load`] is bounded the same
 	/// way. Paths that no longer exist are skipped, and a path whose lookup
-	/// finds a symbolic link is left alone rather than followed. Directories
-	/// left empty by the removals are pruned back toward `root`.
+	/// finds a symbolic link or a directory is left alone rather than followed.
+	/// Directories left empty by the removals are pruned back toward `root`.
 	pub(crate) fn remove_under(&self, root: &Path, prefix: &Path) -> Result<()> {
 		for entry in &self.paths {
 			if !entry.starts_with(prefix) || !is_tracked_entry(entry) {
@@ -63,15 +63,14 @@ impl GenerationManifest {
 				continue;
 			};
 
-			if metadata.is_symlink() {
+			// Renders record files only. A directory here comes from a manifest
+			// Pina did not write, and removing it would take the files a
+			// developer keeps inside it.
+			if metadata.is_symlink() || metadata.is_dir() {
 				continue;
 			}
 
-			if metadata.is_dir() {
-				fs::remove_dir_all(&target).map_err(|source| write_file_error(&target, source))?;
-			} else {
-				fs::remove_file(&target).map_err(|source| write_file_error(&target, source))?;
-			}
+			fs::remove_file(&target).map_err(|source| write_file_error(&target, source))?;
 
 			prune_empty_parents(root, target.parent());
 		}
@@ -105,11 +104,14 @@ fn manifest_entry(path: &Path) -> String {
 }
 
 /// Return whether `path` is a plain relative entry a manifest may record.
+///
+/// Renders record file paths made of normal components only, so `.` is as
+/// illegitimate as `..`: on its own it names the client root.
 fn is_tracked_entry(path: &Path) -> bool {
 	!path.as_os_str().is_empty()
 		&& path
 			.components()
-			.all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
+			.all(|component| matches!(component, Component::Normal(_)))
 }
 
 /// Remove directories that became empty up to, but never including, `root`.
@@ -233,6 +235,8 @@ mod tests {
 			"../escape",
 			"",
 			"C:\\escape",
+			".",
+			"./foreign.txt",
 		]);
 
 		let all = Path::new("");
@@ -253,22 +257,18 @@ mod tests {
 	}
 
 	#[test]
-	fn a_tracked_directory_is_removed_with_its_contents() {
+	fn a_directory_entry_never_removes_the_files_inside_it() {
 		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let root = temp.path();
 		let prefix = Path::new("src/generated");
-		put(&root.join("src/generated/nested/owned.rs"), "old");
-		put(&root.join("src/generated/kept.rs"), "keep");
+		put(&root.join("src/generated/nested/developer.rs"), "keep");
 
-		let manifest = manifest_with(&["src/generated/nested"]);
+		// Renders record files, so this entry was not written by one.
+		let manifest = manifest_with(&["src/generated/nested", "src/generated"]);
 
 		GenerationManifest::remove_under(&manifest, root, prefix).unwrap_or_else(|e| panic!("{e}"));
 
-		assert!(!root.join("src/generated/nested").exists());
-		assert!(
-			root.join("src/generated/kept.rs").exists(),
-			"an untracked sibling survives"
-		);
+		assert!(root.join("src/generated/nested/developer.rs").is_file());
 	}
 
 	#[test]

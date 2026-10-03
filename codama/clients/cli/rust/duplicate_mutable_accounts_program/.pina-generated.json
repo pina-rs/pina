@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/allows_duplicate_mutable.rs",
 		"src/commands/allows_duplicate_readonly.rs",
 		"src/commands/fails_duplicate_mutable.rs",

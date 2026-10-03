@@ -147,6 +147,31 @@ fn rejects_idl_names_that_break_rust_identifiers() {
 }
 
 #[test]
+fn rendering_without_a_scaffold_writes_and_tracks_sources_only() {
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+	let temp_root = fs::canonicalize(temp.path())
+		.unwrap_or_else(|error| panic!("canonicalize temp dir: {error}"));
+	let root = temp_root.join("cli");
+	let fixture_root = read_root_node(&fixture("counter_program"))
+		.unwrap_or_else(|error| panic!("fixture: {error}"));
+	let mut sources_only = config();
+	sources_only.scaffold = false;
+
+	render_root_node(&fixture_root, &root, &sources_only)
+		.unwrap_or_else(|error| panic!("render without a scaffold: {error}"));
+
+	let record = fs::read_to_string(root.join(".pina-generated.json"))
+		.unwrap_or_else(|error| panic!("read record: {error}"));
+	assert!(root.join("src/main.rs").is_file());
+	assert!(!root.join("Cargo.toml").exists());
+	assert!(record.contains("src/main.rs"));
+	assert!(
+		!record.contains("Cargo.toml"),
+		"a scaffold that was never written is not tracked: {record}"
+	);
+}
+
+#[test]
 fn render_root_node_enforces_modes_and_safety() {
 	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
 	let temp_root = fs::canonicalize(temp.path())
@@ -218,7 +243,12 @@ fn render_root_node_enforces_modes_and_safety() {
 	overwrite.mode = RenderMode::Overwrite;
 	render_root_node(&fixture_root(), &root, &overwrite)
 		.unwrap_or_else(|error| panic!("overwrite mode replaces the crate: {error}"));
-	assert!(root.join("Cargo.toml").is_file());
+	assert_ne!(
+		fs::read_to_string(root.join("Cargo.toml"))
+			.unwrap_or_else(|error| panic!("read manifest: {error}")),
+		"# custom manifest",
+		"the scaffold stays tracked through an update, so overwrite regenerates it"
+	);
 	assert!(root.join(super::MARKER_FILE).is_file());
 	assert!(
 		root.join("keep.txt").is_file(),

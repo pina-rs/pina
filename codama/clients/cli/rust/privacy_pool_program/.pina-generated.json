@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/approve_disclosure.rs",
 		"src/commands/cancel_disclosure.rs",
 		"src/commands/challenge_disclosure.rs",

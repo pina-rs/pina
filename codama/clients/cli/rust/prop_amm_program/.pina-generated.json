@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/initialize.rs",
 		"src/commands/mod.rs",
 		"src/commands/rotate_authority.rs",

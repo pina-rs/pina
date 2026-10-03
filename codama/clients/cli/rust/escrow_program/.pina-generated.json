@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/cancel.rs",
 		"src/commands/make.rs",
 		"src/commands/mod.rs",

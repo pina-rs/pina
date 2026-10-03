@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/add_role.rs",
 		"src/commands/deactivate_role.rs",
 		"src/commands/initialize.rs",

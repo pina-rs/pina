@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/config_authority_execute.rs",
 		"src/commands/config_execute.rs",
 		"src/commands/config_initialize.rs",

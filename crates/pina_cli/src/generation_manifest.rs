@@ -130,11 +130,13 @@ fn load(root: &Path) -> BTreeSet<PathBuf> {
 		.unwrap_or_default()
 }
 
+/// Renders record plain file paths, so `.` is as illegitimate as `..`: on its
+/// own it names the client root.
 fn is_tracked_entry(path: &Path) -> bool {
 	!path.as_os_str().is_empty()
 		&& path
 			.components()
-			.all(|component| matches!(component, Component::Normal(_) | Component::CurDir))
+			.all(|component| matches!(component, Component::Normal(_)))
 }
 
 #[cfg(test)]
@@ -165,7 +167,11 @@ mod tests {
 		append(root, &[PathBuf::from("src/generated/mod.rs")]);
 		append(
 			root,
-			&[PathBuf::from("lib/barrel.dart"), PathBuf::from("../escape")],
+			&[
+				PathBuf::from("lib/barrel.dart"),
+				PathBuf::from("../escape"),
+				PathBuf::from("./escape"),
+			],
 		);
 
 		let contents = read_manifest(root);

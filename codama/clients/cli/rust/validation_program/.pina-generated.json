@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/check_policy.rs",
 		"src/commands/initialize_policy.rs",
 		"src/commands/mod.rs",

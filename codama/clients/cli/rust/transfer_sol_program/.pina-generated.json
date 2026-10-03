@@ -1,6 +1,8 @@
 {
 	"paths": [
 		".pina-generated",
+		"Cargo.toml",
+		"README.md",
 		"src/commands/cpi_transfer.rs",
 		"src/commands/direct_transfer.rs",
 		"src/commands/mod.rs",

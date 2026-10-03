@@ -1386,6 +1386,35 @@ fn generate_refuses_overwrite_and_outside_outputs_configured_in_pina_toml() {
 		"the refusal must name the boundary and the operator flag: {stderr}"
 	);
 
+	// A per-client output is joined onto the clients directory, so one that
+	// climbs back out with `..` must be refused like any other escape.
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\noutput = \"clients\"\nlanguages = [\"typescript\"]\n\n[clients.typescript]\noutput = \
+		 \"../../outside\"\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let climbed = project_command(&project, &cargo, &target)
+		.arg("generate")
+		.arg("--npx")
+		.arg(&npx)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		!climbed.status.success(),
+		"a per-client output that climbs outside the project must be refused"
+	);
+	let stderr = String::from_utf8_lossy(&climbed.stderr);
+	assert!(
+		stderr.contains("must stay inside"),
+		"the refusal must name the boundary: {stderr}"
+	);
+	assert!(
+		!temp.path().join("outside").exists(),
+		"nothing may be written outside the project"
+	);
+
 	// The operator flag may target anywhere outside the project.
 	let outside = temp.path().join("outside");
 	let flagged = project_command(&project, &cargo, &target)
