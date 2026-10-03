@@ -4,6 +4,298 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.23.0](https://github.com/pina-rs/pina/releases/tag/v0.23.0) (2026-10-03)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Snapshot instructions and decode events per version
+
+_Packages:_ 🔴 _pina_, 🔴 _pina_cli_, 🔴 _pina_macros_, 🔴 _pina_codama_renderer_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #568](https://github.com/pina-rs/pina/pull/568) · _Related issues:_ [#569](https://github.com/pina-rs/pina/issues/569), [#571](https://github.com/pina-rs/pina/issues/571)
+
+- **Instructions carry no version envelope by default.** Under an `auto` policy that covers instructions, a plain `#[instruction]` is recorded as a snapshot (`"envelope": false`) with no version byte on the wire, so every instruction payload is one byte shorter. The build fails when the struct drifts from its snapshot. `pina migrations create` replaces an unpublished snapshot; after publication it refuses a payload change (`PublishedPayloadChanged`: declare a new discriminator) but still appends optional accounts in place.
+- **Full instruction migrations are an explicit opt-in.** `#[instruction(..., migrations)]` keeps the envelope and adjacent transitions. The `#[discriminator(entrypoint)]` dispatcher converts a historical payload before calling the new `ProcessAccountInfos::process_from_version(data, source_version)`, which defaults to `process`, so handlers no longer normalize data themselves. An added instruction argument always needs a manual transition, because a zero-filled argument is indistinguishable from a client's zero. `normalize_instruction_data` returns a `NormalizedInstruction` that also reports the source version.
+- **Programs published under ABI 0.20** keep enveloped instructions: add `migrations` to each published `#[instruction]`. The build error names the contract, and `pina migrations create` refuses to add or remove an envelope once an instruction is published (`EnvelopeAddition`, `EnvelopeRemoval`).
+- **Events are versioned, not migrated.** The program emits only the current version, and changing an event appends a version with no transition. `normalize_event_data`, `MigratableEvent`, and `CurrentEventData` are removed. Codama IDLs describe every earlier version as its own event (`<Event>V<n>`), so the TypeScript, Dart, and Rust clients decode each log with the schema that emitted it. The program log parsers fail closed on a version no generated event describes, instead of projecting old logs into the current shape. Decoded events no longer carry `sourceVersion`/`wasMigrated`, and client generation no longer reads the migration manifest.
+- **TypeScript event decoders are named for what they do.** The generated per-event decoder `normalize<Event>Event` is renamed `decode<Event>Event` (for example `decodeValueChangedEventEvent` and `decodeValueChangedEventV0Event`), matching the Dart clients' existing `decode<Event>Event`. It decodes one version and converts nothing. Rename calls to the old name.
+
+#### Stop migration drafts and published history drifting
+
+_Packages:_ 🔴 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #555](https://github.com/pina-rs/pina/pull/555) · _Related issues:_ [#569](https://github.com/pina-rs/pina/issues/569), [#571](https://github.com/pina-rs/pina/issues/571)
+
+- A finished manual transition body survived later changes to its draft's layout and kept compiling, silently misplacing bytes. When a draft's destination schema changes, `pina migrations create` now moves the finished body to `vN_to_vM.rs.stale`, writes a fresh stub for the new offsets, and says so; the stub's marker blocks the build until the body is ported.
+- `--manual <field>` was ignored for a draft already recorded as automatic. It now converts the draft to a manual stub.
+- A publication receipt whose `history` was empty skipped the published-schema immutability check, so blanking it let a published schema be rewritten. An unpinned receipt is now refused when the ledger is decoded: a 0.21 entry with no pins fails with "pins no versions", and a 0.20 ledger that names versions without pinning them fails with an error naming the new `pina migrations reconcile --pin-legacy`, which pins those entries from the manifest once the operator has verified it and writes the ledger in the current shape.
+- An unpublished history now rebinds to a changed `declare_id!` on the next `create` (the normal path after `pina keys new`), and `pina keys new`/`sync` point at that step. A published history still refuses a different program ID.
+- The generated `tests/abi_layout.rs` reports a compact contract's `MAX_SIZE` including the envelope header, like its `MIN_SIZE`.
+- Library API: `CreateMigrationsOutput`, `KeySync`, and `KeyGeneration` gain public fields, and `KeysError::MissingKeypair`, `CodamaError::ClientManifest`, and `DeployError::CommandInterrupted` are new variants, so exhaustive struct literals and matches over them must be updated.
+
+#### Record the migration policy only in the manifest
+
+_Packages:_ 🔴 _pina_cli_, 🟠 _pina_macros_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #568](https://github.com/pina-rs/pina/pull/568) · _Related issues:_ [#569](https://github.com/pina-rs/pina/issues/569), [#571](https://github.com/pina-rs/pina/issues/571)
+
+- **`pina.toml` no longer configures migrations.** `[migrations].version_type` (and its `version-type` alias) and `[migrations].auto` are removed: `migrations/manifest.json` already recorded both, and macros read only the manifest. A `pina.toml` that still sets either fails every command that reads it with an error naming the replacement, for example "`[migrations].auto` no longer belongs in pina.toml: migrations/manifest.json records it, and macros read only the manifest. Remove the key and run `pina migrations create --auto true` to record it." `[migrations.answers]` stays in `pina.toml`.
+- **`pina migrations create` sets the policy.** `--auto <POLICY>` takes `true` (or `all`), `false` (or `none`), or a comma-separated list of `accounts`, `events`, and `instructions`, such as `--auto accounts,events`. `--version-type <u8|u16|u32>` sets the version envelope width. Omitting a flag keeps what the manifest records; without a manifest the defaults are no auto policy and `u8`.
+- **The width can change until the first publication.** While there is no receipt and no pending record, `--version-type` rewrites the width in place, because every history is still a single draft, and `create` prints the change. After that it fails with "Migration version encoding is frozen as u8 because a deployment published it, so it cannot become u16". This replaces deleting `migrations/` and re-baselining to widen the envelope before launch.
+- **One copy needs no agreement checks.** `MigrationError::VersionTypeChanged` and `AutoPolicyChanged` are removed, and so is the `pina idl` and `pina generate` refusal for a `pina.toml` policy without a manifest: without a manifest there is no policy anywhere, so the program and its IDL agree that nothing carries an envelope.
+- **`pina init` writes no `[migrations]` table.** Its next steps run `pina migrations create --auto true  # track every contract; record version 0`, and suggest adding `--version-type u16` (or `u32`) to that first run only if one contract may need more than 255 versions, because the width freezes at the first deployment.
+- **A hand edit cannot strip an envelope.** A declaration without a `migrations` token that the recorded auto policy does not cover, but that the manifest records with a version envelope, now fails the build instead of expanding without the envelope, the same as an explicit `migrations = false`.
+- **A respelling is not drift.** Drift detection in `pina migrations create` and `check`, the automatic transition planner, rename pairing, and the macros' snapshot check compare types with `pina_abi::wire_type`, so respelling `PodU64` as `u64`, or `Address` as `[u8; 32]`, consumes no version and fails no build, and a real change next to a respelling still gets an automatic byte copy. Published spellings and pinned hashes are never rewritten. Types that only share a width, such as `u64` and `i64`, still need a manual transition.
+- **The ledger follows ABI 0.21.** `pina deploy` writes receipts without `sequence`, `programId`, `manifestSha256`, or a hash chain, and `pina migrations reconcile --pin-legacy` repairs only an ABI 0.20 ledger; on a 0.21 ledger it reports nothing to pin.
+- Library API: `Project::migration_version_type` and `Project::migration_auto`, `ProjectError::InvalidMigrationAuto` and `UnknownMigrationKind`, and `MigrationError::VersionTypeChanged`, `AutoPolicyChanged`, and `PublicationSequenceExhausted` are removed. `ProjectError::RetiredMigrationSetting` and `MigrationError::VersionTypeFrozen` are new variants, `CreateMigrationsOutput` gains `version_type` and `previous_version_type`, and `MigrationAnswers::set_policy` carries the two flags.
+
+### Features
+
+#### Add a dispatch-first entrypoint
+
+_Packages:_ 🟠 _pina_, 🟠 _pina_macros_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #578](https://github.com/pina-rs/pina/pull/578)
+
+`dispatch_entrypoint!(Instruction)` declares the entrypoint for a program routed by `#[discriminator(entrypoint)]`. It reads the instruction data through the pointer the loader passes since SIMD-0321, validates the program ID and discriminator, then walks only the accounts the routed accounts struct reads, instead of deserializing every account first. On the comparison fixtures, the counter measured 8,424 → 7,592 bytes, `initialize` 1,713 → 1,694 compute units, and `increment` 378 → 360; the hello world measured 1,984 → 1,616 bytes and 146 → 136 compute units.
+
+`#[derive(Accounts)]` now declares `ParseAccounts::ACCOUNT_LIMIT`, the most accounts a struct reads, and `ACCOUNT_MINIMUM`, the fewest it accepts, which the router uses to pick each route's walk. Every check the struct and handler make still runs. Account counts now take precedence over per-account checks: an instruction with more accounts than its struct reads fails with `TooManyAccountKeys`, and one with fewer than a fixed-length struct reads fails with `NotEnoughAccountKeys`.
+
+`AccountsCursor::next` and `next_mut` are now always inlined, which the new entrypoint depends on and which also makes most programs on `nostd_entrypoint!` smaller.
+
+#### Generate a safe entrypoint account capacity
+
+_Packages:_ 🟠 _pina_, 🟠 _pina_macros_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #557](https://github.com/pina-rs/pina/pull/557)
+
+`#[discriminator(entrypoint)]` now generates `ENTRYPOINT_ACCOUNT_CAPACITY`, an account-array size for the second argument of `nostd_entrypoint!`:
+
+```rust,ignore
+nostd_entrypoint!(
+	CounterInstruction::process_instruction,
+	CounterInstruction::ENTRYPOINT_ACCOUNT_CAPACITY
+);
+```
+
+The program-size guide and ADR 0010 recommended bounding the entrypoint's account array at the widest instruction, and the lean comparison fixtures measured that bound. It is unsafe: the loader skips accounts past the array instead of rejecting them, so an extra trailing account never reached `finish_exact` and an over-supplied instruction ran instead of failing with `TooManyAccountKeys`. The generated capacity keeps one spare slot past the widest routed accounts struct and the reserved `Migrate` route's slots, and falls back to 255 when any route accepts unbounded trailing accounts, so every exact-count instruction still rejects extra accounts. The one observable difference from the full array is precedence: a writable account whose duplicate sits past the spare slot fails with `TooManyAccountKeys` rather than `DuplicateMutableAccount`. The generated capacity test asserts the spare slot for every route.
+
+A bounded array only shrinks a program when it has five slots or fewer, because pinocchio walks accounts five at a time; a larger bound keeps that loop and adds one that skips the extra accounts. Measured on top of the seed-capacity change: the hello fixture fell from 4,680 to 2,944 bytes, the counter fixture from 10,456 to 9,416, and `counter_program` from 16,096 to 14,896, at +1 compute unit on the fixtures' `hello` and `initialize` and +4 on `increment`. The migrations, escrow, and staking examples, whose capacities exceed five, grew by 184 to 464 bytes with a bound and keep the default.
+
+`nostd_entrypoint!` and `nostd_entrypoint_alloc!` now brace their second argument, so a path such as `Enum::ENTRYPOINT_ACCOUNT_CAPACITY` is accepted as the const generic. The published Pina comparison fixtures now use the generated router with the capacity, replacing the removed `pina_lean` fixtures, and `counter_program` adopts it with a Surfpool test proving that extra trailing accounts inside and past the array are rejected. The program-size guide and ADR 0010 document the spare-slot rule and the five-slot threshold.
+
+#### Verify stored-bump PDAs with sha256
+
+_Packages:_ 🟠 _pina_, 🟢 _pina_macros_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #572](https://github.com/pina-rs/pina/pull/572)
+
+The generated stored-bump loaders, `load_pda`, `load_pda_mut`, and `with_stored_bump_pda`, now re-derive the account's address from its stored bump with `sha256` instead of the `sol_create_program_address` syscall. That removes about 1,350 compute units from every load: the counter comparison fixture's `increment` fell from 1,738 to 378.
+
+The syscall adds one check the hash does not: that the address lies off the ed25519 curve. It is redundant for these loaders. Each one first requires the program to own the account and its data to pass the type's checks, and the program can only have created an account at a seed-derived address through `invoke_signed`, which the runtime signs only for an off-curve address. The security model guide spells out the argument. Loaders and checks that validate a caller-supplied or canonical bump keep the full derivation.
+
+The new `pina::is_derived_address` exposes the same check for hand-written loaders, with its contract documented. Like `create_program_address`, it rejects a seed longer than `MAX_SEED_LEN`: the hash concatenates the seeds, so a 33-byte seed would otherwise match the address of its first 32 bytes followed by the last one. Anchor v2 and Quasar verify stored-bump PDAs the same way.
+
+#### Harden generated clients against spoofing and injection
+
+_Packages:_ 🟢 _pina_cli_, 🟢 _pina_codama_renderer_, 🟠 _pina_codama_renderer_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #555](https://github.com/pina-rs/pina/pull/555)
+
+- **Event attribution.** The TypeScript and Dart `parse<Program>EventsFromLogs` helpers decoded every `Program data:` line in a transaction, so any program — including one the caller invokes through CPI — could forge an event with the right discriminator, and one foreign future-version line made the whole parse throw. The parsers now follow the runtime's `Program <address> invoke [n]` / `success` / `failed` frames and decode a line only while the program (or an explicit `programAddress`) is the innermost invocation.
+- **`Migrate` system program.** The TypeScript, Dart, and Rust `Migrate` composers filled an omitted `systemProgram` with the program-address placeholder, which the on-chain `MigrateContext` rejects, so the documented `getMigrateInstruction({ state, payer })` call always failed. Slot 1 now defaults to the system program, and the payer and system program slots are always sent.
+- **Payer writability.** The IDL marked a payer passed to Pina's account-creation builders (and the `from`/`to` of `CreateAccount`/`Transfer`) read-only when its Rust field was a shared reference, so every client sent it read-only and the transaction failed with a privilege escalation whenever the payer was not also the fee payer. The extractor now marks those accounts writable; `counter_program`, `todo_program`, and `float_accounts_program` IDLs and clients are regenerated accordingly.
+- **Doc-comment injection.** A doc comment containing `*/` closed the TypeScript JSDoc block, and a multi-line `#[doc = "..."]` value ended a `///` comment, turning the rest into live generated code. Docs are now split into lines and defused before rendering, and the Dart CLI renderer escapes `$` so IDL text can no longer become an interpolated Dart expression.
+- **Packaging.** `@pina-rs/codama-renderer-cli` 0.22.0 was published without `dist/`, so `cli-ts` and `cli-dart` generation failed outside this repository. The publish job now builds the package and verifies the tarball, and its declaration build no longer inherits `noEmit`.
+
+### Fixes
+
+#### Shrink PDA-creation seed and signer arrays
+
+_Packages:_ 🟢 _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #556](https://github.com/pina-rs/pina/pull/556)
+
+The PDA-creation CPI spine built three fixed-capacity stack arrays for every account it created: 16 derivation seeds, 16 signer seeds, and 16 signers. Only the first `seeds.len() + 1` seeds and `signers.len() + 1` signers are ever read, but safe Rust must initialize every slot, and because each array escapes to a syscall LLVM cannot remove the stores to the unread slots. `combine_seeds_with_bump` also returned its 16-seed array by value, adding a 256-byte copy.
+
+The spine now picks the smallest seed capacity — 4, 8, or 16 — that holds the seeds plus the bump. Every `#[pda]`-generated seed array has a compile-time length, so only one capacity survives inlining. When the builder receives no extra signers, the target's signer is passed on its own and the 16-signer array is never built. `CompactCreationTarget::allocate_zeroed`, which is deliberately outlined and shared by compact accounts with different seed counts, keeps one full-capacity copy rather than three.
+
+Validation, error values, and error order are unchanged: the signer-count and seed-count checks run first on every entry, the derived address is compared before any CPI, and the same system-program instructions are issued with the same signer seeds. `combine_seeds_with_bump` keeps its public signature.
+
+Measured with the framework-comparison profile and verifier, the counter fixture fell from 11,400 to 10,456 bytes and its `initialize` from 3,203 to 3,079 compute units. Among the examples, `multisig_program` fell by 1,608 bytes, `staking_rewards_program` by 976, `counter_program` by 864, `vesting_program` by 808, and `escrow_program` by 776.
+
+#### Size the entrypoint account array by each route's limit
+
+_Packages:_ 🟢 _pina_, 🟢 _pina_macros_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #575](https://github.com/pina-rs/pina/pull/575)
+
+`ENTRYPOINT_ACCOUNT_CAPACITY` is new in this release. As first merged, it was derived from each route's `ACCOUNT_BOUND`, which counts a `#[pina(remaining)]` slice as one slot. A route with one positional account and a trailing slice got a capacity of three, so an instruction sent five accounts ran with only two in the slice, and a writable account duplicated past the third slot was never compared against. No published version generated the constant, so this corrects the capacity before it ships.
+
+`ParseAccounts::ACCOUNT_LIMIT` now declares the most accounts a parser can accept: `#[derive(Accounts)]` counts positional and optional fields plus nested limits, and declares `UNBOUNDED` for a struct with a trailing slice, directly or through a nested group. Hand-written parsers default to `UNBOUNDED`. The capacity is one more than the largest limit, or the transaction maximum when any route is unbounded. `ACCOUNT_BOUND` and `MAX_INSTRUCTION_ACCOUNTS` keep counting declared slots.
+
+The reserved `Migrate` route now reads only its declared slots and fails with `TooManyAccountKeys` when an account follows the last one, so its slot count is a limit too. Before, `MigrateContext` validated accounts past the slots only when the entrypoint array happened to hold them. Omitted trailing slots still migrate only the accounts that are present.
+
+#### Keep address-check errors visible to the entrypoint
+
+_Packages:_ 🟢 _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #566](https://github.com/pina-rs/pina/pull/566)
+
+`assert_address` reached the entrypoint through `validate_address`, which LLVM kept out of line because the program and sysvar checks share it. An out-of-line function returns its `ProgramResult` through memory, so neither the caller nor the entrypoint's inline error conversion could see which error it carried. The address comparison and its failure log now live in one out-of-line helper that returns `bool`, and `validate_address` and `assert_address` are always inlined, so every call site returns `InvalidAccountData` as a constant while sharing one copy of the comparison.
+
+Measured across the examples: 14 programs smaller (−8 to −664 bytes, `role_registry_program` −664, `vesting_program` −528, `multisig_program` −448), 12 unchanged, and `privacy_pool_program` +184. The counter comparison fixture fell from 8,712 to 8,632 bytes, 64 under Anchor v2. Behavior is unchanged: the same checks run in the same order, fail with the same error, and log the same message.
+
+#### Convert entrypoint errors inline
+
+_Packages:_ 🟢 _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #558](https://github.com/pina-rs/pina/pull/558)
+
+`nostd_entrypoint!` and `nostd_entrypoint_alloc!` now declare pina's own `entrypoint` instead of expanding `pinocchio::program_entrypoint!`. Accounts are still deserialized by `pinocchio::entrypoint::deserialize`, with the same account array and the same safety contract; the only difference is how the result becomes the runtime's `u64` status. Pinocchio converts the `ProgramError` in an `#[inline(never)]` function, an 864-byte comparison tree that every program carries even when each error it returns is a constant. Pina converts it inline, so an error returned by value folds to its status code where it is returned, and the tree is only emitted for errors the compiler cannot see through, such as those from outlined helpers and CPIs.
+
+Status codes are unchanged: a new test runs the entrypoint over loader-format input for every `ProgramError` variant and compares each status with `u64::from`, and further tests cover skipped accounts past the array and duplicate slots. Those tests also run under Miri in `test:miri`.
+
+Measured with the framework-comparison profile on top of the entrypoint account capacity: the hello fixture fell from 2,944 to 2,088 bytes and the counter fixture from 9,416 to 9,304, with no compute-unit increase. Among the examples, `escrow_program` fell by 1,048 bytes, `staking_rewards_program` by 432, `counter_program` by 368, and `multisig_program` by 48.
+
+#### Upgrade pinapod to 0.4.5
+
+_Packages:_ 🟢 _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #553](https://github.com/pina-rs/pina/pull/553)
+
+Bump the workspace `pinapod` dependency from 0.4.4 to 0.4.5 and refresh the root, `pina_fuzz`, and `pina_fuzz/fuzz` lock files. No pina source changes are required — pina re-exports and type-mentions the pinapod API, and 0.4.5 adds no public API and changes no wire format.
+
+The release closes a declaration-versus-layout divergence. A compact field declared as an array of explicit-prefix containers, such as `[PodString<8, 3>; 4]`, previously skipped the prefix-width check: validation descended through generic arguments but never through array elements, so the element-wise mapping silently re-encoded the field with the default one-byte prefix and the account compiled with a different wire layout than the schema declared. The runtime still validated whatever bytes the rewritten type produced, so this was never memory-unsound, but a client generated from the declared schema would disagree with the on-chain bytes. The declaration is now a compile error, and the descent covers `Option<[PodVec<u8, 8, 0>; 2]>` and parenthesized spellings while explicit widths inside an array remain accepted.
+
+The same release trims compact-enum validation and documents the generated surface. The commit-entry check no longer interprets a variant's fixed payload, because relocation consumes only the payload's compile-time range; the semantic half stays in `validate` and every value-exposing boundary. The dead tag-size guard after the storage-length check is gone, compact-enum support helpers carry `#[inline(always)]` like their compact-struct counterparts, the compact `Ref` accessors and `Mut` setters carry `#[inline]`, staged vector setters route through `ZcValidate::validate_slice`, and the generated compact `Ref`/`Mut`/`Patch` surface now emits rustdoc — the one visible change in `tests/expand/pda.expanded.rs`, alongside the setter's `validate_slice` call.
+
+Measured through this repository's instruction compute-unit harness against the 0.4.4 pina pins today, all 100 example instruction cases are compute-unit identical and 23 of 28 SBF artifacts are byte-identical; the five that differ in content measure the same. Wire format, validation order, error variants, and error precedence are unchanged.
+
+#### Stop logging failure messages that restate the error
+
+_Packages:_ 🟢 _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #559](https://github.com/pina-rs/pina/pull/559)
+
+Five of pina's account validations logged a fixed message that only restated the error they return: a missing signature (`MissingRequiredSignature`), a wrong owner (`InvalidAccountOwner`), an account that is not empty (`AccountAlreadyInitialized`) or is empty (`UninitializedAccount`), and a fixed account of the wrong size (`InvalidAccountSize`). The runtime already reports each of those codes, and pina returns each of them for that one reason, so the message told a client nothing new. It still cost deployed size at every inlined validation site, because a logging branch cannot be merged with the other failures that return the same code.
+
+Default builds no longer log these messages. With `verbose-logs`, they are logged as before, together with the address detail and caller location. Messages that tell apart the causes of a shared code are unchanged and still logged by default: the several reasons for `InvalidAccountData`, the causes of `InvalidSeeds`, and `account has an invalid discriminator`, which distinguishes an account discriminator from an instruction discriminator returning the same `InvalidDiscriminator`. Error values and error order are unchanged.
+
+Measured with the framework-comparison profile on top of the inline entrypoint error conversion: the hello fixture fell from 2,088 to 1,984 bytes and the counter fixture from 9,304 to 8,712. Among the examples, `multisig_program` fell by 2,968 bytes, `staking_rewards_program` by 1,632, `escrow_program` by 1,000, `counter_program` by 680, and `hello_solana_program` by 104.
+
+#### Check PDA creation targets with sha256
+
+_Packages:_ 🟢 _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #573](https://github.com/pina-rs/pina/pull/573)
+
+The PDA creation builders checked the target account's address with the `sol_create_program_address` syscall before the create-account CPI, about 1,500 compute units per creation. They now hash the seeds, bump, owner, and PDA marker with `sha256` and compare, which took the counter comparison fixture's `initialize` from 3,073 to 1,713 compute units.
+
+The hash skips only the ed25519 curve check, and the runtime repeats it: the allocation signs for the target through `invoke_signed` with the same seeds and bump, and the runtime refuses to sign for an on-curve address. `counter_program`'s Surfpool suite now proves it with a bump whose derived address is on the curve, which fails with "Could not create program address with signer seeds" and creates nothing. A mismatched address, or a seed longer than `MAX_SEED_LEN`, still fails the builder's own check with `InvalidSeeds`.
+
+`pina` now depends on `solana-sha256-hasher` directly for the variable-length hash, with the same target-specific features `solana-address` already enables.
+
+#### Make fresh `pina init` projects and `pina deploy` work
+
+_Packages:_ 🟢 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #555](https://github.com/pina-rs/pina/pull/555)
+
+- `pina init` scaffolded a nightly no Pina release ships lint drivers for, so `pina lint` could never succeed on a new project. The scaffold now pins the workspace toolchain (with `clippy`), and a test keeps the two in step.
+- TypeScript and Dart generation failed in any project without a local `codama` install, because the stdin render script could not resolve `npx -p` packages. It now loads the pinned packages from the `npx`/`pnpm dlx` install.
+- Freshly scaffolded Rust, CPI, and `cli-rust` clients inherited dependencies from a workspace a `pina init` project does not have, so they failed to parse. Outside a workspace that declares `pina`, their manifests now name concrete, tested versions and their own `[workspace]`. The program scaffold itself no longer declares a `[workspace]` table, so it can live inside an existing workspace.
+- `pina init` rejects names Cargo or Rust cannot use (a leading digit or `-`, Rust keywords, more than 64 characters), prints `pina keys new` in its next steps, and warns about the git-ignored program keypair. `pina doctor` and `pina migrations create` warn while `declare_id!` is still the shared placeholder. The scaffold's Surfpool test no longer has doubled braces.
+- `pina deploy` discards the pending publication it just wrote when the deploy program never started (a program whose exit could not be observed keeps it), so a missing `solana` no longer forces `--abandon` to freeze draft versions. The input snapshot directory is owner-only, a mistyped cluster name lists the accepted names, and the plan warns when the program keypair is also the upgrade authority or the artifact is not an ELF file.
+- `pina keys sync` names `pina keys new` when no keypair exists, the `--build-driver` failure no longer prints an invalid `rustup --toolchain` argument, and `pina verify submit`/`status --help` and several migration error messages no longer carry stray tabs and backslashes.
+- The repository's rustfmt configuration no longer sets `format_strings`. It split long string literals in the middle of escape sequences, which corrupted several help texts and error messages and made one test's source rewrite a silent no-op. Existing code is unaffected; generated Rust clients now keep long string literals on one line.
+
+#### Accept macOS system path aliases in link checks
+
+_Packages:_ 🟢 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #563](https://github.com/pina-rs/pina/pull/563)
+
+`pina keys new`, `pina profile --output`, migration storage, and generated-client output checks no longer refuse paths that pass through a root-owned system alias directly below the filesystem root, such as macOS's `/tmp` and `/var` links into `/private`. Keypair generation for a project under `/tmp`, or in any macOS temporary directory, previously failed with `refusing non-regular, symbolic-link, or reparse-point destination`.
+
+Every other symbolic link or reparse point in a destination path is still refused, whoever owns it. Generated-client output checks, and keypair checks since #564, trusted any root-owned link at any depth, so a command running as root trusted a project's own committed links; they now apply the same stricter rule.
+
+#### Read accounts from hand-written versioned dispatch
+
+_Packages:_ 🟢 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #585](https://github.com/pina-rs/pina/pull/585)
+
+`pina idl`, `pina generate`, and `pina migrations create` described an instruction as taking no accounts when a hand-written dispatcher routed it through the generated `process_versioned`, the form the migration guide gives for an instruction that keeps its envelope:
+
+```rust,ignore
+WalkInstruction::Update => UpdateInstruction::process_versioned(
+	UpdateAccounts::try_from((program_id, accounts))?,
+	data,
+),
+```
+
+The extractor read the accounts struct only from the receiver of `.process(data)`. Every generated client then sent the instruction with no accounts, which the program rejects with `NotEnoughAccountKeys`, and `pina migrations create` recorded the empty account list as the instruction's process, which a published history refuses to correct.
+
+The extractor now reads the `Accounts::try_from((program_id, accounts))` conversion wherever an arm performs it, including when the parsed accounts are bound to a local first. An arm that converts into two different structs has no single account layout and is still emitted without accounts. Programs routed by `#[discriminator(entrypoint)]` were not affected.
+
+A program that already recorded an instruction this way should run `pina migrations create` after upgrading: an unpublished history is re-recorded with its accounts.
+
+#### Distrust root-owned project symlinks in renderers
+
+_Packages:_ 🟢 _pina_cli_renderer_, 🟢 _pina_codama_renderer_, 🟢 _pina_cpi_renderer_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #565](https://github.com/pina-rs/pina/pull/565)
+
+The CLI, CPI, and Codama renderers trusted any root-owned symbolic link while validating output path components. When a renderer runs as root (Docker containers, many CI images) every file a checkout creates is root-owned, so a symlink committed to the project, such as `clients -> /elsewhere`, passed the check and redirected generated output.
+
+Every link or reparse point is now untrusted except a root-owned link directly below the filesystem root, such as macOS's `/var` and `/tmp` or a merged-`/usr` system's `/bin` and `/lib`. Only root can create an entry at that depth, and no project tree lives there. This matches the rule `pina_cli` applies to the paths it publishes.
+
+#### Update the skill with the round-four evaluation findings
+
+_Packages:_ 🟢 _pina_skill_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #555](https://github.com/pina-rs/pina/pull/555) · _Related issues:_ [#569](https://github.com/pina-rs/pina/issues/569), [#571](https://github.com/pina-rs/pina/issues/571)
+
+The setup sequence now runs `pina keys new` and `pina migrations create` before building, and its example dispatch uses the `try_from((program_id, accounts))` form the accounts derive implements. The migrations reference documents stale manual bodies, `--manual` conversion, the refusal of unpinned receipts and the `--pin-legacy` repair for ABI 0.20 ledgers, program-ID rebinding, the envelope-free build a missing manifest allows, and the `--auto` and `--version-type` flags that record the migration policy in the manifest now that `pina.toml` holds none, and it corrects two claims: `create` never writes `[migrations.answers]`, and reordering or widening fields is manual. The CLI reference gains a "Using generated clients safely" section on owner checks, event attribution, trailing bytes, and writable flags, plus deploy caveats for loopback tunnels and snapshot paths. The testing reference drops the unconfigured `bpfel-unknown-none` build and the Mollusk claim.
+
+### Documentation
+
+- **Document recovery from invalid PDA creation bumps.** Explain that noncanonical and unchecked PDA creation aborts execution when the runtime rejects an on-curve signer address. Callers that need to catch an invalid bump and continue can preflight the seeds, including the bump, with `create_program_address`. The fast default creation path and its compute-unit savings remain unchanged. _Packages:_ ⚪ _pina_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #579](https://github.com/pina-rs/pina/pull/579)
+
+#### Describe ABI 0.21 in the docs and client tests
+
+_Packages:_ ⚪ _pina_cpi_renderer_, ⚪ _pina_codama_nodes_, ⚪ _pina_test_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #568](https://github.com/pina-rs/pina/pull/568) · _Related issues:_ [#569](https://github.com/pina-rs/pina/issues/569), [#571](https://github.com/pina-rs/pina/issues/571)
+
+- `pina_test::HistoricalEvent` and its readme say to decode a golden event with the generated client event for the version that emitted it (`<Event>V<n>` for an earlier version), because events are versioned rather than migrated.
+- The CPI renderer's vesting snapshots and the `nodes-from-pina` generated-client tests expect instruction data without a version byte, matching the regenerated example clients.
+
+### Testing
+
+#### Isolate CLI test fixture commits from global git config
+
+_Packages:_ ⚪ _pina_, ⚪ _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #570](https://github.com/pina-rs/pina/pull/570)
+
+The verified-build tests in `crates/pina_cli/tests/project_commands.rs` commit a throwaway fixture repository. Those commits read the developer's global git config, so with `commit.gpgsign = true` every fixture commit was signed through the developer's gpg-agent. Under the parallel load of the pre-push gate the agent failed with `gpg: signing failed: Cannot allocate memory`, and the gate blocked the push while the same test passed on its own.
+
+The fixture commands now run with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`, so no global or system setting reaches them and a `--global` write fails instead of editing the developer's `~/.gitconfig`. The fixture keeps its own repository-local identity. `git_environment_isolation_preserves_external_config` now also injects a global and system config that signs through a failing program, and asserts the verified-build cases pass and leave that config unchanged. Removing either override makes it fail.
+
+### Notes
+
+#### Reformat with the dprint plugin migration
+
+_Packages:_ ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_codama_renderer_cpi_, ⚪ _pina_codama_renderer_cli_, ⚪ _pina_cli_npm_, ⚪ _pina_cli_darwin_arm64_, ⚪ _pina_cli_darwin_x64_, ⚪ _pina_cli_freebsd_x64_, ⚪ _pina_cli_linux_arm64_gnu_, ⚪ _pina_cli_linux_arm64_musl_, ⚪ _pina_cli_linux_x64_gnu_, ⚪ _pina_cli_linux_x64_musl_, ⚪ _pina_cli_win32_arm64_msvc_, ⚪ _pina_cli_win32_x64_msvc_, ⚪ _pina_skill_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #569](https://github.com/pina-rs/pina/pull/569)
+
+- The dprint plugin migration (npm references, newer plugin versions) reformats readmes, manifests, and generated package metadata across these packages. The changes are formatting only — no published behavior, API, or content changes — so they are recorded without a bump.
+
 ## [0.22.0](https://github.com/pina-rs/pina/releases/tag/v0.22.0) (2026-09-29)
 
 Grouped release for `core`.
