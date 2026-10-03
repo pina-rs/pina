@@ -18,6 +18,24 @@ use crate::ir::ErrorIr;
 /// extractor cannot evaluate other expressions, and guessing a code would
 /// publish an IDL whose errors decode to the wrong variant.
 pub fn extract_error_enums(file: &File) -> Result<Vec<ErrorIr>, syn::Error> {
+	Ok(extract_declared_errors(file)?
+		.into_iter()
+		.map(|declared| declared.error)
+		.collect())
+}
+
+/// An `#[error]` variant together with the enum that declares it.
+#[derive(Debug, Clone)]
+pub(crate) struct DeclaredError {
+	/// Name of the `#[error]` enum, such as `ValidationError`.
+	pub(crate) enum_name: String,
+	/// The variant and the code the program returns for it.
+	pub(crate) error: ErrorIr,
+}
+
+/// [`extract_error_enums`], keeping each variant's enum name so source sites
+/// that construct `Enum::Variant` can be found.
+pub(crate) fn extract_declared_errors(file: &File) -> Result<Vec<DeclaredError>, syn::Error> {
 	let mut result = Vec::new();
 
 	for item in &file.items {
@@ -47,10 +65,13 @@ pub fn extract_error_enums(file: &File) -> Result<Vec<ErrorIr>, syn::Error> {
 			};
 			next_code = code.checked_add(1);
 
-			result.push(ErrorIr {
-				name: variant.ident.to_string(),
-				code,
-				docs: extract_docs(&variant.attrs),
+			result.push(DeclaredError {
+				enum_name: item_enum.ident.to_string(),
+				error: ErrorIr {
+					name: variant.ident.to_string(),
+					code,
+					docs: extract_docs(&variant.attrs),
+				},
 			});
 		}
 	}

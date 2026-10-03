@@ -1,0 +1,24 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction RMKCYYk1EaBxmRRFj36faqckrfC9DN49QMp2vfQd6NH1DF9HvvsABmzdBgu82eukNEnZybDdXSTt3SxNCyfSLyj (slot 63, from file)
+Instruction #0 failed: initialize_policy (InitializeAccounts) in validation_program
+Error: InvalidAccountData
+
+Most likely cause:
+  policy: writable (`&mut` field) [confirmed, matches the program log] at src/lib.rs:197
+    account #1 (8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe) is read-only in this transaction
+
+Accounts:
+  #   field           signer  writable  address
+  0   authority       yes     yes       9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  1   policy          no      no        8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe
+  2   system_program  no      no        11111111111111111111111111111111
+
+Program logs (last 4 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program log: account has not been marked as writable
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 196 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: invalid account data for instruction

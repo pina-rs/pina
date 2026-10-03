@@ -34,10 +34,11 @@ pina test --help
 pina dev --help
 ```
 
-For project diagnostics and identity:
+For project diagnostics, failed transactions, and identity:
 
 ```bash
 pina doctor --help
+pina explain --help
 pina keys --help
 ```
 
@@ -95,6 +96,13 @@ Read-only identity inspection is also JSON-safe:
 pina keys show --json > /tmp/pina-keys.json
 ```
 
+Explain a failed transaction through the versioned JSON contract. A saved `getTransaction` result works offline:
+
+```bash
+pina explain --transaction-file ./failed.json --json > /tmp/pina-explain.json
+jq -e '.status == "succeeded" or (.candidates | type == "array")' /tmp/pina-explain.json
+```
+
 These commands write no progress or ANSI styling to stdout. Doctor check IDs and statuses are stable agent inputs; do not parse the human report when JSON is available.
 
 Inspect a deployment without executing a child process:
@@ -125,6 +133,8 @@ jq -e '.program_id and .commands' /tmp/deploy-plan.json
 - Never infer a repository, revision, cluster, authority, or uploader. The build record binds source provenance; every network target and signing identity remains explicit.
 - Use `--yes` only for a reviewed record plan. Mainnet submissions additionally require `--acknowledge-mainnet`; transaction export requires neither flag.
 - Never put secrets in a custom RPC URL. Pina passes the RPC origin to `solana-verify` as argv.
+- Treat `pina explain` candidates by their `confidence`: only `confirmed` is proven by the transaction, `checked_against_current_state` reads state that may have changed after the transaction, and `possible` needs runtime values. Exit code `0` means an explanation was produced, including for a transaction that succeeded.
+- `pina explain` queries localnet unless `--network` or `--rpc-url` names another endpoint, and never retries a request.
 - Use `pina test --unit` when only native Rust or Mollusk tests are required.
 - Treat a missing `tests/surfpool` package or built `.so` as a failed integration setup, not a skip.
 - `pina dev` is offline unless `--network` or a credential-free HTTP(S) `--rpc-url` is explicitly supplied. The URL is visible in Surfpool's process arguments, so never place a secret anywhere in it.

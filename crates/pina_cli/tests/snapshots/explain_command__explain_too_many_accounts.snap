@@ -1,0 +1,27 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction 3KceYTZ6ePgactc6WpDncuo8RAgmqo8fcFtixFFnjaSSQPBjcQxBKBopQJJeg1Vv6ueT6nGWgMoaFDKbAqHLrLEB (slot 65, from file)
+Instruction #0 failed: check_policy (CheckAccounts) in validation_program
+Error: PinaProgramError::TooManyAccountKeys (custom error 0xFFFFFFFE)
+  More account keys were provided than the instruction expects.
+
+Most likely cause:
+  instruction: no extra accounts [confirmed] at src/lib.rs:213
+    the instruction passed 6 accounts, but `CheckAccounts` reads at most 4 (extra: #4, #5)
+
+Accounts:
+  #   field           signer  writable  address
+  0   authority       yes     no        9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  1   policy          no      no        GyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse
+  2   audit           no      yes       EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1
+  3   system_program  no      no        11111111111111111111111111111111
+  4   -               no      no        8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe
+  5   -               no      no        AKkzLhjhyFtM9j7WAhbaqYpFe49cXeJBg2kzLRC2PnNa
+
+Program logs (last 3 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 94 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: custom program error: 0xfffffffe

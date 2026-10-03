@@ -1,0 +1,57 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 70
+expression: document
+---
+{
+  "accounts": [
+    {
+      "absent": false,
+      "address": "EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1",
+      "field": null,
+      "index": 0,
+      "signer": true,
+      "writable": true
+    },
+    {
+      "absent": false,
+      "address": "AKkzLhjhyFtM9j7WAhbaqYpFe49cXeJBg2kzLRC2PnNa",
+      "field": null,
+      "index": 1,
+      "signer": false,
+      "writable": true
+    }
+  ],
+  "candidates": [],
+  "errorSites": [],
+  "failure": {
+    "cpi": null,
+    "error": {
+      "code": 1,
+      "description": "A custom error of 11111111111111111111111111111111, which this project does not describe.",
+      "kind": "unknown",
+      "name": "Custom(1)"
+    },
+    "instruction": null,
+    "instructionIndex": 0,
+    "programId": "11111111111111111111111111111111",
+    "targetsProgram": false
+  },
+  "logs": [
+    "Program 11111111111111111111111111111111 invoke [1]",
+    "Transfer: insufficient lamports 10000000000, need 1000000000000",
+    "Program 11111111111111111111111111111111 failed: custom program error: 0x1"
+  ],
+  "notes": [
+    "Instruction #0 targets 11111111111111111111111111111111, not `validation_program` (GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn), so its checks are not in this project."
+  ],
+  "program": {
+    "name": "validation_program",
+    "programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+  },
+  "schemaVersion": 1,
+  "signature": "2tq64No55gaeeRjZQiSwSesBNR5AeJnQZBuTJt4wZVvfaR2xiq2xaGNCtiPEFSDD5HVoetw4RCZEtpYxXJzLSZaH",
+  "slot": 69,
+  "source": "file",
+  "status": "failed"
+}

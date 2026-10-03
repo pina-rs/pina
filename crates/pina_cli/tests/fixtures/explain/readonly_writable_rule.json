@@ -1,0 +1,95 @@
+{
+	"slot": 62,
+	"transaction": {
+		"signatures": [
+			"4MeRynoBFLczcN7jND2spt4Vvwn5K8kasDeG7vaJU7fjTDDA2YzwFkYUqzTGS4m5UQPFGEDbzqpTqncwwg1rVYVV",
+			"HPYzmodSaxsggJNveytchT9KWRYeQpCKQS7biDr1rctoaeCAJFRuBuKqQnxvGA5SZoMyw1aZfrWDaLECTDVaBAs"
+		],
+		"message": {
+			"header": {
+				"numRequiredSignatures": 2,
+				"numReadonlySignedAccounts": 1,
+				"numReadonlyUnsignedAccounts": 4
+			},
+			"accountKeys": [
+				"AKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9",
+				"9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu",
+				"GyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse",
+				"EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1",
+				"11111111111111111111111111111111",
+				"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+			],
+			"recentBlockhash": "SURFNETxSAFEHASHxxxxxxxxxxxxxxxxxxxxxxxxx1f",
+			"instructions": [
+				{
+					"programIdIndex": 5,
+					"accounts": [
+						1,
+						2,
+						3,
+						4
+					],
+					"data": "2",
+					"stackHeight": 1
+				}
+			]
+		}
+	},
+	"meta": {
+		"err": {
+			"InstructionError": [
+				0,
+				"InvalidAccountData"
+			]
+		},
+		"status": {
+			"Err": {
+				"InstructionError": [
+					0,
+					"InvalidAccountData"
+				]
+			}
+		},
+		"fee": 10000,
+		"preBalances": [
+			9999995000,
+			10000000000,
+			10000000,
+			10000000000,
+			1,
+			1141440
+		],
+		"postBalances": [
+			9999985000,
+			10000000000,
+			10000000,
+			10000000000,
+			1,
+			1141440
+		],
+		"innerInstructions": [],
+		"logMessages": [
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]",
+			"Program log: account has not been marked as writable",
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 182 of 200000 compute units",
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: invalid account data for instruction"
+		],
+		"preTokenBalances": [],
+		"postTokenBalances": [],
+		"rewards": [],
+		"loadedAddresses": {
+			"writable": [],
+			"readonly": []
+		},
+		"returnData": {
+			"programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
+			"data": [
+				"",
+				"base64"
+			]
+		},
+		"computeUnitsConsumed": 182
+	},
+	"version": "legacy",
+	"blockTime": 1791060105
+}
