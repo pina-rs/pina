@@ -21,6 +21,7 @@ pina_cli: fix
 - describes `PodF32` and `PodF64`
 - replaces the guidance to keep `assert_writable()` on `&mut AccountView`, to call `assert_empty()` before initialization, and to use `assert_type::<T>()` against type cosplay with the current writable-slot, typed creation builder, and typed loader guidance
 - adds the stored-bump and checked PDA loader guidance and the `CreateProgramAccountWithUncheckedBump` caveat
+- names `load_checked_pda` and `load_checked_pda_mut` for fixed PDAs an untrusted caller selects, and `invoke_with_bump` and `invoke_signed_with_bump` for accounts that store their own bump (the repository readme and the mdBook security chapter gain the same two points)
 
 Both topics gain a title and section headings.
 
