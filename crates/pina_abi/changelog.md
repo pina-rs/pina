@@ -4,7 +4,7 @@ All notable changes to the `pina_abi` ABI document contract are documented in th
 
 This crate owns its own release line. The version recorded in `crates/pina_abi/ABI_VERSION` is the ABI document version, pinned to this package's `major.minor`: it advances with a `breaking` changeset here and with nothing else, so the ABI version moves if and only if the document contract moved.
 
-## abi [0.20.0](https://github.com/pina-rs/pina/releases/tag/abi/v0.20.0) (2026-09-23)
+## [0.20.0](https://github.com/pina-rs/pina/releases/tag/abi/v0.20.0) (2026-09-23)
 
 Grouped release for `abi`.
 
