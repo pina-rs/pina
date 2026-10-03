@@ -32,6 +32,7 @@ For project testing and a persistent local network:
 pina lint --help
 pina test --help
 pina dev --help
+pina rehearse --help
 ```
 
 For project diagnostics and identity:
@@ -83,6 +84,13 @@ pina profile compare /tmp/profile.json --json > /tmp/comparison.json
 jq -e '.status == "unchanged" or .status == "improved"' /tmp/comparison.json
 ```
 
+Rehearse an upgrade against recent traffic; the exit status is 2 when any transaction's outcome or written account state changes:
+
+```bash
+pina rehearse --network devnet --json > /tmp/rehearsal.json
+jq -e '.schemaVersion == 1 and .summary.outcomeChanged == 0' /tmp/rehearsal.json
+```
+
 Diagnose project readiness through the versioned JSON contract:
 
 ```bash
@@ -121,6 +129,8 @@ jq -e '.program_id and .commands' /tmp/deploy-plan.json
 - Inspect `pina docs` before requesting a topic.
 - Never use the input `.so` path as the profile output path.
 - Treat exit code `2` from `verify check` or `verify record` as a verified hash mismatch, not an operational failure.
+- Treat exit code `2` from `rehearse` as a completed rehearsal that found behaviour changes; read `transactions[].status` from the JSON report. Exit code `3` means no transaction could be compared, so nothing was verified; it is never a pass. Exit code `1` is an operational failure with empty stdout. Never pass `--allow-changes` until every `state_changed` and `outcome_changed` transaction has been reviewed.
+- `pina rehearse` sends each RPC request once and stops on the first failure. Do not loop it against a rate-limited public endpoint; use a dedicated endpoint or a smaller `--limit`.
 - Run `pina build --verify` first and pass its printed content-addressed JSON path to `pina verify record --build-record`.
 - Never infer a repository, revision, cluster, authority, or uploader. The build record binds source provenance; every network target and signing identity remains explicit.
 - Use `--yes` only for a reviewed record plan. Mainnet submissions additionally require `--acknowledge-mainnet`; transaction export requires neither flag.

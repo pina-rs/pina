@@ -1233,6 +1233,15 @@ pub(crate) fn manifest_auto_policy(program_dir: &Path) -> MigrationAuto {
 		.map_or_else(MigrationAuto::none, |manifest| manifest.auto)
 }
 
+/// The checked-in manifest's version-envelope width, read as tolerantly as
+/// [`manifest_auto_policy`]: callers use it only to present account bytes.
+pub(crate) fn manifest_version_type(program_dir: &Path) -> Option<MigrationVersionType> {
+	load_manifest(&program_dir.join(MANIFEST_PATH))
+		.ok()
+		.flatten()
+		.map(|manifest| manifest.version_type)
+}
+
 /// Verify history and return only the current constants needed by IDL codegen.
 pub(crate) fn idl_migration_metadata(
 	start: &Path,

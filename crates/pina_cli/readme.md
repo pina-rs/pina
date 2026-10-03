@@ -199,6 +199,18 @@ pina profile target/deploy/my_program.so --output report.json
 
 When no binary is supplied, Pina discovers the current project's canonical deploy artifact. Output publication rejects aliases, hardlinks, symbolic links, and reparse points that could overwrite the input program.
 
+### `pina rehearse`
+
+Replay a deployed program's recent transactions against the build you are about to ship. Pina forks the cluster with Surfpool, runs every transaction against the deployed program and the candidate on identical state, and reports each difference in outcome, decoded account state, and compute units. It exits `2` when behaviour changed and `3` when no transaction could be compared.
+
+```bash
+pina rehearse --network devnet
+pina rehearse --network mainnet --build --limit 100
+pina rehearse --rpc-url http://127.0.0.1:8899 --json
+```
+
+Nothing is sent to the cluster. Requires Surfpool 1.6 or newer and an upgradeable-loader deployment.
+
 ### `pina deploy`
 
 Plan an explicit deployment without contacting a cluster:

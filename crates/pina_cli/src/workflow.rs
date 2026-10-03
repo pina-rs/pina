@@ -181,7 +181,7 @@ pub fn dev_project(options: &DevOptions) -> Result<(), WorkflowError> {
 	run(&mut command, &surfpool.to_string_lossy())
 }
 
-fn validate_surfpool_network(network: &SurfpoolNetwork) -> Result<(), WorkflowError> {
+pub(crate) fn validate_surfpool_network(network: &SurfpoolNetwork) -> Result<(), WorkflowError> {
 	let SurfpoolNetwork::RpcUrl(value) = network else {
 		return Ok(());
 	};
@@ -354,7 +354,7 @@ fn dev_arguments(
 	arguments
 }
 
-fn executable(variable: &str, fallback: &str) -> OsString {
+pub(crate) fn executable(variable: &str, fallback: &str) -> OsString {
 	std::env::var_os(variable).unwrap_or_else(|| OsString::from(fallback))
 }
 
@@ -377,6 +377,26 @@ fn run(command: &mut Command, program: &str) -> Result<(), WorkflowError> {
 }
 
 fn ensure_surfpool_version(surfpool: &OsStr) -> Result<(), WorkflowError> {
+	let (version, diagnostic) = surfpool_version(surfpool)?;
+
+	if !meets_minimum(&version, MINIMUM_SURFPOOL_VERSION) {
+		return Err(WorkflowError::SurfpoolTooOld { found: diagnostic });
+	}
+
+	Ok(())
+}
+
+/// Whether a released Surfpool is at least `minimum`. Pre-releases never
+/// qualify, because their flags are not a stable contract.
+pub(crate) fn meets_minimum(version: &semver::Version, minimum: (u64, u64, u64)) -> bool {
+	version.pre.is_empty() && *version >= semver::Version::new(minimum.0, minimum.1, minimum.2)
+}
+
+/// Run `surfpool --version` and return the parsed version with a sanitized
+/// copy of the output for diagnostics.
+pub(crate) fn surfpool_version(
+	surfpool: &OsStr,
+) -> Result<(semver::Version, String), WorkflowError> {
 	let program = surfpool.to_string_lossy().into_owned();
 	let mut child = Command::new(surfpool)
 		.arg("--version")
@@ -412,17 +432,7 @@ fn ensure_surfpool_version(surfpool: &OsStr) -> Result<(), WorkflowError> {
 			}
 		})?;
 
-	let minimum = semver::Version::new(
-		MINIMUM_SURFPOOL_VERSION.0,
-		MINIMUM_SURFPOOL_VERSION.1,
-		MINIMUM_SURFPOOL_VERSION.2,
-	);
-
-	if !version.pre.is_empty() || version < minimum {
-		return Err(WorkflowError::SurfpoolTooOld { found: diagnostic });
-	}
-
-	Ok(())
+	Ok((version, diagnostic))
 }
 
 struct CapturedVersionOutput {

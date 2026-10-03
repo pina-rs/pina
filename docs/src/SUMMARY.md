@@ -21,6 +21,7 @@
   - [Diagnose a Project](./cli/doctor.md)
   - [Generate Shell Completions](./cli/completions.md)
   - [Profile an SBF Program](./cli/profile.md)
+  - [Rehearse an Upgrade](./cli/rehearse.md)
   - [Deploy a Program](./cli/deploy.md)
   - [Automation and Agent Usage](./cli/automation.md)
 - [Agent Skill](./agent-skill.md)

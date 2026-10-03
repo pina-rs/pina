@@ -20,9 +20,10 @@ use pina_cli::GenerationMode;
 	              'pina init' to start a program, 'pina lint' for the official security lint set, \
 	              'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina \
 	              test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent \
-	              Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' \
-	              for explicit cluster deployment, and 'pina verify' for deployed-program \
-	              verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt \
+	              Surfpool network, 'pina generate' for selected client ecosystems, 'pina \
+	              rehearse' to replay real traffic against an upgrade, 'pina deploy' for explicit \
+	              cluster deployment, and 'pina verify' for deployed-program verification. Use \
+	              'pina cpi' for standalone CPI crates, 'pina import' to adopt \
 	              another program's IDL as one, 'pina doctor' for agent-readable diagnostics, \
 	              'pina keys' for program identity, and 'pina completions' for shell integration. \
 	              Low-level IDL, profiling, and terminal documentation remain available.",
@@ -35,7 +36,8 @@ use pina_cli::GenerationMode;
 	              --program-id SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv --idl ./idl.json\n  \
 	              pina idl --path ./programs/counter_program --output \
 	              ./idls/counter_program.json\n  pina profile ./target/deploy/counter_program.so \
-	              --json\n  pina deploy --cluster localnet --payer ~/.config/solana/id.json \
+	              --json\n  pina rehearse --network devnet\n  pina deploy --cluster localnet \
+	              --payer ~/.config/solana/id.json \
 	              --upgrade-authority ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  \
 	              Run 'pina <command> --help' for command-specific inputs, outputs, and \
 	              examples.\n  Run 'pina docs' to list the bundled architecture and IDL reference \
@@ -668,6 +670,105 @@ pub(crate) enum Commands {
 		/// Compare the current artifact against a saved baseline report.
 		#[command(subcommand)]
 		command: Option<ProfileCommands>,
+	},
+
+	/// Replay a program's recent transactions against an upgrade before shipping it.
+	///
+	/// Fetches the program's most recent transactions (or the ones named with
+	/// --signature) from the cluster, read-only, and starts a private Surfpool
+	/// forked from the same RPC endpoint. Each signed transaction is profiled
+	/// against the deployed program, then again after the candidate is installed
+	/// in the program's own program data, on one frozen snapshot of every account
+	/// the transactions touch. Every difference in outcome, written account
+	/// state, and compute units is reported. Nothing is sent to the cluster and
+	/// no project file is written.
+	#[command(after_help = r"Examples:
+  pina rehearse --network devnet
+  pina rehearse --network mainnet --build --limit 100
+  pina rehearse --rpc-url http://127.0.0.1:8899 --program ./target/deploy/my_program.so
+  pina rehearse --network devnet --signature <SIGNATURE> --signature <SIGNATURE>
+  pina rehearse --network devnet --json > rehearsal.json
+
+Results:
+  unchanged        identical outcome, account state, and compute units
+  cu_changed       identical outcome and state; compute units differ (informational)
+  state_changed    both runs succeed but leave an account different
+  outcome_changed  success and failure swapped, or the error changed
+  skipped          not compared, for example a transaction that fails identically in
+                   both runs because the state it needed has moved on
+
+Exit status:
+  0 when transactions were compared and none changed outcome or state; compute-unit
+    changes alone pass.
+  2 when behaviour changed, unless --allow-changes accepts it.
+  3 when no transaction could be compared, so nothing was verified.
+  1 for operational errors, including any failed RPC request; stdout is then empty.
+
+Requirements:
+  Surfpool 1.6 or newer on PATH, or its path in PINA_SURFPOOL. The deployed program must
+  use the upgradeable loader, as `solana program deploy` and `pina deploy` do.
+
+Network safety:
+  Pina never sends a transaction. A custom URL must be HTTP(S) without user information,
+  queries, or fragments. Surfpool receives it as an argument, so never put a secret
+  anywhere in it. Reports show only the URL's origin.")]
+	Rehearse {
+		/// Directory used for pina.toml or Cargo metadata project discovery.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Rehearse against mainnet, devnet, or testnet.
+		#[arg(
+			long,
+			value_enum,
+			conflicts_with = "rpc_url",
+			required_unless_present = "rpc_url",
+			hide_possible_values = true,
+			value_name = "CLUSTER"
+		)]
+		network: Option<SurfpoolCluster>,
+
+		/// Rehearse against a credential-free HTTP(S) RPC URL with a host.
+		///
+		/// User information, query parameters, fragments, and control characters are rejected.
+		/// Surfpool receives the URL in its arguments, so never put a secret anywhere in it.
+		#[arg(long, conflicts_with = "network", value_name = "URL")]
+		rpc_url: Option<String>,
+
+		/// Candidate SBF shared object. Defaults to target/deploy/<program>.so.
+		#[arg(long, value_name = "PROGRAM.SO", conflicts_with = "build")]
+		program: Option<PathBuf>,
+
+		/// Run Pina's project-aware SBF build first and rehearse its artifact.
+		#[arg(long)]
+		build: bool,
+
+		/// Number of recent transactions to replay, from 1 to 1000.
+		#[arg(
+			long,
+			default_value_t = 25,
+			value_parser = clap::value_parser!(u16).range(1..=1000),
+			value_name = "N"
+		)]
+		limit: u16,
+
+		/// Rehearse this transaction instead of the most recent ones. Repeat for more.
+		#[arg(long = "signature", value_name = "SIGNATURE", conflicts_with = "limit")]
+		signatures: Vec<String>,
+
+		/// Emit the stable JSON report (schemaVersion 1) instead of text.
+		#[arg(long)]
+		json: bool,
+
+		/// Exit 0 even when transactions change outcome or state.
+		#[arg(long)]
+		allow_changes: bool,
 	},
 
 	/// Verify deployed programs and publish source-build records.

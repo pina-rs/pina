@@ -3,7 +3,7 @@
 	"kind": "cli-surface",
 	"tool": {
 		"name": "pina",
-		"version": "0.21.0"
+		"version": "0.22.0"
 	},
 	"provenance": {
 		"extractor": "clap",
@@ -660,6 +660,36 @@
 						},
 						{
 							"names": [
+								"--auto"
+							],
+							"canonical_name": "--auto",
+							"hidden": false,
+							"global": false,
+							"summary": "Record which contract kinds are tracked without a per-item `migrations` token: `true`, `false`, or a comma-separated list of `accounts`, `events`, and `instructions`. The policy lives in migrations/manifest.json; omit the flag to keep the recorded one",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--version-type"
+							],
+							"canonical_name": "--version-type",
+							"hidden": false,
+							"global": false,
+							"summary": "Record the version envelope width: `u8` (the default), `u16`, or `u32`. It can change only while nothing is published",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
 								"--json"
 							],
 							"canonical_name": "--json",
@@ -831,6 +861,25 @@
 							"hidden": false,
 							"global": false,
 							"summary": "Convert the pending deployment into an abandoned receipt. The pinned versions stay frozen because the deployment may still have gone live",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--pin-legacy"
+							],
+							"canonical_name": "--pin-legacy",
+							"hidden": false,
+							"global": false,
+							"summary": "Pin receipts a 0.20 ledger records without their schema hashes to what migrations/manifest.json records now. Run it only after confirming with version control that the manifest still describes what those receipts made live",
 							"value": {
 								"kind": "flag",
 								"required": false,
@@ -2876,6 +2925,181 @@
 							}
 						}
 					]
+				}
+			]
+		},
+		{
+			"path": [
+				"rehearse"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Replay a program's recent transactions against an upgrade before shipping it",
+			"description": "Replay a program's recent transactions against an upgrade before shipping it.\n\nFetches the program's most recent transactions (or the ones named with --signature) from the cluster, read-only, and starts a private Surfpool forked from the same RPC endpoint. Each signed transaction is profiled against the deployed program, then again after the candidate is installed in the program's own program data, on one frozen snapshot of every account the transactions touch. Every difference in outcome, written account state, and compute units is reported. Nothing is sent to the cluster and no project file is written.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory used for pina.toml or Cargo metadata project discovery",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--network"
+					],
+					"canonical_name": "--network",
+					"hidden": false,
+					"global": false,
+					"summary": "Rehearse against mainnet, devnet, or testnet",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"mainnet",
+							"devnet",
+							"testnet"
+						]
+					}
+				},
+				{
+					"names": [
+						"--rpc-url"
+					],
+					"canonical_name": "--rpc-url",
+					"hidden": false,
+					"global": false,
+					"summary": "Rehearse against a credential-free HTTP(S) RPC URL with a host",
+					"description": "Rehearse against a credential-free HTTP(S) RPC URL with a host.\n\nUser information, query parameters, fragments, and control characters are rejected. Surfpool receives the URL in its arguments, so never put a secret anywhere in it.",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--program"
+					],
+					"canonical_name": "--program",
+					"hidden": false,
+					"global": false,
+					"summary": "Candidate SBF shared object. Defaults to target/deploy/<program>.so",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--build"
+					],
+					"canonical_name": "--build",
+					"hidden": false,
+					"global": false,
+					"summary": "Run Pina's project-aware SBF build first and rehearse its artifact",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--limit"
+					],
+					"canonical_name": "--limit",
+					"hidden": false,
+					"global": false,
+					"summary": "Number of recent transactions to replay, from 1 to 1000",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "25"
+					}
+				},
+				{
+					"names": [
+						"--signature"
+					],
+					"canonical_name": "--signature",
+					"hidden": false,
+					"global": false,
+					"summary": "Rehearse this transaction instead of the most recent ones. Repeat for more",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit the stable JSON report (schemaVersion 1) instead of text",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--allow-changes"
+					],
+					"canonical_name": "--allow-changes",
+					"hidden": false,
+					"global": false,
+					"summary": "Exit 0 even when transactions change outcome or state",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
 				}
 			]
 		},
