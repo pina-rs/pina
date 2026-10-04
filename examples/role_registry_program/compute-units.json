@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"measurement": "surfpool-simulation-max",
+	"artifactSha256": "285c383b7e978bd7adbd714563d9aad0aa35e843a47c2f4c7a7380d4775124c4",
+	"instructions": {
+		"addRole": {
+			"computeUnits": 1856,
+			"samples": 3
+		},
+		"deactivateRole": {
+			"computeUnits": 174,
+			"samples": 1
+		},
+		"initialize": {
+			"computeUnits": 1647,
+			"samples": 5
+		},
+		"rotateAdmin": {
+			"computeUnits": 129,
+			"samples": 1
+		},
+		"updateRole": {
+			"computeUnits": 175,
+			"samples": 1
+		}
+	}
+}

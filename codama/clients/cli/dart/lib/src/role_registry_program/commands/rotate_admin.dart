@@ -41,6 +41,8 @@ final class RotateAdminCommand extends Command<void> {
       newAdmin: newAdmin,
       registryConfig: registryConfig,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: rotateAdminComputeUnitLimit);
   }
 }

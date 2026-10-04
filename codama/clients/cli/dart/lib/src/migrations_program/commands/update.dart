@@ -71,6 +71,6 @@ final class UpdateCommand extends Command<void> {
       value: valueValue,
       memo: memoValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: updateComputeUnitLimit);
   }
 }

@@ -9,6 +9,14 @@
 )]
 
 pub const GRANT_DISCLOSURE_DISCRIMINATOR: u8 = 8u8;
+/// Compute units `GrantDisclosure` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const GRANT_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 1893;
+/// Compute unit limit to request for a transaction carrying `GrantDisclosure`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT: u32 = 2600;
 
 /// Accounts.
 #[derive(Clone, Debug)]

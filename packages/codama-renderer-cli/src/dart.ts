@@ -86,6 +86,137 @@ String _authorityHost(String authority) {
 }
 `;
 
+/**
+ * Emitted verbatim as `lib/src/compute_budget.dart`: how every program's
+ * commands request a compute unit limit, kept apart from the per-program
+ * context so it can be tested once.
+ */
+const COMPUTE_BUDGET_SOURCE = `${HEADER}
+import 'package:solana_kit_address/solana_kit_address.dart';
+import 'package:solana_kit_instructions/solana_kit_instructions.dart';
+import 'package:solana_kit_transaction_messages/solana_kit_transaction_messages.dart';
+
+/// The legacy message a command sends: one \`SetComputeUnitLimit\` first when
+/// [computeUnitLimit] is set, then [instructions].
+TransactionMessage budgetedTransactionMessage({
+  required Address feePayer,
+  required Iterable<Instruction> instructions,
+  int? computeUnitLimit,
+}) {
+  final budgeted = setTransactionMessageComputeUnitLimit(
+    computeUnitLimit,
+    TransactionMessage(version: TransactionVersion.legacy, feePayer: feePayer),
+  );
+
+  return appendTransactionMessageInstructions(
+    instructions.toList(),
+    budgeted,
+  );
+}
+
+/// Parses \`--compute-unit-limit\`: a whole number of compute units from 1 to
+/// [maxComputeUnitLimit], or \`null\` when the option is absent.
+///
+/// Throws a [FormatException] for any other value.
+int? parseComputeUnitLimit(String? value) {
+  if (value == null) {
+    return null;
+  }
+
+  final units = RegExp(r'^[0-9]+$').hasMatch(value) ? int.tryParse(value) : null;
+  if (units == null || units < 1 || units > maxComputeUnitLimit) {
+    throw FormatException(
+      '--compute-unit-limit must be a whole number from 1 to $maxComputeUnitLimit',
+      value,
+    );
+  }
+
+  return units;
+}
+
+/// How much of the requested budget a simulation consumed.
+String consumptionSummary(Object consumed, int? computeUnitLimit) {
+  if (computeUnitLimit == null) {
+    return 'Consumed $consumed compute units '
+        '(no limit requested; the runtime default applies)';
+  }
+
+  return 'Consumed $consumed of $computeUnitLimit requested compute units';
+}
+`;
+
+function computeBudgetTest(packageName: string): string {
+	return `${HEADER}
+import 'dart:typed_data';
+
+import 'package:${packageName}/src/compute_budget.dart';
+import 'package:solana_kit_address/solana_kit_address.dart';
+import 'package:solana_kit_instructions/solana_kit_instructions.dart';
+import 'package:test/test.dart';
+
+void main() {
+  const payer = Address('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin');
+  final instruction = Instruction(
+    programAddress: const Address('So11111111111111111111111111111111111111112'),
+    data: Uint8List.fromList([1]),
+  );
+
+  group('budgetedTransactionMessage', () {
+    test('prepends exactly one limit instruction', () {
+      final message = budgetedTransactionMessage(
+        feePayer: payer,
+        instructions: [instruction],
+        computeUnitLimit: 800,
+      );
+
+      expect(message.instructions, hasLength(2));
+      expect(
+        message.instructions.first.programAddress,
+        const Address('ComputeBudget111111111111111111111111111111'),
+      );
+      expect(message.instructions.first.data, [2, 0x20, 0x03, 0, 0]);
+      expect(message.instructions.last, instruction);
+    });
+
+    test('sends the instructions alone without a limit', () {
+      final message = budgetedTransactionMessage(
+        feePayer: payer,
+        instructions: [instruction],
+      );
+
+      expect(message.instructions, [instruction]);
+    });
+  });
+
+  group('parseComputeUnitLimit', () {
+    test('accepts whole numbers within the transaction limit', () {
+      expect(parseComputeUnitLimit(null), isNull);
+      expect(parseComputeUnitLimit('1'), 1);
+      expect(parseComputeUnitLimit('1400000'), 1400000);
+    });
+
+    test('rejects values a transaction cannot request', () {
+      for (final value in ['0', '1400001', '-5', '1.5', 'many', '']) {
+        expect(
+          () => parseComputeUnitLimit(value),
+          throwsFormatException,
+          reason: value,
+        );
+      }
+    });
+  });
+
+  test('consumptionSummary compares consumption with the requested limit', () {
+    expect(
+      consumptionSummary(529, 800),
+      'Consumed 529 of 800 requested compute units',
+    );
+    expect(consumptionSummary(379, null), contains('runtime default'));
+  });
+}
+`;
+}
+
 function endpointGuardTest(packageName: string): string {
 	return `${HEADER}
 import 'package:test/test.dart';
@@ -140,6 +271,7 @@ import 'package:solana_kit_rpc_spec/solana_kit_rpc_spec.dart';
 import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart' hide TransactionVersion;
 import 'package:solana_kit_transaction_messages/solana_kit_transaction_messages.dart';
 
+import '../compute_budget.dart';
 import '../endpoint_guard.dart';
 import 'package:solana_kit_transactions/solana_kit_transactions.dart';
 
@@ -168,6 +300,7 @@ class CliContext {
     required this.programAddress,
     required this.simulate,
     required this.json,
+    required this.computeUnitLimit,
     required this.cluster,
   });
 
@@ -177,12 +310,25 @@ class CliContext {
   final bool simulate;
   final bool json;
 
+  /// \`--compute-unit-limit\`, which replaces every instruction's recorded limit.
+  final int? computeUnitLimit;
+
   /// Explorer cluster selector for [programAddress]'s endpoint, or empty.
   final String cluster;
 
   Address get payerAddress => getAddressFromPublicKey(payer.publicKey);
 
-  Future<void> send(Iterable<Instruction> instructions) async {
+  /// Sends or simulates [instructions], printing the result.
+  ///
+  /// [recordedLimit] is the compute unit limit the IDL records for the
+  /// command's instruction. \`--compute-unit-limit\` replaces it; with
+  /// neither, the transaction requests no limit and the runtime default
+  /// applies.
+  Future<void> send(
+    Iterable<Instruction> instructions, {
+    int? recordedLimit,
+  }) async {
+    final requestedLimit = computeUnitLimit ?? recordedLimit;
     final blockhashResponse = await rpc.getLatestBlockhashValue().send();
     final blockhashValue = blockhashResponse.value;
 
@@ -191,10 +337,10 @@ class CliContext {
         blockhash: blockhashValue.blockhash.value,
         lastValidBlockHeight: blockhashValue.lastValidBlockHeight,
       ),
-      TransactionMessage(
-        version: TransactionVersion.legacy,
-        instructions: instructions.toList(),
+      budgetedTransactionMessage(
         feePayer: payerAddress,
+        instructions: instructions,
+        computeUnitLimit: requestedLimit,
       ),
     );
     final compiled = compileTransactionMessage(message);
@@ -225,7 +371,11 @@ class CliContext {
           .toList();
       if (json) {
         stdout.writeln(
-          jsonEncode({'logs': logs, 'unitsConsumed': result['unitsConsumed']}),
+          jsonEncode({
+            'logs': logs,
+            'unitsConsumed': result['unitsConsumed'],
+            'computeUnitLimit': requestedLimit,
+          }),
         );
       } else {
         for (final log in logs) {
@@ -233,7 +383,7 @@ class CliContext {
         }
         final units = result['unitsConsumed'];
         if (units != null) {
-          stdout.writeln('Consumed \${units.toString()} compute units');
+          stdout.writeln(consumptionSummary(units, requestedLimit));
         }
       }
       if (result['err'] != null) {
@@ -382,9 +532,21 @@ Future<CliContext> createContext(ArgResults globals) {
           : Address(PROGRAM_ADDRESS),
       simulate: globals['simulate'] as bool? ?? false,
       json: globals['json'] as bool? ?? false,
+      computeUnitLimit: computeUnitLimitOption(
+        globals['compute-unit-limit'] as String?,
+      ),
       cluster: clusterOf(endpoint),
     );
   });
+}
+
+/// The \`--compute-unit-limit\` override, reported as a [CliError] when invalid.
+int? computeUnitLimitOption(String? value) {
+  try {
+    return parseComputeUnitLimit(value);
+  } on FormatException catch (error) {
+    throw CliError(error.message);
+  }
 }
 
 void printFields(
@@ -596,7 +758,11 @@ ${
     final instruction = get${instruction.pascal}Instruction(
 ${factoryParams(instruction)}
     );
-    await context.send([instruction]);
+    await context.send([instruction]${
+		instruction.computeUnitLimitName === undefined
+			? ""
+			: `, recordedLimit: ${instruction.computeUnitLimitName}ComputeUnitLimit`
+	});
   }
 }
 `;
@@ -792,6 +958,11 @@ CommandRunner<void> buildRunner() {
         negatable: false,
         help: 'Print machine-readable JSON output.',
       )
+    ..argParser.addOption(
+        'compute-unit-limit',
+        valueHelp: 'units',
+        help: 'Compute unit limit to request instead of the one recorded for the instruction.',
+      )
 ${registrations};
 }
 `;
@@ -810,6 +981,11 @@ export function renderDart(
 	files.set(
 		"test/endpoint_guard_test.dart",
 		endpointGuardTest(options.packageName),
+	);
+	files.set("lib/src/compute_budget.dart", COMPUTE_BUDGET_SOURCE);
+	files.set(
+		"test/compute_budget_test.dart",
+		computeBudgetTest(options.packageName),
 	);
 
 	files.set(

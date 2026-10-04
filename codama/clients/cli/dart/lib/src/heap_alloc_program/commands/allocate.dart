@@ -32,6 +32,6 @@ final class AllocateCommand extends Command<void> {
       programAddress: context.programAddress,
       value: valueValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: allocateComputeUnitLimit);
   }
 }

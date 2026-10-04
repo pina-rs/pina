@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+pub mod compute_units;
 mod error;
 mod render;
 
@@ -10,6 +11,7 @@ use std::path::PathBuf;
 
 use codama_nodes::ProgramNode;
 use codama_nodes::RootNode;
+use compute_units::ComputeUnitBudget;
 pub use error::RenderError;
 pub use error::Result;
 use render::accounts::migration_envelope;
@@ -323,11 +325,26 @@ fn render_program_to_files(root: &RootNode) -> Result<BTreeMap<PathBuf, String>>
 		.map(|pda| (pda.name.as_ref().to_string(), pda))
 		.collect::<BTreeMap<_, _>>();
 
+	let mut has_compute_budget = false;
+	for instruction in &program.instructions {
+		has_compute_budget |= ComputeUnitBudget::from_instruction(instruction)?.is_some();
+	}
+
 	// Core module files
 	files.insert(
 		PathBuf::from("mod.rs"),
-		page(&render_root_mod(program, !public_defined_types.is_empty())),
+		page(&render_root_mod(
+			program,
+			!public_defined_types.is_empty(),
+			has_compute_budget,
+		)),
 	);
+	if has_compute_budget {
+		files.insert(
+			PathBuf::from("compute_budget.rs"),
+			page(&render_compute_budget_mod()),
+		);
+	}
 	files.insert(
 		PathBuf::from("programs.rs"),
 		page(&render_programs_mod(&program_constants)?),

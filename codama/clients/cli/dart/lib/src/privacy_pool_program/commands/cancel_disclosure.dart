@@ -40,6 +40,8 @@ final class CancelDisclosureCommand extends Command<void> {
       disclosureRequest: disclosureRequest,
       reserved: reservedValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: cancelDisclosureComputeUnitLimit);
   }
 }

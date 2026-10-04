@@ -60,6 +60,16 @@
 							}
 						}
 					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 400,
+							"measured": 61
+						}
+					}
 				]
 			}
 		]

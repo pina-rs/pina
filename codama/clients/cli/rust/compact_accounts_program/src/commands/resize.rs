@@ -58,5 +58,8 @@ pub(crate) fn run(context: &CliContext, args: ResizeArgs) -> Result<(), CliError
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(compact_accounts_program_client::instructions::RESIZE_COMPUTE_UNIT_LIMIT),
+	)
 }

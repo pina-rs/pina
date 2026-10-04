@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getSetCustodiansInstructionAsync } from "../client";
+import {
+	getSetCustodiansInstructionAsync,
+	SET_CUSTODIANS_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -43,5 +46,5 @@ export const setCustodiansCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, SET_CUSTODIANS_COMPUTE_UNIT_LIMIT);
 	});

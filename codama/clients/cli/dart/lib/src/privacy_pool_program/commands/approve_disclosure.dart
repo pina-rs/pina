@@ -77,6 +77,8 @@ final class ApproveDisclosureCommand extends Command<void> {
       clock: clock,
       reserved: reservedValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: approveDisclosureComputeUnitLimit);
   }
 }

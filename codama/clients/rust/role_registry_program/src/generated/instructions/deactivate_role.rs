@@ -9,6 +9,14 @@
 )]
 
 pub const DEACTIVATE_ROLE_DISCRIMINATOR: u8 = 3u8;
+/// Compute units `DeactivateRole` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const DEACTIVATE_ROLE_MEASURED_COMPUTE_UNITS: u32 = 174;
+/// Compute unit limit to request for a transaction carrying `DeactivateRole`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const DEACTIVATE_ROLE_COMPUTE_UNIT_LIMIT: u32 = 600;
 
 /// Accounts.
 #[derive(Clone, Debug)]

@@ -51,6 +51,6 @@ final class RelayCommand extends Command<void> {
       migrationProgram: migrationProgram,
       value: valueValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: relayComputeUnitLimit);
   }
 }

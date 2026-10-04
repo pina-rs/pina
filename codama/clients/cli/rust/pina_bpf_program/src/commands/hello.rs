@@ -28,5 +28,8 @@ pub(crate) fn run(context: &CliContext, _args: HelloArgs) -> Result<(), CliError
 
 	let accounts = Hello {};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(pina_bpf_program_client::instructions::HELLO_COMPUTE_UNIT_LIMIT),
+	)
 }

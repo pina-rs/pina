@@ -34,6 +34,6 @@ final class NoteCommand extends Command<void> {
       authority: authority,
       note: note,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: noteComputeUnitLimit);
   }
 }

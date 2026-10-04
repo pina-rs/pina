@@ -113,6 +113,6 @@ final class DepositCommand extends Command<void> {
       envelope: envelopeValue,
       shares: sharesValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: depositComputeUnitLimit);
   }
 }

@@ -42,5 +42,8 @@ pub(crate) fn run(context: &CliContext, args: RotateAdminArgs) -> Result<(), Cli
 		registry_config,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(role_registry_program_client::instructions::ROTATE_ADMIN_COMPUTE_UNIT_LIMIT),
+	)
 }

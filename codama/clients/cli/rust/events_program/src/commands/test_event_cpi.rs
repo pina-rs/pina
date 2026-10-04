@@ -28,5 +28,8 @@ pub(crate) fn run(context: &CliContext, _args: TestEventCpiArgs) -> Result<(), C
 
 	let accounts = TestEventCpi {};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(events_program_client::instructions::TEST_EVENT_CPI_COMPUTE_UNIT_LIMIT),
+	)
 }

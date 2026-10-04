@@ -53,5 +53,8 @@ pub(crate) fn run(context: &CliContext, args: ChallengeDisclosureArgs) -> Result
 		clock,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT),
+	)
 }

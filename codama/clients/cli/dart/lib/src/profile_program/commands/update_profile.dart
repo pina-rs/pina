@@ -47,6 +47,8 @@ final class UpdateProfileCommand extends Command<void> {
       name: nameValue,
       bio: bioValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: updateProfileComputeUnitLimit);
   }
 }

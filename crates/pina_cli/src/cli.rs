@@ -640,16 +640,23 @@ pub(crate) enum Commands {
 	/// exists, and runs the project's isolated `tests/surfpool` test package. That
 	/// package owns an embedded Surfpool instance, so parallel runs use separate
 	/// ports and teardown remains deterministic. Use --unit for native Rust and
-	/// Mollusk tests only.
+	/// Mollusk tests only. Use --record-compute-units to measure every
+	/// instruction for the compute unit limits generated clients request.
 	#[command(
 		after_help = "Examples:\n  pina test\n  pina test --filter initialize\n  pina test \
-		              --unit\n  pina test --compatibility\n  pina test --unit --filter \
-		              rejects_wrong_owner\n\nTest layers:\n  --unit keeps the fast native/Mollusk \
-		              loop and does not build SBF.\n  The default builds SBF and runs the ignored \
-		              test in the isolated `tests/surfpool` package.\n\nSafety:\n  Embedded \
-		              Surfpool tests allocate isolated ports and must stop their instance before \
-		              returning. Missing SBF artifacts and incomplete Surfpool test packages are \
-		              hard failures."
+		              --unit\n  pina test --compatibility\n  pina test --record-compute-units\n  \
+		              pina test --unit --filter rejects_wrong_owner\n\nTest layers:\n  --unit \
+		              keeps the fast native/Mollusk loop and does not build SBF.\n  The default \
+		              builds SBF and runs the ignored test in the isolated `tests/surfpool` \
+		              package.\n\nCompute units:\n  --record-compute-units runs the complete \
+		              Surfpool suite and writes compute-units.json beside Cargo.toml: the most \
+		              compute units each instruction consumed in a successful simulation. `pina \
+		              generate` turns each measurement into the limit clients request, adding \
+		              [compute_units] margin_percent (default 20) and the compute budget \
+		              instructions' cost. Commit the file with the clients it produced.\n\nSafety:\n  \
+		              Embedded Surfpool tests allocate isolated ports and must stop their \
+		              instance before returning. Missing SBF artifacts and incomplete Surfpool \
+		              test packages are hard failures."
 	)]
 	Test {
 		/// Project directory or a directory below it. Defaults to the current directory.
@@ -673,6 +680,10 @@ pub(crate) enum Commands {
 		/// Run only tests whose names contain FILTER.
 		#[arg(short, long, value_name = "FILTER")]
 		filter: Option<String>,
+
+		/// Measure every instruction in the complete Surfpool suite and write compute-units.json.
+		#[arg(long, conflicts_with_all = ["unit", "filter"])]
+		record_compute_units: bool,
 	},
 
 	/// Start a persistent Surfpool development network with SBF watch and redeploy.
@@ -731,7 +742,9 @@ pub(crate) enum Commands {
 	/// Performs static analysis of an SBF shared object. Text is written to
 	/// stdout by default. Use --json for machine-readable output and --output
 	/// to write either format to a file. Use `pina profile compare` to diff a
-	/// saved baseline report against the current artifact.
+	/// saved baseline report against the current artifact, and `pina profile
+	/// trace` to measure executed compute units line by line from the
+	/// project's Mollusk tests.
 	#[command(
 		after_help = "Examples:\n  pina profile\n  pina profile --json\n  pina profile --project \
 		              ./programs/counter_program\n  pina profile \
@@ -739,7 +752,8 @@ pub(crate) enum Commands {
 		              ./target/deploy/counter_program.so --json -o ./profile.json\n  pina profile \
 		              compare ./profile.json\n  pina profile compare ./profile.json \
 		              ./target/deploy/counter_program.so --json\n  pina profile compare \
-		              ./profile.json --fail-cu 100 --fail-percent 5\n\nBaselines:\n  compare \
+		              ./profile.json --fail-cu 100 --fail-percent 5\n  pina profile trace \
+		              --instruction increment\n\nBaselines:\n  compare \
 		              accepts any report written by `pina profile --json`, including the \
 		              versioned baseline document. The exit status is 2 when the total CU \
 		              regression reaches both --fail-cu and --fail-percent, so local runs mirror \
@@ -767,7 +781,7 @@ pub(crate) enum Commands {
 		#[arg(short, long, value_name = "FILE")]
 		output: Option<PathBuf>,
 
-		/// Compare the current artifact against a saved baseline report.
+		/// Compare against a saved baseline, or trace executed compute units.
 		#[command(subcommand)]
 		command: Option<ProfileCommands>,
 	},
@@ -946,6 +960,62 @@ pub(crate) enum ProfileCommands {
 			value_name = "PERCENT"
 		)]
 		fail_percent: f64,
+	},
+
+	/// Measure where each instruction's compute units go, line by line.
+	///
+	/// Builds the program with DWARF line tables, runs its Mollusk tests with
+	/// register tracing, and attributes every executed SBF instruction to a
+	/// source line and call stack. Prints a summary per traced instruction and
+	/// writes a self-contained HTML report to <target>/pina/trace/<program>.html.
+	/// The program's mollusk-svm dev-dependency must enable the
+	/// `register-tracing` feature.
+	#[command(
+		after_help = "Examples:\n  pina profile trace\n  pina profile trace --project \
+		              ./programs/counter_program\n  pina profile trace --filter increment \
+		              --instruction increment\n  pina profile trace --json -o ./trace.json\n  pina \
+		              profile trace --folded > ./stacks.folded\n  pina profile trace --trace-dir \
+		              ./target/pina/trace/traces\n\nCost model:\n  Every executed SBF \
+		              instruction costs 1 CU. The runtime charges syscalls separately; they are \
+		              listed by name and call site but their charges are not included.\n\nSetup:\n  \
+		              Enable tracing in the program's Cargo.toml:\n    [dev-dependencies]\n    \
+		              mollusk-svm = { version = \"0.15\", features = [\"register-tracing\"] }"
+	)]
+	Trace {
+		/// Directory inside the project to discover.
+		#[arg(
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Run only tests whose names contain TEST (passed to `cargo test`).
+		#[arg(long, value_name = "TEST", conflicts_with = "trace_dir")]
+		filter: Option<String>,
+
+		/// Report only this instruction (any case style, or a label such as `increment #2`).
+		#[arg(long, value_name = "NAME")]
+		instruction: Option<String>,
+
+		/// Analyze existing traces in DIR instead of building and running tests.
+		///
+		/// Attribution uses the traced build from the project's last `pina profile trace`.
+		#[arg(long, value_name = "DIR")]
+		trace_dir: Option<PathBuf>,
+
+		/// Emit the versioned JSON document instead of the text summary.
+		#[arg(long, conflicts_with = "folded")]
+		json: bool,
+
+		/// Emit Brendan Gregg folded stacks for speedscope, inferno, or flamegraph.pl.
+		#[arg(long)]
+		folded: bool,
+
+		/// Write the selected output to FILE instead of stdout.
+		#[arg(short, long, value_name = "FILE")]
+		output: Option<PathBuf>,
 	},
 }
 

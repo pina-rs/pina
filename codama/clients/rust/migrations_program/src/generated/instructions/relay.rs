@@ -9,6 +9,14 @@
 )]
 
 pub const RELAY_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `Relay` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const RELAY_MEASURED_COMPUTE_UNITS: u32 = 4977;
+/// Compute unit limit to request for a transaction carrying `Relay`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const RELAY_COMPUTE_UNIT_LIMIT: u32 = 6300;
 
 /// Accounts.
 #[derive(Clone, Debug)]

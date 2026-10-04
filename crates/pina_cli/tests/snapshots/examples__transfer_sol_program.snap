@@ -107,6 +107,16 @@ expression: idl
               }
             }
           }
+        ],
+        "plugins": [
+          {
+            "kind": "pluginNode",
+            "name": "pinaComputeUnits",
+            "payload": {
+              "limit": 2000,
+              "measured": 1379
+            }
+          }
         ]
       },
       {
@@ -183,6 +193,16 @@ expression: idl
                 "kind": "numberValueNode",
                 "number": 1
               }
+            }
+          }
+        ],
+        "plugins": [
+          {
+            "kind": "pluginNode",
+            "name": "pinaComputeUnits",
+            "payload": {
+              "limit": 600,
+              "measured": 205
             }
           }
         ]

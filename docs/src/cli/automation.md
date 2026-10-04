@@ -83,6 +83,14 @@ pina profile ./target/deploy/counter_program.so --json > /tmp/profile.json
 jq -e '.functions | type == "array"' /tmp/profile.json
 ```
 
+Trace executed compute units from the project's Mollusk tests as JSON. Build and test output goes to stderr, so stdout stays a single JSON document; a failing test run exits with the test runner's status:
+
+```bash
+pina profile trace --json > /tmp/trace.json
+jq -e '.schemaVersion == 1 and (.instructions | length > 0)' /tmp/trace.json
+jq '.instructions[] | {name, executedInstructions, syscalls}' /tmp/trace.json
+```
+
 Diff the current build against a saved baseline; the exit status is 2 when a total CU regression reaches both `--fail-cu` and `--fail-percent`:
 
 ```bash

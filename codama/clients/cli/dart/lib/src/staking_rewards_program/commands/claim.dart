@@ -92,6 +92,6 @@ final class ClaimCommand extends Command<void> {
       tokenProgram: tokenProgram,
       systemProgram: Address("11111111111111111111111111111111"),
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: claimComputeUnitLimit);
   }
 }

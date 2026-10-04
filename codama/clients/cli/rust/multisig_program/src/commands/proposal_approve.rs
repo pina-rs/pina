@@ -47,5 +47,8 @@ pub(crate) fn run(context: &CliContext, args: ProposalApproveArgs) -> Result<(),
 		clock,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(multisig_program_client::instructions::PROPOSAL_APPROVE_COMPUTE_UNIT_LIMIT),
+	)
 }

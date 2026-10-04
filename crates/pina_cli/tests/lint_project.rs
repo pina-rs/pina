@@ -19,7 +19,6 @@
 
 use std::ffi::OsString;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -29,6 +28,8 @@ use pina_cli::lint::LintError;
 use pina_cli::lint::LintOptions;
 use pina_cli::lint::lint_project;
 use tempfile::TempDir;
+
+mod support;
 
 /// Tests here mutate the process environment, so they run one at a time.
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -82,14 +83,7 @@ impl Drop for Environment<'_> {
 }
 
 fn executable(path: &Path, contents: &str) {
-	fs::write(path, contents)
-		.unwrap_or_else(|error| panic!("failed to write {}: {error}", path.display()));
-	let mut permissions = fs::metadata(path)
-		.unwrap_or_else(|error| panic!("failed to inspect {}: {error}", path.display()))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(path, permissions)
-		.unwrap_or_else(|error| panic!("failed to make {} executable: {error}", path.display()));
+	support::write_executable(path, contents).unwrap();
 }
 
 /// The configured-levels table reaches the driver through the environment

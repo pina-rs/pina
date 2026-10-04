@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getOpenPositionInstruction } from "../client";
+import {
+	getOpenPositionInstruction,
+	OPEN_POSITION_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -34,5 +37,5 @@ export const openPositionCommand = registerGlobals(new Command("open_position"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, OPEN_POSITION_COMPUTE_UNIT_LIMIT);
 	});

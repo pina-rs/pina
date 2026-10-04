@@ -45,6 +45,13 @@ use heck::ToUpperCamelCase;
 use crate::error::RenderError;
 use crate::error::Result;
 
+/// The instruction plugin carrying Pina's recorded compute unit budget.
+///
+/// The CLI never reads the numbers: it requests the limit the generated Rust
+/// client exports, which `pina_codama_renderer` validated and copied from the
+/// same plugin.
+const COMPUTE_UNITS_PLUGIN: &str = "pinaComputeUnits";
+
 /// A rendered CLI application model for one program.
 #[derive(Debug, Clone)]
 pub struct CliModel {
@@ -81,6 +88,9 @@ pub struct InstructionModel {
 	pub data_ident: String,
 	pub args: Vec<ArgModel>,
 	pub accounts: Vec<AccountRefModel>,
+	/// The client's compute unit limit constant, e.g.
+	/// `INITIALIZE_COMPUTE_UNIT_LIMIT`, when the IDL records a measurement.
+	pub compute_unit_limit: Option<String>,
 }
 
 impl InstructionModel {
@@ -319,6 +329,12 @@ fn instruction_model(
 		)?);
 	}
 
+	let compute_unit_limit = instruction
+		.plugins
+		.iter()
+		.any(|plugin| plugin.name.as_ref() == COMPUTE_UNITS_PLUGIN)
+		.then(|| format!("{}_COMPUTE_UNIT_LIMIT", snake.to_uppercase()));
+
 	Ok(InstructionModel {
 		data_ident: format!("{pascal}InstructionData"),
 		accounts_struct: pascal.clone(),
@@ -327,6 +343,7 @@ fn instruction_model(
 		docs: instruction.docs.iter().cloned().collect(),
 		args,
 		accounts,
+		compute_unit_limit,
 	})
 }
 

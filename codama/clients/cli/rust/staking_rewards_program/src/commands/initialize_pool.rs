@@ -81,5 +81,8 @@ pub(crate) fn run(context: &CliContext, args: InitializePoolArgs) -> Result<(), 
 		token_program,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(staking_rewards_program_client::instructions::INITIALIZE_POOL_COMPUTE_UNIT_LIMIT),
+	)
 }

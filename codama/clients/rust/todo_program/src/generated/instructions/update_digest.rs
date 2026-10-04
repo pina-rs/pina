@@ -9,6 +9,14 @@
 )]
 
 pub const UPDATE_DIGEST_DISCRIMINATOR: u8 = 2u8;
+/// Compute units `UpdateDigest` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const UPDATE_DIGEST_MEASURED_COMPUTE_UNITS: u32 = 303;
+/// Compute unit limit to request for a transaction carrying `UpdateDigest`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const UPDATE_DIGEST_COMPUTE_UNIT_LIMIT: u32 = 700;
 
 /// Accounts.
 #[derive(Clone, Debug)]

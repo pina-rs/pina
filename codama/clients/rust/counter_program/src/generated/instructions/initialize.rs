@@ -13,6 +13,14 @@
 /// Contains the PDA bump seed so the client can pass a pre-computed bump
 /// (avoids the cost of `find_program_address` on-chain).
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
+/// Compute units `Initialize` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const INITIALIZE_MEASURED_COMPUTE_UNITS: u32 = 1704;
+/// Compute unit limit to request for a transaction carrying `Initialize`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const INITIALIZE_COMPUTE_UNIT_LIMIT: u32 = 2400;
 
 /// Accounts.
 #[derive(Clone, Debug)]

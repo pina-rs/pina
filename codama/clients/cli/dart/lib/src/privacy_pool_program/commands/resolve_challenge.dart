@@ -54,6 +54,8 @@ final class ResolveChallengeCommand extends Command<void> {
       disclosureRequest: disclosureRequest,
       approve: approveValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: resolveChallengeComputeUnitLimit);
   }
 }

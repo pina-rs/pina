@@ -60,5 +60,8 @@ pub(crate) fn run(context: &CliContext, args: AddRoleArgs) -> Result<(), CliErro
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(role_registry_program_client::instructions::ADD_ROLE_COMPUTE_UNIT_LIMIT),
+	)
 }

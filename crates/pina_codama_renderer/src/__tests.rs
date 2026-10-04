@@ -39,6 +39,7 @@ use codama_nodes::PdaNode;
 use codama_nodes::PdaSeedNode;
 use codama_nodes::PdaSeedValueNode;
 use codama_nodes::PdaValueNode;
+use codama_nodes::PluginNode;
 use codama_nodes::PostOffsetTypeNode;
 use codama_nodes::ProgramNode;
 use codama_nodes::PublicKeyTypeNode;
@@ -1213,6 +1214,81 @@ fn rejects_missing_instruction_discriminators() {
 		"rejects_missing_instruction_discriminators",
 		err.to_string()
 	);
+}
+
+/// The counter fixture with its recorded budgets replaced by `plugins` on
+/// `increment` alone.
+fn counter_with_increment_plugins(plugins: Vec<PluginNode>) -> RootNode {
+	let mut root = load_fixture_root("counter_program");
+
+	for instruction in &mut root.program.instructions {
+		instruction.plugins = if instruction.name.as_ref() == "increment" {
+			plugins.clone()
+		} else {
+			Vec::new()
+		};
+	}
+
+	root
+}
+
+#[test]
+fn renders_recorded_compute_unit_budgets_and_the_limit_helper() -> Result<()> {
+	let root = counter_with_increment_plugins(vec![
+		ComputeUnitBudget {
+			measured: 379,
+			limit: 800,
+		}
+		.to_plugin(),
+	]);
+	let crate_dir = unique_temp_dir("pina-codama-render-compute-units").join("counter_program");
+	render_root_node(&root, &crate_dir, &RenderConfig::default())?;
+
+	let increment = read_generated_file(&crate_dir, "instructions/increment.rs");
+	let initialize = read_generated_file(&crate_dir, "instructions/initialize.rs");
+
+	assert!(!initialize.contains("COMPUTE_UNIT"), "{initialize}");
+	insta::assert_snapshot!(
+		"recorded_compute_unit_budget",
+		format!(
+			"{increment}\n\n{}\n\n{}",
+			read_generated_file(&crate_dir, "compute_budget.rs"),
+			read_generated_file(&crate_dir, "mod.rs"),
+		)
+	);
+
+	Ok(())
+}
+
+#[test]
+fn unmeasured_programs_render_no_compute_budget_module() -> Result<()> {
+	let crate_dir = unique_temp_dir("pina-codama-render-no-compute-units").join("counter_program");
+	render_root_node(
+		&counter_with_increment_plugins(Vec::new()),
+		&crate_dir,
+		&RenderConfig::default(),
+	)?;
+
+	assert!(!crate_dir.join("src/generated/compute_budget.rs").exists());
+	assert!(!read_generated_file(&crate_dir, "mod.rs").contains("compute_budget"));
+	assert!(!read_generated_file(&crate_dir, "instructions/increment.rs").contains("COMPUTE_UNIT"));
+
+	Ok(())
+}
+
+#[test]
+fn rejects_malformed_compute_unit_budgets() {
+	let root =
+		counter_with_increment_plugins(vec![PluginNode::new(compute_units::COMPUTE_UNITS_PLUGIN)]);
+
+	let error = render_root_node(
+		&root,
+		&unique_temp_dir("pina-codama-render-bad-compute-units"),
+		&RenderConfig::default(),
+	)
+	.expect_err("a malformed budget must fail rendering");
+
+	assert!(error.to_string().contains("pinaComputeUnits"), "{error}");
 }
 
 #[test]

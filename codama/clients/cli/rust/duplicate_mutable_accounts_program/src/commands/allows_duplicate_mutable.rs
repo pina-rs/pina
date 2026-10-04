@@ -28,5 +28,5 @@ pub(crate) fn run(context: &CliContext, _args: AllowsDuplicateMutableArgs) -> Re
 
 	let accounts = AllowsDuplicateMutable {};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), Some(duplicate_mutable_accounts_program_client::instructions::ALLOWS_DUPLICATE_MUTABLE_COMPUTE_UNIT_LIMIT))
 }

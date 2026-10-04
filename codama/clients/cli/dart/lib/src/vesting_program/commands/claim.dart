@@ -75,6 +75,6 @@ final class ClaimCommand extends Command<void> {
       clock: clock,
       amount: amountValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: claimComputeUnitLimit);
   }
 }

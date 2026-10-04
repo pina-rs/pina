@@ -1,0 +1,11 @@
+{
+	"schemaVersion": 1,
+	"measurement": "surfpool-simulation-max",
+	"artifactSha256": "de69781ef8e21ea24eb869fce61cf072a46c23ed18b7e2b5c2c1b09ebf838d56",
+	"instructions": {
+		"initialize": {
+			"computeUnits": 61,
+			"samples": 1
+		}
+	}
+}

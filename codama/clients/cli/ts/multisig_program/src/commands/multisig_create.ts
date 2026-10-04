@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getMultisigCreateInstructionAsync } from "../client";
+import {
+	getMultisigCreateInstructionAsync,
+	MULTISIG_CREATE_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -78,5 +81,5 @@ export const multisigCreateCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, MULTISIG_CREATE_COMPUTE_UNIT_LIMIT);
 	});
