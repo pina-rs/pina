@@ -13,6 +13,12 @@ use std::process::Stdio;
 
 use crate::build::BuildError;
 use crate::build::build_project;
+use crate::build::build_project_for_recording;
+use crate::compute_units::ComputeUnitRecording;
+use crate::compute_units::ComputeUnitsError;
+use crate::compute_units::write_error;
+use crate::compute_units::write_recording;
+use crate::parse_program_ir;
 use crate::project::Project;
 use crate::project::ProjectError;
 
@@ -148,7 +154,79 @@ pub fn test_project(options: &TestOptions) -> Result<(), WorkflowError> {
 		&output.sbf_artifact,
 		options.filter.as_deref(),
 		options.compatibility,
+		None,
 	)
+}
+
+/// Run a project's complete Surfpool suite and record what every instruction
+/// consumes in `compute-units.json`, beside the program's `Cargo.toml`.
+///
+/// The suite runs exactly as `pina test` runs it, against the same SBF build,
+/// with `pina_test` recording a simulation of each single-instruction
+/// transaction the program receives. The file is written only when the whole
+/// suite passes, because a failing suite says nothing reliable about cost. The
+/// suite always runs unfiltered: a filtered run would silently drop the
+/// measurements of the instructions it skipped.
+///
+/// # Errors
+///
+/// Returns an error when discovery, the build, or the suite fails, or when the
+/// recorded samples cannot be read, attributed, or written.
+pub fn record_compute_units(
+	project_dir: &Path,
+	compatibility: bool,
+) -> Result<ComputeUnitRecording, ComputeUnitsError> {
+	let project = Project::discover(project_dir)?;
+
+	require_surfpool_test(&project)?;
+	let output = build_project_for_recording(project_dir).map_err(WorkflowError::from)?;
+	let samples = project.target_dir.join("pina").join(format!(
+		"{}-compute-unit-samples.jsonl",
+		project.library_name
+	));
+	let samples_dir = samples.parent().unwrap_or(&project.target_dir);
+
+	fs::create_dir_all(samples_dir).map_err(|source| write_error(samples_dir, source))?;
+	remove_stale_samples(&samples)?;
+
+	let recording = SampleRecording {
+		samples: &samples,
+		program: &project.library_name,
+	};
+	run_surfpool_test(
+		&project,
+		&output.sbf_artifact,
+		None,
+		compatibility,
+		Some(&recording),
+	)?;
+
+	let ir = parse_program_ir(&project.program_dir, Some(&project.library_name))?;
+
+	write_recording(
+		&project.program_dir,
+		&project.library_name,
+		&ir.instructions,
+		&samples,
+		&output.sbf_artifact,
+	)
+}
+
+/// Where a recording suite appends its samples, and which program they
+/// belong to.
+struct SampleRecording<'a> {
+	samples: &'a Path,
+	program: &'a str,
+}
+
+/// Delete samples a previous recording left behind, so the new file holds
+/// only this run's.
+fn remove_stale_samples(samples: &Path) -> Result<(), ComputeUnitsError> {
+	match fs::remove_file(samples) {
+		Ok(()) => Ok(()),
+		Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+		Err(source) => Err(write_error(samples, source)),
+	}
 }
 
 /// Build a project, then delegate persistent watch and redeploy to Surfpool.
@@ -296,6 +374,7 @@ fn run_surfpool_test(
 	artifact: &Path,
 	filter: Option<&str>,
 	compatibility: bool,
+	recording: Option<&SampleRecording<'_>>,
 ) -> Result<(), WorkflowError> {
 	let cargo = executable("CARGO", "cargo");
 	let manifest = project.program_dir.join("tests/surfpool/Cargo.toml");
@@ -304,12 +383,22 @@ fn run_surfpool_test(
 		.current_dir(&project.root)
 		.env("PINA_SBF_ARTIFACT", artifact)
 		.env_remove("PINA_COMPATIBILITY")
+		// A benchmark manifest would make `pina_test` deploy its artifact
+		// instead of the one this command just built.
+		.env_remove("PINA_CU_MANIFEST")
+		.env_remove("PINA_CU_PROGRAM")
+		.env_remove("PINA_CU_RECORD_FILE")
 		.arg("test")
 		.arg("--manifest-path")
 		.arg(manifest)
 		.arg("--lib");
 	if compatibility {
 		command.env("PINA_COMPATIBILITY", "1");
+	}
+	if let Some(recording) = recording {
+		command
+			.env("PINA_CU_RECORD_FILE", recording.samples)
+			.env("PINA_CU_PROGRAM", recording.program);
 	}
 
 	if let Some(filter) = filter {
@@ -758,6 +847,26 @@ mod tests {
 			))
 			.ends_with(&["--rpc-url".to_owned(), "https://rpc.example".to_owned(),])
 		);
+	}
+
+	#[test]
+	fn stale_samples_are_removed_and_unremovable_ones_reported()
+	-> Result<(), Box<dyn std::error::Error>> {
+		let temporary = tempfile::tempdir()?;
+		let samples = temporary.path().join("samples.jsonl");
+
+		remove_stale_samples(&samples)?;
+		fs::write(&samples, "stale")?;
+		remove_stale_samples(&samples)?;
+		assert!(!samples.exists());
+
+		fs::create_dir(&samples)?;
+		assert!(matches!(
+			remove_stale_samples(&samples),
+			Err(ComputeUnitsError::Write { .. })
+		));
+
+		Ok(())
 	}
 
 	#[test]

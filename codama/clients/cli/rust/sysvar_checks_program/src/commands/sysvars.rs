@@ -45,5 +45,8 @@ pub(crate) fn run(context: &CliContext, args: SysvarsArgs) -> Result<(), CliErro
 		stake_history,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(sysvar_checks_program_client::instructions::SYSVARS_COMPUTE_UNIT_LIMIT),
+	)
 }

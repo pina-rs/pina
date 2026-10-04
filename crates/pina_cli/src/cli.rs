@@ -607,16 +607,23 @@ pub(crate) enum Commands {
 	/// exists, and runs the project's isolated `tests/surfpool` test package. That
 	/// package owns an embedded Surfpool instance, so parallel runs use separate
 	/// ports and teardown remains deterministic. Use --unit for native Rust and
-	/// Mollusk tests only.
+	/// Mollusk tests only. Use --record-compute-units to measure every
+	/// instruction for the compute unit limits generated clients request.
 	#[command(
 		after_help = "Examples:\n  pina test\n  pina test --filter initialize\n  pina test \
-		              --unit\n  pina test --compatibility\n  pina test --unit --filter \
-		              rejects_wrong_owner\n\nTest layers:\n  --unit keeps the fast native/Mollusk \
-		              loop and does not build SBF.\n  The default builds SBF and runs the ignored \
-		              test in the isolated `tests/surfpool` package.\n\nSafety:\n  Embedded \
-		              Surfpool tests allocate isolated ports and must stop their instance before \
-		              returning. Missing SBF artifacts and incomplete Surfpool test packages are \
-		              hard failures."
+		              --unit\n  pina test --compatibility\n  pina test --record-compute-units\n  \
+		              pina test --unit --filter rejects_wrong_owner\n\nTest layers:\n  --unit \
+		              keeps the fast native/Mollusk loop and does not build SBF.\n  The default \
+		              builds SBF and runs the ignored test in the isolated `tests/surfpool` \
+		              package.\n\nCompute units:\n  --record-compute-units runs the complete \
+		              Surfpool suite and writes compute-units.json beside Cargo.toml: the most \
+		              compute units each instruction consumed in a successful simulation. `pina \
+		              generate` turns each measurement into the limit clients request, adding \
+		              [compute_units] margin_percent (default 20) and the compute budget \
+		              instructions' cost. Commit the file with the clients it produced.\n\nSafety:\n  \
+		              Embedded Surfpool tests allocate isolated ports and must stop their \
+		              instance before returning. Missing SBF artifacts and incomplete Surfpool \
+		              test packages are hard failures."
 	)]
 	Test {
 		/// Project directory or a directory below it. Defaults to the current directory.
@@ -640,6 +647,10 @@ pub(crate) enum Commands {
 		/// Run only tests whose names contain FILTER.
 		#[arg(short, long, value_name = "FILTER")]
 		filter: Option<String>,
+
+		/// Measure every instruction in the complete Surfpool suite and write compute-units.json.
+		#[arg(long, conflicts_with_all = ["unit", "filter"])]
+		record_compute_units: bool,
 	},
 
 	/// Start a persistent Surfpool development network with SBF watch and redeploy.

@@ -40,5 +40,8 @@ pub(crate) fn run(context: &CliContext, args: DirectTransferArgs) -> Result<(), 
 
 	let accounts = DirectTransfer { sender, recipient };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(transfer_sol_program_client::instructions::DIRECT_TRANSFER_COMPUTE_UNIT_LIMIT),
+	)
 }

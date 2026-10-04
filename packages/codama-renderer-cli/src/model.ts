@@ -51,7 +51,16 @@ export interface InstructionModel {
 	/** The generated client exposes an `…InstructionAsync` builder when any
 	 * account default needs PDA resolution at send time. */
 	hasAsyncBuilder: boolean;
+	/** The instruction's name exactly as the IDL spells it, which the generated
+	 * clients derive their compute unit constants from. Absent when the IDL
+	 * records no compute unit budget for the instruction, so its command
+	 * requests no limit. The CLI requests the limit the client exports and
+	 * never recomputes a margin. */
+	computeUnitLimitName?: string;
 }
+
+/** The instruction plugin carrying Pina's recorded compute unit budget. */
+const COMPUTE_UNITS_PLUGIN = "pinaComputeUnits";
 
 export type FieldKind =
 	| { kind: "number" }
@@ -453,6 +462,7 @@ export function extractCliModel(root: {
 						seeds?: unknown[];
 					};
 				}[];
+				plugins?: { name: string }[];
 			};
 			const context = `instruction \`${node.name}\``;
 			const args = (node.arguments ?? [])
@@ -513,6 +523,10 @@ export function extractCliModel(root: {
 				};
 			});
 
+			const measured = (node.plugins ?? []).some(
+				(plugin) => plugin.name === COMPUTE_UNITS_PLUGIN,
+			);
+
 			return {
 				snake: toSnake(node.name),
 				camel: toCamel(node.name),
@@ -523,6 +537,7 @@ export function extractCliModel(root: {
 				hasAsyncBuilder: accounts.some(
 					(account) => account.resolution.resolution === "pda",
 				),
+				...(measured ? { computeUnitLimitName: node.name } : {}),
 			};
 		},
 	);

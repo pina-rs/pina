@@ -1,0 +1,63 @@
+{
+	"schemaVersion": 1,
+	"measurement": "surfpool-simulation-max",
+	"artifactSha256": "32bac0707e9a00523009074c136a38f80c9eb7968090cfb4fef976c5feece20e",
+	"instructions": {
+		"configAuthorityExecute": {
+			"computeUnits": 3386,
+			"samples": 2
+		},
+		"configExecute": {
+			"computeUnits": 13025,
+			"samples": 8
+		},
+		"configInitialize": {
+			"computeUnits": 4543,
+			"samples": 1
+		},
+		"configUpdate": {
+			"computeUnits": 1731,
+			"samples": 1
+		},
+		"multisigCreate": {
+			"computeUnits": 4057,
+			"samples": 13
+		},
+		"proposalActivate": {
+			"computeUnits": 4422,
+			"samples": 15
+		},
+		"proposalApprove": {
+			"computeUnits": 4485,
+			"samples": 27
+		},
+		"proposalCancel": {
+			"computeUnits": 4412,
+			"samples": 1
+		},
+		"proposalClose": {
+			"computeUnits": 3799,
+			"samples": 2
+		},
+		"proposalCreate": {
+			"computeUnits": 15435,
+			"samples": 18
+		},
+		"proposalReject": {
+			"computeUnits": 4471,
+			"samples": 2
+		},
+		"proposalRevoke": {
+			"computeUnits": 4463,
+			"samples": 1
+		},
+		"spendingLimitUse": {
+			"computeUnits": 7517,
+			"samples": 3
+		},
+		"vaultExecute": {
+			"computeUnits": 8321,
+			"samples": 2
+		}
+	}
+}

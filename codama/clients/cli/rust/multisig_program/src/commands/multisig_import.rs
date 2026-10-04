@@ -99,5 +99,5 @@ pub(crate) fn run(context: &CliContext, args: MultisigImportArgs) -> Result<(), 
 		treasury: Some(treasury),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

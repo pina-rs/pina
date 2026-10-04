@@ -149,6 +149,27 @@ struct ProjectConfig {
 	migrations: MigrationsConfig,
 	#[serde(default)]
 	lints: LintsConfig,
+	#[serde(default, alias = "compute-units")]
+	compute_units: ComputeUnitsConfig,
+}
+
+/// How recorded compute unit measurements become the limits clients request,
+/// configured through the `[compute_units]` table.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, deny_unknown_fields)]
+pub(crate) struct ComputeUnitsConfig {
+	/// Percentage added to each measurement before rounding, so a limit
+	/// absorbs inputs more expensive than the recorded fixtures.
+	#[serde(alias = "margin-percent")]
+	pub(crate) margin_percent: u32,
+}
+
+impl Default for ComputeUnitsConfig {
+	fn default() -> Self {
+		Self {
+			margin_percent: crate::compute_units::DEFAULT_COMPUTE_UNIT_MARGIN_PERCENT,
+		}
+	}
 }
 
 /// Lint level overrides configured through the `[lints]` table.
@@ -430,18 +451,7 @@ impl Project {
 		let root = config_path
 			.parent()
 			.map_or_else(|| PathBuf::from("."), Path::to_path_buf);
-		let source = std::fs::read_to_string(config_path).map_err(|source| {
-			ProjectError::ReadFile {
-				path: config_path.to_path_buf(),
-				source,
-			}
-		})?;
-		let config: ProjectConfig = toml::from_str(&source).map_err(|source| {
-			ProjectError::ParseToml {
-				path: config_path.to_path_buf(),
-				source,
-			}
-		})?;
+		let config = read_project_config(config_path)?;
 		let templates = PathTemplates::new(root.clone(), config.project.paths.clone())?;
 		let configured_program =
 			templates.resolve_dir(&root, "project.program", &config.project.program)?;
@@ -1214,6 +1224,42 @@ fn cargo_metadata(start: &Path, manifest_path: Option<&Path>) -> Result<Metadata
 	})
 }
 
+fn read_project_config(config_path: &Path) -> Result<ProjectConfig, ProjectError> {
+	let source = std::fs::read_to_string(config_path).map_err(|source| {
+		ProjectError::ReadFile {
+			path: config_path.to_path_buf(),
+			source,
+		}
+	})?;
+
+	toml::from_str(&source).map_err(|source| {
+		ProjectError::ParseToml {
+			path: config_path.to_path_buf(),
+			source,
+		}
+	})
+}
+
+/// Read the `[compute_units]` settings governing the program at `start`.
+///
+/// The nearest `pina.toml` at or above `start` is the configuration
+/// [`Project::discover`] would use; without one every setting keeps its
+/// default. Unlike discovery this never runs Cargo, so IDL generation can call
+/// it on every run.
+///
+/// # Errors
+///
+/// Returns an error when `start` cannot be inspected or the configuration
+/// cannot be read or parsed.
+pub(crate) fn compute_units_config(start: &Path) -> Result<ComputeUnitsConfig, ProjectError> {
+	let start = normalize_start(start)?;
+	let Some(config_path) = find_ancestor_config(&start) else {
+		return Ok(ComputeUnitsConfig::default());
+	};
+
+	Ok(read_project_config(&config_path)?.compute_units)
+}
+
 fn normalize_start(start: &Path) -> Result<PathBuf, ProjectError> {
 	let absolute = std::fs::canonicalize(start).map_err(|source| {
 		ProjectError::InspectPath {
@@ -1467,6 +1513,78 @@ mode = "overwrite"
 			.expect_err("unknown project config keys should fail closed");
 
 		assert!(error.to_string().contains("unknown field"));
+	}
+
+	#[test]
+	fn compute_unit_settings_default_without_a_config_and_parse_from_one()
+	-> Result<(), Box<dyn std::error::Error>> {
+		let temp = TempDir::new()?;
+		let nested = temp.path().join("src");
+		write_program(temp.path(), "counter");
+
+		assert_eq!(
+			compute_units_config(&nested)?.margin_percent,
+			crate::compute_units::DEFAULT_COMPUTE_UNIT_MARGIN_PERCENT
+		);
+
+		for config in [
+			"[compute_units]\nmargin_percent = 35\n",
+			"[compute-units]\nmargin-percent = 35\n",
+		] {
+			fs::write(
+				temp.path().join(CONFIG_FILE_NAME),
+				format!("[project]\nprogram = \".\"\n\n{config}"),
+			)?;
+
+			assert_eq!(compute_units_config(&nested)?.margin_percent, 35);
+			Project::discover(temp.path())?;
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn compute_unit_settings_fail_closed_on_unknown_or_invalid_values()
+	-> Result<(), Box<dyn std::error::Error>> {
+		let temp = TempDir::new()?;
+		write_program(temp.path(), "counter");
+
+		for config in [
+			"[compute_units]\nmargin = 20\n",
+			"[compute_units]\nmargin_percent = -5\n",
+			"[compute_units]\nmargin_percent = \"20\"\n",
+		] {
+			fs::write(temp.path().join(CONFIG_FILE_NAME), config)?;
+
+			assert!(
+				matches!(
+					compute_units_config(temp.path()),
+					Err(ProjectError::ParseToml { .. })
+				),
+				"{config:?} must be rejected"
+			);
+		}
+
+		assert!(matches!(
+			compute_units_config(&temp.path().join("missing")),
+			Err(ProjectError::InspectPath { .. })
+		));
+
+		Ok(())
+	}
+
+	#[test]
+	fn compute_unit_settings_report_an_unreadable_config() -> Result<(), Box<dyn std::error::Error>>
+	{
+		let temp = TempDir::new()?;
+		fs::write(temp.path().join(CONFIG_FILE_NAME), [0xff, 0xfe, 0xfd])?;
+
+		assert!(matches!(
+			compute_units_config(temp.path()),
+			Err(ProjectError::ReadFile { .. })
+		));
+
+		Ok(())
 	}
 
 	/// The manifest owns the version width and the auto policy, so their old

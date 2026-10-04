@@ -9,6 +9,14 @@
 )]
 
 pub const ALLOWS_DUPLICATE_READONLY_DISCRIMINATOR: u8 = 2u8;
+/// Compute units `AllowsDuplicateReadonly` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const ALLOWS_DUPLICATE_READONLY_MEASURED_COMPUTE_UNITS: u32 = 52;
+/// Compute unit limit to request for a transaction carrying `AllowsDuplicateReadonly`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const ALLOWS_DUPLICATE_READONLY_COMPUTE_UNIT_LIMIT: u32 = 400;
 
 /// Accounts.
 #[derive(Clone, Debug)]

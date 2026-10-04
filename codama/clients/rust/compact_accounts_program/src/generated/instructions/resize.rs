@@ -9,6 +9,14 @@
 )]
 
 pub const RESIZE_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `Resize` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const RESIZE_MEASURED_COMPUTE_UNITS: u32 = 3684;
+/// Compute unit limit to request for a transaction carrying `Resize`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const RESIZE_COMPUTE_UNIT_LIMIT: u32 = 4800;
 
 /// Accounts.
 #[derive(Clone, Debug)]

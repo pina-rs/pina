@@ -64,5 +64,8 @@ pub(crate) fn run(context: &CliContext, args: ConfigUpdateArgs) -> Result<(), Cl
 		program_config,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(multisig_program_client::instructions::CONFIG_UPDATE_COMPUTE_UNIT_LIMIT),
+	)
 }

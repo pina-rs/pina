@@ -44,6 +44,6 @@ final class AddTagCommand extends Command<void> {
       profile: profile,
       tag: tagValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: addTagComputeUnitLimit);
   }
 }

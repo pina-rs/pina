@@ -10,6 +10,14 @@
 
 /// Instruction data for `AddTag`. Appends a tag to the profile.
 pub const ADD_TAG_DISCRIMINATOR: u8 = 2u8;
+/// Compute units `AddTag` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const ADD_TAG_MEASURED_COMPUTE_UNITS: u32 = 609;
+/// Compute unit limit to request for a transaction carrying `AddTag`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const ADD_TAG_COMPUTE_UNIT_LIMIT: u32 = 1100;
 
 /// Accounts.
 #[derive(Clone, Debug)]

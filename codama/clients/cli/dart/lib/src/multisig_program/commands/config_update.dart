@@ -59,6 +59,8 @@ final class ConfigUpdateCommand extends Command<void> {
       setCreationFee: setCreationFeeValue,
       creationFee: creationFeeValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: configUpdateComputeUnitLimit);
   }
 }

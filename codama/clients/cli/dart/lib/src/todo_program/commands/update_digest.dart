@@ -42,6 +42,8 @@ final class UpdateDigestCommand extends Command<void> {
       todo: todo,
       digest: digestValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: updateDigestComputeUnitLimit);
   }
 }

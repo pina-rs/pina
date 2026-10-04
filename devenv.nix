@@ -1003,6 +1003,25 @@ in
           -- \
           --ignored \
           --nocapture
+        # The generated compute unit limit, sent through the generated Rust
+        # client and the generated CLI against the deployed counter. Neither
+        # runs inside the suites `pina test --record-compute-units` measures, so
+        # a limit the program has outgrown fails here instead of blocking the
+        # recording that would fix it.
+        PINA_SBF_ARTIFACT="''${SBF_OUT_DIR:-$DEVENV_ROOT/target/surfpool/examples}/counter_program.so" cargo test \
+          --locked \
+          -p counter-program-surfpool-tests \
+          --test compute_unit_budget \
+          -- \
+          --ignored \
+          --nocapture
+        cargo test \
+          --locked \
+          -p counter_program_cli \
+          --test surfpool \
+          -- \
+          --ignored \
+          --nocapture
         # `pina rehearse` replays real counter traffic between two Surfpool
         # instances, using the counter and its rehearsal variant built above.
         cargo test \

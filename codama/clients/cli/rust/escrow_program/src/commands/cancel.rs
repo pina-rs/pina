@@ -62,5 +62,8 @@ pub(crate) fn run(context: &CliContext, args: CancelArgs) -> Result<(), CliError
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(escrow_program_client::instructions::CANCEL_COMPUTE_UNIT_LIMIT),
+	)
 }

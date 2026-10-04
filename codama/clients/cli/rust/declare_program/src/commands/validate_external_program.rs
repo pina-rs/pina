@@ -37,5 +37,5 @@ pub(crate) fn run(context: &CliContext, args: ValidateExternalProgramArgs) -> Re
 		external_program,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

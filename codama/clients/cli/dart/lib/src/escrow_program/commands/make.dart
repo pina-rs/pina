@@ -91,6 +91,6 @@ final class MakeCommand extends Command<void> {
       amountB: amountBValue,
       bump: bumpValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: makeComputeUnitLimit);
   }
 }

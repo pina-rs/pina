@@ -42,6 +42,6 @@ final class SysvarsCommand extends Command<void> {
       rent: rent,
       stakeHistory: stakeHistory,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: sysvarsComputeUnitLimit);
   }
 }

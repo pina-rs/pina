@@ -86,5 +86,8 @@ pub(crate) fn run(context: &CliContext, args: SpendingLimitUseArgs) -> Result<()
 		system_program: Some(system_program),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(multisig_program_client::instructions::SPENDING_LIMIT_USE_COMPUTE_UNIT_LIMIT),
+	)
 }

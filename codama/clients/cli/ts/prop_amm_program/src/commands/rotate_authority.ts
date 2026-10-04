@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getRotateAuthorityInstruction } from "../client";
+import {
+	getRotateAuthorityInstruction,
+	ROTATE_AUTHORITY_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -31,5 +34,5 @@ export const rotateAuthorityCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, ROTATE_AUTHORITY_COMPUTE_UNIT_LIMIT);
 	});

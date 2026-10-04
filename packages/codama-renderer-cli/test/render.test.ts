@@ -140,6 +140,65 @@ describe("renderTypeScript", () => {
 		}
 	});
 
+	it("requests the client's recorded limit only for measured instructions", () => {
+		const root = JSON.parse(
+			readFileSync(join(idls, "counter_program.json"), "utf8"),
+		) as {
+			program: { instructions: { name: string; plugins?: unknown[] }[] };
+		};
+		for (const instruction of root.program.instructions) {
+			instruction.plugins = instruction.name === "increment"
+				? [{
+					kind: "pluginNode",
+					name: "pinaComputeUnits",
+					payload: { measured: 379, limit: 800 },
+				}]
+				: [];
+		}
+		const files = renderTypeScript(extractCliModel(root as never), {
+			clientImportPath: "../../../js/counter_program/src/generated/index",
+		});
+
+		const increment = files.get("src/commands/increment.ts")!;
+		expect(increment).toContain(
+			'import { getIncrementInstructionAsync, INCREMENT_COMPUTE_UNIT_LIMIT } from "../client";',
+		);
+		expect(increment).toContain(
+			"await context.send(instruction, INCREMENT_COMPUTE_UNIT_LIMIT);",
+		);
+
+		const initialize = files.get("src/commands/initialize.ts")!;
+		expect(initialize).not.toContain("COMPUTE_UNIT_LIMIT");
+		expect(initialize).toContain("await context.send(instruction);");
+
+		const context = files.get("src/context.ts")!;
+		expect(context).toContain('"--compute-unit-limit <units>"');
+		expect(context).toContain("setTransactionMessageComputeUnitLimit");
+		expect(files.get("README.md")!).toContain("--compute-unit-limit");
+	});
+
+	it("names the client constant in the client's constant case", () => {
+		const root = JSON.parse(
+			readFileSync(join(idls, "counter_program.json"), "utf8"),
+		) as {
+			program: { instructions: { name: string; plugins?: unknown[] }[] };
+		};
+		root.program.instructions = root.program.instructions
+			.filter((instruction) => instruction.name === "increment")
+			.map((instruction) => ({
+				...instruction,
+				name: "incrementV2",
+				plugins: [{ kind: "pluginNode", name: "pinaComputeUnits" }],
+			}));
+		const files = renderTypeScript(extractCliModel(root as never), {
+			clientImportPath: "../../../js/counter_program/src/generated/index",
+		});
+
+		expect(files.get("src/commands/increment_v2.ts")!).toContain(
+			"INCREMENT_V2_COMPUTE_UNIT_LIMIT",
+		);
+	});
+
 	it("wires ownership and validation into the emitted runtime", () => {
 		const files = renderCounterProgram();
 		const fetch = files.get("src/fetch.ts")!;

@@ -1049,6 +1049,16 @@
 							}
 						}
 					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 5800,
+							"measured": 4543
+						}
+					}
 				]
 			},
 			{
@@ -1154,6 +1164,16 @@
 								"kind": "numberValueNode",
 								"number": 1
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 2400,
+							"measured": 1731
 						}
 					}
 				]
@@ -1346,6 +1366,16 @@
 								"kind": "numberValueNode",
 								"number": 2
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 5200,
+							"measured": 4057
 						}
 					}
 				]
@@ -1754,6 +1784,16 @@
 							}
 						}
 					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 18900,
+							"measured": 15435
+						}
+					}
 				]
 			},
 			{
@@ -1820,6 +1860,16 @@
 								"kind": "numberValueNode",
 								"number": 5
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 5700,
+							"measured": 4422
 						}
 					}
 				]
@@ -1890,6 +1940,16 @@
 							}
 						}
 					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 5700,
+							"measured": 4485
+						}
+					}
 				]
 			},
 			{
@@ -1956,6 +2016,16 @@
 								"kind": "numberValueNode",
 								"number": 7
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 5700,
+							"measured": 4471
 						}
 					}
 				]
@@ -2026,6 +2096,16 @@
 							}
 						}
 					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 5700,
+							"measured": 4463
+						}
+					}
 				]
 			},
 			{
@@ -2092,6 +2172,16 @@
 								"kind": "numberValueNode",
 								"number": 9
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 5600,
+							"measured": 4412
 						}
 					}
 				]
@@ -2171,6 +2261,16 @@
 								"kind": "numberValueNode",
 								"number": 10
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 10300,
+							"measured": 8321
 						}
 					}
 				]
@@ -2281,6 +2381,16 @@
 								"kind": "numberValueNode",
 								"number": 11
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 16000,
+							"measured": 13025
 						}
 					}
 				]
@@ -2404,6 +2514,16 @@
 								"kind": "numberValueNode",
 								"number": 12
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 4400,
+							"measured": 3386
 						}
 					}
 				]
@@ -2553,6 +2673,16 @@
 							}
 						}
 					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 9400,
+							"measured": 7517
+						}
+					}
 				]
 			},
 			{
@@ -2624,6 +2754,16 @@
 								"kind": "numberValueNode",
 								"number": 14
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 4900,
+							"measured": 3799
 						}
 					}
 				]

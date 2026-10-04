@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getUpdateInstruction } from "../client";
+import { getUpdateInstruction, UPDATE_COMPUTE_UNIT_LIMIT } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -31,5 +31,5 @@ export const updateCommand = registerGlobals(new Command("update"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, UPDATE_COMPUTE_UNIT_LIMIT);
 	});

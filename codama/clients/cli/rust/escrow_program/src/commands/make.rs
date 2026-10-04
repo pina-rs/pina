@@ -84,5 +84,8 @@ pub(crate) fn run(context: &CliContext, args: MakeArgs) -> Result<(), CliError> 
 		token_program,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(escrow_program_client::instructions::MAKE_COMPUTE_UNIT_LIMIT),
+	)
 }

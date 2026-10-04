@@ -234,6 +234,16 @@
 							}
 						}
 					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 4200,
+							"measured": 3219
+						}
+					}
 				]
 			},
 			{
@@ -315,6 +325,16 @@
 								"kind": "numberValueNode",
 								"number": 0
 							}
+						}
+					}
+				],
+				"plugins": [
+					{
+						"kind": "pluginNode",
+						"name": "pinaComputeUnits",
+						"payload": {
+							"limit": 5200,
+							"measured": 4073
 						}
 					}
 				]

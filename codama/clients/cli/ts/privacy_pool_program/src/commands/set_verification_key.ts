@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getSetVerificationKeyInstruction } from "../client";
+import {
+	getSetVerificationKeyInstruction,
+	SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -67,5 +70,5 @@ export const setVerificationKeyCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT);
 	});

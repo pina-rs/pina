@@ -56,5 +56,8 @@ pub(crate) fn run(context: &CliContext, args: RelayArgs) -> Result<(), CliError>
 		migration_program,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(migrations_program_client::instructions::RELAY_COMPUTE_UNIT_LIMIT),
+	)
 }

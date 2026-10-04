@@ -103,6 +103,8 @@ final class SetVerificationKeyCommand extends Command<void> {
       ic2: ic2Value,
       ic3: ic3Value,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: setVerificationKeyComputeUnitLimit);
   }
 }

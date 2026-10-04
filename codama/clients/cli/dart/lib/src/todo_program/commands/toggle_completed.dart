@@ -39,6 +39,8 @@ final class ToggleCompletedCommand extends Command<void> {
       owner: owner,
       todo: todo,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: toggleCompletedComputeUnitLimit);
   }
 }

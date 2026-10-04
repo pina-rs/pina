@@ -37,6 +37,8 @@ final class ProposalActivateCommand extends Command<void> {
       member: member,
       clock: clock,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: proposalActivateComputeUnitLimit);
   }
 }

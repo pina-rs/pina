@@ -47,5 +47,8 @@ pub(crate) fn run(context: &CliContext, args: CreateArgs) -> Result<(), CliError
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(float_accounts_program_client::instructions::CREATE_COMPUTE_UNIT_LIMIT),
+	)
 }

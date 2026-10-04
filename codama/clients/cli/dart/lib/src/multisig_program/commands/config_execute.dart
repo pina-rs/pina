@@ -62,6 +62,8 @@ final class ConfigExecuteCommand extends Command<void> {
       rentCollector: rentCollector,
       spendingLimitAccounts: spendingLimitAccounts,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: configExecuteComputeUnitLimit);
   }
 }

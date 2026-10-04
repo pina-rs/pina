@@ -37,5 +37,8 @@ pub(crate) fn run(context: &CliContext, args: TouchArgs) -> Result<(), CliError>
 		store: Some(store),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(optional_accounts_program_client::instructions::TOUCH_COMPUTE_UNIT_LIMIT),
+	)
 }

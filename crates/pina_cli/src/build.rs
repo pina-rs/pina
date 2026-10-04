@@ -11,8 +11,10 @@ use std::process::Command;
 
 use atomic_write_file::AtomicWriteFile;
 
+use crate::compute_units::MeasurementUse;
 use crate::error::IdlError;
 use crate::generate_idl;
+use crate::generate_idl_with;
 use crate::project::Project;
 use crate::project::ProjectError;
 pub use crate::verifiable::VerifiedBuildRecord;
@@ -183,12 +185,17 @@ pub enum BuildError {
 /// Returns an error when discovery, the SBF build, IDL extraction, or writing
 /// the generated IDL fails.
 pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
-	build_project_with_options(&BuildOptions {
+	build_project_with_options(&default_build_options(start))
+}
+
+/// The options `pina build` uses without flags.
+fn default_build_options(start: &Path) -> BuildOptions {
+	BuildOptions {
 		project_dir: start.to_path_buf(),
 		features: Vec::new(),
 		no_default_features: false,
 		size_profile: SizeProfile::default(),
-	})
+	}
 }
 
 /// Build a project with explicit Cargo feature selection.
@@ -201,6 +208,23 @@ pub fn build_project(start: &Path) -> Result<BuildOutput, BuildError> {
 /// Returns the same discovery, Cargo, extraction, and publication errors as
 /// [`build_project`].
 pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput, BuildError> {
+	build_with_measurements(options, MeasurementUse::Lenient)
+}
+
+/// Build a project for `pina test --record-compute-units`.
+///
+/// The IDL this build writes carries no compute unit budgets: the recording
+/// replaces `compute-units.json`, so whatever the old file says, including
+/// measurements of instructions the program no longer declares, must not stop
+/// the run that fixes it.
+pub(crate) fn build_project_for_recording(start: &Path) -> Result<BuildOutput, BuildError> {
+	build_with_measurements(&default_build_options(start), MeasurementUse::Skip)
+}
+
+fn build_with_measurements(
+	options: &BuildOptions,
+	measurements: MeasurementUse,
+) -> Result<BuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
 	check_migrations_for_build(&project)?;
 	if options.size_profile.requests_lto() {
@@ -251,13 +275,17 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		});
 	}
 
-	let idl =
-		generate_idl(&project.program_dir, Some(&project.library_name)).map_err(|source| {
-			BuildError::GenerateIdl {
-				package: project.package_name.clone(),
-				source,
-			}
-		})?;
+	let idl = generate_idl_with(
+		&project.program_dir,
+		Some(&project.library_name),
+		measurements,
+	)
+	.map_err(|source| {
+		BuildError::GenerateIdl {
+			package: project.package_name.clone(),
+			source,
+		}
+	})?;
 	let json = serde_json::to_string_pretty(&idl)
 		.map_err(|source| serialize_idl_error(&project.package_name, source))?;
 

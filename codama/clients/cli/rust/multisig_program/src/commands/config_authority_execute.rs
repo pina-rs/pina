@@ -66,5 +66,8 @@ pub(crate) fn run(context: &CliContext, args: ConfigAuthorityExecuteArgs) -> Res
 		spending_limit_accounts,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(multisig_program_client::instructions::CONFIG_AUTHORITY_EXECUTE_COMPUTE_UNIT_LIMIT),
+	)
 }

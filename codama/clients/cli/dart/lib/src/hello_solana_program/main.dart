@@ -37,5 +37,11 @@ CommandRunner<void> buildRunner() {
       negatable: false,
       help: 'Print machine-readable JSON output.',
     )
+    ..argParser.addOption(
+      'compute-unit-limit',
+      valueHelp: 'units',
+      help:
+          'Compute unit limit to request instead of the one recorded for the instruction.',
+    )
     ..addCommand(HelloCommand());
 }
