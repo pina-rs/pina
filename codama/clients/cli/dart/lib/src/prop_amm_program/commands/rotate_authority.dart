@@ -36,6 +36,8 @@ final class RotateAuthorityCommand extends Command<void> {
       authority: authority,
       newAuthority: newAuthorityValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: rotateAuthorityComputeUnitLimit);
   }
 }

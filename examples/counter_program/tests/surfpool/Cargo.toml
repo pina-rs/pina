@@ -7,3 +7,8 @@ publish = false
 [dependencies]
 pina = { workspace = true, features = ["account-resize", "logs", "derive"] }
 pina_test = { workspace = true }
+
+[dev-dependencies]
+# The compute unit budget test drives the deployed program through the
+# generated Rust client, so it proves the generated limit end to end.
+counter-program-client = { path = "../../../../codama/clients/rust/counter_program" }

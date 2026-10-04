@@ -51,6 +51,8 @@ final class InitializeCommand extends Command<void> {
       systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializeComputeUnitLimit);
   }
 }

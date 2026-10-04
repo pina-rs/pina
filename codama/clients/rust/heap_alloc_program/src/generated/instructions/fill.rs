@@ -10,6 +10,14 @@
 
 /// Instruction data for `Fill`.
 pub const FILL_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `Fill` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const FILL_MEASURED_COMPUTE_UNITS: u32 = 82171;
+/// Compute unit limit to request for a transaction carrying `Fill`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const FILL_COMPUTE_UNIT_LIMIT: u32 = 99000;
 
 /// Accounts.
 #[derive(Clone, Debug)]

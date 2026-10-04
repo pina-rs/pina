@@ -73,6 +73,16 @@ expression: idl
               }
             }
           }
+        ],
+        "plugins": [
+          {
+            "kind": "pluginNode",
+            "name": "pinaComputeUnits",
+            "payload": {
+              "limit": 500,
+              "measured": 145
+            }
+          }
         ]
       }
     ]

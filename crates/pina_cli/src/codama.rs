@@ -19,11 +19,14 @@ use pina_cpi_renderer::RenderMode as CpiRenderMode;
 use pina_cpi_renderer::ScaffoldDependency as CpiScaffoldDependency;
 use pina_cpi_renderer::render_idl_file as render_cpi_idl_file;
 
+use crate::compute_units::MeasurementUse;
+use crate::compute_units::stale_measurement_warning;
 use crate::dart_client::harden_generated_dart_clients;
 use crate::dart_client::validate_dart_client_idls;
 use crate::dart_client::write_dart_package_barrels;
 use crate::error::CodamaError;
-use crate::generate_idl;
+use crate::error::IdlError;
+use crate::generate_idl_with;
 use crate::js_client::harden_generated_clients;
 use crate::project::ClientLanguage;
 use crate::project::GenerationMode;
@@ -279,14 +282,16 @@ function publishDartCli() {
 			join(outputRoot, "bin", `${name}.dart`),
 		);
 	}
-	publishFile(
-		join(stagingRoot, "lib", "src", "endpoint_guard.dart"),
-		join(outputRoot, "lib", "src", "endpoint_guard.dart"),
-	);
-	publishFile(
-		join(stagingRoot, "test", "endpoint_guard_test.dart"),
-		join(outputRoot, "test", "endpoint_guard_test.dart"),
-	);
+	for (const shared of ["endpoint_guard", "compute_budget"]) {
+		publishFile(
+			join(stagingRoot, "lib", "src", `${shared}.dart`),
+			join(outputRoot, "lib", "src", `${shared}.dart`),
+		);
+		publishFile(
+			join(stagingRoot, "test", `${shared}_test.dart`),
+			join(outputRoot, "test", `${shared}_test.dart`),
+		);
+	}
 
 	const manifest = join(outputRoot, "pubspec.yaml");
 	if (scaffold && !existsSync(manifest)) {
@@ -450,6 +455,7 @@ pub fn generate_project_clients(
 	options: &ProjectGenerateOptions,
 ) -> Result<ProjectGenerateOutput, CodamaError> {
 	let project = Project::discover(&options.project_dir).map_err(CodamaError::Project)?;
+	warn_about_stale_compute_units(&project)?;
 	let clients = if options.clients.is_empty() {
 		project.clients.clone()
 	} else {
@@ -511,6 +517,29 @@ pub fn generate_project_clients(
 		clients_dir,
 		clients: clients.into_iter().collect(),
 	})
+}
+
+/// Warn when `compute-units.json` was measured against a different build of
+/// the program than the one `pina build` last published.
+///
+/// The limits still generate: a rebuild that changes nothing material keeps
+/// them valid, and the margin absorbs small drift. The warning names the
+/// command that measures the current build.
+fn warn_about_stale_compute_units(project: &Project) -> Result<(), CodamaError> {
+	let warning = stale_measurement_warning(&project.program_dir, &project.sbf_artifact())
+		.map_err(|error| {
+			CodamaError::GenerateIdl {
+				example: project.library_name.clone(),
+				path: project.program_dir.clone(),
+				source: IdlError::Other(error.to_string()),
+			}
+		})?;
+
+	if let Some(warning) = warning {
+		eprintln!("warning: {warning}");
+	}
+
+	Ok(())
 }
 
 /// Add each selected CLI's base client and warn when several CLIs are picked.
@@ -599,13 +628,17 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	let mut idl_paths = Vec::with_capacity(plan.programs.len());
 	for (example, program_path) in &plan.programs {
 		let name_override = plan.override_idl_names.then_some(example.as_str());
-		let idl = generate_idl(program_path, name_override).map_err(|source| {
-			CodamaError::GenerateIdl {
-				example: example.clone(),
-				path: program_path.clone(),
-				source,
-			}
-		})?;
+		// Generated clients are committed, so a measurement for an undeclared
+		// instruction fails here instead of silently losing its budget.
+		let idl = generate_idl_with(program_path, name_override, MeasurementUse::Strict).map_err(
+			|source| {
+				CodamaError::GenerateIdl {
+					example: example.clone(),
+					path: program_path.clone(),
+					source,
+				}
+			},
+		)?;
 		let idl_json = serde_json::to_string_pretty(&idl).map_err(|source| {
 			CodamaError::SerializeIdl {
 				example: example.clone(),
@@ -2306,8 +2339,6 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn client_runner_reports_spawn_and_renderer_failures() {
-		use std::os::unix::fs::PermissionsExt;
-
 		let missing = empty_plan("definitely-missing-pina-renderer-command");
 		let idls = [PathBuf::from("program.json")];
 		assert!(matches!(
@@ -2318,10 +2349,11 @@ mod tests {
 		let temp =
 			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let script = temp.path().join("node");
-		std::fs::write(&script, "#!/bin/sh\nprintf 'renderer failed' >&2\nexit 9\n")
-			.unwrap_or_else(|error| panic!("failed to write renderer: {error}"));
-		std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))
-			.unwrap_or_else(|error| panic!("failed to make renderer executable: {error}"));
+		crate::test_support::write_executable(
+			&script,
+			"#!/bin/sh\nprintf 'renderer failed' >&2\nexit 9\n",
+		)
+		.unwrap();
 		let failing = empty_plan(script.to_string_lossy());
 		let error = run_client_generation(&failing, ClientLanguage::Dart, &idls)
 			.expect_err("renderer failure should be reported");
@@ -2537,8 +2569,6 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn generation_plan_reports_javascript_hardening_failures() {
-		use std::os::unix::fs::PermissionsExt;
-
 		let temp =
 			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let temp_root = std::fs::canonicalize(temp.path())
@@ -2546,10 +2576,7 @@ mod tests {
 		// A fake `node` that succeeds without rendering anything, so the plan
 		// reaches client hardening with no generated tree to walk.
 		let node = temp_root.join("node");
-		std::fs::write(&node, "#!/bin/sh\nexit 0\n")
-			.unwrap_or_else(|error| panic!("failed to write fake node: {error}"));
-		std::fs::set_permissions(&node, std::fs::Permissions::from_mode(0o755))
-			.unwrap_or_else(|error| panic!("failed to make fake node executable: {error}"));
+		crate::test_support::write_executable(&node, "#!/bin/sh\nexit 0\n").unwrap();
 
 		let program =
 			Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana_program");

@@ -406,16 +406,8 @@ pub fn compare_profiles(
 	current: &ProgramProfile,
 	threshold: RegressionThreshold,
 ) -> ComparisonReport {
-	let baseline_functions: BTreeMap<&str, &FunctionProfile> = baseline
-		.functions
-		.iter()
-		.map(|function| (function.name.as_str(), function))
-		.collect();
-	let current_functions: BTreeMap<&str, &FunctionProfile> = current
-		.functions
-		.iter()
-		.map(|function| (function.name.as_str(), function))
-		.collect();
+	let baseline_functions = functions_by_name(baseline);
+	let current_functions = functions_by_name(current);
 
 	let mut functions = Vec::new();
 
@@ -473,6 +465,32 @@ pub fn compare_profiles(
 		exceeds_threshold,
 		functions,
 	}
+}
+
+/// Index a profile's functions by name, merging entries that share one.
+///
+/// Demangled names drop the legacy mangling hash, so distinct
+/// monomorphizations of one generic function share a name. Summing them keeps
+/// every instruction in the comparison instead of keeping only the last entry.
+fn functions_by_name(profile: &ProgramProfile) -> BTreeMap<&str, FunctionProfile> {
+	let mut functions: BTreeMap<&str, FunctionProfile> = BTreeMap::new();
+
+	for function in &profile.functions {
+		functions
+			.entry(function.name.as_str())
+			.and_modify(|merged| {
+				merged.offset = merged.offset.min(function.offset);
+				merged.size = merged.size.saturating_add(function.size);
+				merged.instruction_count = merged
+					.instruction_count
+					.saturating_add(function.instruction_count);
+				merged.syscall_count = merged.syscall_count.saturating_add(function.syscall_count);
+				merged.estimated_cu = merged.estimated_cu.saturating_add(function.estimated_cu);
+			})
+			.or_insert_with(|| function.clone());
+	}
+
+	functions
 }
 
 /// Number of functions whose estimated CU changed, were added, or removed.
@@ -645,6 +663,36 @@ mod tests {
 				.functions
 				.iter()
 				.all(|function| function.change == FunctionChange::Unchanged)
+		);
+	}
+
+	#[test]
+	fn functions_sharing_a_demangled_name_are_compared_as_one() {
+		let mut syscalling = function("generic::<T>", 240, 16, 2, 101);
+		syscalling.syscall_count = 1;
+		let baseline = profile(
+			"demo",
+			vec![function("generic::<T>", 160, 80, 10, 10), syscalling],
+		);
+		let current = profile("demo", vec![function("generic::<T>", 0, 80, 10, 10)]);
+		let report = compare_profiles(&baseline, &current, strict_threshold());
+
+		assert_eq!(report.functions.len(), 1);
+		let merged = &report.functions[0];
+		assert_eq!(merged.change, FunctionChange::Changed);
+		assert_eq!(merged.baseline_cu, Some(111));
+		assert_eq!(merged.baseline_instructions, Some(12));
+		assert_eq!(merged.delta_cu, -101);
+		assert_eq!(
+			functions_by_name(&baseline)["generic::<T>"],
+			FunctionProfile {
+				name: "generic::<T>".to_owned(),
+				offset: 160,
+				size: 96,
+				instruction_count: 12,
+				syscall_count: 1,
+				estimated_cu: 111,
+			}
 		);
 	}
 

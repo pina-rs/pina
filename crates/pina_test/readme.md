@@ -58,6 +58,23 @@ program
 
 V1 submissions are confirmed before the call returns, and the wire encoding is the runtime's own — a v1 message has no serde representation, so the typed client cannot encode it.
 
+## Measure compute units
+
+`pina test --record-compute-units` sets `PINA_CU_RECORD_FILE` and `PINA_CU_PROGRAM`. While they are set, `send`, `send_instruction`, `send_with_signers`, and `send_transaction` simulate each single-instruction transaction addressed to the program before submitting it, and append one JSON line per sample: the program, the leading instruction-data bytes as `discriminatorBytes` (enough for a discriminator of any width), the compute units consumed, and whether the simulated transaction succeeded. Only successful samples become budgets, and the transaction is still submitted, so a test that expects a rejection sees the same error with or without recording.
+
+To check a compute unit limit against the deployed program, measure a transaction and send it with compute budget instructions in front:
+
+```rust,ignore
+let measured = program.simulate_compute_units(&[increment.clone()], &[])?;
+
+program.send_instructions(
+	&[set_compute_unit_limit_instruction(INCREMENT_COMPUTE_UNIT_LIMIT), increment],
+	&[],
+)?;
+```
+
+`simulate_compute_units` returns exactly what the transaction consumed, which is the smallest limit it succeeds with. `send_instructions` submits several instructions in one legacy transaction and records nothing, because its consumption is not one instruction's. A `SetComputeUnitLimit` or `SetComputeUnitPrice` instruction consumes 150 compute units itself.
+
 ## Test historical compatibility
 
 Run `pina test --compatibility` to verify the checked-in migration history and run the complete Surfpool suite against the latest SBF artifact. `compatibility_mode()` returns `true` during that run. Use the signal to add expensive historical matrices without skipping current-flow tests.

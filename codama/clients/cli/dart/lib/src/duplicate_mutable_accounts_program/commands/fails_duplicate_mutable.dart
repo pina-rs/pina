@@ -32,6 +32,8 @@ final class FailsDuplicateMutableCommand extends Command<void> {
       account1: account1,
       account2: account2,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: failsDuplicateMutableComputeUnitLimit);
   }
 }

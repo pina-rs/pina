@@ -59,6 +59,6 @@ final class RenameCommand extends Command<void> {
       titleLen: titleLenValue,
       title: titleValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: renameComputeUnitLimit);
   }
 }

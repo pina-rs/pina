@@ -35,5 +35,8 @@ pub(crate) fn run(context: &CliContext, _args: InitializeArgs) -> Result<(), Cli
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(prop_amm_program_client::instructions::INITIALIZE_COMPUTE_UNIT_LIMIT),
+	)
 }

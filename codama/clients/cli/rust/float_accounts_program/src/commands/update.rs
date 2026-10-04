@@ -42,5 +42,8 @@ pub(crate) fn run(context: &CliContext, args: UpdateArgs) -> Result<(), CliError
 
 	let accounts = Update { account, authority };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(float_accounts_program_client::instructions::UPDATE_COMPUTE_UNIT_LIMIT),
+	)
 }

@@ -72,5 +72,8 @@ pub(crate) fn run(context: &CliContext, args: ClaimArgs) -> Result<(), CliError>
 		clock,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(vesting_program_client::instructions::CLAIM_COMPUTE_UNIT_LIMIT),
+	)
 }

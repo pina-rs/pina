@@ -25,6 +25,8 @@ final class InitializeCommand extends Command<void> {
     final instruction = getInitializeInstruction(
       programAddress: context.programAddress,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializeComputeUnitLimit);
   }
 }

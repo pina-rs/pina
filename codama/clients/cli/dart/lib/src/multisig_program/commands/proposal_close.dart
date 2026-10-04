@@ -50,6 +50,8 @@ final class ProposalCloseCommand extends Command<void> {
       rentCollector: rentCollector,
       clock: clock,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: proposalCloseComputeUnitLimit);
   }
 }

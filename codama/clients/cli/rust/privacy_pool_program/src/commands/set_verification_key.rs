@@ -102,5 +102,8 @@ pub(crate) fn run(context: &CliContext, args: SetVerificationKeyArgs) -> Result<
 		system_program,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT),
+	)
 }

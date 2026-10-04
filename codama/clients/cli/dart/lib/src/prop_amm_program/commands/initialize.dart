@@ -32,6 +32,8 @@ final class InitializeCommand extends Command<void> {
       oracle: oracle,
       systemProgram: Address("11111111111111111111111111111111"),
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializeComputeUnitLimit);
   }
 }

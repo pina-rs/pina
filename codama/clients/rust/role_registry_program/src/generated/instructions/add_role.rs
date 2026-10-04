@@ -9,6 +9,14 @@
 )]
 
 pub const ADD_ROLE_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `AddRole` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const ADD_ROLE_MEASURED_COMPUTE_UNITS: u32 = 1856;
+/// Compute unit limit to request for a transaction carrying `AddRole`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const ADD_ROLE_COMPUTE_UNIT_LIMIT: u32 = 2600;
 
 /// Accounts.
 #[derive(Clone, Debug)]

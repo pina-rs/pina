@@ -28,5 +28,8 @@ pub(crate) fn run(context: &CliContext, _args: TestEventArgs) -> Result<(), CliE
 
 	let accounts = TestEvent {};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(events_program_client::instructions::TEST_EVENT_COMPUTE_UNIT_LIMIT),
+	)
 }

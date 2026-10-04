@@ -28,5 +28,5 @@ pub(crate) fn run(context: &CliContext, _args: RequireEqArgs) -> Result<(), CliE
 
 	let accounts = RequireEq {};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

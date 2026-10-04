@@ -10,6 +10,14 @@
 
 /// Instruction data for `UpdateProfile`. Replaces both name and bio.
 pub const UPDATE_PROFILE_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `UpdateProfile` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const UPDATE_PROFILE_MEASURED_COMPUTE_UNITS: u32 = 900;
+/// Compute unit limit to request for a transaction carrying `UpdateProfile`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const UPDATE_PROFILE_COMPUTE_UNIT_LIMIT: u32 = 1400;
 
 /// Accounts.
 #[derive(Clone, Debug)]

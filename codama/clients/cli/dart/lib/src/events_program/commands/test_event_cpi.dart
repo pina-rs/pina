@@ -25,6 +25,8 @@ final class TestEventCpiCommand extends Command<void> {
     final instruction = getTestEventCpiInstruction(
       programAddress: context.programAddress,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: testEventCpiComputeUnitLimit);
   }
 }

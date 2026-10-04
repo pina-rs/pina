@@ -9,6 +9,14 @@
 )]
 
 pub const CANCEL_DISCRIMINATOR: u8 = 3u8;
+/// Compute units `Cancel` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const CANCEL_MEASURED_COMPUTE_UNITS: u32 = 13271;
+/// Compute unit limit to request for a transaction carrying `Cancel`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const CANCEL_COMPUTE_UNIT_LIMIT: u32 = 16300;
 
 /// Accounts.
 #[derive(Clone, Debug)]

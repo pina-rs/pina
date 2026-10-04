@@ -36,6 +36,6 @@ final class UpdateCommand extends Command<void> {
       authority: authority,
       newPrice: newPriceValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: updateComputeUnitLimit);
   }
 }

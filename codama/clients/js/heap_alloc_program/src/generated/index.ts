@@ -6,5 +6,6 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./computeUnits";
 export * from "./instructions";
 export * from "./programs";

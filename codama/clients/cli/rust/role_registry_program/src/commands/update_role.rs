@@ -47,5 +47,8 @@ pub(crate) fn run(context: &CliContext, args: UpdateRoleArgs) -> Result<(), CliE
 		role_entry,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(role_registry_program_client::instructions::UPDATE_ROLE_COMPUTE_UNIT_LIMIT),
+	)
 }

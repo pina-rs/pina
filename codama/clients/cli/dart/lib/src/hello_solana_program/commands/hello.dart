@@ -28,6 +28,6 @@ final class HelloCommand extends Command<void> {
       programAddress: context.programAddress,
       user: user,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: helloComputeUnitLimit);
   }
 }

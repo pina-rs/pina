@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getMakeInstruction } from "../client";
+import { getMakeInstruction, MAKE_COMPUTE_UNIT_LIMIT } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -51,5 +51,5 @@ export const makeCommand = registerGlobals(new Command("make"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, MAKE_COMPUTE_UNIT_LIMIT);
 	});

@@ -9,6 +9,14 @@
 )]
 
 pub const PROPOSAL_REVOKE_DISCRIMINATOR: u8 = 8u8;
+/// Compute units `ProposalRevoke` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const PROPOSAL_REVOKE_MEASURED_COMPUTE_UNITS: u32 = 4463;
+/// Compute unit limit to request for a transaction carrying `ProposalRevoke`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const PROPOSAL_REVOKE_COMPUTE_UNIT_LIMIT: u32 = 5700;
 
 /// Accounts.
 #[derive(Clone, Debug)]

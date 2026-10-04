@@ -9,6 +9,14 @@
 )]
 
 pub const RESOLVE_CHALLENGE_DISCRIMINATOR: u8 = 10u8;
+/// Compute units `ResolveChallenge` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const RESOLVE_CHALLENGE_MEASURED_COMPUTE_UNITS: u32 = 198;
+/// Compute unit limit to request for a transaction carrying `ResolveChallenge`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const RESOLVE_CHALLENGE_COMPUTE_UNIT_LIMIT: u32 = 600;
 
 /// Accounts.
 #[derive(Clone, Debug)]

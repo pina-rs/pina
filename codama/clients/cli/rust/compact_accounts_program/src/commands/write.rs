@@ -52,5 +52,8 @@ pub(crate) fn run(context: &CliContext, args: WriteArgs) -> Result<(), CliError>
 
 	let accounts = Write { authority, journal };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(compact_accounts_program_client::instructions::WRITE_COMPUTE_UNIT_LIMIT),
+	)
 }

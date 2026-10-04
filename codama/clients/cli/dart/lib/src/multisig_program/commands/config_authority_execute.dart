@@ -71,6 +71,8 @@ final class ConfigAuthorityExecuteCommand extends Command<void> {
       actionsLen: actionsLenValue,
       actions: actionsValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: configAuthorityExecuteComputeUnitLimit);
   }
 }

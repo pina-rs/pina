@@ -9,6 +9,14 @@
 )]
 
 pub const CLAIM_DISCRIMINATOR: u8 = 4u8;
+/// Compute units `Claim` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const CLAIM_MEASURED_COMPUTE_UNITS: u32 = 18291;
+/// Compute unit limit to request for a transaction carrying `Claim`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const CLAIM_COMPUTE_UNIT_LIMIT: u32 = 22300;
 
 /// Accounts.
 #[derive(Clone, Debug)]

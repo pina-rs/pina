@@ -61,6 +61,8 @@ final class InitializePolicyCommand extends Command<void> {
       maximum: maximumValue,
       requiredApprovals: requiredApprovalsValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializePolicyComputeUnitLimit);
   }
 }

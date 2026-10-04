@@ -136,6 +136,6 @@ final class TransferCommand extends Command<void> {
       proofB: proofBValue,
       proofC: proofCValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: transferComputeUnitLimit);
   }
 }

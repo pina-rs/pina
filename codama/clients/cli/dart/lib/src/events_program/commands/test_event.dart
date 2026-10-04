@@ -25,6 +25,6 @@ final class TestEventCommand extends Command<void> {
     final instruction = getTestEventInstruction(
       programAddress: context.programAddress,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: testEventComputeUnitLimit);
   }
 }

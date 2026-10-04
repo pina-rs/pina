@@ -1,12 +1,13 @@
 #![cfg(unix)]
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
 use tempfile::TempDir;
+
+mod support;
 
 /// Name of the fake driver executable installed by each fixture.
 const FAKE_DRIVER: &str = "fake-pina-lint-driver";
@@ -64,31 +65,9 @@ path = "src/lib.rs"
 		.unwrap_or_else(|error| panic!("failed to write Pina configuration: {error}"));
 }
 
-/// Write an executable script at `path`, atomically.
-///
-/// The script is written to a staging file and renamed into place, so no write
-/// descriptor is ever open on `path` when a test executes it. A plain write
-/// followed by an exec is a `Text file busy` race: the kernel refuses an
-/// `exec` while a descriptor for the same file is open anywhere, including in
-/// a child a concurrent `fork` inherited, which is how this fixture failed
-/// under a parallel test run.
+/// Write an executable script at `path` (see [`support::write_executable`]).
 fn executable(path: &Path, contents: &str) {
-	let staging = path.with_extension("staging");
-	fs::write(&staging, contents)
-		.unwrap_or_else(|error| panic!("failed to write {}: {error}", staging.display()));
-	let mut permissions = fs::metadata(&staging)
-		.unwrap_or_else(|error| panic!("failed to inspect {}: {error}", staging.display()))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&staging, permissions)
-		.unwrap_or_else(|error| panic!("failed to make {} executable: {error}", staging.display()));
-	fs::rename(&staging, path).unwrap_or_else(|error| {
-		panic!(
-			"failed to move {} into {}: {error}",
-			staging.display(),
-			path.display()
-		)
-	});
+	support::write_executable(path, contents).unwrap();
 }
 
 struct Fixture {

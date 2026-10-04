@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getCheckPolicyInstructionAsync } from "../client";
+import {
+	CHECK_POLICY_COMPUTE_UNIT_LIMIT,
+	getCheckPolicyInstructionAsync,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -40,5 +43,5 @@ export const checkPolicyCommand = registerGlobals(new Command("check_policy"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, CHECK_POLICY_COMPUTE_UNIT_LIMIT);
 	});

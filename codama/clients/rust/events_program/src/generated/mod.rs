@@ -8,9 +8,11 @@
 	clippy::too_many_arguments
 )]
 
+pub mod compute_budget;
 pub mod events;
 pub mod instructions;
 pub mod programs;
 
+pub use compute_budget::set_compute_unit_limit_instruction;
 #[allow(unused_imports)]
 pub(crate) use programs::*;

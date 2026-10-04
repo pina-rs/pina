@@ -50,5 +50,8 @@ pub(crate) fn run(context: &CliContext, args: AddTagArgs) -> Result<(), CliError
 
 	let accounts = AddTag { authority, profile };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(profile_program_client::instructions::ADD_TAG_COMPUTE_UNIT_LIMIT),
+	)
 }

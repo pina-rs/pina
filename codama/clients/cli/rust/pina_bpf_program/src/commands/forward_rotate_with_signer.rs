@@ -48,5 +48,5 @@ pub(crate) fn run(context: &CliContext, args: ForwardRotateWithSignerArgs) -> Re
 		prop_amm_program,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

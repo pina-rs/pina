@@ -141,7 +141,14 @@ pub(crate) fn run(cli: Cli) {
 			unit,
 			compatibility,
 			filter,
-		} => run_test(project, unit, compatibility, filter),
+			record_compute_units,
+		} => {
+			if record_compute_units {
+				run_record_compute_units(&project, compatibility);
+			} else {
+				run_test(project, unit, compatibility, filter);
+			}
+		}
 		Commands::Dev {
 			project,
 			network,
@@ -174,6 +181,26 @@ pub(crate) fn run(cli: Cli) {
 							delta_cu: fail_cu,
 							delta_percent: fail_percent,
 						},
+					);
+				}
+				Some(ProfileCommands::Trace {
+					project,
+					filter,
+					instruction,
+					trace_dir,
+					json,
+					folded,
+					output,
+				}) => {
+					run_profile_trace(
+						&pina_cli::profile_trace::TraceOptions {
+							project,
+							filter,
+							trace_dir,
+						},
+						instruction.as_deref(),
+						trace_format(json, folded),
+						output.as_deref(),
 					);
 				}
 			}
@@ -1218,6 +1245,59 @@ fn run_test(project: PathBuf, unit: bool, compatibility: bool, filter: Option<St
 	}
 }
 
+fn run_record_compute_units(project: &Path, compatibility: bool) {
+	let recording = match pina_cli::workflow::record_compute_units(project, compatibility) {
+		Ok(recording) => recording,
+		Err(error) => {
+			eprintln!("{} {}", "Error".red().bold(), error);
+			std::process::exit(error.exit_code());
+		}
+	};
+
+	println!(
+		"{} Recorded compute units for {} instruction(s) in {}",
+		"✔".green(),
+		recording.measured.len(),
+		recording.path.display(),
+	);
+
+	if !recording.unmeasured.is_empty() {
+		eprintln!(
+			"{} no successful Surfpool test sent {}; generated clients keep the runtime default \
+			 limit for them. Exercise them through `ProgramTest::send` to record a budget.",
+			"warning:".yellow().bold(),
+			backticked(&recording.unmeasured),
+		);
+	}
+
+	if !recording.unmatched.is_empty() {
+		eprintln!(
+			"{} {} recorded instruction data prefix(es) match no instruction discriminator: {}",
+			"warning:".yellow().bold(),
+			recording.unmatched.len(),
+			backticked(&recording.unmatched),
+		);
+	}
+
+	if recording.failed_samples > 0 {
+		println!(
+			"Skipped {} sample(s) from transactions that failed; only successful runs set a budget.",
+			recording.failed_samples,
+		);
+	}
+
+	println!("Run `pina generate` to give the clients the new limits.");
+}
+
+/// Join names as a comma-separated list of code spans.
+fn backticked(names: &[String]) -> String {
+	names
+		.iter()
+		.map(|name| format!("`{name}`"))
+		.collect::<Vec<_>>()
+		.join(", ")
+}
+
 fn run_dev(
 	project: PathBuf,
 	network: Option<SurfpoolCluster>,
@@ -1777,6 +1857,83 @@ fn run_profile_compare(
 
 	if report.exceeds_threshold {
 		std::process::exit(2);
+	}
+}
+
+/// The rendering `pina profile trace` writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TraceFormat {
+	/// The terminal summary, plus the HTML report.
+	Text,
+	/// The versioned JSON document.
+	Json,
+	/// Folded stacks for flame graph tools.
+	Folded,
+}
+
+fn trace_format(json: bool, folded: bool) -> TraceFormat {
+	if json {
+		return TraceFormat::Json;
+	}
+
+	if folded {
+		return TraceFormat::Folded;
+	}
+
+	TraceFormat::Text
+}
+
+fn run_profile_trace(
+	options: &pina_cli::profile_trace::TraceOptions,
+	instruction: Option<&str>,
+	format: TraceFormat,
+	output: Option<&Path>,
+) {
+	use pina_cli::profile_trace;
+
+	let exit = |error: profile_trace::TraceError| -> ! {
+		eprintln!("{} {error}", "Error".red().bold());
+		std::process::exit(error.exit_code());
+	};
+	let mut run = profile_trace::trace_project(options).unwrap_or_else(|error| exit(error));
+
+	for warning in &run.warnings {
+		eprintln!("{} {warning}", "Warning".yellow().bold());
+	}
+
+	if let Some(instruction) = instruction {
+		profile_trace::retain_instruction(&mut run.report, instruction)
+			.unwrap_or_else(|error| exit(error));
+	}
+
+	let mut rendered = Vec::new();
+	let written = match format {
+		TraceFormat::Text => {
+			pina_profile::trace_output::write_trace_text(&run.report, &mut rendered)
+		}
+		TraceFormat::Json => {
+			pina_profile::trace_output::write_trace_json(&run.report, &mut rendered)
+		}
+		TraceFormat::Folded => pina_profile::trace_output::write_folded(&run.report, &mut rendered),
+	};
+	unwrap_or_exit(written);
+
+	match output {
+		Some(path) => {
+			profile_trace::write_output(path, &rendered).unwrap_or_else(|error| exit(error));
+		}
+		None => unwrap_or_exit(std::io::stdout().lock().write_all(&rendered)),
+	}
+
+	if format == TraceFormat::Text {
+		let report = profile_trace::write_html_report(&run).unwrap_or_else(|error| exit(error));
+		let line = format!("\nHTML report: {}", report.display());
+
+		if output.is_some() {
+			eprintln!("{line}");
+		} else {
+			println!("{line}");
+		}
 	}
 }
 
