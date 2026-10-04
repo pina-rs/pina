@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 
 use quote::ToTokens as _;
@@ -6,6 +7,7 @@ use syn::ImplItem;
 use syn::Item;
 use syn::Pat;
 use syn::Stmt;
+use syn::punctuated::Punctuated;
 
 use crate::ir::DefaultValueIr;
 
@@ -76,6 +78,44 @@ const PDA_CREATION_METHODS: &[&str] = &[
 	"invoke_signed_with_bump",
 ];
 
+/// Calls whose first argument is an account they prove is a PDA.
+///
+/// Most are the static functions `#[pda]` generates on the account type
+/// (`State::assert_stored_bump(self.state, ..)`); `assert_seeds_with_bump` and
+/// `assert_canonical_bump` are the `AccountInfoValidation` methods the generated
+/// functions call, which programs also invoke directly.
+const PDA_VALIDATION_CALLS: &[&str] = &[
+	"assert_seeds",
+	"assert_stored_bump",
+	"assert_seeds_with_bump",
+	"assert_canonical_bump",
+	"load_pda",
+	"load_pda_mut",
+	"load_checked_pda",
+	"load_checked_pda_mut",
+	"with_pda",
+	"with_stored_bump_pda",
+	"with_checked_pda",
+];
+
+/// PDA loaders that also borrow the account mutably, which the runtime only
+/// allows for a writable account.
+const MUTABLE_PDA_LOADERS: &[&str] = &["load_pda_mut", "load_checked_pda_mut"];
+
+/// Account methods whose first generic argument names the account type they
+/// load or validate, as in `self.state.as_account::<State>(&ID)`.
+const TYPED_ACCOUNT_METHODS: &[&str] = &[
+	"as_account",
+	"as_account_mut",
+	"with_compact_account",
+	"update_compact_account",
+	"assert_type",
+	"assert_compact_type",
+];
+
+/// How many nested helper calls the analysis follows from a `process` body.
+const MAX_HELPER_DEPTH: usize = 4;
+
 /// Client properties declared by annotations or inferred from a validation
 /// chain for one account field.
 #[derive(Debug, Clone, Default)]
@@ -84,6 +124,65 @@ pub struct AccountProperties {
 	pub is_writable: bool,
 	pub is_pda: bool,
 	pub default_value: Option<DefaultValueIr>,
+}
+
+/// Everything a `process` body reveals about one account field.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct FieldFacts {
+	pub(crate) properties: AccountProperties,
+	/// Account types the body names for the field: `T` in
+	/// `T::assert_seeds(self.field, ..)`, `self.field.as_account::<T>(..)`, and
+	/// `CreateProgramAccount { account: self.field, .. }.invoke::<T>()`.
+	///
+	/// Assembly resolves these against the `#[pda]` account types, so a typed
+	/// load of a PDA account marks the field as that PDA.
+	pub(crate) account_types: BTreeSet<String>,
+}
+
+/// Free functions the crate declares at module level, by name.
+///
+/// A `process` body that passes an account field to one of these helpers is
+/// analysed through the helper's body too. A name declared more than once is
+/// ambiguous and never followed.
+#[derive(Debug, Default)]
+pub(crate) struct HelperFunctions<'file> {
+	by_name: HashMap<String, Option<Helper<'file>>>,
+}
+
+/// A module-level function and the index of the file that declares it.
+#[derive(Clone, Copy, Debug)]
+struct Helper<'file> {
+	function: &'file syn::ItemFn,
+	file: usize,
+}
+
+impl<'file> HelperFunctions<'file> {
+	/// Index the module-level functions of `files`. A site found in a helper
+	/// names its file by its position in `files`.
+	pub(crate) fn collect(files: &[&'file syn::File]) -> Self {
+		let mut by_name = HashMap::new();
+
+		for (file, item) in files
+			.iter()
+			.enumerate()
+			.flat_map(|(index, file)| file.items.iter().map(move |item| (index, item)))
+		{
+			let Item::Fn(function) = item else {
+				continue;
+			};
+
+			by_name
+				.entry(function.sig.ident.to_string())
+				.and_modify(|existing| *existing = None)
+				.or_insert(Some(Helper { function, file }));
+		}
+
+		Self { by_name }
+	}
+
+	fn get(&self, name: &str) -> Option<Helper<'file>> {
+		self.by_name.get(name).copied().flatten()
+	}
 }
 
 /// Return a stable representation of declarative account constraints.
@@ -267,17 +366,41 @@ pub(crate) fn extract_declared_validation_properties(
 /// Analyse all `impl ProcessAccountInfos for X` blocks in a file and return a
 /// map from the struct name (without lifetime) to a map of field name ->
 /// properties.
+///
+/// Helper functions declared in the same file are followed when a `process`
+/// body passes them an account field.
 pub fn extract_validation_properties(
 	file: &syn::File,
 ) -> HashMap<String, HashMap<String, AccountProperties>> {
-	process_walks(file)
+	let helpers = HelperFunctions::collect(&[file]);
+
+	process_walks(file, &helpers)
 		.into_iter()
-		.map(|(struct_name, walk)| (struct_name, walk.props))
+		.map(|(struct_name, walk)| {
+			let properties = walk
+				.fields
+				.into_iter()
+				.map(|(field_name, facts)| (field_name, facts.properties))
+				.collect();
+			(struct_name, properties)
+		})
+		.collect()
+}
+
+/// [`extract_validation_properties`] with the account types each field is
+/// loaded as, following the crate-wide `helpers`.
+pub(crate) fn extract_validation_facts(
+	file: &syn::File,
+	helpers: &HelperFunctions<'_>,
+) -> HashMap<String, HashMap<String, FieldFacts>> {
+	process_walks(file, helpers)
+		.into_iter()
+		.map(|(struct_name, walk)| (struct_name, walk.fields))
 		.collect()
 }
 
 /// A recognized method or generated static call on one account field inside a
-/// `process()` body.
+/// `process()` body, or inside a helper the body passes the field to.
 #[derive(Debug, Clone)]
 pub(crate) struct AssertionSite {
 	/// Accounts-struct field the call validates.
@@ -286,48 +409,34 @@ pub(crate) struct AssertionSite {
 	pub(crate) method: String,
 	/// Span of the method name, which carries its source line.
 	pub(crate) span: proc_macro2::Span,
+	/// The file the call is written in when a followed helper makes it: an
+	/// index into the files `helpers` was collected from. `None` when the
+	/// `process()` body makes it, so the span belongs to the body's own file.
+	///
+	/// A site inside a helper keeps the helper's own line rather than the line
+	/// of the call in `process()`, because that is where the check is written
+	/// and where a reader has to look to change it.
+	pub(crate) helper_file: Option<usize>,
 }
 
 /// Collect the account calls in every `impl ProcessAccountInfos for X`, keyed by
 /// the struct name, in execution order: a call's receiver and arguments are
-/// recorded before the call itself, so a chain records its first link first.
-pub(crate) fn extract_assertion_sites(file: &syn::File) -> HashMap<String, Vec<AssertionSite>> {
-	process_walks(file)
+/// recorded before the call itself, so a chain records its first link first,
+/// and a followed helper's calls are recorded where the helper runs.
+pub(crate) fn extract_assertion_sites(
+	file: &syn::File,
+	helpers: &HelperFunctions<'_>,
+) -> HashMap<String, Vec<AssertionSite>> {
+	process_walks(file, helpers)
 		.into_iter()
 		.map(|(struct_name, walk)| (struct_name, walk.sites))
 		.collect()
 }
 
-/// Properties and call sites gathered while walking one `process()` body.
-#[derive(Default)]
-struct ProcessWalk {
-	props: HashMap<String, AccountProperties>,
-	sites: Vec<AssertionSite>,
-}
-
-impl ProcessWalk {
-	/// Record a call on an account field: its client-visible effect and its location.
-	fn record(
-		&mut self,
-		field_name: String,
-		method: &str,
-		args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>,
-		span: proc_macro2::Span,
-	) {
-		apply_assertion(
-			method,
-			args,
-			self.props.entry(field_name.clone()).or_default(),
-		);
-		self.sites.push(AssertionSite {
-			field: field_name,
-			method: method.to_owned(),
-			span,
-		});
-	}
-}
-
-fn process_walks(file: &syn::File) -> HashMap<String, ProcessWalk> {
+fn process_walks<'helpers, 'file>(
+	file: &syn::File,
+	helpers: &'helpers HelperFunctions<'file>,
+) -> HashMap<String, ProcessWalk<'helpers, 'file>> {
 	let mut result = HashMap::new();
 
 	for item in &file.items {
@@ -352,61 +461,24 @@ fn process_walks(file: &syn::File) -> HashMap<String, ProcessWalk> {
 			continue;
 		};
 
-		result.insert(struct_name, analyse_process_body(&process_fn.block.stmts));
+		let mut walk = ProcessWalk::new(helpers);
+		walk.stmts(&process_fn.block.stmts, &mut HashMap::new());
+		result.insert(struct_name, walk);
 	}
 
 	result
 }
 
-/// Walk the statements in a `process()` body and collect assertions per field.
-fn analyse_process_body(stmts: &[Stmt]) -> ProcessWalk {
-	let mut walk = ProcessWalk::default();
-	let mut bindings: HashMap<String, String> = HashMap::new();
-
-	for stmt in stmts {
-		collect_assertions_from_stmt(stmt, &mut walk, &mut bindings);
-	}
-
-	walk
-}
-
-fn collect_assertions_from_stmt(
-	stmt: &Stmt,
-	walk: &mut ProcessWalk,
-	bindings: &mut HashMap<String, String>,
-) {
-	match stmt {
-		Stmt::Expr(expr, _) => {
-			collect_assertions_from_expr(expr, walk, bindings);
-		}
-
-		Stmt::Local(local) => {
-			let field_name = local
-				.init
-				.as_ref()
-				.and_then(|init| resolve_self_field(&init.expr, bindings));
-			remove_pattern_idents(&local.pat, bindings);
-
-			// Aliases such as `if let Some(escrow) = &self.escrow` or
-			// `let escrow = self.escrow.as_ref()` capture an account field, so
-			// assertions written against the alias must be attributed back to
-			// the originating field.
-			if let Some(field_name) = field_name {
-				bind_pattern_idents(&local.pat, &field_name, bindings);
-			}
-
-			let Some(init) = &local.init else {
-				return;
-			};
-
-			collect_assertions_from_expr(&init.expr, walk, bindings);
-			if let Some((_, diverge)) = &init.diverge {
-				collect_assertions_from_expr(diverge, walk, bindings);
-			}
-		}
-
-		_ => {}
-	}
+/// Walks one `process` body, and the crate helpers it passes account fields
+/// to, collecting what each account field proves and where each account call
+/// is written.
+struct ProcessWalk<'helpers, 'file> {
+	helpers: &'helpers HelperFunctions<'file>,
+	/// Helpers on the current call path, each with the index of the file it is
+	/// declared in, so recursive helpers terminate and sites name their file.
+	active_helpers: Vec<(String, usize)>,
+	fields: HashMap<String, FieldFacts>,
+	sites: Vec<AssertionSite>,
 }
 
 /// Bind pattern identifiers for `let <pat> = <expr>` forms where `<expr>`
@@ -496,144 +568,329 @@ fn remove_pattern_idents(pat: &Pat, bindings: &mut HashMap<String, String>) {
 	}
 }
 
-fn collect_assertions_from_expr(
-	expr: &Expr,
-	walk: &mut ProcessWalk,
-	bindings: &mut HashMap<String, String>,
-) {
-	match expr {
-		Expr::MethodCall(mc) => {
-			let method = mc.method.to_string();
-			let pda_target = pda_creation_target(&method, &mc.receiver, bindings);
-			let field_name = resolve_self_field(&mc.receiver, bindings);
+impl<'helpers, 'file> ProcessWalk<'helpers, 'file> {
+	fn new(helpers: &'helpers HelperFunctions<'file>) -> Self {
+		Self {
+			helpers,
+			active_helpers: Vec::new(),
+			fields: HashMap::new(),
+			sites: Vec::new(),
+		}
+	}
 
-			// Rust evaluates the receiver, then the arguments, then calls the
-			// method. Walking in that order records call sites in execution
-			// order, so `self.a.assert_data_len(8)?.assert_writable()?` records
-			// `assert_data_len` first.
-			collect_assertions_from_expr(&mc.receiver, walk, bindings);
+	fn field(&mut self, field_name: String) -> &mut FieldFacts {
+		self.fields.entry(field_name).or_default()
+	}
 
-			for arg in &mc.args {
-				collect_assertions_from_expr(arg, walk, bindings);
+	/// Record a call on an account field: its client-visible effect and where
+	/// it is written.
+	fn record(
+		&mut self,
+		field_name: String,
+		method: &str,
+		args: &Punctuated<Expr, syn::Token![,]>,
+		span: proc_macro2::Span,
+	) {
+		apply_assertion(method, args, &mut self.field(field_name.clone()).properties);
+		self.sites.push(AssertionSite {
+			field: field_name,
+			method: method.to_owned(),
+			span,
+			helper_file: self.active_helpers.last().map(|(_, file)| *file),
+		});
+	}
+
+	fn stmts(&mut self, stmts: &[Stmt], bindings: &mut HashMap<String, String>) {
+		for stmt in stmts {
+			self.stmt(stmt, bindings);
+		}
+	}
+
+	fn stmt(&mut self, stmt: &Stmt, bindings: &mut HashMap<String, String>) {
+		match stmt {
+			Stmt::Expr(expr, _) => {
+				self.expr(expr, bindings);
 			}
 
-			if let Some(field_name) = pda_target {
-				let entry = walk.props.entry(field_name).or_default();
-				entry.is_pda = true;
-				entry.is_writable = true;
-			} else if let Some(field_name) = field_name {
-				walk.record(field_name, &method, &mc.args, mc.method.span());
-			}
-		}
+			Stmt::Local(local) => {
+				let field_name = local
+					.init
+					.as_ref()
+					.and_then(|init| resolve_self_field(&init.expr, bindings));
+				remove_pattern_idents(&local.pat, bindings);
 
-		Expr::Try(t) => {
-			collect_assertions_from_expr(&t.expr, walk, bindings);
-		}
-
-		Expr::Block(b) => {
-			let mut block_bindings = bindings.clone();
-			for stmt in &b.block.stmts {
-				collect_assertions_from_stmt(stmt, walk, &mut block_bindings);
-			}
-		}
-
-		Expr::If(if_expr) => {
-			// An `if let` alias exists only in the `then` branch. The `else`
-			// branch and surrounding block retain their original bindings.
-			let mut then_bindings = bindings.clone();
-			bind_let_bindings(&if_expr.cond, &mut then_bindings);
-			collect_assertions_from_expr(&if_expr.cond, walk, &mut then_bindings);
-
-			for stmt in &if_expr.then_branch.stmts {
-				collect_assertions_from_stmt(stmt, walk, &mut then_bindings);
-			}
-
-			if let Some((_, else_expr)) = &if_expr.else_branch {
-				let mut else_bindings = bindings.clone();
-				collect_assertions_from_expr(else_expr, walk, &mut else_bindings);
-			}
-		}
-
-		Expr::Let(let_expr) => {
-			bind_let_bindings(expr, bindings);
-			collect_assertions_from_expr(&let_expr.expr, walk, bindings);
-		}
-
-		Expr::Match(match_expr) => {
-			let scrutinee_field = resolve_self_field(&match_expr.expr, bindings);
-
-			for arm in &match_expr.arms {
-				let mut arm_bindings = bindings.clone();
-				if let Some(field_name) = &scrutinee_field {
-					bind_pattern_idents(&arm.pat, field_name, &mut arm_bindings);
+				// Aliases such as `if let Some(escrow) = &self.escrow` or
+				// `let escrow = self.escrow.as_ref()` capture an account field, so
+				// assertions written against the alias must be attributed back to
+				// the originating field.
+				if let Some(field_name) = field_name {
+					bind_pattern_idents(&local.pat, &field_name, bindings);
 				}
 
-				collect_assertions_from_expr(&arm.body, walk, &mut arm_bindings);
+				let Some(init) = &local.init else {
+					return;
+				};
+
+				self.expr(&init.expr, bindings);
+				if let Some((_, diverge)) = &init.diverge {
+					self.expr(diverge, bindings);
+				}
 			}
 
-			collect_assertions_from_expr(&match_expr.expr, walk, bindings);
+			_ => {}
 		}
-
-		Expr::Call(call) => {
-			// Recognize generated static calls from the `#[pda]` attribute
-			// macro. Stored-bump assertions and one-pass loaders all mark the
-			// account as a PDA; the mutable loader also proves writability.
-			// `with_checked_pda` proves the canonical bump where `with_pda`
-			// proves only the stored bump, and both describe a PDA account.
-			let generated = if let Expr::Path(path) = &*call.func
-				&& let Some(segment) = path.path.segments.last()
-				&& let method = segment.ident.to_string()
-				&& matches!(
-					method.as_str(),
-					"assert_seeds"
-						| "assert_seeds_with_bump"
-						| "assert_canonical_bump"
-						| "load_pda" | "load_pda_mut"
-						| "with_pda" | "with_stored_bump_pda"
-						| "with_checked_pda"
-				) && let Some(first_arg) = call.args.first()
-				&& let Some(field_name) = resolve_self_field(first_arg, bindings)
-			{
-				Some((field_name, method, segment.ident.span()))
-			} else {
-				None
-			};
-
-			// The arguments run before the call, so record it after them.
-			collect_assertions_from_expr(&call.func, walk, bindings);
-
-			for arg in &call.args {
-				collect_assertions_from_expr(arg, walk, bindings);
-			}
-
-			if let Some((field_name, method, span)) = generated {
-				walk.record(field_name, &method, &call.args, span);
-			}
-		}
-
-		Expr::Paren(p) => {
-			collect_assertions_from_expr(&p.expr, walk, bindings);
-		}
-
-		Expr::Reference(r) => {
-			collect_assertions_from_expr(&r.expr, walk, bindings);
-		}
-
-		Expr::Unary(unary) => {
-			collect_assertions_from_expr(&unary.expr, walk, bindings);
-		}
-
-		Expr::Struct(builder) => {
-			for field_name in lamport_moving_fields(builder, bindings) {
-				walk.props.entry(field_name).or_default().is_writable = true;
-			}
-			for field in &builder.fields {
-				collect_assertions_from_expr(&field.expr, walk, bindings);
-			}
-		}
-
-		_ => {}
 	}
+
+	fn expr(&mut self, expr: &Expr, bindings: &mut HashMap<String, String>) {
+		match expr {
+			Expr::MethodCall(mc) => {
+				let method = mc.method.to_string();
+				let pda_target = pda_creation_target(&method, &mc.receiver, bindings);
+				let field_name = resolve_self_field(&mc.receiver, bindings);
+
+				// Rust evaluates the receiver, then the arguments, then calls the
+				// method. Walking in that order records call sites in execution
+				// order, so `self.a.assert_data_len(8)?.assert_writable()?` records
+				// `assert_data_len` first.
+				self.expr(&mc.receiver, bindings);
+
+				for arg in &mc.args {
+					self.expr(arg, bindings);
+				}
+
+				if let Some(field_name) = pda_target {
+					let facts = self.field(field_name);
+					facts.properties.is_pda = true;
+					facts.properties.is_writable = true;
+					facts.account_types.extend(turbofish_type_name(mc));
+				} else if let Some(field_name) = field_name {
+					if TYPED_ACCOUNT_METHODS.contains(&method.as_str()) {
+						let account_types = &mut self.field(field_name.clone()).account_types;
+						account_types.extend(turbofish_type_name(mc));
+					}
+					self.record(field_name, &method, &mc.args, mc.method.span());
+				}
+			}
+
+			Expr::Try(t) => {
+				self.expr(&t.expr, bindings);
+			}
+
+			Expr::Block(b) => {
+				self.stmts(&b.block.stmts, &mut bindings.clone());
+			}
+
+			Expr::If(if_expr) => {
+				// An `if let` alias exists only in the `then` branch. The `else`
+				// branch and surrounding block retain their original bindings.
+				let mut then_bindings = bindings.clone();
+				bind_let_bindings(&if_expr.cond, &mut then_bindings);
+				self.expr(&if_expr.cond, &mut then_bindings);
+				self.stmts(&if_expr.then_branch.stmts, &mut then_bindings);
+
+				if let Some((_, else_expr)) = &if_expr.else_branch {
+					self.expr(else_expr, &mut bindings.clone());
+				}
+			}
+
+			Expr::Let(let_expr) => {
+				bind_let_bindings(expr, bindings);
+				self.expr(&let_expr.expr, bindings);
+			}
+
+			Expr::Match(match_expr) => {
+				let scrutinee_field = resolve_self_field(&match_expr.expr, bindings);
+
+				for arm in &match_expr.arms {
+					let mut arm_bindings = bindings.clone();
+					if let Some(field_name) = &scrutinee_field {
+						bind_pattern_idents(&arm.pat, field_name, &mut arm_bindings);
+					}
+
+					self.expr(&arm.body, &mut arm_bindings);
+				}
+
+				self.expr(&match_expr.expr, bindings);
+			}
+
+			Expr::Call(call) => {
+				let path = match &*call.func {
+					Expr::Path(path) => Some(&path.path),
+					_ => None,
+				};
+				let pda_validation =
+					path.and_then(|path| pda_validation_target(path, &call.args, bindings));
+				let helper = path.and_then(|path| self.helper_target(path, &call.args, bindings));
+
+				// The arguments run before the call, so the call and anything a
+				// followed helper does are recorded after them.
+				self.expr(&call.func, bindings);
+
+				for arg in &call.args {
+					self.expr(arg, bindings);
+				}
+
+				if let Some(target) = pda_validation {
+					let account_types = &mut self.field(target.field.clone()).account_types;
+					account_types.extend(target.account_type);
+					self.record(target.field, &target.function, &call.args, target.span);
+				}
+				if let Some(helper) = helper {
+					self.walk_helper(helper);
+				}
+			}
+
+			Expr::Paren(p) => {
+				self.expr(&p.expr, bindings);
+			}
+
+			Expr::Reference(r) => {
+				self.expr(&r.expr, bindings);
+			}
+
+			Expr::Unary(unary) => {
+				self.expr(&unary.expr, bindings);
+			}
+
+			Expr::Struct(builder) => {
+				for field_name in lamport_moving_fields(builder, bindings) {
+					self.field(field_name).properties.is_writable = true;
+				}
+				for field in &builder.fields {
+					self.expr(&field.expr, bindings);
+				}
+			}
+
+			_ => {}
+		}
+	}
+
+	/// The crate helper a call runs, if the walk should follow it: one passed
+	/// at least one account field, not already on the call path, and within the
+	/// depth limit. The bindings map each parameter to the field it receives.
+	fn helper_target(
+		&self,
+		path: &syn::Path,
+		args: &Punctuated<Expr, syn::Token![,]>,
+		bindings: &HashMap<String, String>,
+	) -> Option<HelperCall<'file>> {
+		let name = helper_function_name(path)?;
+		let helper = self.helpers.get(&name)?;
+		let followable = self.active_helpers.len() < MAX_HELPER_DEPTH
+			&& !self
+				.active_helpers
+				.iter()
+				.any(|(active, _)| *active == name);
+		let mut parameters = HashMap::new();
+
+		for (input, arg) in helper.function.sig.inputs.iter().zip(args) {
+			if let syn::FnArg::Typed(parameter) = input
+				&& let Some(field_name) = resolve_self_field(arg, bindings)
+			{
+				bind_pattern_idents(&parameter.pat, &field_name, &mut parameters);
+			}
+		}
+
+		(followable && !parameters.is_empty()).then_some(HelperCall {
+			name,
+			helper,
+			parameters,
+		})
+	}
+
+	/// Analyse a crate helper the body passes account fields to, attributing
+	/// what the helper proves about each parameter back to its field.
+	fn walk_helper(&mut self, call: HelperCall<'file>) {
+		let HelperCall {
+			name,
+			helper,
+			mut parameters,
+		} = call;
+
+		self.active_helpers.push((name, helper.file));
+		self.stmts(&helper.function.block.stmts, &mut parameters);
+		self.active_helpers.pop();
+	}
+}
+
+/// A crate helper the walk follows, with the field each parameter receives.
+struct HelperCall<'file> {
+	name: String,
+	helper: Helper<'file>,
+	parameters: HashMap<String, String>,
+}
+
+/// A recognized static PDA validation call such as
+/// `State::assert_stored_bump(self.state, ..)`.
+struct PdaValidation {
+	field: String,
+	function: String,
+	/// The path segment before the function: the account type the generated
+	/// function belongs to, which identifies the PDA more reliably than the
+	/// field name.
+	account_type: Option<String>,
+	span: proc_macro2::Span,
+}
+
+fn pda_validation_target(
+	path: &syn::Path,
+	args: &Punctuated<Expr, syn::Token![,]>,
+	bindings: &HashMap<String, String>,
+) -> Option<PdaValidation> {
+	let segment = path
+		.segments
+		.last()
+		.filter(|segment| PDA_VALIDATION_CALLS.contains(&segment.ident.to_string().as_str()))?;
+	let field = resolve_self_field(args.first()?, bindings)?;
+
+	Some(PdaValidation {
+		field,
+		function: segment.ident.to_string(),
+		account_type: path
+			.segments
+			.iter()
+			.rev()
+			.nth(1)
+			.map(|owner| owner.ident.to_string()),
+		span: segment.ident.span(),
+	})
+}
+
+/// The name of the free function a call path can refer to.
+///
+/// Every segment before the function must be a module (`helpers::spend`,
+/// `crate::spend`), so associated functions such as `State::seeds` are never
+/// mistaken for a helper that shares their name.
+fn helper_function_name(path: &syn::Path) -> Option<String> {
+	let function = path.segments.last()?;
+	let is_module_path = path
+		.segments
+		.iter()
+		.take(path.segments.len() - 1)
+		.all(|segment| {
+			segment
+				.ident
+				.to_string()
+				.starts_with(|first: char| first.is_ascii_lowercase())
+		});
+
+	is_module_path.then(|| function.ident.to_string())
+}
+
+/// The account type named by a method's first generic argument, such as
+/// `State` in `as_account::<State>(..)`.
+fn turbofish_type_name(call: &syn::ExprMethodCall) -> Option<String> {
+	let syn::GenericArgument::Type(syn::Type::Path(account_type)) =
+		call.turbofish.as_ref()?.args.first()?
+	else {
+		return None;
+	};
+
+	account_type
+		.path
+		.segments
+		.last()
+		.map(|segment| segment.ident.to_string())
 }
 
 /// Builders whose named fields debit or credit lamports, so the runtime
@@ -756,29 +1013,20 @@ fn member_to_string(member: &syn::Member) -> String {
 /// Record the effect of a recognized assertion method.
 fn apply_assertion(
 	method: &str,
-	args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>,
+	args: &Punctuated<Expr, syn::Token![,]>,
 	props: &mut AccountProperties,
 ) {
 	match method {
 		"assert_signer" => props.is_signer = true,
 		"assert_writable" => props.is_writable = true,
-		"assert_seeds"
-		| "assert_seeds_with_bump"
-		| "assert_canonical_bump"
-		| "load_pda"
-		| "with_pda"
-		| "with_stored_bump_pda"
-		| "with_checked_pda" => {
-			props.is_pda = true;
-		}
-		"load_pda_mut" => {
-			props.is_pda = true;
-			props.is_writable = true;
-		}
 		"assert_address" => {
 			if let Some(addr) = first_arg_to_known_address(args) {
 				props.default_value = Some(DefaultValueIr::PublicKey(addr));
 			}
+		}
+		_ if PDA_VALIDATION_CALLS.contains(&method) => {
+			props.is_pda = true;
+			props.is_writable |= MUTABLE_PDA_LOADERS.contains(&method);
 		}
 		// Other assertions don't map directly to IDL properties.
 		_ => {}
@@ -787,9 +1035,7 @@ fn apply_assertion(
 
 /// If the first argument to `assert_address` is a known program ID reference,
 /// return its base58 address.
-fn first_arg_to_known_address(
-	args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>,
-) -> Option<String> {
+fn first_arg_to_known_address(args: &Punctuated<Expr, syn::Token![,]>) -> Option<String> {
 	let first = args.first()?;
 	known_address_from_expr(first)
 }
@@ -978,6 +1224,24 @@ mod tests {
 		assert!(props["sender"].is_writable);
 	}
 
+	/// Every call site of `MyAccounts` as `(field, method, line, helper file)`.
+	fn sites_of(files: &[&syn::File]) -> Vec<(String, String, usize, Option<usize>)> {
+		let helpers = HelperFunctions::collect(files);
+		let all = extract_assertion_sites(files[0], &helpers);
+
+		all["MyAccounts"]
+			.iter()
+			.map(|site| {
+				(
+					site.field.clone(),
+					site.method.clone(),
+					site.span.start().line,
+					site.helper_file,
+				)
+			})
+			.collect()
+	}
+
 	#[test]
 	fn records_account_call_sites_in_execution_order() {
 		let source = r"
@@ -993,29 +1257,21 @@ mod tests {
 			}
 		";
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
-		let all = extract_assertion_sites(&file);
-		let sites: Vec<_> = all["MyAccounts"]
-			.iter()
-			.map(|site| {
-				(
-					site.field.as_str(),
-					site.method.as_str(),
-					site.span.start().line,
-				)
-			})
-			.collect();
+		let sites = sites_of(&[&file]);
+		let site =
+			|field: &str, method: &str, line| (field.to_owned(), method.to_owned(), line, None);
 
 		assert_eq!(
 			sites,
 			[
-				("sender", "assert_signer", 4),
-				("sender", "assert_writable", 5),
-				("authority", "assert_signer", 7),
-				("authority", "address", 7),
-				("vault", "load_pda", 7),
-				("mint", "assert_executable", 8),
-				("mint", "address", 8),
-				("vault", "assert_owner", 8),
+				site("sender", "assert_signer", 4),
+				site("sender", "assert_writable", 5),
+				site("authority", "assert_signer", 7),
+				site("authority", "address", 7),
+				site("vault", "load_pda", 7),
+				site("mint", "assert_executable", 8),
+				site("mint", "address", 8),
+				site("vault", "assert_owner", 8),
 			]
 		);
 
@@ -1025,6 +1281,52 @@ mod tests {
 		assert!(properties["sender"].is_signer && properties["sender"].is_writable);
 		assert!(properties["vault"].is_pda);
 		assert!(properties["authority"].is_signer);
+	}
+
+	#[test]
+	fn records_helper_call_sites_at_the_helpers_own_lines() {
+		let process = r"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					self.payer.assert_writable()?;
+					require_viewer(self.viewer, self.note.assert_owner(&ID)?)?;
+					local_check(self.payer)?;
+					self.viewer.assert_executable()?;
+					Ok(())
+				}
+			}
+
+			fn local_check(account: &AccountView) -> ProgramResult {
+				account.assert_empty()?;
+				Ok(())
+			}
+		";
+		let helpers = r"
+			fn require_viewer(viewer: &AccountView, _note: &AccountView) -> ProgramResult {
+				viewer.assert_signer()?;
+				EscrowState::assert_stored_bump(viewer, 7, &ID)?;
+				Ok(())
+			}
+		";
+		let process = syn::parse_file(process).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let helpers = syn::parse_file(helpers).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let site = |field: &str, method: &str, line, file| {
+			(field.to_owned(), method.to_owned(), line, file)
+		};
+
+		assert_eq!(
+			sites_of(&[&process, &helpers]),
+			[
+				site("payer", "assert_writable", 4, None),
+				// The arguments run first, then the helper's body, in its file.
+				site("note", "assert_owner", 5, None),
+				site("viewer", "assert_signer", 3, Some(1)),
+				site("viewer", "assert_stored_bump", 4, Some(1)),
+				// A helper in the body's own file names that file's index.
+				site("payer", "assert_empty", 13, Some(0)),
+				site("viewer", "assert_executable", 7, None),
+			]
+		);
 	}
 
 	#[test]
@@ -1560,5 +1862,268 @@ mod tests {
 			remove_pattern_idents(&pattern, &mut bindings);
 			assert!(bindings.is_empty());
 		}
+	}
+
+	/// Facts for every field of `MyAccounts`, following helpers in `source`.
+	fn facts_for(source: &str) -> HashMap<String, FieldFacts> {
+		let file = syn::parse_file(source).unwrap_or_else(|error| panic!("parse failed: {error}"));
+		let helpers = HelperFunctions::collect(&[&file]);
+		let fields = extract_validation_facts(&file, &helpers).remove("MyAccounts");
+
+		fields.unwrap_or_else(|| panic!("`MyAccounts` has a process body"))
+	}
+
+	fn account_types(facts: &FieldFacts) -> Vec<&str> {
+		facts.account_types.iter().map(String::as_str).collect()
+	}
+
+	#[test]
+	fn extracts_pda_and_account_type_from_stored_bump_assertion() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let bump = self.escrow.as_account::<EscrowState>(&ID)?.bump;
+					EscrowState::assert_stored_bump(self.escrow, bump, &maker, seed, &ID)?;
+					Ok(())
+				}
+			}
+		"#,
+		);
+		let escrow = &fields["escrow"];
+
+		assert!(escrow.properties.is_pda);
+		assert!(!escrow.properties.is_writable);
+		assert_eq!(account_types(escrow), ["EscrowState"]);
+	}
+
+	#[test]
+	fn checked_fixed_loaders_mark_pdas_and_mutable_loaders_writable() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					ConfigState::load_checked_pda(self.reader, &ID)?;
+					ConfigState::load_checked_pda_mut(self.writer, &ID)?;
+					Ok(())
+				}
+			}
+		"#,
+		);
+
+		assert!(fields["reader"].properties.is_pda);
+		assert!(!fields["reader"].properties.is_writable);
+		assert!(fields["writer"].properties.is_pda);
+		assert!(fields["writer"].properties.is_writable);
+		assert_eq!(account_types(&fields["writer"]), ["ConfigState"]);
+	}
+
+	#[test]
+	fn typed_account_methods_record_types_without_proving_pdas() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					self.fixed.as_account::<Fixed>(&ID)?;
+					self.fixed_mut.as_account_mut::<state::FixedMut>(&ID)?;
+					self.compact.with_compact_account::<Compact, _>(&ID, |state| Ok(()))?;
+					self.patched.update_compact_account::<Patched>(&ID, &patch)?;
+					self.asserted.assert_type::<Asserted>(&ID)?;
+					self.compact_asserted.assert_compact_type::<CompactAsserted>(&ID)?;
+					self.untyped.as_account(&ID)?;
+					self.referenced.as_account::<&Referenced>(&ID)?;
+					self.unrelated.borrow::<Unrelated>()?;
+					Ok(())
+				}
+			}
+		"#,
+		);
+		let typed = [
+			("fixed", "Fixed"),
+			("fixed_mut", "FixedMut"),
+			("compact", "Compact"),
+			("patched", "Patched"),
+			("asserted", "Asserted"),
+			("compact_asserted", "CompactAsserted"),
+		];
+
+		for (field, account_type) in typed {
+			assert_eq!(account_types(&fields[field]), [account_type], "{field}");
+			assert!(!fields[field].properties.is_pda, "{field}");
+		}
+		for field in ["untyped", "referenced", "unrelated"] {
+			assert!(fields[field].account_types.is_empty(), "{field}");
+		}
+	}
+
+	#[test]
+	fn creation_builders_record_the_created_account_type() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					CreateProgramAccountWithBump {
+						account: self.tree,
+						payer: self.authority,
+						owner: &ID,
+						seeds: &MerkleTree::seeds().as_slices(),
+						bump: 255,
+					}
+					.invoke_with::<MerkleTree>(|tree| Ok(()))?;
+					Ok(())
+				}
+			}
+		"#,
+		);
+
+		assert!(fields["tree"].properties.is_pda);
+		assert_eq!(account_types(&fields["tree"]), ["MerkleTree"]);
+	}
+
+	#[test]
+	fn follows_helpers_that_receive_account_fields() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					spend(self.tree, &mut self.nullifiers, self.treasury.as_deref_mut())?;
+					crate::helpers::require_viewer(self.viewer)?;
+					Ok(())
+				}
+			}
+
+			fn spend(
+				tree: &AccountView,
+				nullifiers: &mut AccountView,
+				treasury: Option<&mut AccountView>,
+			) -> ProgramResult {
+				tree.as_account::<MerkleTree>(&ID)?;
+				NullifierSet::assert_seeds(nullifiers, &ID)?;
+				let treasury = treasury.ok_or(ProgramError::NotEnoughAccountKeys)?;
+				treasury.assert_writable()?;
+				Ok(())
+			}
+
+			fn require_viewer(viewer: &AccountView) -> ProgramResult {
+				viewer.assert_signer()?;
+				Ok(())
+			}
+		"#,
+		);
+
+		assert_eq!(account_types(&fields["tree"]), ["MerkleTree"]);
+		assert!(fields["nullifiers"].properties.is_pda);
+		assert!(fields["treasury"].properties.is_writable);
+		assert!(fields["viewer"].properties.is_signer);
+	}
+
+	#[test]
+	fn does_not_follow_ambiguous_associated_or_unbound_helpers() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					duplicated(self.duplicate)?;
+					State::associated(self.associated)?;
+					associated(self.unbound_argument_free)?;
+					unbound(LOCAL_ACCOUNT)?;
+					missing(self.missing)?;
+					self.associated.assert_owner(&ID)?;
+					Ok(())
+				}
+			}
+
+			fn duplicated(account: &AccountView) -> ProgramResult {
+				account.assert_signer()?;
+				Ok(())
+			}
+
+			fn duplicated(account: &AccountView) -> ProgramResult {
+				account.assert_signer()?;
+				Ok(())
+			}
+
+			fn associated() -> ProgramResult {
+				SIGNER.assert_signer()?;
+				Ok(())
+			}
+
+			fn unbound(account: &AccountView) -> ProgramResult {
+				account.assert_signer()?;
+				Ok(())
+			}
+		"#,
+		);
+
+		assert!(fields.get("duplicate").is_none());
+		assert!(!fields["associated"].properties.is_signer);
+		assert!(fields.get("unbound_argument_free").is_none());
+		assert!(fields.get("missing").is_none());
+		assert!(fields.values().all(|facts| !facts.properties.is_signer));
+	}
+
+	#[test]
+	fn follows_helpers_inside_match_arms_on_local_values() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					match data.len() {
+						0 => require_signer(*self.flagged)?,
+						_ => {}
+					}
+					Ok(())
+				}
+			}
+
+			fn require_signer(account: AccountView) -> ProgramResult {
+				account.assert_signer()?;
+				Ok(())
+			}
+		"#,
+		);
+
+		assert!(fields["flagged"].properties.is_signer);
+	}
+
+	#[test]
+	fn helper_analysis_stops_at_recursion_and_the_depth_limit() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					recurse(self.looped)?;
+					first(self.deep)?;
+					Ok(())
+				}
+			}
+
+			fn recurse(account: &AccountView) -> ProgramResult {
+				account.assert_signer()?;
+				recurse(account)
+			}
+
+			fn first(account: &AccountView) -> ProgramResult { second(account) }
+			fn second(account: &AccountView) -> ProgramResult { third(account) }
+			fn third(account: &AccountView) -> ProgramResult { fourth(account) }
+
+			fn fourth(account: &AccountView) -> ProgramResult {
+				account.assert_signer()?;
+				fifth(account)
+			}
+
+			fn fifth(account: &AccountView) -> ProgramResult {
+				account.assert_writable()?;
+				Ok(())
+			}
+		"#,
+		);
+
+		assert!(fields["looped"].properties.is_signer);
+		assert!(fields["deep"].properties.is_signer);
+		assert!(
+			!fields["deep"].properties.is_writable,
+			"a helper beyond the depth limit is not analysed"
+		);
 	}
 }

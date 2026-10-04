@@ -12,6 +12,7 @@
 use clap::Args;
 use privacy_pool_program_client::instructions::RegisterRequester;
 use privacy_pool_program_client::instructions::RegisterRequesterInstructionData;
+use solana_sdk::pubkey::Pubkey;
 
 use crate::context::CliContext;
 use crate::context::CliError;
@@ -23,19 +24,37 @@ pub struct RegisterRequesterArgs {
 	/// Highest tier the entity may file at.
 	#[arg(long)]
 	max_tier: u8,
-	/// The `pool_config` account
+	/// The `pool_config` account [default: derived]
 	#[arg(long)]
-	pool_config: String,
-	/// The `requester_registry` account
+	pool_config: Option<String>,
+	/// The `requester_registry` account [default: derived]
 	#[arg(long)]
-	requester_registry: String,
+	requester_registry: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: RegisterRequesterArgs) -> Result<(), CliError> {
 	let requester = CliContext::pubkey("--requester", &args.requester)?;
 	let authority = context.payer_pubkey();
-	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
-	let requester_registry = CliContext::pubkey("--requester_registry", &args.requester_registry)?;
+	let pool_config = match &args.pool_config {
+		Some(value) => CliContext::pubkey("--pool_config", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
+	let requester_registry = match &args.requester_registry {
+		Some(value) => CliContext::pubkey("--requester_registry", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-requesters".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let data = RegisterRequesterInstructionData::new(|data| {
 		data.requester = requester;
 		data.max_tier = args.max_tier;

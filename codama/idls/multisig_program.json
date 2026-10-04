@@ -1168,7 +1168,14 @@
 						"name": "programConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "programConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -1379,7 +1386,14 @@
 						"name": "programConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "programConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

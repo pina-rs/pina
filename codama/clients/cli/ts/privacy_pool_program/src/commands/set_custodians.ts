@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getSetCustodiansInstruction } from "../client";
+import { getSetCustodiansInstructionAsync } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -19,23 +19,27 @@ export const setCustodiansCommand = registerGlobals(
 )
 	.description("setCustodians")
 	.requiredOption("--custodians <custodians>", "custodians")
-	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
-	.requiredOption(
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
 		"--custodian-registry <custodianRegistry>",
-		"The `custodian_registry` account",
+		"The `custodian_registry` account [default: derived]",
 	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			custodians: base58("--custodians", options.custodians),
 			authority: context.payer,
-			poolConfig: pubkey("--pool-config", options.poolConfig),
-			custodianRegistry: pubkey(
-				"--custodian-registry",
-				options.custodianRegistry,
-			),
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			custodianRegistry: options.custodianRegistry === undefined
+				? undefined
+				: pubkey("--custodian-registry", options.custodianRegistry),
 		};
-		const instruction = getSetCustodiansInstruction(
+		const instruction = await getSetCustodiansInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

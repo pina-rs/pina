@@ -46,12 +46,12 @@ pub struct TransferArgs {
 	/// The `pool_config` account
 	#[arg(long)]
 	pool_config: String,
-	/// The `merkle_tree` account
+	/// The `merkle_tree` account [default: derived]
 	#[arg(long)]
-	merkle_tree: String,
-	/// The `nullifier_set` account
+	merkle_tree: Option<String>,
+	/// The `nullifier_set` account [default: derived]
 	#[arg(long)]
-	nullifier_set: String,
+	nullifier_set: Option<String>,
 	/// The `verifying_key_account` account
 	#[arg(long)]
 	verifying_key_account: String,
@@ -72,8 +72,26 @@ pub(crate) fn run(context: &CliContext, args: TransferArgs) -> Result<(), CliErr
 	let proof_c = CliContext::bytes::<64>("--proof_c", &args.proof_c)?;
 	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
 	let payer = context.payer_pubkey();
-	let merkle_tree = CliContext::pubkey("--merkle_tree", &args.merkle_tree)?;
-	let nullifier_set = CliContext::pubkey("--nullifier_set", &args.nullifier_set)?;
+	let merkle_tree = match &args.merkle_tree {
+		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-tree".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
+	let nullifier_set = match &args.nullifier_set {
+		Some(value) => CliContext::pubkey("--nullifier_set", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-nullifiers".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let verifying_key_account =
 		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
 	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;

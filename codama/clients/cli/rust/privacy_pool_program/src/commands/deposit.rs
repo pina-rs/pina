@@ -35,15 +35,15 @@ pub struct DepositArgs {
 	/// Encrypted per-custodian key shares.
 	#[arg(long)]
 	shares: String,
-	/// The `pool_config` account
+	/// The `pool_config` account [default: derived]
 	#[arg(long)]
-	pool_config: String,
+	pool_config: Option<String>,
 	/// The `pool_vault` account [default: derived]
 	#[arg(long)]
 	pool_vault: Option<String>,
-	/// The `merkle_tree` account
+	/// The `merkle_tree` account [default: derived]
 	#[arg(long)]
-	merkle_tree: String,
+	merkle_tree: Option<String>,
 	/// The `note_commitment` account
 	#[arg(long)]
 	note_commitment: String,
@@ -55,7 +55,16 @@ pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliErro
 	let envelope = CliContext::bytes::<128>("--envelope", &args.envelope)?;
 	let shares = CliContext::bytes::<144>("--shares", &args.shares)?;
 	let depositor = context.payer_pubkey();
-	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
+	let pool_config = match &args.pool_config {
+		Some(value) => CliContext::pubkey("--pool_config", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let pool_vault = match &args.pool_vault {
 		Some(value) => CliContext::pubkey("--pool_vault", value)?,
 		None => {
@@ -66,7 +75,16 @@ pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliErro
 			.0
 		}
 	};
-	let merkle_tree = CliContext::pubkey("--merkle_tree", &args.merkle_tree)?;
+	let merkle_tree = match &args.merkle_tree {
+		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-tree".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let data = DepositInstructionData::new(|data| {
 		data.bump = args.bump;

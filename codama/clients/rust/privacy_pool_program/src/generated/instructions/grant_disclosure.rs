@@ -55,7 +55,7 @@ impl GrantDisclosure {
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.viewer,
-			false,
+			true,
 		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {

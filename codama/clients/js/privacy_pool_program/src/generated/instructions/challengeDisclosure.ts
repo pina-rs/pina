@@ -8,6 +8,7 @@
 
 import {
 	type AccountMeta,
+	type AccountSignerMeta,
 	type Address,
 	combineCodec,
 	type FixedSizeCodec,
@@ -21,6 +22,7 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
+	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
@@ -31,6 +33,7 @@ import {
 	getAccountMetaFactory,
 	type InstructionAccountInput,
 	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
@@ -61,7 +64,9 @@ export type ChallengeDisclosureInstruction<
 			TAccountNoteCommitment extends string
 				? ReadonlyAccount<TAccountNoteCommitment>
 				: TAccountNoteCommitment,
-			TAccountViewer extends string ? ReadonlyAccount<TAccountViewer>
+			TAccountViewer extends string ?
+					& ReadonlySignerAccount<TAccountViewer>
+					& AccountSignerMeta<TAccountViewer>
 				: TAccountViewer,
 			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
 				: TAccountClock,
@@ -119,7 +124,7 @@ export type ChallengeDisclosureInput<
 		InstructionAccountInput,
 	TAccountNoteCommitment extends InstructionAccountInput =
 		InstructionAccountInput,
-	TAccountViewer extends InstructionAccountInput = InstructionAccountInput,
+	TAccountViewer extends InstructionSignerInput = InstructionSignerInput,
 	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	disclosureRequest: TAccountDisclosureRequest;
@@ -132,7 +137,7 @@ export type ChallengeDisclosureInput<
 export function getChallengeDisclosureInstruction<
 	TAccountDisclosureRequest extends InstructionAccountInput,
 	TAccountNoteCommitment extends InstructionAccountInput,
-	TAccountViewer extends InstructionAccountInput,
+	TAccountViewer extends InstructionSignerInput,
 	TAccountClock extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -181,7 +186,7 @@ export function getChallengeDisclosureInstruction<
 			isSigner: false,
 			isWritable: false,
 		},
-		viewer: { value: input.viewer ?? null, isSigner: false, isWritable: false },
+		viewer: { value: input.viewer ?? null, isSigner: true, isWritable: false },
 		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<

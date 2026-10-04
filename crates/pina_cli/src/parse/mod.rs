@@ -15,6 +15,7 @@ pub mod seeds;
 pub mod types;
 pub mod validation;
 
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
@@ -189,8 +190,9 @@ pub fn assemble_program_ir_multi_with_auto(
 	let mut all_errors = Vec::new();
 	let mut dispatch = Vec::new();
 	let mut dispatch_source_count = 0;
-	let mut all_validation_props = HashMap::new();
+	let mut all_validation_facts = HashMap::new();
 	let mut all_declared_validation_props = HashMap::new();
+	let helpers = validation::HelperFunctions::collect(files);
 	let mut all_pinapod_enums = Vec::new();
 	let mut public_key = None;
 	let mut pdas_ir = Vec::new();
@@ -233,8 +235,7 @@ pub fn assemble_program_ir_multi_with_auto(
 			dispatch = file_dispatch;
 		}
 
-		let file_validation_props = validation::extract_validation_properties(file);
-		all_validation_props.extend(file_validation_props);
+		all_validation_facts.extend(validation::extract_validation_facts(file, &helpers));
 		let file_declared_validation_props =
 			validation::extract_declared_validation_properties(file)
 				.map_err(|error| IdlError::Other(error.to_string()))?;
@@ -249,9 +250,9 @@ pub fn assemble_program_ir_multi_with_auto(
 	}
 
 	for (struct_name, fields) in all_declared_validation_props {
-		let properties = all_validation_props.entry(struct_name).or_default();
+		let facts = all_validation_facts.entry(struct_name).or_default();
 		for (field_name, declared) in fields {
-			let property = properties.entry(field_name).or_default();
+			let property = &mut facts.entry(field_name).or_default().properties;
 			property.is_signer |= declared.is_signer;
 			property.is_writable |= declared.is_writable;
 			property.is_pda |= declared.is_pda;
@@ -274,7 +275,7 @@ pub fn assemble_program_ir_multi_with_auto(
 		&all_errors,
 		&all_pinapod_enums,
 		&dispatch,
-		&all_validation_props,
+		&all_validation_facts,
 		&pdas_ir,
 		auto,
 	)
@@ -298,7 +299,7 @@ fn assemble_from_extracted(
 	errors: &[ErrorIr],
 	pinapod_enums: &[crate::ir::PinaPodEnumIr],
 	dispatch: &[entrypoint::DispatchEntry],
-	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
+	validation_facts: &HashMap<String, HashMap<String, validation::FieldFacts>>,
 	pdas_ir: &[PdaIr],
 	auto: &pina_abi::MigrationAuto,
 ) -> Result<ProgramIr, IdlError> {
@@ -384,8 +385,8 @@ fn assemble_from_extracted(
 			instruction_structs,
 			ix_accounts_structs,
 			dispatch,
-			validation_props,
-			pdas_ir,
+			validation_facts,
+			&PdaCatalog::new(pdas_ir, account_structs),
 			auto,
 		)?
 	};
@@ -577,8 +578,8 @@ fn build_instructions_from_dispatch(
 	instruction_structs: &[instruction_data::InstructionStruct],
 	ix_accounts_structs: &[accounts_struct::AccountsStruct],
 	dispatch: &[entrypoint::DispatchEntry],
-	validation_props: &HashMap<String, HashMap<String, validation::AccountProperties>>,
-	pdas_ir: &[PdaIr],
+	validation_facts: &HashMap<String, HashMap<String, validation::FieldFacts>>,
+	pdas: &PdaCatalog<'_>,
 	auto: &pina_abi::MigrationAuto,
 ) -> Result<Vec<InstructionIr>, IdlError> {
 	let mut instructions = Vec::with_capacity(dispatch.len());
@@ -604,8 +605,8 @@ fn build_instructions_from_dispatch(
 					}
 				})?;
 
-			let val_props = validation_props.get(accounts_struct_name);
-			build_instruction_accounts(accts_struct, val_props, pdas_ir)?
+			let facts = validation_facts.get(accounts_struct_name);
+			build_instruction_accounts(accts_struct, facts, pdas)?
 		} else {
 			Vec::new()
 		};
@@ -634,26 +635,19 @@ fn build_instructions_from_dispatch(
 
 fn build_instruction_accounts(
 	accts_struct: &accounts_struct::AccountsStruct,
-	val_props: Option<&HashMap<String, validation::AccountProperties>>,
-	pdas_ir: &[PdaIr],
+	field_facts: Option<&HashMap<String, validation::FieldFacts>>,
+	pdas: &PdaCatalog<'_>,
 ) -> Result<Vec<InstructionAccountIr>, IdlError> {
 	accts_struct
 		.fields
 		.iter()
 		.map(|field| {
-			let properties = val_props
+			let facts = field_facts
 				.and_then(|m| m.get(&field.name))
 				.cloned()
 				.unwrap_or_default();
-
-			let pda_name = if properties.is_pda {
-				Some(
-					infer_pda_name_for_field(&field.name, pdas_ir)
-						.ok_or_else(|| IdlError::unresolved_pda(&field.name))?,
-				)
-			} else {
-				None
-			};
+			let slot_pda = pdas.slot_pda(&field.name, &facts)?;
+			let properties = facts.properties;
 
 			Ok(InstructionAccountIr {
 				name: field.name.clone(),
@@ -661,13 +655,115 @@ fn build_instruction_accounts(
 				is_signer: properties.is_signer,
 				is_optional: field.is_optional,
 				default_value: properties.default_value,
-				is_pda: properties.is_pda,
-				pda_name,
+				is_pda: slot_pda.is_pda,
+				pda_name: slot_pda.pda_name,
 				constraints: field.constraints.clone(),
 				docs: field.docs.clone(),
 			})
 		})
 		.collect()
+}
+
+/// What the processor proves about one account slot's PDA.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct SlotPda {
+	/// The processor pins the slot's address: it derives or checks the address
+	/// from the PDA's seeds, or loads a PDA account type with only constant
+	/// seeds, which has a single address.
+	is_pda: bool,
+	/// The PDA the slot's account belongs to, also known when the processor
+	/// loads a variable-seed PDA account type without checking its address.
+	pda_name: Option<String>,
+}
+
+/// The PDAs a program declares, and the `#[pda]` account types behind them.
+struct PdaCatalog<'a> {
+	pdas: &'a [PdaIr],
+	/// Account type name to the PDA its `#[pda]` attribute declares.
+	account_pdas: HashMap<&'a str, &'a str>,
+}
+
+impl<'a> PdaCatalog<'a> {
+	fn new(pdas: &'a [PdaIr], account_structs: &'a [account_state::AccountStruct]) -> Self {
+		let account_pdas = account_structs
+			.iter()
+			.filter_map(|account| Some((account.name.as_str(), account.pda_name.as_deref()?)))
+			.collect();
+
+		Self { pdas, account_pdas }
+	}
+
+	/// The PDA an instruction account slot holds, as far as its processor
+	/// proves it.
+	///
+	/// A validated slot is pinned to its PDA; the loaded account type names the
+	/// PDA when it is unambiguous, and the field name names it otherwise. A
+	/// typed load alone proves which PDA the account belongs to but not which
+	/// seeds derived it, so it pins the address only when every seed is
+	/// constant. Generated clients derive a default address only for a pinned
+	/// slot: a variable seed that happens to share a name with another account
+	/// in the instruction is not proof that the account supplies the seed.
+	///
+	/// # Errors
+	///
+	/// Returns an unresolved-PDA error when the processor validates the slot as
+	/// a PDA but neither its types nor its name identify one.
+	fn slot_pda(
+		&self,
+		field_name: &str,
+		facts: &validation::FieldFacts,
+	) -> Result<SlotPda, IdlError> {
+		let typed_pda_name = self.typed_pda_name(&facts.account_types);
+
+		if facts.properties.is_pda {
+			let pda_name = typed_pda_name
+				.or_else(|| infer_pda_name_for_field(field_name, self.pdas))
+				.ok_or_else(|| IdlError::unresolved_pda(field_name))?;
+
+			return Ok(SlotPda {
+				is_pda: true,
+				pda_name: Some(pda_name),
+			});
+		}
+
+		let Some(pda_name) = typed_pda_name else {
+			return Ok(SlotPda::default());
+		};
+
+		Ok(SlotPda {
+			is_pda: self.has_single_address(&pda_name),
+			pda_name: Some(pda_name),
+		})
+	}
+
+	/// Whether every seed of the named PDA is a constant.
+	fn has_single_address(&self, pda_name: &str) -> bool {
+		self.pdas
+			.iter()
+			.find(|pda| pda.name == pda_name)
+			.is_some_and(|pda| {
+				pda.seeds
+					.iter()
+					.all(|seed| matches!(seed, crate::ir::PdaSeedIr::Constant { .. }))
+			})
+	}
+
+	/// The single PDA declared by the account types a field is loaded as.
+	///
+	/// A field loaded as two account types with different PDAs is ambiguous, so
+	/// it names no PDA.
+	fn typed_pda_name(&self, account_types: &BTreeSet<String>) -> Option<String> {
+		let pda_names = account_types
+			.iter()
+			.filter_map(|account_type| self.account_pdas.get(account_type.as_str()))
+			.collect::<BTreeSet<_>>();
+		let mut pda_names = pda_names.into_iter();
+
+		match (pda_names.next(), pda_names.next()) {
+			(Some(pda_name), None) => Some((*pda_name).to_owned()),
+			_ => None,
+		}
+	}
 }
 
 fn infer_pda_name_for_field(field_name: &str, pdas: &[PdaIr]) -> Option<String> {
@@ -967,6 +1063,193 @@ pub struct RunAccounts<'a> {
 		assert_eq!(ir.instructions[0].accounts.len(), 2);
 		assert!(!ir.instructions[0].accounts[0].is_writable);
 		assert!(ir.instructions[0].accounts[1].is_writable);
+	}
+
+	#[test]
+	fn assemble_program_ir_resolves_pdas_from_account_types() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			const SEED_CONFIG: &[u8] = b"config";
+			const SEED_VAULT: &[u8] = b"vault";
+			const SEED_POSITION: &[u8] = b"position";
+
+			#[discriminator]
+			pub enum PdaAccount {
+				ConfigState = 1,
+				PoolVault = 2,
+				Position = 3,
+				Plain = 4,
+			}
+
+			#[account(discriminator = PdaAccount)]
+			#[pda(seeds = [SEED_CONFIG], bump = bump)]
+			pub struct ConfigState {
+				pub bump: u8,
+			}
+
+			#[account(discriminator = PdaAccount)]
+			#[pda(seeds = [SEED_VAULT], bump = bump)]
+			pub struct PoolVault {
+				pub bump: u8,
+			}
+
+			#[account(discriminator = PdaAccount)]
+			#[pda(seeds = [SEED_POSITION, owner: Address], bump = bump)]
+			pub struct Position {
+				pub bump: u8,
+			}
+
+			#[account(discriminator = PdaAccount)]
+			pub struct Plain {
+				pub value: u64,
+			}
+
+			#[discriminator]
+			pub enum PdaInstruction {
+				Run = 0,
+			}
+
+			#[instruction(discriminator = PdaInstruction, variant = Run)]
+			pub struct RunInstruction {}
+
+			#[derive(Accounts)]
+			pub struct RunAccounts<'a> {
+				pub owner: &'a AccountView,
+				pub config: &'a mut AccountView,
+				pub vault: &'a AccountView,
+				pub position: &'a mut AccountView,
+				pub plain: &'a AccountView,
+				pub mixed: &'a AccountView,
+				pub checked: &'a AccountView,
+				pub pool_vault: &'a AccountView,
+			}
+
+			impl<'a> ProcessAccountInfos<'a> for RunAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let _ = RunInstruction::try_from_bytes(data)?;
+					self.config.as_account_mut::<ConfigState>(&ID)?;
+					let bump = self.vault.as_account::<PoolVault>(&ID)?.bump;
+					PoolVault::assert_stored_bump(self.vault, bump, &ID)?;
+					self.position.as_account_mut::<Position>(&ID)?;
+					self.plain.as_account::<Plain>(&ID)?;
+					self.mixed.as_account::<ConfigState>(&ID)?;
+					self.mixed.as_account::<Position>(&ID)?;
+					check_position(self.checked, self.owner)?;
+					self.pool_vault.assert_seeds_with_bump(&[SEED_VAULT, &[bump]], &ID)?;
+					self.pool_vault.as_account::<ConfigState>(&ID)?;
+					self.pool_vault.as_account::<Position>(&ID)?;
+					Ok(())
+				}
+			}
+
+			fn check_position(position: &AccountView, owner: &AccountView) -> ProgramResult {
+				owner.assert_signer()?;
+				Position::load_checked_pda(position, owner.address(), &ID)?;
+				Ok(())
+			}
+
+			pub mod entrypoint {
+				use super::*;
+
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &mut [AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					let instruction: PdaInstruction = parse_instruction(program_id, &ID, data)?;
+
+					match instruction {
+						PdaInstruction::Run => RunAccounts::try_from((program_id, accounts))?.process(data),
+					}
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir = assemble_program_ir(&file, "typed").unwrap_or_else(|e| panic!("assemble: {e}"));
+		let slots = ir.instructions[0]
+			.accounts
+			.iter()
+			.map(|account| {
+				(
+					account.name.as_str(),
+					account.is_pda,
+					account.pda_name.as_deref(),
+				)
+			})
+			.collect::<Vec<_>>();
+
+		assert_eq!(
+			slots,
+			[
+				// The helper asserts the owner signs, but nothing makes it a PDA.
+				("owner", false, None),
+				// A typed load of a constant-seed PDA has one possible address.
+				("config", true, Some("config")),
+				// The validating call's type names the PDA, not the field name.
+				("vault", true, Some("pool_vault")),
+				// A typed load of a variable-seed PDA names the PDA, but nothing
+				// ties the address to seeds a client could supply.
+				("position", false, Some("position")),
+				// A typed load of an account without `#[pda]` stays an account.
+				("plain", false, None),
+				// Two different PDA types cannot both describe one slot.
+				("mixed", false, None),
+				// The helper's checked loader validates the slot it is handed.
+				("checked", true, Some("position")),
+				// Ambiguous types fall back to the field name for a validated PDA.
+				("pool_vault", true, Some("pool_vault")),
+			]
+		);
+		assert!(ir.instructions[0].accounts[0].is_signer);
+	}
+
+	#[test]
+	fn assemble_program_ir_rejects_validated_pda_without_identity() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[discriminator]
+			pub enum LooseInstruction {
+				Run = 0,
+			}
+
+			#[instruction(discriminator = LooseInstruction, variant = Run)]
+			pub struct RunInstruction {}
+
+			#[derive(Accounts)]
+			pub struct RunAccounts<'a> {
+				pub anonymous: &'a AccountView,
+			}
+
+			impl<'a> ProcessAccountInfos<'a> for RunAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					Unknown::assert_stored_bump(self.anonymous, 255, &ID)?;
+					Ok(())
+				}
+			}
+
+			pub mod entrypoint {
+				use super::*;
+
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &mut [AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					let instruction: LooseInstruction = parse_instruction(program_id, &ID, data)?;
+
+					match instruction {
+						LooseInstruction::Run => RunAccounts::try_from((program_id, accounts))?.process(data),
+					}
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let error = assemble_program_ir(&file, "loose")
+			.expect_err("a validated PDA no type or name identifies must fail closed");
+
+		assert!(error.to_string().contains("anonymous"), "{error}");
 	}
 
 	#[test]

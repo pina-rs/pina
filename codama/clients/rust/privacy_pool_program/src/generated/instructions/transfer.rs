@@ -30,16 +30,22 @@ impl Transfer {
 	pub fn new(
 		pool_config: solana_pubkey::Pubkey,
 		payer: solana_pubkey::Pubkey,
-		merkle_tree: solana_pubkey::Pubkey,
-		nullifier_set: solana_pubkey::Pubkey,
 		verifying_key_account: solana_pubkey::Pubkey,
 		note_commitment: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			pool_config,
 			payer,
-			merkle_tree,
-			nullifier_set,
+			merkle_tree: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-tree".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
+			nullifier_set: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-nullifiers".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			verifying_key_account,
 			note_commitment,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),

@@ -31,12 +31,18 @@ export const depositCommand = registerGlobals(new Command("deposit"))
 	)
 	.requiredOption("--envelope <envelope>", "envelope")
 	.requiredOption("--shares <shares>", "Encrypted per-custodian key shares.")
-	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
 	.option(
 		"--pool-vault <poolVault>",
 		"The `pool_vault` account [default: derived]",
 	)
-	.requiredOption("--merkle-tree <merkleTree>", "The `merkle_tree` account")
+	.option(
+		"--merkle-tree <merkleTree>",
+		"The `merkle_tree` account [default: derived]",
+	)
 	.requiredOption(
 		"--note-commitment <noteCommitment>",
 		"The `note_commitment` account",
@@ -51,11 +57,15 @@ export const depositCommand = registerGlobals(new Command("deposit"))
 			envelope: base58("--envelope", options.envelope),
 			shares: base58("--shares", options.shares),
 			depositor: context.payer,
-			poolConfig: pubkey("--pool-config", options.poolConfig),
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
 			poolVault: options.poolVault === undefined
 				? undefined
 				: pubkey("--pool-vault", options.poolVault),
-			merkleTree: pubkey("--merkle-tree", options.merkleTree),
+			merkleTree: options.merkleTree === undefined
+				? undefined
+				: pubkey("--merkle-tree", options.merkleTree),
 			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
 		};
 		const instruction = await getDepositInstructionAsync(

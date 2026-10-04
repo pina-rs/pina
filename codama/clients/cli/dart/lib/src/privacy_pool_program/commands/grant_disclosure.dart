@@ -20,8 +20,7 @@ final class GrantDisclosureCommand extends Command<void> {
         'note_commitment',
         mandatory: true,
         help: "The note_commitment account",
-      )
-      ..addOption('viewer', mandatory: true, help: "The viewer account");
+      );
   }
 
   @override
@@ -42,7 +41,7 @@ final class GrantDisclosureCommand extends Command<void> {
       '--note-commitment',
       results['note_commitment']! as String,
     );
-    final viewer = pubkey('--viewer', results['viewer']! as String);
+    final viewer = context.payerAddress;
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getGrantDisclosureInstruction(
       programAddress: context.programAddress,

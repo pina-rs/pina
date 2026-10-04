@@ -37,8 +37,8 @@ final class MultisigCreateCommand extends Command<void> {
       )
       ..addOption(
         'program_config',
-        mandatory: true,
-        help: "The program_config account",
+        mandatory: false,
+        help: "The program_config account [default: derived]",
       )
       ..addOption(
         'multisig',
@@ -68,10 +68,11 @@ final class MultisigCreateCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final programConfig = pubkey(
-      '--program-config',
-      results['program_config']! as String,
-    );
+    final programConfig = (results['program_config'] as String?) != null
+        ? pubkey('--program-config', results['program_config']! as String)
+        : (await findProgramConfigPda(
+            programAddress: context.programAddress,
+          )).$1;
     final createKey = context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)

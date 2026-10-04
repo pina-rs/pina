@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getReallocInstruction } from "../client";
+import { getReallocInstructionAsync } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -19,15 +19,17 @@ export const reallocCommand = registerGlobals(new Command("realloc"))
 		"Resizes the complete account-data buffer to `len` bytes.\n\n`len` must equal `Sample::projected_bytes` for an active value count.",
 	)
 	.requiredOption("--len <len>", "len")
-	.requiredOption("--sample <sample>", "The `sample` account")
+	.option("--sample <sample>", "The `sample` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			len: smallInteger("--len", options.len),
 			authority: context.payer,
-			sample: pubkey("--sample", options.sample),
+			sample: options.sample === undefined
+				? undefined
+				: pubkey("--sample", options.sample),
 		};
-		const instruction = getReallocInstruction(
+		const instruction = await getReallocInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

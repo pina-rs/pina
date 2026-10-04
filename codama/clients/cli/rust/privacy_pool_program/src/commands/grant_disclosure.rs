@@ -27,15 +27,12 @@ pub struct GrantDisclosureArgs {
 	/// The `note_commitment` account
 	#[arg(long)]
 	note_commitment: String,
-	/// The `viewer` account
-	#[arg(long)]
-	viewer: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: GrantDisclosureArgs) -> Result<(), CliError> {
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
 	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
-	let viewer = CliContext::pubkey("--viewer", &args.viewer)?;
+	let viewer = context.payer_pubkey();
 	let data = GrantDisclosureInstructionData::new(|data| {
 		data.reserved = args.reserved;
 	})

@@ -38,13 +38,13 @@ final class TransferCommand extends Command<void> {
       )
       ..addOption(
         'merkle_tree',
-        mandatory: true,
-        help: "The merkle_tree account",
+        mandatory: false,
+        help: "The merkle_tree account [default: derived]",
       )
       ..addOption(
         'nullifier_set',
-        mandatory: true,
-        help: "The nullifier_set account",
+        mandatory: false,
+        help: "The nullifier_set account [default: derived]",
       )
       ..addOption(
         'verifying_key_account',
@@ -73,14 +73,14 @@ final class TransferCommand extends Command<void> {
       results['pool_config']! as String,
     );
     final payer = context.payerAddress;
-    final merkleTree = pubkey(
-      '--merkle-tree',
-      results['merkle_tree']! as String,
-    );
-    final nullifierSet = pubkey(
-      '--nullifier-set',
-      results['nullifier_set']! as String,
-    );
+    final merkleTree = (results['merkle_tree'] as String?) != null
+        ? pubkey('--merkle-tree', results['merkle_tree']! as String)
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
+    final nullifierSet = (results['nullifier_set'] as String?) != null
+        ? pubkey('--nullifier-set', results['nullifier_set']! as String)
+        : (await findNullifierSetPda(
+            programAddress: context.programAddress,
+          )).$1;
     final verifyingKeyAccount = pubkey(
       '--verifying-key-account',
       results['verifying_key_account']! as String,

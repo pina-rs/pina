@@ -36,8 +36,8 @@ final class DepositCommand extends Command<void> {
       )
       ..addOption(
         'pool_config',
-        mandatory: true,
-        help: "The pool_config account",
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
       )
       ..addOption(
         'pool_vault',
@@ -46,8 +46,8 @@ final class DepositCommand extends Command<void> {
       )
       ..addOption(
         'merkle_tree',
-        mandatory: true,
-        help: "The merkle_tree account",
+        mandatory: false,
+        help: "The merkle_tree account [default: derived]",
       )
       ..addOption(
         'note_commitment',
@@ -67,17 +67,15 @@ final class DepositCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final depositor = context.payerAddress;
-    final poolConfig = pubkey(
-      '--pool-config',
-      results['pool_config']! as String,
-    );
+    final poolConfig = (results['pool_config'] as String?) != null
+        ? pubkey('--pool-config', results['pool_config']! as String)
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final poolVault = (results['pool_vault'] as String?) != null
         ? pubkey('--pool-vault', results['pool_vault']! as String)
         : (await findPoolVaultPda(programAddress: context.programAddress)).$1;
-    final merkleTree = pubkey(
-      '--merkle-tree',
-      results['merkle_tree']! as String,
-    );
+    final merkleTree = (results['merkle_tree'] as String?) != null
+        ? pubkey('--merkle-tree', results['merkle_tree']! as String)
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
     final noteCommitment = pubkey(
       '--note-commitment',
       results['note_commitment']! as String,

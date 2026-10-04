@@ -33,12 +33,14 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type InstructionAccountInput,
 	type InstructionAccountInputAddress,
 	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
+import { findSamplePda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -109,6 +111,150 @@ export function getRealloc2InstructionDataCodec(): FixedSizeCodec<
 		getRealloc2InstructionDataEncoder(),
 		getRealloc2InstructionDataDecoder(),
 	);
+}
+
+export type Realloc2AsyncInput<
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSample1 extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSample2 extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+> = {
+	authority: TAccountAuthority;
+	sample1?: TAccountSample1;
+	sample2?: TAccountSample2;
+	systemProgram?: TAccountSystemProgram;
+	len: Realloc2InstructionDataArgs["len"];
+};
+
+export async function getRealloc2InstructionAsync<
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountSample1 extends InstructionAccountInput,
+	TAccountSample2 extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TProgramAddress extends Address =
+		typeof ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: Realloc2AsyncInput<
+		TAccountAuthority,
+		TAccountSample1,
+		TAccountSample2,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	Realloc2Instruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample1,
+			InstructionAccountInputAddress<TAccountSample1>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample2,
+			InstructionAccountInputAddress<TAccountSample2>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		sample1: {
+			value: input.sample1 ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		sample2: {
+			value: input.sample2 ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.sample1.value) {
+		accounts.sample1.value = await findSamplePda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		}, { programAddress });
+	}
+	if (!accounts.sample2.value) {
+		accounts.sample2.value = await findSamplePda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		}, { programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("sample1", accounts.sample1),
+			getAccountMeta("sample2", accounts.sample2),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getRealloc2InstructionDataEncoder().encode(
+			args as Realloc2InstructionDataArgs,
+		),
+		programAddress,
+	} as Realloc2Instruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample1,
+			InstructionAccountInputAddress<TAccountSample1>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample2,
+			InstructionAccountInputAddress<TAccountSample2>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
+	>);
 }
 
 export type Realloc2Input<

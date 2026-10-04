@@ -13,7 +13,11 @@ final class ReallocCommand extends Command<void> {
   ReallocCommand() {
     argParser
       ..addOption('len', mandatory: true, help: "len")
-      ..addOption('sample', mandatory: true, help: "The sample account");
+      ..addOption(
+        'sample',
+        mandatory: false,
+        help: "The sample account [default: derived]",
+      );
   }
 
   @override
@@ -28,7 +32,12 @@ final class ReallocCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final authority = context.payerAddress;
-    final sample = pubkey('--sample', results['sample']! as String);
+    final sample = (results['sample'] as String?) != null
+        ? pubkey('--sample', results['sample']! as String)
+        : (await findSamplePda(
+            seeds: SampleSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final lenValue = integer('--len', results['len']! as String);
     final instruction = getReallocInstruction(
       programAddress: context.programAddress,

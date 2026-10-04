@@ -39,6 +39,7 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
+import { findPoolConfigPda, findRequesterRegistryPda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -121,6 +122,118 @@ export function getRegisterRequesterInstructionDataCodec(): FixedSizeCodec<
 		getRegisterRequesterInstructionDataEncoder(),
 		getRegisterRequesterInstructionDataDecoder(),
 	);
+}
+
+export type RegisterRequesterAsyncInput<
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+> = {
+	authority: TAccountAuthority;
+	poolConfig?: TAccountPoolConfig;
+	requesterRegistry?: TAccountRequesterRegistry;
+	requester: RegisterRequesterInstructionDataArgs["requester"];
+	maxTier: RegisterRequesterInstructionDataArgs["maxTier"];
+};
+
+export async function getRegisterRequesterInstructionAsync<
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RegisterRequesterAsyncInput<
+		TAccountAuthority,
+		TAccountPoolConfig,
+		TAccountRequesterRegistry
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	RegisterRequesterInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		requesterRegistry: {
+			value: input.requesterRegistry ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.poolConfig.value) {
+		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+	}
+	if (!accounts.requesterRegistry.value) {
+		accounts.requesterRegistry.value = await findRequesterRegistryPda({
+			programAddress,
+		});
+	}
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
+		],
+		data: getRegisterRequesterInstructionDataEncoder().encode(
+			args as RegisterRequesterInstructionDataArgs,
+		),
+		programAddress,
+	} as RegisterRequesterInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>
+	>);
 }
 
 export type RegisterRequesterInput<

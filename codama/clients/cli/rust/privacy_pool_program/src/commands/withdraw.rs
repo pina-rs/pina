@@ -31,18 +31,18 @@ pub struct WithdrawArgs {
 	proof_b: String,
 	#[arg(long)]
 	proof_c: String,
-	/// The `pool_config` account
+	/// The `pool_config` account [default: derived]
 	#[arg(long)]
-	pool_config: String,
+	pool_config: Option<String>,
 	/// The `pool_vault` account [default: derived]
 	#[arg(long)]
 	pool_vault: Option<String>,
-	/// The `merkle_tree` account
+	/// The `merkle_tree` account [default: derived]
 	#[arg(long)]
-	merkle_tree: String,
-	/// The `nullifier_set` account
+	merkle_tree: Option<String>,
+	/// The `nullifier_set` account [default: derived]
 	#[arg(long)]
-	nullifier_set: String,
+	nullifier_set: Option<String>,
 	/// The `verifying_key_account` account
 	#[arg(long)]
 	verifying_key_account: String,
@@ -57,7 +57,16 @@ pub(crate) fn run(context: &CliContext, args: WithdrawArgs) -> Result<(), CliErr
 	let proof_a = CliContext::bytes::<64>("--proof_a", &args.proof_a)?;
 	let proof_b = CliContext::bytes::<128>("--proof_b", &args.proof_b)?;
 	let proof_c = CliContext::bytes::<64>("--proof_c", &args.proof_c)?;
-	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
+	let pool_config = match &args.pool_config {
+		Some(value) => CliContext::pubkey("--pool_config", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let pool_vault = match &args.pool_vault {
 		Some(value) => CliContext::pubkey("--pool_vault", value)?,
 		None => {
@@ -68,8 +77,26 @@ pub(crate) fn run(context: &CliContext, args: WithdrawArgs) -> Result<(), CliErr
 			.0
 		}
 	};
-	let merkle_tree = CliContext::pubkey("--merkle_tree", &args.merkle_tree)?;
-	let nullifier_set = CliContext::pubkey("--nullifier_set", &args.nullifier_set)?;
+	let merkle_tree = match &args.merkle_tree {
+		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-tree".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
+	let nullifier_set = match &args.nullifier_set {
+		Some(value) => CliContext::pubkey("--nullifier_set", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-nullifiers".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let verifying_key_account =
 		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
 	let recipient = CliContext::pubkey("--recipient", &args.recipient)?;
