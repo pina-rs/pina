@@ -486,6 +486,12 @@ fn build_pda_default_value(
 	instruction: &InstructionIr,
 	pdas: &[PdaIr],
 ) -> Option<InstructionInputValueNode> {
+	// A slot that names its PDA without `is_pda` belongs to that PDA, but its
+	// processor never ties the address to seeds a client could supply.
+	if !account.is_pda {
+		return None;
+	}
+
 	let pda_name = account.pda_name.as_ref()?;
 	let pda = pdas.iter().find(|pda| pda.name == *pda_name)?;
 	let mut seed_values = Vec::new();
@@ -1398,6 +1404,69 @@ mod tests {
 				.is_none(),
 			"optional accounts must not retain explicit defaults"
 		);
+	}
+
+	#[test]
+	fn only_pinned_pda_slots_derive_default_addresses() {
+		let account = |name: &str, is_pda: bool, pda_name: Option<&str>| {
+			InstructionAccountIr {
+				name: name.to_owned(),
+				is_writable: false,
+				is_signer: false,
+				is_optional: false,
+				default_value: None,
+				is_pda,
+				pda_name: pda_name.map(str::to_owned),
+				constraints: vec![],
+				docs: vec![],
+			}
+		};
+		let ir = ProgramIr {
+			name: "positions".to_owned(),
+			public_key: "11111111111111111111111111111111".to_owned(),
+			pinapod_enums: vec![],
+			accounts: vec![],
+			events: Vec::new(),
+			instructions: vec![InstructionIr {
+				name: "touch".to_owned(),
+				rust_name: "TouchInstruction".to_owned(),
+				accounts: vec![
+					account("owner", false, None),
+					// Loaded by type: the PDA is known, its seeds are not.
+					account("loaded", false, Some("position")),
+					// Validated against seeds: `owner` supplies the seed.
+					account("validated", true, Some("position")),
+				],
+				arguments: vec![],
+				discriminator: DiscriminatorIr {
+					value: 1,
+					repr_size: 1,
+				},
+				docs: vec![],
+			}],
+			errors: vec![],
+			pdas: vec![PdaIr {
+				name: "position".to_owned(),
+				seeds: vec![
+					crate::ir::PdaSeedIr::Constant {
+						value: b"position".to_vec(),
+					},
+					crate::ir::PdaSeedIr::Variable {
+						name: "owner".to_owned(),
+						rust_type: "Address".to_owned(),
+					},
+				],
+			}],
+		};
+
+		let root = ir_to_root_node(&ir).unwrap_or_else(|error| panic!("{error}"));
+		let accounts = &root.program.instructions[0].accounts;
+
+		assert!(accounts[1].default_value.is_none());
+		assert!(matches!(
+			accounts[2].default_value.as_ref(),
+			Some(InstructionInputValueNode::PdaValue(_))
+		));
 	}
 
 	#[test]

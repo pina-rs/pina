@@ -38,7 +38,12 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import { findPoolVaultPda } from "../pdas";
+import {
+	findMerkleTreePda,
+	findNullifierSetPda,
+	findPoolConfigPda,
+	findPoolVaultPda,
+} from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
@@ -163,10 +168,10 @@ export type WithdrawAsyncInput<
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
 > = {
-	poolConfig: TAccountPoolConfig;
+	poolConfig?: TAccountPoolConfig;
 	poolVault?: TAccountPoolVault;
-	merkleTree: TAccountMerkleTree;
-	nullifierSet: TAccountNullifierSet;
+	merkleTree?: TAccountMerkleTree;
+	nullifierSet?: TAccountNullifierSet;
 	verifyingKeyAccount: TAccountVerifyingKeyAccount;
 	recipient: TAccountRecipient;
 	systemProgram?: TAccountSystemProgram;
@@ -284,8 +289,17 @@ export async function getWithdrawInstructionAsync<
 	const args = { ...input };
 
 	// Resolve default values.
+	if (!accounts.poolConfig.value) {
+		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+	}
 	if (!accounts.poolVault.value) {
 		accounts.poolVault.value = await findPoolVaultPda({ programAddress });
+	}
+	if (!accounts.merkleTree.value) {
+		accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
+	}
+	if (!accounts.nullifierSet.value) {
+		accounts.nullifierSet.value = await findNullifierSetPda({ programAddress });
 	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =

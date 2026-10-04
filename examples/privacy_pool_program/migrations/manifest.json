@@ -891,13 +891,16 @@
 						"accounts": [
 							{
 								"name": "disclosure_request",
-								"writable": true
+								"writable": true,
+								"pda": "disclosure_request"
 							},
 							{
-								"name": "note_commitment"
+								"name": "note_commitment",
+								"pda": "note_commitment"
 							},
 							{
-								"name": "viewer"
+								"name": "viewer",
+								"signer": true
 							}
 						]
 					}
@@ -922,13 +925,16 @@
 						"accounts": [
 							{
 								"name": "disclosure_request",
-								"writable": true
+								"writable": true,
+								"pda": "disclosure_request"
 							},
 							{
-								"name": "note_commitment"
+								"name": "note_commitment",
+								"pda": "note_commitment"
 							},
 							{
-								"name": "viewer"
+								"name": "viewer",
+								"signer": true
 							},
 							{
 								"name": "clock"

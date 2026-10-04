@@ -37,6 +37,11 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
+import {
+	findCustodianRegistryPda,
+	findDisclosureLogPda,
+	findPoolConfigPda,
+} from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -124,6 +129,174 @@ export function getApproveDisclosureInstructionDataCodec(): FixedSizeCodec<
 		getApproveDisclosureInstructionDataEncoder(),
 		getApproveDisclosureInstructionDataDecoder(),
 	);
+}
+
+export type ApproveDisclosureAsyncInput<
+	TAccountCustodian extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountCustodianRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountDisclosureLog extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+> = {
+	custodian: TAccountCustodian;
+	poolConfig?: TAccountPoolConfig;
+	custodianRegistry?: TAccountCustodianRegistry;
+	disclosureRequest: TAccountDisclosureRequest;
+	disclosureLog?: TAccountDisclosureLog;
+	clock: TAccountClock;
+	reserved: ApproveDisclosureInstructionDataArgs["reserved"];
+};
+
+export async function getApproveDisclosureInstructionAsync<
+	TAccountCustodian extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountCustodianRegistry extends InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountDisclosureLog extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: ApproveDisclosureAsyncInput<
+		TAccountCustodian,
+		TAccountPoolConfig,
+		TAccountCustodianRegistry,
+		TAccountDisclosureRequest,
+		TAccountDisclosureLog,
+		TAccountClock
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	ApproveDisclosureInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountCustodian,
+			InstructionAccountInputAddress<TAccountCustodian>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCustodianRegistry,
+			InstructionAccountInputAddress<TAccountCustodianRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureLog,
+			InstructionAccountInputAddress<TAccountDisclosureLog>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		custodian: {
+			value: input.custodian ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		custodianRegistry: {
+			value: input.custodianRegistry ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		disclosureRequest: {
+			value: input.disclosureRequest ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		disclosureLog: {
+			value: input.disclosureLog ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.poolConfig.value) {
+		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+	}
+	if (!accounts.custodianRegistry.value) {
+		accounts.custodianRegistry.value = await findCustodianRegistryPda({
+			programAddress,
+		});
+	}
+	if (!accounts.disclosureLog.value) {
+		accounts.disclosureLog.value = await findDisclosureLogPda({
+			programAddress,
+		});
+	}
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("custodian", accounts.custodian),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("custodianRegistry", accounts.custodianRegistry),
+			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
+			getAccountMeta("disclosureLog", accounts.disclosureLog),
+			getAccountMeta("clock", accounts.clock),
+		],
+		data: getApproveDisclosureInstructionDataEncoder().encode(
+			args as ApproveDisclosureInstructionDataArgs,
+		),
+		programAddress,
+	} as ApproveDisclosureInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountCustodian,
+			InstructionAccountInputAddress<TAccountCustodian>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountCustodianRegistry,
+			InstructionAccountInputAddress<TAccountCustodianRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureLog,
+			InstructionAccountInputAddress<TAccountDisclosureLog>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
+	>);
 }
 
 export type ApproveDisclosureInput<

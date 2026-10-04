@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getRealloc2Instruction } from "../client";
+import { getRealloc2InstructionAsync } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -19,17 +19,21 @@ export const realloc2Command = registerGlobals(new Command("realloc2"))
 		"Exercises Anchor's duplicate-reallocation guard.\n\nBoth sample accounts must be the same canonical PDA for the signer, so the\ninstruction always rejects with `AccountDuplicateReallocs` before any\naccount is resized. It is intentionally not a two-target mutation API.",
 	)
 	.requiredOption("--len <len>", "len")
-	.requiredOption("--sample1 <sample1>", "The `sample1` account")
-	.requiredOption("--sample2 <sample2>", "The `sample2` account")
+	.option("--sample1 <sample1>", "The `sample1` account [default: derived]")
+	.option("--sample2 <sample2>", "The `sample2` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			len: smallInteger("--len", options.len),
 			authority: context.payer,
-			sample1: pubkey("--sample1", options.sample1),
-			sample2: pubkey("--sample2", options.sample2),
+			sample1: options.sample1 === undefined
+				? undefined
+				: pubkey("--sample1", options.sample1),
+			sample2: options.sample2 === undefined
+				? undefined
+				: pubkey("--sample2", options.sample2),
 		};
-		const instruction = getRealloc2Instruction(
+		const instruction = await getRealloc2InstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

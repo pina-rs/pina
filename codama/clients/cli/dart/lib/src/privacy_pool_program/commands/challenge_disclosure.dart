@@ -21,7 +21,6 @@ final class ChallengeDisclosureCommand extends Command<void> {
         mandatory: true,
         help: "The note_commitment account",
       )
-      ..addOption('viewer', mandatory: true, help: "The viewer account")
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -43,7 +42,7 @@ final class ChallengeDisclosureCommand extends Command<void> {
       '--note-commitment',
       results['note_commitment']! as String,
     );
-    final viewer = pubkey('--viewer', results['viewer']! as String);
+    final viewer = context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getChallengeDisclosureInstruction(

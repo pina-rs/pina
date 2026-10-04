@@ -30,7 +30,6 @@ export const grantDisclosureCommand = registerGlobals(
 		"--note-commitment <noteCommitment>",
 		"The `note_commitment` account",
 	)
-	.requiredOption("--viewer <viewer>", "The `viewer` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
@@ -40,7 +39,7 @@ export const grantDisclosureCommand = registerGlobals(
 				options.disclosureRequest,
 			),
 			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
-			viewer: pubkey("--viewer", options.viewer),
+			viewer: context.payer,
 		};
 		const instruction = getGrantDisclosureInstruction(
 			...[input],

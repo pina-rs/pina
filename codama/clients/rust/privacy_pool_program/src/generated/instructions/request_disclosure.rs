@@ -33,8 +33,6 @@ pub struct RequestDisclosure {
 impl RequestDisclosure {
 	pub fn new(
 		requester: solana_pubkey::Pubkey,
-		pool_config: solana_pubkey::Pubkey,
-		requester_registry: solana_pubkey::Pubkey,
 		note_commitment: solana_pubkey::Pubkey,
 		disclosure_request: solana_pubkey::Pubkey,
 		system_program: solana_pubkey::Pubkey,
@@ -42,8 +40,16 @@ impl RequestDisclosure {
 	) -> Self {
 		Self {
 			requester,
-			pool_config,
-			requester_registry,
+			pool_config: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
+			requester_registry: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-requesters".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			note_commitment,
 			disclosure_request,
 			system_program,

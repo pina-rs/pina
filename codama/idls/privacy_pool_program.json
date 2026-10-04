@@ -1713,7 +1713,14 @@
 						"name": "poolConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -1909,14 +1916,28 @@
 						"name": "poolConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "custodianRegistry",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "custodianRegistry"
+							}
+						}
 					}
 				],
 				"arguments": [
@@ -1991,14 +2012,28 @@
 						"name": "poolConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "requesterRegistry",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "requesterRegistry"
+							}
+						}
 					}
 				],
 				"arguments": [
@@ -2081,7 +2116,14 @@
 						"name": "poolConfig",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -2102,7 +2144,14 @@
 						"name": "merkleTree",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "merkleTree"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -2251,7 +2300,14 @@
 						"name": "poolConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -2272,14 +2328,28 @@
 						"name": "merkleTree",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "merkleTree"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "nullifierSet",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "nullifierSet"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -2442,14 +2512,28 @@
 						"name": "merkleTree",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "merkleTree"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "nullifierSet",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "nullifierSet"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -2661,14 +2745,28 @@
 						"name": "poolConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "requesterRegistry",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "requesterRegistry"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -2847,7 +2945,7 @@
 						"kind": "instructionAccountNode",
 						"name": "viewer",
 						"isWritable": false,
-						"isSigner": false,
+						"isSigner": true,
 						"isOptional": false
 					}
 				],
@@ -2930,7 +3028,7 @@
 						"kind": "instructionAccountNode",
 						"name": "viewer",
 						"isWritable": false,
-						"isSigner": false,
+						"isSigner": true,
 						"isOptional": false
 					},
 					{
@@ -3014,7 +3112,14 @@
 						"name": "poolConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -3098,14 +3203,28 @@
 						"name": "poolConfig",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "poolConfig"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "custodianRegistry",
 						"isWritable": false,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "custodianRegistry"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -3119,7 +3238,14 @@
 						"name": "disclosureLog",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "disclosureLog"
+							}
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

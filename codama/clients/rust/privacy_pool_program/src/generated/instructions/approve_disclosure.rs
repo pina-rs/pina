@@ -32,18 +32,27 @@ pub struct ApproveDisclosure {
 impl ApproveDisclosure {
 	pub fn new(
 		custodian: solana_pubkey::Pubkey,
-		pool_config: solana_pubkey::Pubkey,
-		custodian_registry: solana_pubkey::Pubkey,
 		disclosure_request: solana_pubkey::Pubkey,
-		disclosure_log: solana_pubkey::Pubkey,
 		clock: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			custodian,
-			pool_config,
-			custodian_registry,
+			pool_config: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
+			custodian_registry: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-custodians".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			disclosure_request,
-			disclosure_log,
+			disclosure_log: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-log".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			clock,
 		}
 	}

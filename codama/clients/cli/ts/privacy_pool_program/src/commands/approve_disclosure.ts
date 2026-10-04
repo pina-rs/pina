@@ -5,7 +5,7 @@
 import { Command } from "commander";
 import {
 	APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT,
-	getApproveDisclosureInstruction,
+	getApproveDisclosureInstructionAsync,
 } from "../client";
 import {
 	base58,
@@ -22,18 +22,21 @@ export const approveDisclosureCommand = registerGlobals(
 )
 	.description("approveDisclosure")
 	.requiredOption("--reserved <reserved>", "Reserved; must be zero.")
-	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
-	.requiredOption(
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
 		"--custodian-registry <custodianRegistry>",
-		"The `custodian_registry` account",
+		"The `custodian_registry` account [default: derived]",
 	)
 	.requiredOption(
 		"--disclosure-request <disclosureRequest>",
 		"The `disclosure_request` account",
 	)
-	.requiredOption(
+	.option(
 		"--disclosure-log <disclosureLog>",
-		"The `disclosure_log` account",
+		"The `disclosure_log` account [default: derived]",
 	)
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.action(async (options) => {
@@ -41,19 +44,22 @@ export const approveDisclosureCommand = registerGlobals(
 		const input = {
 			reserved: smallInteger("--reserved", options.reserved),
 			custodian: context.payer,
-			poolConfig: pubkey("--pool-config", options.poolConfig),
-			custodianRegistry: pubkey(
-				"--custodian-registry",
-				options.custodianRegistry,
-			),
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			custodianRegistry: options.custodianRegistry === undefined
+				? undefined
+				: pubkey("--custodian-registry", options.custodianRegistry),
 			disclosureRequest: pubkey(
 				"--disclosure-request",
 				options.disclosureRequest,
 			),
-			disclosureLog: pubkey("--disclosure-log", options.disclosureLog),
+			disclosureLog: options.disclosureLog === undefined
+				? undefined
+				: pubkey("--disclosure-log", options.disclosureLog),
 			clock: pubkey("--clock", options.clock),
 		};
-		const instruction = getApproveDisclosureInstruction(
+		const instruction = await getApproveDisclosureInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

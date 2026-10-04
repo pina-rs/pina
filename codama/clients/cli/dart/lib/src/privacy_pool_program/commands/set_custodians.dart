@@ -13,13 +13,13 @@ final class SetCustodiansCommand extends Command<void> {
       ..addOption('custodians', mandatory: true, help: "custodians")
       ..addOption(
         'pool_config',
-        mandatory: true,
-        help: "The pool_config account",
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
       )
       ..addOption(
         'custodian_registry',
-        mandatory: true,
-        help: "The custodian_registry account",
+        mandatory: false,
+        help: "The custodian_registry account [default: derived]",
       );
   }
 
@@ -34,14 +34,17 @@ final class SetCustodiansCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final authority = context.payerAddress;
-    final poolConfig = pubkey(
-      '--pool-config',
-      results['pool_config']! as String,
-    );
-    final custodianRegistry = pubkey(
-      '--custodian-registry',
-      results['custodian_registry']! as String,
-    );
+    final poolConfig = (results['pool_config'] as String?) != null
+        ? pubkey('--pool-config', results['pool_config']! as String)
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
+    final custodianRegistry = (results['custodian_registry'] as String?) != null
+        ? pubkey(
+            '--custodian-registry',
+            results['custodian_registry']! as String,
+          )
+        : (await findCustodianRegistryPda(
+            programAddress: context.programAddress,
+          )).$1;
     final custodiansValue = base58Bytes(
       '--custodians',
       results['custodians']! as String,

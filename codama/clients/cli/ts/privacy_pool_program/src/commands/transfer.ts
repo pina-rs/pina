@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getTransferInstruction, TRANSFER_COMPUTE_UNIT_LIMIT } from "../client";
+import {
+	getTransferInstructionAsync,
+	TRANSFER_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -34,10 +37,13 @@ export const transferCommand = registerGlobals(new Command("transfer"))
 	.requiredOption("--proof-b <proofB>", "proofB")
 	.requiredOption("--proof-c <proofC>", "proofC")
 	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
-	.requiredOption("--merkle-tree <merkleTree>", "The `merkle_tree` account")
-	.requiredOption(
+	.option(
+		"--merkle-tree <merkleTree>",
+		"The `merkle_tree` account [default: derived]",
+	)
+	.option(
 		"--nullifier-set <nullifierSet>",
-		"The `nullifier_set` account",
+		"The `nullifier_set` account [default: derived]",
 	)
 	.requiredOption(
 		"--verifying-key-account <verifyingKeyAccount>",
@@ -63,15 +69,19 @@ export const transferCommand = registerGlobals(new Command("transfer"))
 			proofC: base58("--proof-c", options.proofC),
 			poolConfig: pubkey("--pool-config", options.poolConfig),
 			payer: context.payer,
-			merkleTree: pubkey("--merkle-tree", options.merkleTree),
-			nullifierSet: pubkey("--nullifier-set", options.nullifierSet),
+			merkleTree: options.merkleTree === undefined
+				? undefined
+				: pubkey("--merkle-tree", options.merkleTree),
+			nullifierSet: options.nullifierSet === undefined
+				? undefined
+				: pubkey("--nullifier-set", options.nullifierSet),
 			verifyingKeyAccount: pubkey(
 				"--verifying-key-account",
 				options.verifyingKeyAccount,
 			),
 			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
 		};
-		const instruction = getTransferInstruction(
+		const instruction = await getTransferInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

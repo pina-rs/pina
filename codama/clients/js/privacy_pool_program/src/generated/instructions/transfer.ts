@@ -41,6 +41,7 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
+import { findMerkleTreePda, findNullifierSetPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
@@ -178,6 +179,208 @@ export function getTransferInstructionDataCodec(): FixedSizeCodec<
 		getTransferInstructionDataEncoder(),
 		getTransferInstructionDataDecoder(),
 	);
+}
+
+export type TransferAsyncInput<
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
+	TAccountNullifierSet extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountVerifyingKeyAccount extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+> = {
+	poolConfig: TAccountPoolConfig;
+	/**
+	 * Funds the successor note's rent. Transfers are anonymous with respect
+	 * to the spent note, not to fees: this example has no relayer, so the
+	 * submitting wallet signs and pays. Production routes this through a
+	 * relayer so even this linkage disappears.
+	 */
+	payer: TAccountPayer;
+	merkleTree?: TAccountMerkleTree;
+	nullifierSet?: TAccountNullifierSet;
+	verifyingKeyAccount: TAccountVerifyingKeyAccount;
+	noteCommitment: TAccountNoteCommitment;
+	systemProgram?: TAccountSystemProgram;
+	bump: TransferInstructionDataArgs["bump"];
+	nullifier: TransferInstructionDataArgs["nullifier"];
+	root: TransferInstructionDataArgs["root"];
+	newCommitment: TransferInstructionDataArgs["newCommitment"];
+	newViewPubkey: TransferInstructionDataArgs["newViewPubkey"];
+	envelopeLen: TransferInstructionDataArgs["envelopeLen"];
+	envelope: TransferInstructionDataArgs["envelope"];
+	shares: TransferInstructionDataArgs["shares"];
+	proofA: TransferInstructionDataArgs["proofA"];
+	proofB: TransferInstructionDataArgs["proofB"];
+	proofC: TransferInstructionDataArgs["proofC"];
+};
+
+export async function getTransferInstructionAsync<
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountPayer extends InstructionSignerInput,
+	TAccountMerkleTree extends InstructionAccountInput,
+	TAccountNullifierSet extends InstructionAccountInput,
+	TAccountVerifyingKeyAccount extends InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: TransferAsyncInput<
+		TAccountPoolConfig,
+		TAccountPayer,
+		TAccountMerkleTree,
+		TAccountNullifierSet,
+		TAccountVerifyingKeyAccount,
+		TAccountNoteCommitment,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	TransferInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierSet,
+			InstructionAccountInputAddress<TAccountNullifierSet>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVerifyingKeyAccount,
+			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+		merkleTree: {
+			value: input.merkleTree ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		nullifierSet: {
+			value: input.nullifierSet ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		verifyingKeyAccount: {
+			value: input.verifyingKeyAccount ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		noteCommitment: {
+			value: input.noteCommitment ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.merkleTree.value) {
+		accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
+	}
+	if (!accounts.nullifierSet.value) {
+		accounts.nullifierSet.value = await findNullifierSetPda({ programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("payer", accounts.payer),
+			getAccountMeta("merkleTree", accounts.merkleTree),
+			getAccountMeta("nullifierSet", accounts.nullifierSet),
+			getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount),
+			getAccountMeta("noteCommitment", accounts.noteCommitment),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getTransferInstructionDataEncoder().encode(
+			args as TransferInstructionDataArgs,
+		),
+		programAddress,
+	} as TransferInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierSet,
+			InstructionAccountInputAddress<TAccountNullifierSet>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountVerifyingKeyAccount,
+			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
+	>);
 }
 
 export type TransferInput<

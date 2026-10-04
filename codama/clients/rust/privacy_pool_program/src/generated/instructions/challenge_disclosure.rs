@@ -66,7 +66,7 @@ impl ChallengeDisclosure {
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.viewer,
-			false,
+			true,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.clock, false,
