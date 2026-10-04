@@ -14,6 +14,8 @@ use flate2::Compression;
 use flate2::write::ZlibEncoder;
 use serde_json::Value;
 
+mod support;
+
 const PROGRAM_ID: &str = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS";
 
 fn workspace_root() -> PathBuf {
@@ -69,13 +71,7 @@ fn fake_npx(directory: &Path, stdout: &str, status: i32) -> (PathBuf, PathBuf) {
 		capture.display(),
 		escaped_stdout,
 	);
-	fs::write(&runner, script).unwrap_or_else(|error| panic!("fake runner write failed: {error}"));
-	let mut permissions = fs::metadata(&runner)
-		.unwrap_or_else(|error| panic!("fake runner metadata failed: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&runner, permissions)
-		.unwrap_or_else(|error| panic!("fake runner permissions failed: {error}"));
+	support::write_executable(&runner, &script).unwrap();
 
 	(runner, capture)
 }
@@ -150,13 +146,7 @@ fn official_client_receives_eof_instead_of_operator_input() {
 		"#!/bin/sh\nif IFS= read -r input; then\n  printf 'client inherited stdin: %s\\n' \
 		 \"$input\" >&2\n  exit 91\nfi\nprintf '{raw}\\n'\n"
 	);
-	fs::write(&runner, script).unwrap_or_else(|error| panic!("stdin probe write failed: {error}"));
-	let mut permissions = fs::metadata(&runner)
-		.unwrap_or_else(|error| panic!("stdin probe metadata failed: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&runner, permissions)
-		.unwrap_or_else(|error| panic!("stdin probe permissions failed: {error}"));
+	support::write_executable(&runner, &script).unwrap();
 
 	let mut child = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args([

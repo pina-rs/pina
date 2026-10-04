@@ -13,6 +13,8 @@ use sha2::Digest;
 use sha2::Sha256;
 use tempfile::TempDir;
 
+mod support;
+
 const PROGRAM_ID: &str = "11111111111111111111111111111111";
 const MATCHING_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -57,8 +59,7 @@ case " $* " in
     ;;
 esac
 "#;
-	fs::write(&path, script).unwrap();
-	fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+	support::write_executable(&path, script).unwrap();
 	path
 }
 
@@ -184,12 +185,11 @@ fn verifier_children_never_inherit_operator_input() {
 fn non_interactive_record_refuses_before_spawning_verifier() {
 	let temp = TempDir::new().unwrap();
 	let verifier = temp.path().join("must not run");
-	fs::write(
+	support::write_executable(
 		&verifier,
 		"#!/bin/sh\ntouch \"$PINA_SPAWN_MARKER\"\nexit 99\n",
 	)
 	.unwrap();
-	fs::set_permissions(&verifier, fs::Permissions::from_mode(0o755)).unwrap();
 	let marker = temp.path().join("spawned");
 	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.args([

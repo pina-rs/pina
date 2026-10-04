@@ -1,7 +1,6 @@
 #![cfg(unix)]
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -9,6 +8,8 @@ use std::process::Output;
 
 use pina_cli::project::Project;
 use tempfile::TempDir;
+
+mod support;
 
 fn workspace_root() -> PathBuf {
 	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -100,7 +101,7 @@ fn fake_cargo(root: &Path) -> PathBuf {
 	fs::create_dir_all(root)
 		.unwrap_or_else(|error| panic!("failed to create fake Cargo directory: {error}"));
 	let path = root.join("fake-cargo.sh");
-	fs::write(
+	support::write_executable(
 		&path,
 		r#"#!/usr/bin/env bash
 set -euo pipefail
@@ -145,13 +146,7 @@ mkdir -p "$target_dir/sbf-build"
 printf 'compiled-sbf' > "$target_dir/sbf-build/custom_program.so"
 "#,
 	)
-	.unwrap_or_else(|error| panic!("failed to write fake cargo: {error}"));
-	let mut permissions = fs::metadata(&path)
-		.unwrap_or_else(|error| panic!("failed to inspect fake cargo: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&path, permissions)
-		.unwrap_or_else(|error| panic!("failed to make fake cargo executable: {error}"));
+	.unwrap();
 	path
 }
 
@@ -159,7 +154,7 @@ fn fake_npx(root: &Path) -> PathBuf {
 	fs::create_dir_all(root)
 		.unwrap_or_else(|error| panic!("failed to create fake npx directory: {error}"));
 	let path = root.join("fake-npx.sh");
-	fs::write(
+	support::write_executable(
 		&path,
 		r#"#!/usr/bin/env bash
 set -euo pipefail
@@ -192,13 +187,7 @@ done
 exit 2
 "#,
 	)
-	.unwrap_or_else(|error| panic!("failed to write fake npx: {error}"));
-	let mut permissions = fs::metadata(&path)
-		.unwrap_or_else(|error| panic!("failed to inspect fake npx: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&path, permissions)
-		.unwrap_or_else(|error| panic!("failed to make fake npx executable: {error}"));
+	.unwrap();
 	path
 }
 
@@ -206,7 +195,7 @@ fn fake_solana_verify(root: &Path) -> PathBuf {
 	fs::create_dir_all(root)
 		.unwrap_or_else(|error| panic!("failed to create fake verifier directory: {error}"));
 	let path = root.join("fake-solana-verify.sh");
-	fs::write(
+	support::write_executable(
 		&path,
 		r#"#!/usr/bin/env bash
 set -euo pipefail
@@ -248,13 +237,7 @@ if [[ "${FAKE_VERIFY_REMOVE_SOURCE:-0}" == "1" ]]; then
 fi
 "#,
 	)
-	.unwrap_or_else(|error| panic!("failed to write fake verifier: {error}"));
-	let mut permissions = fs::metadata(&path)
-		.unwrap_or_else(|error| panic!("failed to inspect fake verifier: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&path, permissions)
-		.unwrap_or_else(|error| panic!("failed to make fake verifier executable: {error}"));
+	.unwrap();
 	path
 }
 
