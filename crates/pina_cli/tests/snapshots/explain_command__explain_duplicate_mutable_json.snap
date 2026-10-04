@@ -1,0 +1,78 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 70
+expression: document
+---
+{
+  "accounts": [
+    {
+      "absent": false,
+      "address": "9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu",
+      "field": "authority",
+      "index": 0,
+      "signer": true,
+      "writable": true
+    },
+    {
+      "absent": false,
+      "address": "9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu",
+      "field": "policy",
+      "index": 1,
+      "signer": true,
+      "writable": true
+    },
+    {
+      "absent": false,
+      "address": "11111111111111111111111111111111",
+      "field": "system_program",
+      "index": 2,
+      "signer": false,
+      "writable": false
+    }
+  ],
+  "candidates": [
+    {
+      "accountIndex": 0,
+      "confidence": "confirmed",
+      "field": "authority",
+      "location": "src/lib.rs:194",
+      "logConfirmed": false,
+      "reason": "account #0 (9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu) is bound to a mutable field and appears again at #1",
+      "rule": "distinct mutable account",
+      "scope": "account"
+    }
+  ],
+  "errorSites": [],
+  "failure": {
+    "cpi": null,
+    "error": {
+      "code": 4294967289,
+      "description": "Two mutable account fields point at the same runtime account.",
+      "kind": "pina",
+      "name": "PinaProgramError::DuplicateMutableAccount"
+    },
+    "instruction": {
+      "accountsStruct": "InitializeAccounts",
+      "name": "initialize_policy",
+      "rustName": "InitializePolicyInstruction"
+    },
+    "instructionIndex": 0,
+    "programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
+    "targetsProgram": true
+  },
+  "logs": [
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]",
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 87 of 200000 compute units",
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: custom program error: 0xfffffff9"
+  ],
+  "notes": [],
+  "program": {
+    "name": "validation_program",
+    "programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+  },
+  "schemaVersion": 1,
+  "signature": "5cbMxLNKqbHvV8SBoe9Z1g9HeoZSk8LiDoauGrfqU3X5wDHb3GZRe12e6m8ySpPHH4HaZNZEbXfZTBnrMGFsB6zt",
+  "slot": 66,
+  "source": "file",
+  "status": "failed"
+}

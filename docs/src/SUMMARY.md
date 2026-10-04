@@ -19,6 +19,7 @@
   - [Read Terminal Docs](./cli/docs.md)
   - [Inspect Program Keys](./cli/keys.md)
   - [Diagnose a Project](./cli/doctor.md)
+  - [Explain a Failed Transaction](./cli/explain.md)
   - [Generate Shell Completions](./cli/completions.md)
   - [Profile an SBF Program](./cli/profile.md)
   - [Deploy a Program](./cli/deploy.md)

@@ -1,0 +1,94 @@
+{
+	"slot": 67,
+	"transaction": {
+		"signatures": [
+			"3ppGiQzbkCqX3ZRMrkU1ePbiSeLs6Z3ZNkK7hU7Sm3rZyaMRp3brMHeDWv1bTZAyjL24vQMAGs1Wa35TXGKL4YP3",
+			"2vTKWaziCCwHaKKfLYM4xgfj4tocFpYgZrVMEqJqkACkgeYHuKC77LeWxgCo138QwcCjpZ3DYNev32eiEaUfgzJE"
+		],
+		"message": {
+			"header": {
+				"numRequiredSignatures": 2,
+				"numReadonlySignedAccounts": 0,
+				"numReadonlyUnsignedAccounts": 2
+			},
+			"accountKeys": [
+				"AKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9",
+				"9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu",
+				"8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe",
+				"11111111111111111111111111111111",
+				"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+			],
+			"recentBlockhash": "SURFNETxSAFEHASHxxxxxxxxxxxxxxxxxxxxxxxxx24",
+			"instructions": [
+				{
+					"programIdIndex": 4,
+					"accounts": [
+						1,
+						2,
+						3
+					],
+					"data": "1BaSpVYUmyTSqvneSEUBkshRBX",
+					"stackHeight": 1
+				}
+			]
+		}
+	},
+	"meta": {
+		"err": {
+			"InstructionError": [
+				0,
+				{
+					"Custom": 2
+				}
+			]
+		},
+		"status": {
+			"Err": {
+				"InstructionError": [
+					0,
+					{
+						"Custom": 2
+					}
+				]
+			}
+		},
+		"fee": 10000,
+		"preBalances": [
+			9999945000,
+			10000000000,
+			0,
+			1,
+			1141440
+		],
+		"postBalances": [
+			9999935000,
+			10000000000,
+			0,
+			1,
+			1141440
+		],
+		"innerInstructions": [],
+		"logMessages": [
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]",
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 140 of 200000 compute units",
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: custom program error: 0x2"
+		],
+		"preTokenBalances": [],
+		"postTokenBalances": [],
+		"rewards": [],
+		"loadedAddresses": {
+			"writable": [],
+			"readonly": []
+		},
+		"returnData": {
+			"programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
+			"data": [
+				"",
+				"base64"
+			]
+		},
+		"computeUnitsConsumed": 140
+	},
+	"version": "legacy",
+	"blockTime": 1791060107
+}

@@ -1,0 +1,90 @@
+{
+	"slot": 69,
+	"transaction": {
+		"signatures": [
+			"2tq64No55gaeeRjZQiSwSesBNR5AeJnQZBuTJt4wZVvfaR2xiq2xaGNCtiPEFSDD5HVoetw4RCZEtpYxXJzLSZaH",
+			"3L6txvX569UxMYmUQWKtRPci16JcY5vaHtfCYg1NfP6HCG1mmyejmxCV1f7uZ2dSvTcuZtTc5PqpQZbNUvqc6Bq4"
+		],
+		"message": {
+			"header": {
+				"numRequiredSignatures": 2,
+				"numReadonlySignedAccounts": 0,
+				"numReadonlyUnsignedAccounts": 1
+			},
+			"accountKeys": [
+				"AKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9",
+				"EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1",
+				"AKkzLhjhyFtM9j7WAhbaqYpFe49cXeJBg2kzLRC2PnNa",
+				"11111111111111111111111111111111"
+			],
+			"recentBlockhash": "SURFNETxSAFEHASHxxxxxxxxxxxxxxxxxxxxxxxxx26",
+			"instructions": [
+				{
+					"programIdIndex": 3,
+					"accounts": [
+						1,
+						2
+					],
+					"data": "3Bxs3zsHqk67sK2o",
+					"stackHeight": 1
+				}
+			]
+		}
+	},
+	"meta": {
+		"err": {
+			"InstructionError": [
+				0,
+				{
+					"Custom": 1
+				}
+			]
+		},
+		"status": {
+			"Err": {
+				"InstructionError": [
+					0,
+					{
+						"Custom": 1
+					}
+				]
+			}
+		},
+		"fee": 10000,
+		"preBalances": [
+			9999925000,
+			10000000000,
+			0,
+			1
+		],
+		"postBalances": [
+			9999915000,
+			10000000000,
+			0,
+			1
+		],
+		"innerInstructions": [],
+		"logMessages": [
+			"Program 11111111111111111111111111111111 invoke [1]",
+			"Transfer: insufficient lamports 10000000000, need 1000000000000",
+			"Program 11111111111111111111111111111111 failed: custom program error: 0x1"
+		],
+		"preTokenBalances": [],
+		"postTokenBalances": [],
+		"rewards": [],
+		"loadedAddresses": {
+			"writable": [],
+			"readonly": []
+		},
+		"returnData": {
+			"programId": "11111111111111111111111111111111",
+			"data": [
+				"",
+				"base64"
+			]
+		},
+		"computeUnitsConsumed": 150
+	},
+	"version": "legacy",
+	"blockTime": 1791060108
+}

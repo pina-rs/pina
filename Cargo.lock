@@ -6421,6 +6421,7 @@ dependencies = [
  "monochange_snapshot",
  "object 0.40.0",
  "owo-colors",
+ "pina",
  "pina_abi",
  "pina_cli_renderer",
  "pina_codama_renderer",

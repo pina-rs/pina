@@ -44,6 +44,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | [`pina docs`](./docs.md)               | List or render bundled terminal docs                           | Terminal text                             |
 | [`pina keys`](./keys.md)               | Inspect or explicitly change program identity                  | Text or JSON                              |
 | [`pina doctor`](./doctor.md)           | Diagnose project and toolchain readiness                       | Text or JSON                              |
+| [`pina explain`](./explain.md)         | Explain which account check failed in a transaction            | Text or JSON                              |
 | [`pina completions`](./completions.md) | Generate a shell completion script                             | Shell script                              |
 | [`pina profile`](./profile.md)         | Estimate SBF compute cost, or trace it per line from tests     | Text, JSON, folded stacks, or HTML        |
 | [`pina deploy`](./deploy.md)           | Plan and execute an explicit cluster deployment                | Plan or JSON                              |
@@ -69,6 +70,7 @@ pina init --help
 pina lint --help
 pina keys --help
 pina doctor --help
+pina explain --help
 pina completions --help
 pina profile --help
 pina deploy --help
@@ -93,6 +95,7 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `dev`             | Surfpool UI and logs              | Build output and errors                                 |
 | `keys`            | Identity report or change summary | Errors                                                  |
 | `doctor`          | Diagnostic report                 | Errors                                                  |
+| `explain`         | Explanation report                | Errors                                                  |
 | `completions`     | Completion script                 | Errors                                                  |
 | `profile`         | Report when `--output` is omitted | Errors; `trace` adds build and test output and warnings |
 | `deploy`          | Inspectable plan and completion   | Confirmation, progress, errors                          |

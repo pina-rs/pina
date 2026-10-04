@@ -1,0 +1,24 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction 5cbMxLNKqbHvV8SBoe9Z1g9HeoZSk8LiDoauGrfqU3X5wDHb3GZRe12e6m8ySpPHH4HaZNZEbXfZTBnrMGFsB6zt (slot 66, from file)
+Instruction #0 failed: initialize_policy (InitializeAccounts) in validation_program
+Error: PinaProgramError::DuplicateMutableAccount (custom error 0xFFFFFFF9)
+  Two mutable account fields point at the same runtime account.
+
+Most likely cause:
+  authority: distinct mutable account [confirmed] at src/lib.rs:194
+    account #0 (9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu) is bound to a mutable field and appears again at #1
+
+Accounts:
+  #   field           signer  writable  address
+  0   authority       yes     yes       9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  1   policy          yes     yes       9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  2   system_program  no      no        11111111111111111111111111111111
+
+Program logs (last 3 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 87 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: custom program error: 0xfffffff9
