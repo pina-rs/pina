@@ -12,6 +12,7 @@
 use clap::Args;
 use privacy_pool_program_client::instructions::ApproveDisclosure;
 use privacy_pool_program_client::instructions::ApproveDisclosureInstructionData;
+use solana_sdk::pubkey::Pubkey;
 
 use crate::context::CliContext;
 use crate::context::CliError;
@@ -21,18 +22,18 @@ pub struct ApproveDisclosureArgs {
 	/// Reserved; must be zero.
 	#[arg(long)]
 	reserved: u8,
-	/// The `pool_config` account
+	/// The `pool_config` account [default: derived]
 	#[arg(long)]
-	pool_config: String,
-	/// The `custodian_registry` account
+	pool_config: Option<String>,
+	/// The `custodian_registry` account [default: derived]
 	#[arg(long)]
-	custodian_registry: String,
+	custodian_registry: Option<String>,
 	/// The `disclosure_request` account
 	#[arg(long)]
 	disclosure_request: String,
-	/// The `disclosure_log` account
+	/// The `disclosure_log` account [default: derived]
 	#[arg(long)]
-	disclosure_log: String,
+	disclosure_log: Option<String>,
 	/// The `clock` account
 	#[arg(long)]
 	clock: String,
@@ -40,10 +41,34 @@ pub struct ApproveDisclosureArgs {
 
 pub(crate) fn run(context: &CliContext, args: ApproveDisclosureArgs) -> Result<(), CliError> {
 	let custodian = context.payer_pubkey();
-	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
-	let custodian_registry = CliContext::pubkey("--custodian_registry", &args.custodian_registry)?;
+	let pool_config = match &args.pool_config {
+		Some(value) => CliContext::pubkey("--pool_config", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
+	let custodian_registry = match &args.custodian_registry {
+		Some(value) => CliContext::pubkey("--custodian_registry", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-custodians".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
-	let disclosure_log = CliContext::pubkey("--disclosure_log", &args.disclosure_log)?;
+	let disclosure_log = match &args.disclosure_log {
+		Some(value) => CliContext::pubkey("--disclosure_log", value)?,
+		None => {
+			Pubkey::find_program_address(&["privacy-pool-log".as_bytes()], &context.program_address)
+				.0
+		}
+	};
 	let clock = CliContext::pubkey("--clock", &args.clock)?;
 	let data = ApproveDisclosureInstructionData::new(|data| {
 		data.reserved = args.reserved;

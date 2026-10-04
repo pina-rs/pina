@@ -110,7 +110,7 @@ Instruction getGrantDisclosureInstruction({
     accounts: [
       AccountMeta(address: disclosureRequest, role: AccountRole.writable),
       AccountMeta(address: noteCommitment, role: AccountRole.readonly),
-      AccountMeta(address: viewer, role: AccountRole.readonly),
+      AccountMeta(address: viewer, role: AccountRole.readonlySigner),
     ],
     data: getGrantDisclosureInstructionDataEncoder().encode(instructionData),
   );

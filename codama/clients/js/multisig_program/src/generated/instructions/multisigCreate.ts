@@ -49,7 +49,7 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import { findMultisigPda } from "../pdas";
+import { findMultisigPda, findProgramConfigPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
@@ -193,7 +193,7 @@ export type MultisigCreateAsyncInput<
 	TAccountMemberAccounts extends InstructionAccountInput =
 		InstructionAccountInput,
 > = {
-	programConfig: TAccountProgramConfig;
+	programConfig?: TAccountProgramConfig;
 	createKey: TAccountCreateKey;
 	multisig?: TAccountMultisig;
 	rentPayer: TAccountRentPayer;
@@ -324,6 +324,11 @@ export async function getMultisigCreateInstructionAsync<
 	const args = { ...input };
 
 	// Resolve default values.
+	if (!accounts.programConfig.value) {
+		accounts.programConfig.value = await findProgramConfigPda({
+			programAddress,
+		});
+	}
 	if (!accounts.multisig.value) {
 		accounts.multisig.value = await findMultisigPda({
 			createKey: getAddressFromResolvedInstructionAccount(

@@ -1,0 +1,270 @@
+---
+source: crates/pina_cli/tests/map.rs
+expression: project.map
+---
+{
+  "schemaVersion": 1,
+  "program": "counter_program",
+  "programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+  "nodes": [
+    {
+      "id": "caller:initialize.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:counter",
+      "name": "counter",
+      "class": "keyed",
+      "address": null,
+      "pda": "counter",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "636f756e746572",
+          "text": "counter"
+        },
+        {
+          "kind": "variable",
+          "name": "authority",
+          "type": "Address"
+        }
+      ]
+    },
+    {
+      "id": "address:11111111111111111111111111111111",
+      "name": "system_program",
+      "class": "fixed",
+      "address": "11111111111111111111111111111111",
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:increment.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    }
+  ],
+  "instructions": [
+    {
+      "name": "initialize",
+      "writes": [
+        {
+          "node": "caller:initialize.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:counter",
+          "slot": "counter",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "increment",
+      "writes": [
+        {
+          "node": "pda:counter",
+          "slot": "counter",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:increment.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        }
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "instructions": [
+        "initialize",
+        "initialize"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:counter"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "increment"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:counter"
+      ]
+    },
+    {
+      "instructions": [
+        "increment",
+        "increment"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:counter"
+      ]
+    }
+  ],
+  "hotspots": [],
+  "instructionDetails": [
+    {
+      "name": "initialize",
+      "docs": [
+        "Instruction data for `Initialize`.",
+        "",
+        "Contains the PDA bump seed so the client can pass a pre-computed bump",
+        "(avoids the cost of `find_program_address` on-chain)."
+      ],
+      "arguments": [
+        {
+          "name": "bump",
+          "type": "u8",
+          "docs": [
+            "The PDA bump seed, computed off-chain."
+          ]
+        }
+      ],
+      "accounts": [
+        {
+          "slot": "authority",
+          "node": "caller:initialize.authority",
+          "writable": true,
+          "signer": true,
+          "optional": false,
+          "pda": null,
+          "constraints": [],
+          "docs": [
+            "The wallet creating the counter. Pays for account creation and becomes",
+            "the authority whose address seeds the PDA."
+          ]
+        },
+        {
+          "slot": "counter",
+          "node": "pda:counter",
+          "writable": true,
+          "signer": false,
+          "optional": false,
+          "pda": "counter",
+          "constraints": [],
+          "docs": [
+            "The counter PDA account (must be empty — not yet created)."
+          ]
+        },
+        {
+          "slot": "system_program",
+          "node": "address:11111111111111111111111111111111",
+          "writable": false,
+          "signer": false,
+          "optional": false,
+          "pda": null,
+          "constraints": [],
+          "docs": [
+            "The system program, required for `CreateAccount` CPI."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "increment",
+      "docs": [
+        "Instruction data for `Increment`. No extra payload beyond the",
+        "discriminator byte."
+      ],
+      "arguments": [],
+      "accounts": [
+        {
+          "slot": "authority",
+          "node": "caller:increment.authority",
+          "writable": false,
+          "signer": true,
+          "optional": false,
+          "pda": null,
+          "constraints": [],
+          "docs": [
+            "The counter's authority. Must sign to prove ownership."
+          ]
+        },
+        {
+          "slot": "counter",
+          "node": "pda:counter",
+          "writable": true,
+          "signer": false,
+          "optional": false,
+          "pda": "counter",
+          "constraints": [],
+          "docs": [
+            "The counter PDA account (must already exist and be writable)."
+          ]
+        }
+      ]
+    }
+  ],
+  "accountTypes": [
+    {
+      "name": "CounterState",
+      "pda": "counter",
+      "docs": [
+        "On-chain counter state.",
+        "",
+        "The `#[account]` macro generates:",
+        "- A discriminator field (`CounterAccountType::CounterState`) as the first",
+        "byte.",
+        "- A `CounterStateZc` storage view generated by `pinapod::PinaPod`.",
+        "- `HasDiscriminator` linking this struct to",
+        "`CounterAccountType::CounterState`.",
+        "- `initialize` and `try_from_bytes` helpers for caller-owned storage.",
+        "",
+        "Layout (11 bytes total):",
+        "```text",
+        "| offset | size | field                     |",
+        "|--------|------|---------------------------|",
+        "| 0      | 1    | discriminator             |",
+        "| 1      | 1    | migration version byte    |",
+        "| 2      | 1    | bump                      |",
+        "| 3      | 8    | count (little-endian u64) |",
+        "```"
+      ],
+      "fields": [
+        {
+          "name": "bump",
+          "type": "u8",
+          "docs": [
+            "The PDA bump seed, stored on-chain so we don't need to re-derive it."
+          ]
+        },
+        {
+          "name": "count",
+          "type": "u64",
+          "docs": [
+            "The current counter value. The `PinaPod` view stores it using its",
+            "alignment-one, little-endian representation."
+          ]
+        }
+      ]
+    }
+  ]
+}

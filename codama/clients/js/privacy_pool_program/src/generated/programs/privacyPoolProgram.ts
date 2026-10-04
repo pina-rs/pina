@@ -65,22 +65,22 @@ import {
 	type VerifyingKeyAccountArgs,
 } from "../accounts";
 import {
-	type ApproveDisclosureInput,
+	type ApproveDisclosureAsyncInput,
 	type CancelDisclosureInput,
 	type ChallengeDisclosureInput,
 	type DepositAsyncInput,
-	getApproveDisclosureInstruction,
+	getApproveDisclosureInstructionAsync,
 	getCancelDisclosureInstruction,
 	getChallengeDisclosureInstruction,
 	getDepositInstructionAsync,
 	getGrantDisclosureInstruction,
 	getInitializeInstructionAsync,
-	getRegisterRequesterInstruction,
-	getRequestDisclosureInstruction,
-	getResolveChallengeInstruction,
-	getSetCustodiansInstruction,
-	getSetVerificationKeyInstruction,
-	getTransferInstruction,
+	getRegisterRequesterInstructionAsync,
+	getRequestDisclosureInstructionAsync,
+	getResolveChallengeInstructionAsync,
+	getSetCustodiansInstructionAsync,
+	getSetVerificationKeyInstructionAsync,
+	getTransferInstructionAsync,
 	getWithdrawInstructionAsync,
 	type GrantDisclosureInput,
 	type InitializeAsyncInput,
@@ -110,12 +110,12 @@ import {
 	parseSetVerificationKeyInstruction,
 	parseTransferInstruction,
 	parseWithdrawInstruction,
-	type RegisterRequesterInput,
-	type RequestDisclosureInput,
-	type ResolveChallengeInput,
-	type SetCustodiansInput,
-	type SetVerificationKeyInput,
-	type TransferInput,
+	type RegisterRequesterAsyncInput,
+	type RequestDisclosureAsyncInput,
+	type ResolveChallengeAsyncInput,
+	type SetCustodiansAsyncInput,
+	type SetVerificationKeyAsyncInput,
+	type TransferAsyncInput,
 	type WithdrawAsyncInput,
 } from "../instructions";
 import { getMigrateInstruction, type MigrateInput } from "../instructions";
@@ -454,19 +454,19 @@ export type PrivacyPoolProgramPluginInstructions = {
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	setVerificationKey: (
-		input: SetVerificationKeyInput,
+		input: SetVerificationKeyAsyncInput,
 	) =>
-		& ReturnType<typeof getSetVerificationKeyInstruction>
+		& ReturnType<typeof getSetVerificationKeyInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	setCustodians: (
-		input: SetCustodiansInput,
+		input: SetCustodiansAsyncInput,
 	) =>
-		& ReturnType<typeof getSetCustodiansInstruction>
+		& ReturnType<typeof getSetCustodiansInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	registerRequester: (
-		input: RegisterRequesterInput,
+		input: RegisterRequesterAsyncInput,
 	) =>
-		& ReturnType<typeof getRegisterRequesterInstruction>
+		& ReturnType<typeof getRegisterRequesterInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	deposit: (
 		input: DepositAsyncInput,
@@ -477,12 +477,14 @@ export type PrivacyPoolProgramPluginInstructions = {
 		& ReturnType<typeof getWithdrawInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	transfer: (
-		input: TransferInput,
-	) => ReturnType<typeof getTransferInstruction> & SelfPlanAndSendFunctions;
-	requestDisclosure: (
-		input: RequestDisclosureInput,
+		input: TransferAsyncInput,
 	) =>
-		& ReturnType<typeof getRequestDisclosureInstruction>
+		& ReturnType<typeof getTransferInstructionAsync>
+		& SelfPlanAndSendFunctions;
+	requestDisclosure: (
+		input: RequestDisclosureAsyncInput,
+	) =>
+		& ReturnType<typeof getRequestDisclosureInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	grantDisclosure: (
 		input: GrantDisclosureInput,
@@ -495,14 +497,14 @@ export type PrivacyPoolProgramPluginInstructions = {
 		& ReturnType<typeof getChallengeDisclosureInstruction>
 		& SelfPlanAndSendFunctions;
 	resolveChallenge: (
-		input: ResolveChallengeInput,
+		input: ResolveChallengeAsyncInput,
 	) =>
-		& ReturnType<typeof getResolveChallengeInstruction>
+		& ReturnType<typeof getResolveChallengeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	approveDisclosure: (
-		input: ApproveDisclosureInput,
+		input: ApproveDisclosureAsyncInput,
 	) =>
-		& ReturnType<typeof getApproveDisclosureInstruction>
+		& ReturnType<typeof getApproveDisclosureInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	cancelDisclosure: (
 		input: CancelDisclosureInput,
@@ -573,17 +575,17 @@ export function privacyPoolProgramProgram() {
 					setVerificationKey: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getSetVerificationKeyInstruction(input),
+							getSetVerificationKeyInstructionAsync(input),
 						),
 					setCustodians: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getSetCustodiansInstruction(input),
+							getSetCustodiansInstructionAsync(input),
 						),
 					registerRequester: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRegisterRequesterInstruction(input),
+							getRegisterRequesterInstructionAsync(input),
 						),
 					deposit: (input) =>
 						addSelfPlanAndSendFunctions(
@@ -596,11 +598,14 @@ export function privacyPoolProgramProgram() {
 							getWithdrawInstructionAsync(input),
 						),
 					transfer: (input) =>
-						addSelfPlanAndSendFunctions(client, getTransferInstruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getTransferInstructionAsync(input),
+						),
 					requestDisclosure: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRequestDisclosureInstruction(input),
+							getRequestDisclosureInstructionAsync(input),
 						),
 					grantDisclosure: (input) =>
 						addSelfPlanAndSendFunctions(
@@ -615,12 +620,12 @@ export function privacyPoolProgramProgram() {
 					resolveChallenge: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getResolveChallengeInstruction(input),
+							getResolveChallengeInstructionAsync(input),
 						),
 					approveDisclosure: (input) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getApproveDisclosureInstruction(input),
+							getApproveDisclosureInstructionAsync(input),
 						),
 					cancelDisclosure: (input) =>
 						addSelfPlanAndSendFunctions(

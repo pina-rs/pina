@@ -40,9 +40,9 @@ export const multisigCreateCommand = registerGlobals(
 		"--rent-collector <rentCollector>",
 		"The default address disables rent collection.",
 	)
-	.requiredOption(
+	.option(
 		"--program-config <programConfig>",
-		"The `program_config` account",
+		"The `program_config` account [default: derived]",
 	)
 	.option("--multisig <multisig>", "The `multisig` account [default: derived]")
 	.requiredOption(
@@ -66,7 +66,9 @@ export const multisigCreateCommand = registerGlobals(
 			),
 			configAuthority: pubkey("--config-authority", options.configAuthority),
 			rentCollector: pubkey("--rent-collector", options.rentCollector),
-			programConfig: pubkey("--program-config", options.programConfig),
+			programConfig: options.programConfig === undefined
+				? undefined
+				: pubkey("--program-config", options.programConfig),
 			createKey: context.payer,
 			multisig: options.multisig === undefined
 				? undefined

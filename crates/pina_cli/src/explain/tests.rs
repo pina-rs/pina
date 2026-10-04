@@ -1047,6 +1047,54 @@ fn chained_processor_checks_follow_execution_order() {
 }
 
 #[test]
+fn checks_inside_helpers_are_located_where_the_helper_writes_them() {
+	let lib = r"
+impl<'a> ProcessAccountInfos<'a> for GuardedAccounts<'a> {
+	fn process(self, _data: &[u8]) -> ProgramResult {
+		self.vault.assert_writable()?;
+		checks::require_owner(self.authority, self.vault)?;
+		Ok(())
+	}
+}
+";
+	let checks = r"
+pub fn require_owner(owner: &AccountView, vault: &AccountView) -> ProgramResult {
+	owner.assert_signer()?;
+	VaultState::load_checked_pda(vault, owner.address(), &ID)?;
+	Ok(())
+}
+";
+	let resolved = |path: &str, source: &str| {
+		ResolvedFile {
+			path: PathBuf::from(path),
+			file: syn::parse_file(source).unwrap_or_else(|error| panic!("parses: {error}")),
+		}
+	};
+	let index = source::index(
+		vec![
+			resolved("/project/src/lib.rs", lib),
+			resolved("/project/src/checks.rs", checks),
+		],
+		Path::new("/project"),
+	)
+	.unwrap_or_else(|error| panic!("indexes: {error}"));
+	let sites = index.process_sites["GuardedAccounts"]
+		.iter()
+		.map(|site| format!("{}.{} {}", site.field, site.method, site.location))
+		.collect::<Vec<_>>();
+
+	assert_eq!(
+		sites,
+		[
+			"vault.assert_writable src/lib.rs:4",
+			"authority.assert_signer src/checks.rs:3",
+			"authority.address src/checks.rs:4",
+			"vault.load_checked_pda src/checks.rs:4",
+		]
+	);
+}
+
+#[test]
 fn an_unrouted_instruction_has_no_named_accounts() {
 	let error = builtin("InvalidAccountData");
 	let keys = [("Payer", true, true)];

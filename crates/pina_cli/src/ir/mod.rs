@@ -150,7 +150,14 @@ pub struct InstructionAccountIr {
 	pub is_signer: bool,
 	pub is_optional: bool,
 	pub default_value: Option<DefaultValueIr>,
+	/// The processor pins this slot's address to its PDA: it derives or checks
+	/// the address from the PDA's seeds, or loads a PDA account type whose
+	/// seeds are all constants. Generated clients derive default addresses only
+	/// for pinned slots.
 	pub is_pda: bool,
+	/// The PDA this slot's account belongs to. Always set when `is_pda` is;
+	/// also set without `is_pda` when the processor loads a variable-seed PDA
+	/// account type without checking which seeds derived the address.
 	pub pda_name: Option<String>,
 	/// Canonical declarative account constraints used by compatibility checks.
 	pub constraints: Vec<String>,

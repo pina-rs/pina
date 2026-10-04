@@ -622,10 +622,7 @@ pub fn create_migrations_with_answers(
 				.fields
 				.iter()
 				.any(|field| answers.manual.contains(&field.name));
-		if latest.schema.same_wire(&source.schema)
-			&& latest.process == source.process
-			&& !converts_to_manual
-		{
+		if source.matches_wire(latest) && !converts_to_manual {
 			refresh_draft_transition_hash(&project, &ledger, &key, history, &mut output)?;
 			output.unchanged_contracts.push(key);
 			continue;
@@ -839,7 +836,7 @@ fn record_unmigrated(
 		.current_version()
 		.expect("decoded migration histories always contain a current version");
 	let latest = &history.versions[latest_version as usize];
-	if latest.schema.same_wire(&source.schema) && latest.process == source.process {
+	if source.matches_wire(latest) {
 		output.unchanged_contracts.push(key.to_owned());
 		return Ok(());
 	}
@@ -1143,10 +1140,7 @@ fn check_project_migrations_with_manifest(
 		if history.envelope && !source.envelope {
 			return Err(envelope_removal(history));
 		}
-		if !latest.schema.same_wire(&source.schema)
-			|| latest.process != source.process
-			|| history.envelope != source.envelope
-		{
+		if !source.matches_wire(latest) || history.envelope != source.envelope {
 			return Err(MigrationError::SchemaDrift {
 				kind: source.identity.kind.to_string(),
 				name: source.rust_name,

@@ -1193,11 +1193,18 @@ fn assertion_errors(method: &str) -> Option<(Vec<ErrorKey>, Option<&'static str>
 			)
 		}
 		"assert_seeds"
+		| "assert_stored_bump"
 		| "assert_seeds_with_bump"
 		| "assert_canonical_bump"
 		| "assert_associated_token_address" => (builtin(&["InvalidSeeds"]), Some(ADDRESS_LOG)),
 		"assert_type" | "as_account" | "as_account_mut" => (account_type(), None),
-		"load_pda" | "load_pda_mut" | "with_pda" | "with_stored_bump_pda" | "with_checked_pda" => {
+		"load_pda"
+		| "load_pda_mut"
+		| "load_checked_pda"
+		| "load_checked_pda_mut"
+		| "with_pda"
+		| "with_stored_bump_pda"
+		| "with_checked_pda" => {
 			let mut keys = account_type();
 			keys.push(ErrorKey::builtin("InvalidSeeds"));
 			(keys, None)
@@ -1209,6 +1216,7 @@ fn assertion_errors(method: &str) -> Option<(Vec<ErrorKey>, Option<&'static str>
 fn unknown_call_reason(method: &str) -> &'static str {
 	match method {
 		"assert_seeds"
+		| "assert_stored_bump"
 		| "assert_seeds_with_bump"
 		| "assert_canonical_bump"
 		| "assert_associated_token_address" => "PDA seeds are computed at runtime",
@@ -1217,6 +1225,8 @@ fn unknown_call_reason(method: &str) -> &'static str {
 		| "as_account_mut"
 		| "load_pda"
 		| "load_pda_mut"
+		| "load_checked_pda"
+		| "load_checked_pda_mut"
 		| "with_pda"
 		| "with_stored_bump_pda"
 		| "with_checked_pda" => "the account type check reads the account's data at runtime",

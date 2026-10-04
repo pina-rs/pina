@@ -271,7 +271,24 @@
 						"name": "sample",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "sample"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
@@ -362,14 +379,48 @@
 						"name": "sample1",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "sample"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",
 						"name": "sample2",
 						"isWritable": true,
 						"isSigner": false,
-						"isOptional": false
+						"isOptional": false,
+						"defaultValue": {
+							"kind": "pdaValueNode",
+							"pda": {
+								"kind": "pdaLinkNode",
+								"name": "sample"
+							},
+							"seeds": [
+								{
+									"kind": "pdaSeedValueNode",
+									"name": "authority",
+									"value": {
+										"kind": "accountValueNode",
+										"name": "authority"
+									}
+								}
+							]
+						}
 					},
 					{
 						"kind": "instructionAccountNode",

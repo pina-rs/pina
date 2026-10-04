@@ -58,6 +58,30 @@ pina build --features logs --no-default-features
 
 Outputs use Cargo's target directory: `deploy/<library>.so` and `idl/<library>.json`.
 
+### `pina locks`
+
+Report which instructions can never run in parallel, straight from the program source.
+
+```bash
+pina locks
+pina locks --json
+pina locks --deny-hotspots
+```
+
+Solana runs two transactions in parallel only when neither write-locks an account the other locks. A writable PDA whose seeds are all constants has one address for every caller, so every instruction that writes it serializes all of its traffic. The report lists these hotspots with their derived addresses, writers, and readers, then a conflict matrix of every instruction pair. List intentional singletons under `[locks] allow` in `pina.toml`; `--deny-hotspots` exits with status 1 on any other hotspot, for CI.
+
+### `pina map`
+
+Render the same analysis as an interactive, self-contained HTML page.
+
+```bash
+open "$(pina map)"
+pina map --output ./docs/program-map.html
+pina map --json
+```
+
+The page charts which accounts every instruction writes and reads, flags hotspots, and lights up the instructions a row conflicts with. Select an instruction or an account for its docs, constraints, PDA derivation, and conflicts. It inlines everything and makes no network requests; the default output is `<target>/pina/map.html`, and stdout carries only the written path.
+
 ### `pina generate`
 
 Generate the clients selected in `pina.toml`, or override them for one invocation.
@@ -324,9 +348,11 @@ The extractor currently supports these dispatch shapes:
 Keep in mind:
 
 - Account metadata is inferred from the `Accounts::try_from((program_id, accounts))` conversion an arm performs. The conversion is read wherever the arm performs it, including when it is bound to a local first. An arm that converts into two different structs has no single account layout and is emitted without accounts.
-- Signer, writable, and known default-account metadata can be declared with `#[pina(validate(...))]` on `#[derive(Accounts)]` fields. PDA inference still depends on direct validation calls and a field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
-- Existing direct `assert_signer()`, `assert_writable()`, `assert_address()`, and PDA validation-chain inference remains supported. Writable inference also comes from mutable fields such as `&'a mut AccountView`.
-- If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
+- Signer, writable, and known default-account metadata can be declared with `#[pina(validate(...))]` on `#[derive(Accounts)]` fields.
+- The `process` body is read too: direct `assert_signer()`, `assert_writable()`, and `assert_address()` chains, the PDA validators and loaders `#[pda]` generates (`assert_seeds`, `assert_stored_bump`, `load_pda`, `load_checked_pda`, `with_stored_bump_pda`, `with_checked_pda`, and their mutable forms), PDA creation builders, and typed loads such as `as_account::<T>()` and `with_compact_account::<T, _>()`. Writable inference also comes from mutable fields such as `&'a mut AccountView`.
+- A module-level helper function the `process` body passes an account field to is analysed as part of that body, up to four calls deep. Methods, associated functions, and helpers whose name is declared more than once are not followed.
+- A field loaded as a `#[pda]` account type belongs to that PDA. Generated clients derive its default address only when the processor pins the address: it validates the account against its seeds, or every seed of the PDA is a constant. A field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
+- If you hide routing or validation behind method calls or closures, instruction nodes may still exist, but account metadata becomes less complete.
 - Multiple files containing `process_instruction` or an `#[discriminator(entrypoint)]` enum, malformed or unresolved `#[pda]` attributes, missing package names, and missing unconditional modules are rejected as ambiguous or incomplete inputs.
 
 <!-- {/pinaIdlDispatchSupport} -->

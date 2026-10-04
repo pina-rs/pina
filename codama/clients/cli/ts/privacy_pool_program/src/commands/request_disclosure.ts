@@ -4,7 +4,7 @@
 
 import { Command } from "commander";
 import {
-	getRequestDisclosureInstruction,
+	getRequestDisclosureInstructionAsync,
 	REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT,
 } from "../client";
 import {
@@ -37,10 +37,13 @@ export const requestDisclosureCommand = registerGlobals(
 		"--legal-basis-hash <legalBasisHash>",
 		"Hash of the legal basis; nonzero required above tier 0.",
 	)
-	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
-	.requiredOption(
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
 		"--requester-registry <requesterRegistry>",
-		"The `requester_registry` account",
+		"The `requester_registry` account [default: derived]",
 	)
 	.requiredOption(
 		"--note-commitment <noteCommitment>",
@@ -66,11 +69,12 @@ export const requestDisclosureCommand = registerGlobals(
 			notice: base58("--notice", options.notice),
 			legalBasisHash: base58("--legal-basis-hash", options.legalBasisHash),
 			requester: context.payer,
-			poolConfig: pubkey("--pool-config", options.poolConfig),
-			requesterRegistry: pubkey(
-				"--requester-registry",
-				options.requesterRegistry,
-			),
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			requesterRegistry: options.requesterRegistry === undefined
+				? undefined
+				: pubkey("--requester-registry", options.requesterRegistry),
 			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
 			disclosureRequest: pubkey(
 				"--disclosure-request",
@@ -79,7 +83,7 @@ export const requestDisclosureCommand = registerGlobals(
 			systemProgram: pubkey("--system-program", options.systemProgram),
 			clock: pubkey("--clock", options.clock),
 		};
-		const instruction = getRequestDisclosureInstruction(
+		const instruction = await getRequestDisclosureInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

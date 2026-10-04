@@ -180,6 +180,77 @@ pub(crate) enum Commands {
 		explain: Option<String>,
 	},
 
+	/// Report which instructions can never run in parallel.
+	///
+	/// Solana runs two transactions in parallel only when neither write-locks
+	/// an account the other locks. Pina reads the program source, sorts every
+	/// instruction account into fixed, keyed, and caller-chosen addresses, and
+	/// reports hotspots: fixed accounts, such as a PDA whose seeds are all
+	/// constants, that serialize every instruction writing them.
+	#[command(
+		after_help = "Examples:\n  pina locks\n  pina locks --json\n  pina locks --project \
+		              ./programs/privacy_pool\n  pina locks --deny-hotspots\n\nAccepting a \
+		              hotspot:\n  List intentional hotspots by account name in `[locks] allow` in \
+		              pina.toml. Allowed hotspots are still reported; an entry that names no \
+		              hotspot is an error.\n\nExit status:\n  1 when --deny-hotspots finds a \
+		              hotspot that is not allowed, or when the analysis fails."
+	)]
+	Locks {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Emit a stable machine-readable JSON document.
+		#[arg(long)]
+		json: bool,
+
+		/// Exit with status 1 when a hotspot is not listed in `[locks] allow`.
+		#[arg(long)]
+		deny_hotspots: bool,
+	},
+
+	/// Render an interactive map of the program's instructions and account locks.
+	///
+	/// Writes one self-contained HTML file, with no network access, that charts
+	/// which accounts every instruction writes and reads, the hotspots `pina
+	/// locks` reports, and the instructions that block each other. Select an
+	/// instruction or an account for its docs, constraints, PDA derivation, and
+	/// conflicts.
+	#[command(
+		after_help = "Examples:\n  pina map\n  open \"$(pina map)\"\n  pina map --project \
+		              ./programs/privacy_pool\n  pina map --output ./docs/program-map.html\n  pina \
+		              map --json\n\nOutput:\n  The HTML file is written to <target>/pina/map.html \
+		              unless --output names another path. stdout carries only the written path, so \
+		              the command composes with `open` and `xdg-open`; progress goes to stderr. \
+		              --json prints the map's data instead: the `pina locks --json` document plus \
+		              instructionDetails and accountTypes."
+	)]
+	Map {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Write the HTML map to FILE instead of `<target>/pina/map.html`.
+		#[arg(short, long, value_name = "FILE", conflicts_with = "json")]
+		output: Option<PathBuf>,
+
+		/// Print the map's data as a stable machine-readable JSON document instead of writing HTML.
+		#[arg(long)]
+		json: bool,
+	},
+
 	/// Create and verify checked-in ABI migrations.
 	///
 	/// `create` snapshots the current desired schema. It rewrites an unpublished

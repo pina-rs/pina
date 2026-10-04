@@ -33,12 +33,14 @@ import {
 } from "@solana/kit";
 import {
 	getAccountMetaFactory,
+	getAddressFromResolvedInstructionAccount,
 	type InstructionAccountInput,
 	type InstructionAccountInputAddress,
 	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
+import { findSamplePda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
 import { ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
@@ -106,6 +108,124 @@ export function getReallocInstructionDataCodec(): FixedSizeCodec<
 		getReallocInstructionDataEncoder(),
 		getReallocInstructionDataDecoder(),
 	);
+}
+
+export type ReallocAsyncInput<
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountSample extends InstructionAccountInput = InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+> = {
+	/**
+	 * The sample authority. It pays rent on growth and receives excess rent on
+	 * shrink, so it must be writable as well as a signer.
+	 */
+	authority: TAccountAuthority;
+	sample?: TAccountSample;
+	systemProgram?: TAccountSystemProgram;
+	len: ReallocInstructionDataArgs["len"];
+};
+
+export async function getReallocInstructionAsync<
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountSample extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TProgramAddress extends Address =
+		typeof ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: ReallocAsyncInput<
+		TAccountAuthority,
+		TAccountSample,
+		TAccountSystemProgram
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	ReallocInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample,
+			InstructionAccountInputAddress<TAccountSample>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		sample: { value: input.sample ?? null, isSigner: false, isWritable: true },
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.sample.value) {
+		accounts.sample.value = await findSamplePda({
+			authority: getAddressFromResolvedInstructionAccount(
+				"authority",
+				accounts.authority.value,
+			),
+		}, { programAddress });
+	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("sample", accounts.sample),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+		],
+		data: getReallocInstructionDataEncoder().encode(
+			args as ReallocInstructionDataArgs,
+		),
+		programAddress,
+	} as ReallocInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSample,
+			InstructionAccountInputAddress<TAccountSample>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>
+	>);
 }
 
 export type ReallocInput<

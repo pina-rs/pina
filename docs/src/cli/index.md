@@ -33,6 +33,8 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | -------------------------------------- | -------------------------------------------------------------- | ----------------------------------------- |
 | [`pina init`](./init.md)               | Create a project-aware program scaffold                        | Files plus next steps                     |
 | [`pina lint`](./lint.md)               | Run the official security lints via the lint driver            | Compiler diagnostics and optional fixes   |
+| [`pina locks`](./locks.md)             | Report write-lock hotspots and conflicting instructions        | Text or JSON                              |
+| [`pina map`](./map.md)                 | Chart instructions, account locks, and conflicts               | Self-contained HTML or JSON               |
 | [`pina build`](./build.md)             | Build SBF, optionally with deterministic verification inputs   | SBF, IDL, and optional build-record files |
 | [`pina verify`](./verify.md)           | Compare deployments and record verified source                 | Status or transaction                     |
 | [`pina generate`](./generate.md)       | Generate configured client ecosystems                          | Generated clients                         |
@@ -69,6 +71,8 @@ pina idl --help
 pina docs --help
 pina init --help
 pina lint --help
+pina locks --help
+pina map --help
 pina keys --help
 pina doctor --help
 pina explain --help
@@ -88,6 +92,8 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `docs`            | Topic index or rendered Markdown  | Errors                                                  |
 | `init`            | Created path and next steps       | Errors                                                  |
 | `lint`            | Completion summary                | Cargo progress and lint diagnostics                     |
+| `locks`           | Lock report or JSON               | Errors and denied hotspots                              |
+| `map`             | Written HTML path, or JSON        | Progress and errors                                     |
 | `build`           | Published artifact summary        | Cargo output and errors                                 |
 | `verify check`    | Matching hash                     | Mismatch hashes and errors                              |
 | `verify record`   | Upstream streamed progress        | Upstream diagnostics and errors                         |
