@@ -58,6 +58,11 @@ pub(crate) fn run(cli: Cli) {
 			json,
 			deny_hotspots,
 		} => run_locks(&project, json, deny_hotspots),
+		Commands::Map {
+			project,
+			output,
+			json,
+		} => run_map(&project, output, json),
 		Commands::Snapshot { view, save } => run_snapshot(view, save),
 		Commands::Migrations { command } => run_migrations(command),
 		Commands::Abi { command } => run_abi(command),
@@ -669,6 +674,24 @@ fn run_locks(project: &Path, json: bool, deny_hotspots: bool) {
 		);
 		std::process::exit(1);
 	}
+}
+
+fn run_map(project: &Path, output: Option<PathBuf>, json: bool) {
+	let project_map = unwrap_or_exit(pina_cli::map::map_project(project));
+
+	if json {
+		print_json(&project_map.map);
+		return;
+	}
+
+	let path = output.unwrap_or(project_map.default_output);
+	unwrap_or_exit(pina_cli::map::write_html(&project_map.map, &path));
+	eprintln!(
+		"{} Wrote the program map for {}",
+		"✔".green(),
+		escaped_text(&project_map.map.locks.program)
+	);
+	println!("{}", path.display());
 }
 
 fn run_doctor(path: &Path, json: bool) {

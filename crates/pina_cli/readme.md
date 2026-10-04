@@ -70,6 +70,18 @@ pina locks --deny-hotspots
 
 Solana runs two transactions in parallel only when neither write-locks an account the other locks. A writable PDA whose seeds are all constants has one address for every caller, so every instruction that writes it serializes all of its traffic. The report lists these hotspots with their derived addresses, writers, and readers, then a conflict matrix of every instruction pair. List intentional singletons under `[locks] allow` in `pina.toml`; `--deny-hotspots` exits with status 1 on any other hotspot, for CI.
 
+### `pina map`
+
+Render the same analysis as an interactive, self-contained HTML page.
+
+```bash
+open "$(pina map)"
+pina map --output ./docs/program-map.html
+pina map --json
+```
+
+The page charts which accounts every instruction writes and reads, flags hotspots, and lights up the instructions a row conflicts with. Select an instruction or an account for its docs, constraints, PDA derivation, and conflicts. It inlines everything and makes no network requests; the default output is `<target>/pina/map.html`, and stdout carries only the written path.
+
 ### `pina generate`
 
 Generate the clients selected in `pina.toml`, or override them for one invocation.

@@ -58,6 +58,8 @@ Next comes the **conflict matrix**. Rows and columns are the instructions, numbe
 
 `none` is not a promise of parallelism. Accounts the caller chooses are never compared, because two transactions may or may not pass the same one, and nothing in the program decides that. A program with too many instructions for a readable matrix gets a per-instruction list instead.
 
+To explore the same analysis interactively, with the accounts behind each conflict and each account's derivation, run [`pina map`](./map.md).
+
 ## Fixing a hotspot
 
 A hotspot is a design decision, not a bug, but it is usually an accidental one. Common fixes:

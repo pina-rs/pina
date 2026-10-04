@@ -22,6 +22,7 @@ pub mod lint_driver;
 pub mod lint_reference;
 pub mod lint_toolchain;
 pub mod locks;
+pub mod map;
 pub mod migrations;
 pub mod parse;
 mod path_security;

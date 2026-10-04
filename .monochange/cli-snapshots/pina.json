@@ -375,6 +375,77 @@
 		},
 		{
 			"path": [
+				"map"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Render an interactive map of the program's instructions and account locks",
+			"description": "Render an interactive map of the program's instructions and account locks.\n\nWrites one self-contained HTML file, with no network access, that charts which accounts every instruction writes and reads, the hotspots `pina locks` reports, and the instructions that block each other. Select an instruction or an account for its docs, constraints, PDA derivation, and conflicts.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the project to discover. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--output",
+						"-o"
+					],
+					"canonical_name": "--output",
+					"hidden": false,
+					"global": false,
+					"summary": "Write the HTML map to FILE instead of `<target>/pina/map.html`",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Print the map's data as a stable machine-readable JSON document instead of writing HTML",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
 				"migrations"
 			],
 			"hidden": false,

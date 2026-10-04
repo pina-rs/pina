@@ -18,6 +18,7 @@ pina docs --help
 pina init --help
 pina lint --help
 pina locks --help
+pina map --help
 pina test --help
 pina dev --help
 pina keys --help
@@ -102,6 +103,8 @@ pina locks --deny-hotspots
 ```
 
 A writable PDA whose seeds are all constants has one address, so every instruction that writes it serializes all of its traffic across the cluster. `pina locks` lists these hotspots with their derived addresses, writers, and readers, then an instruction conflict matrix (`●` always, `◐` may, `·` none). Fix a hotspot by sharding the PDA with a variable seed, moving hot fields into per-user accounts, or declaring accounts an instruction only reads as read-only. Accept an intentional singleton, such as an admin configuration, by listing its name in `[locks] allow` in `pina.toml`; an entry that names no hotspot fails the command. `--deny-hotspots` exits with status 1 on any hotspot that is not allowed.
+
+`pina map` renders the same analysis as one self-contained HTML page (default `<target>/pina/map.html`; stdout is only the path, so `open "$(pina map)"` works) for a human to explore: a lock chart of instructions against accounts, hotspot plates, conflict tracing, and per-instruction and per-account detail. Agents should read `pina map --json` or `pina locks --json` rather than the HTML.
 
 ## Deterministic build artifacts
 
