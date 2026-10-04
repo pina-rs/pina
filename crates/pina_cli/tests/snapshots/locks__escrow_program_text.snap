@@ -1,0 +1,22 @@
+---
+source: crates/pina_cli/tests/locks.rs
+expression: report.render_text()
+---
+escrow_program (4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT)
+3 instructions; accounts: 2 fixed, 1 keyed, 20 caller-chosen; 0 hotspots (0 allowed)
+
+Hotspots
+  None. No instruction writes an account with a fixed address, so unrelated
+  users never queue behind each other.
+
+Conflicts
+            1  2  3
+  1 make    ◐  ◐  ◐
+  2 take    ◐  ◐  ◐
+  3 cancel  ◐  ◐  ◐
+
+Legend
+  ●  always  both lock a fixed account and at least one writes it: never in parallel
+  ◐  may     both lock a keyed PDA, or a fixed account one of them may omit, and
+             at least one writes it: they wait only when the addresses match
+  ·  none    no shared write lock Pina can prove; caller-chosen accounts are never compared

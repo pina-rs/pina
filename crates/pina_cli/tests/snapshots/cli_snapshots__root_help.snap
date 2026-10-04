@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 207
 info:
   program: pina
   args:
@@ -20,6 +19,8 @@ Commands:
           Build the current Pina program for SBF and generate its IDL
   lint
           Run Pina's official security lints against the current program
+  locks
+          Report which instructions can never run in parallel
   migrations
           Create and verify checked-in ABI migrations
   abi

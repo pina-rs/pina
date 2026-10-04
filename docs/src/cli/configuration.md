@@ -22,6 +22,9 @@ scaffold = true # initialize missing manifests and entrypoints
 [lints] # optional per-lint level overrides
 require_canonical_instruction_dispatch_for_idl = "deny"
 
+[locks] # optional intentional write-lock hotspots for `pina locks`
+allow = ["program_config"]
+
 # Optional persisted disambiguation answers for `pina migrations create`.
 [migrations.answers]
 rename = ["value:points"]
@@ -95,6 +98,12 @@ Override the selection for one run with repeatable `--client cpi`, `--client rus
 | Field               | Required | Default        | Meaning                                                                                                                                                                    |
 | ------------------- | -------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `lints.<lint-name>` | no       | built-in level | Per-lint override: `allow`, `warn`, or `deny`. Names are validated against the bundled lint catalog; see [Run Security Lints](./lint.md) for the full lint-level workflow. |
+
+## `[locks]` fields
+
+| Field         | Required | Default | Meaning                                                                                                                                                                                                                                                                                                                               |
+| ------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `locks.allow` | no       | `[]`    | Hotspots the program keeps on purpose, by account name, such as an admin configuration only admin instructions write. `pina locks` still reports them, marked allowed, and `--deny-hotspots` ignores them. Every entry must name a current hotspot; an entry that names none fails the command. See [Report Write Locks](./locks.md). |
 
 ## `[migrations.answers]` fields
 

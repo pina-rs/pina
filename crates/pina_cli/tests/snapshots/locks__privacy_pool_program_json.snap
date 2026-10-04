@@ -1,0 +1,1473 @@
+---
+source: crates/pina_cli/tests/locks.rs
+expression: report
+---
+{
+  "schemaVersion": 1,
+  "program": "privacy_pool_program",
+  "programId": "DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D",
+  "nodes": [
+    {
+      "id": "caller:initialize.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:pool_config",
+      "name": "pool_config",
+      "class": "fixed",
+      "address": "Ft792WYvArLSrWesc8wpDEvpSH31Tg58pdCnVT984gh7",
+      "pda": "pool_config",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d636f6e666967",
+          "text": "privacy-pool-config"
+        }
+      ]
+    },
+    {
+      "id": "pda:pool_vault",
+      "name": "pool_vault",
+      "class": "fixed",
+      "address": "6LrkwS21BztDA2C2GtWqgMMB8MJtkkkDkYFb5Ys7hom9",
+      "pda": "pool_vault",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d7661756c74",
+          "text": "privacy-pool-vault"
+        }
+      ]
+    },
+    {
+      "id": "pda:merkle_tree",
+      "name": "merkle_tree",
+      "class": "fixed",
+      "address": "BLquaQVntisnQpUoLpzbcFGDN9eG9Qf12TZZS5KVLaLz",
+      "pda": "merkle_tree",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d74726565",
+          "text": "privacy-pool-tree"
+        }
+      ]
+    },
+    {
+      "id": "pda:nullifier_set",
+      "name": "nullifier_set",
+      "class": "fixed",
+      "address": "Fme1vL3wChyjUdumDR9vhf1kxqp6V1vVBhn4eywLmvwj",
+      "pda": "nullifier_set",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d6e756c6c696669657273",
+          "text": "privacy-pool-nullifiers"
+        }
+      ]
+    },
+    {
+      "id": "pda:custodian_registry",
+      "name": "custodian_registry",
+      "class": "fixed",
+      "address": "Eb9uxkG5FB23MJvaEX1mEjieVVF5F7S883V3bF2bLtNW",
+      "pda": "custodian_registry",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d637573746f6469616e73",
+          "text": "privacy-pool-custodians"
+        }
+      ]
+    },
+    {
+      "id": "pda:requester_registry",
+      "name": "requester_registry",
+      "class": "fixed",
+      "address": "CFqVX5qTz2p6xdTYwuqWuZ45g5acr6oRBfawUEcxVnn7",
+      "pda": "requester_registry",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d72657175657374657273",
+          "text": "privacy-pool-requesters"
+        }
+      ]
+    },
+    {
+      "id": "pda:disclosure_log",
+      "name": "disclosure_log",
+      "class": "fixed",
+      "address": "FbPmX65NPgn3oJMTD7P7anZpnCxftJAcM5pGDQoyEjw1",
+      "pda": "disclosure_log",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d6c6f67",
+          "text": "privacy-pool-log"
+        }
+      ]
+    },
+    {
+      "id": "address:11111111111111111111111111111111",
+      "name": "system_program",
+      "class": "fixed",
+      "address": "11111111111111111111111111111111",
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:set_verification_key.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:verifying_key_account",
+      "name": "verifying_key_account",
+      "class": "keyed",
+      "address": null,
+      "pda": "verifying_key_account",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d766b6579",
+          "text": "privacy-pool-vkey"
+        },
+        {
+          "kind": "variable",
+          "name": "slot",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "id": "caller:set_verification_key.system_program",
+      "name": "system_program",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:set_custodians.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:register_requester.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:deposit.depositor",
+      "name": "depositor",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:note_commitment",
+      "name": "note_commitment",
+      "class": "keyed",
+      "address": null,
+      "pda": "note_commitment",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d6e6f7465",
+          "text": "privacy-pool-note"
+        },
+        {
+          "kind": "variable",
+          "name": "commitment",
+          "type": "Address"
+        }
+      ]
+    },
+    {
+      "id": "caller:withdraw.recipient",
+      "name": "recipient",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:transfer.pool_config",
+      "name": "pool_config",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:transfer.payer",
+      "name": "payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:request_disclosure.requester",
+      "name": "requester",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:disclosure_request",
+      "name": "disclosure_request",
+      "class": "keyed",
+      "address": null,
+      "pda": "disclosure_request",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d72657175657374",
+          "text": "privacy-pool-request"
+        },
+        {
+          "kind": "variable",
+          "name": "requester",
+          "type": "Address"
+        },
+        {
+          "kind": "variable",
+          "name": "nonce",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "id": "caller:request_disclosure.system_program",
+      "name": "system_program",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:request_disclosure.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:grant_disclosure.viewer",
+      "name": "viewer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:challenge_disclosure.viewer",
+      "name": "viewer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:challenge_disclosure.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:resolve_challenge.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:approve_disclosure.custodian",
+      "name": "custodian",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:approve_disclosure.clock",
+      "name": "clock",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:cancel_disclosure.requester",
+      "name": "requester",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    }
+  ],
+  "instructions": [
+    {
+      "name": "initialize",
+      "writes": [
+        {
+          "node": "caller:initialize.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_vault",
+          "slot": "pool_vault",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:merkle_tree",
+          "slot": "merkle_tree",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:nullifier_set",
+          "slot": "nullifier_set",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:custodian_registry",
+          "slot": "custodian_registry",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:requester_registry",
+          "slot": "requester_registry",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:disclosure_log",
+          "slot": "disclosure_log",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "set_verification_key",
+      "writes": [
+        {
+          "node": "caller:set_verification_key.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:verifying_key_account",
+          "slot": "verifying_key_account",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:set_verification_key.system_program",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "set_custodians",
+      "writes": [
+        {
+          "node": "pda:custodian_registry",
+          "slot": "custodian_registry",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:set_custodians.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "register_requester",
+      "writes": [
+        {
+          "node": "pda:requester_registry",
+          "slot": "requester_registry",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:register_requester.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "writes": [
+        {
+          "node": "caller:deposit.depositor",
+          "slot": "depositor",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_vault",
+          "slot": "pool_vault",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:merkle_tree",
+          "slot": "merkle_tree",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:note_commitment",
+          "slot": "note_commitment",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "writes": [
+        {
+          "node": "pda:pool_vault",
+          "slot": "pool_vault",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:nullifier_set",
+          "slot": "nullifier_set",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:withdraw.recipient",
+          "slot": "recipient",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:merkle_tree",
+          "slot": "merkle_tree",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:verifying_key_account",
+          "slot": "verifying_key_account",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "transfer",
+      "writes": [
+        {
+          "node": "caller:transfer.payer",
+          "slot": "payer",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:merkle_tree",
+          "slot": "merkle_tree",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:nullifier_set",
+          "slot": "nullifier_set",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:note_commitment",
+          "slot": "note_commitment",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:transfer.pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:verifying_key_account",
+          "slot": "verifying_key_account",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "request_disclosure",
+      "writes": [
+        {
+          "node": "caller:request_disclosure.requester",
+          "slot": "requester",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:disclosure_request",
+          "slot": "disclosure_request",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:requester_registry",
+          "slot": "requester_registry",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:note_commitment",
+          "slot": "note_commitment",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:request_disclosure.system_program",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:request_disclosure.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "grant_disclosure",
+      "writes": [
+        {
+          "node": "pda:disclosure_request",
+          "slot": "disclosure_request",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:note_commitment",
+          "slot": "note_commitment",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:grant_disclosure.viewer",
+          "slot": "viewer",
+          "signer": true,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "challenge_disclosure",
+      "writes": [
+        {
+          "node": "pda:disclosure_request",
+          "slot": "disclosure_request",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:note_commitment",
+          "slot": "note_commitment",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:challenge_disclosure.viewer",
+          "slot": "viewer",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "caller:challenge_disclosure.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "resolve_challenge",
+      "writes": [
+        {
+          "node": "pda:disclosure_request",
+          "slot": "disclosure_request",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:resolve_challenge.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "approve_disclosure",
+      "writes": [
+        {
+          "node": "pda:disclosure_request",
+          "slot": "disclosure_request",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:disclosure_log",
+          "slot": "disclosure_log",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:approve_disclosure.custodian",
+          "slot": "custodian",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:custodian_registry",
+          "slot": "custodian_registry",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:approve_disclosure.clock",
+          "slot": "clock",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "cancel_disclosure",
+      "writes": [
+        {
+          "node": "pda:disclosure_request",
+          "slot": "disclosure_request",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:cancel_disclosure.requester",
+          "slot": "requester",
+          "signer": true,
+          "optional": false
+        }
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "instructions": [
+        "initialize",
+        "initialize"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:custodian_registry",
+        "pda:disclosure_log",
+        "pda:merkle_tree",
+        "pda:nullifier_set",
+        "pda:pool_config",
+        "pda:pool_vault",
+        "pda:requester_registry"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "set_verification_key"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "set_custodians"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:custodian_registry",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "register_requester"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config",
+        "pda:requester_registry"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "deposit"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config",
+        "pda:pool_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "withdraw"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:nullifier_set",
+        "pda:pool_config",
+        "pda:pool_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "transfer"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:nullifier_set"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "request_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config",
+        "pda:requester_registry"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "resolve_challenge"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "approve_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:custodian_registry",
+        "pda:disclosure_log",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "set_verification_key",
+        "set_verification_key"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:verifying_key_account"
+      ]
+    },
+    {
+      "instructions": [
+        "set_verification_key",
+        "deposit"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "set_verification_key",
+        "withdraw"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:verifying_key_account"
+      ]
+    },
+    {
+      "instructions": [
+        "set_verification_key",
+        "transfer"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:verifying_key_account"
+      ]
+    },
+    {
+      "instructions": [
+        "set_custodians",
+        "set_custodians"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:custodian_registry"
+      ]
+    },
+    {
+      "instructions": [
+        "set_custodians",
+        "deposit"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "set_custodians",
+        "approve_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:custodian_registry"
+      ]
+    },
+    {
+      "instructions": [
+        "register_requester",
+        "register_requester"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:requester_registry"
+      ]
+    },
+    {
+      "instructions": [
+        "register_requester",
+        "deposit"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "register_requester",
+        "request_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:requester_registry"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "deposit"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config",
+        "pda:pool_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config",
+        "pda:pool_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "transfer"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "request_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "grant_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:note_commitment"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "challenge_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:note_commitment"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "resolve_challenge"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "approve_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "withdraw",
+        "withdraw"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:nullifier_set",
+        "pda:pool_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "withdraw",
+        "transfer"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:nullifier_set"
+      ]
+    },
+    {
+      "instructions": [
+        "transfer",
+        "transfer"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:nullifier_set"
+      ]
+    },
+    {
+      "instructions": [
+        "transfer",
+        "request_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:note_commitment"
+      ]
+    },
+    {
+      "instructions": [
+        "transfer",
+        "grant_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:note_commitment"
+      ]
+    },
+    {
+      "instructions": [
+        "transfer",
+        "challenge_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:note_commitment"
+      ]
+    },
+    {
+      "instructions": [
+        "request_disclosure",
+        "request_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "request_disclosure",
+        "grant_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "request_disclosure",
+        "challenge_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "request_disclosure",
+        "resolve_challenge"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "request_disclosure",
+        "approve_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "request_disclosure",
+        "cancel_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "grant_disclosure",
+        "grant_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "grant_disclosure",
+        "challenge_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "grant_disclosure",
+        "resolve_challenge"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "grant_disclosure",
+        "approve_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "grant_disclosure",
+        "cancel_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "challenge_disclosure",
+        "challenge_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "challenge_disclosure",
+        "resolve_challenge"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "challenge_disclosure",
+        "approve_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "challenge_disclosure",
+        "cancel_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "resolve_challenge",
+        "resolve_challenge"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "resolve_challenge",
+        "approve_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "resolve_challenge",
+        "cancel_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "approve_disclosure",
+        "approve_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:disclosure_log"
+      ]
+    },
+    {
+      "instructions": [
+        "approve_disclosure",
+        "cancel_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "cancel_disclosure",
+        "cancel_disclosure"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:disclosure_request"
+      ]
+    }
+  ],
+  "hotspots": [
+    {
+      "node": "pda:pool_config",
+      "name": "pool_config",
+      "writers": [
+        "initialize",
+        "deposit"
+      ],
+      "readers": [
+        "set_verification_key",
+        "set_custodians",
+        "register_requester",
+        "withdraw",
+        "request_disclosure",
+        "resolve_challenge",
+        "approve_disclosure"
+      ],
+      "allowed": false
+    },
+    {
+      "node": "pda:pool_vault",
+      "name": "pool_vault",
+      "writers": [
+        "initialize",
+        "deposit",
+        "withdraw"
+      ],
+      "readers": [],
+      "allowed": false
+    },
+    {
+      "node": "pda:merkle_tree",
+      "name": "merkle_tree",
+      "writers": [
+        "initialize",
+        "deposit",
+        "transfer"
+      ],
+      "readers": [
+        "withdraw"
+      ],
+      "allowed": false
+    },
+    {
+      "node": "pda:nullifier_set",
+      "name": "nullifier_set",
+      "writers": [
+        "initialize",
+        "withdraw",
+        "transfer"
+      ],
+      "readers": [],
+      "allowed": false
+    },
+    {
+      "node": "pda:custodian_registry",
+      "name": "custodian_registry",
+      "writers": [
+        "initialize",
+        "set_custodians"
+      ],
+      "readers": [
+        "approve_disclosure"
+      ],
+      "allowed": false
+    },
+    {
+      "node": "pda:requester_registry",
+      "name": "requester_registry",
+      "writers": [
+        "initialize",
+        "register_requester"
+      ],
+      "readers": [
+        "request_disclosure"
+      ],
+      "allowed": false
+    },
+    {
+      "node": "pda:disclosure_log",
+      "name": "disclosure_log",
+      "writers": [
+        "initialize",
+        "approve_disclosure"
+      ],
+      "readers": [],
+      "allowed": false
+    }
+  ]
+}
