@@ -212,7 +212,10 @@ pub fn assemble_program_ir_multi_with_auto(
 			accounts_struct::extract_accounts_structs(file)
 				.map_err(|error| IdlError::Other(error.to_string()))?,
 		);
-		all_errors.extend(error_enum::extract_error_enums(file));
+		all_errors.extend(
+			error_enum::extract_error_enums(file)
+				.map_err(|error| IdlError::Other(error.to_string()))?,
+		);
 		all_pinapod_enums.extend(pod_enum::extract_pinapod_enums(file)?);
 
 		// A hand-written match is authoritative when present. Otherwise the
@@ -1053,6 +1056,45 @@ pub struct RunAccounts<'a> {
 		assert!(message.contains("Could not resolve instruction discriminator"));
 		assert!(message.contains("Missing"));
 		assert!(message.contains("ExampleInstruction"));
+	}
+
+	#[test]
+	fn assemble_program_ir_numbers_implicit_error_codes_and_rejects_unevaluable_ones() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[error]
+			pub enum ExampleError {
+				First = 6000,
+				Second,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir = assemble_program_ir(&file, "example").unwrap_or_else(|e| panic!("assemble: {e}"));
+		let codes: Vec<_> = ir
+			.errors
+			.iter()
+			.map(|error| (error.name.as_str(), error.code))
+			.collect();
+
+		assert_eq!(codes, [("First", 6000), ("Second", 6001)]);
+
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[error]
+			pub enum ExampleError {
+				Computed = BASE + 1,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let error = assemble_program_ir(&file, "example").unwrap_err();
+
+		assert!(
+			error
+				.to_string()
+				.contains("cannot evaluate the discriminant of `ExampleError::Computed`")
+		);
 	}
 
 	#[test]
