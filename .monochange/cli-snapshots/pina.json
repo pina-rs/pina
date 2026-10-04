@@ -3,7 +3,7 @@
 	"kind": "cli-surface",
 	"tool": {
 		"name": "pina",
-		"version": "0.21.0"
+		"version": "0.22.0"
 	},
 	"provenance": {
 		"extractor": "clap",
@@ -660,6 +660,36 @@
 						},
 						{
 							"names": [
+								"--auto"
+							],
+							"canonical_name": "--auto",
+							"hidden": false,
+							"global": false,
+							"summary": "Record which contract kinds are tracked without a per-item `migrations` token: `true`, `false`, or a comma-separated list of `accounts`, `events`, and `instructions`. The policy lives in migrations/manifest.json; omit the flag to keep the recorded one",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--version-type"
+							],
+							"canonical_name": "--version-type",
+							"hidden": false,
+							"global": false,
+							"summary": "Record the version envelope width: `u8` (the default), `u16`, or `u32`. It can change only while nothing is published",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
 								"--json"
 							],
 							"canonical_name": "--json",
@@ -831,6 +861,25 @@
 							"hidden": false,
 							"global": false,
 							"summary": "Convert the pending deployment into an abandoned receipt. The pinned versions stay frozen because the deployment may still have gone live",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--pin-legacy"
+							],
+							"canonical_name": "--pin-legacy",
+							"hidden": false,
+							"global": false,
+							"summary": "Pin receipts a 0.20 ledger records without their schema hashes to what migrations/manifest.json records now. Run it only after confirming with version control that the manifest still describes what those receipts made live",
 							"value": {
 								"kind": "flag",
 								"required": false,
@@ -2461,6 +2510,125 @@
 							"true",
 							"false"
 						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"explain"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Explain why a transaction to the current program failed",
+			"description": "Explain why a transaction to the current program failed.\n\nReconstructs which `#[derive(Accounts)]` field and which rule most likely failed from the transaction (its account flags, error, and logs) and the program source, with `path:line` locations. The diagnosis runs off-chain, so programs keep their bare error codes and pay no size or compute units for it. A produced explanation exits 0, including for a transaction that succeeded; a fetch, file, or project failure exits 1.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--transaction-file"
+					],
+					"canonical_name": "--transaction-file",
+					"hidden": false,
+					"global": false,
+					"summary": "Read a saved getTransaction result or JSON-RPC response instead of fetching",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--network"
+					],
+					"canonical_name": "--network",
+					"hidden": false,
+					"global": false,
+					"summary": "Cluster to query. Defaults to localnet when fetching a signature",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"localnet",
+							"devnet",
+							"testnet",
+							"mainnet"
+						]
+					}
+				},
+				{
+					"names": [
+						"--rpc-url"
+					],
+					"canonical_name": "--rpc-url",
+					"hidden": false,
+					"global": false,
+					"summary": "Credential-free HTTP(S) JSON-RPC URL to query instead of a named network",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the program project. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit a stable machine-readable JSON document",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			],
+			"positionals": [
+				{
+					"name": "signature",
+					"hidden": false,
+					"summary": "Signature of the transaction to explain",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
 					}
 				}
 			]

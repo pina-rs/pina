@@ -1,0 +1,24 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 70
+expression: document
+---
+{
+  "accounts": [],
+  "candidates": [],
+  "errorSites": [],
+  "failure": null,
+  "logs": [],
+  "notes": [
+    "The transaction succeeded; there is nothing to explain."
+  ],
+  "program": {
+    "name": "validation_program",
+    "programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+  },
+  "schemaVersion": 1,
+  "signature": "3FoYAb2tqt9CgonKFL43m8RbHXqEyED5kc4amzYZgHAKcuR5XJskBrHRFLJ3pyah3ezo33REYmApobAExRvi9jp9",
+  "slot": 70,
+  "source": "file",
+  "status": "succeeded"
+}

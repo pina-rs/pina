@@ -1,0 +1,87 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 70
+expression: document
+---
+{
+  "accounts": [
+    {
+      "absent": false,
+      "address": "9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu",
+      "field": "authority",
+      "index": 0,
+      "signer": true,
+      "writable": false
+    },
+    {
+      "absent": false,
+      "address": "GyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse",
+      "field": "policy",
+      "index": 1,
+      "signer": false,
+      "writable": false
+    },
+    {
+      "absent": false,
+      "address": "EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1",
+      "field": "audit",
+      "index": 2,
+      "signer": false,
+      "writable": false
+    },
+    {
+      "absent": false,
+      "address": "11111111111111111111111111111111",
+      "field": "system_program",
+      "index": 3,
+      "signer": false,
+      "writable": false
+    }
+  ],
+  "candidates": [
+    {
+      "accountIndex": 2,
+      "confidence": "confirmed",
+      "field": "audit",
+      "location": "src/lib.rs:221",
+      "logConfirmed": true,
+      "reason": "account #2 (EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1) is read-only in this transaction",
+      "rule": "writable",
+      "scope": "account"
+    }
+  ],
+  "errorSites": [],
+  "failure": {
+    "cpi": null,
+    "error": {
+      "code": null,
+      "description": null,
+      "kind": "builtin",
+      "name": "InvalidAccountData"
+    },
+    "instruction": {
+      "accountsStruct": "CheckAccounts",
+      "name": "check_policy",
+      "rustName": "CheckPolicyInstruction"
+    },
+    "instructionIndex": 0,
+    "programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
+    "targetsProgram": true
+  },
+  "logs": [
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]",
+    "Program log: account has not been marked as writable",
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 182 of 200000 compute units",
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: invalid account data for instruction"
+  ],
+  "notes": [],
+  "program": {
+    "name": "validation_program",
+    "programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+  },
+  "schemaVersion": 1,
+  "signature": "4MeRynoBFLczcN7jND2spt4Vvwn5K8kasDeG7vaJU7fjTDDA2YzwFkYUqzTGS4m5UQPFGEDbzqpTqncwwg1rVYVV",
+  "slot": 62,
+  "source": "file",
+  "status": "failed"
+}

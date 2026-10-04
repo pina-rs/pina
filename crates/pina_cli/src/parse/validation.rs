@@ -270,6 +270,64 @@ pub(crate) fn extract_declared_validation_properties(
 pub fn extract_validation_properties(
 	file: &syn::File,
 ) -> HashMap<String, HashMap<String, AccountProperties>> {
+	process_walks(file)
+		.into_iter()
+		.map(|(struct_name, walk)| (struct_name, walk.props))
+		.collect()
+}
+
+/// A recognized method or generated static call on one account field inside a
+/// `process()` body.
+#[derive(Debug, Clone)]
+pub(crate) struct AssertionSite {
+	/// Accounts-struct field the call validates.
+	pub(crate) field: String,
+	/// Called method, such as `assert_signer` or `load_pda`.
+	pub(crate) method: String,
+	/// Span of the method name, which carries its source line.
+	pub(crate) span: proc_macro2::Span,
+}
+
+/// Collect the account calls in every `impl ProcessAccountInfos for X`, keyed by
+/// the struct name, in execution order: a call's receiver and arguments are
+/// recorded before the call itself, so a chain records its first link first.
+pub(crate) fn extract_assertion_sites(file: &syn::File) -> HashMap<String, Vec<AssertionSite>> {
+	process_walks(file)
+		.into_iter()
+		.map(|(struct_name, walk)| (struct_name, walk.sites))
+		.collect()
+}
+
+/// Properties and call sites gathered while walking one `process()` body.
+#[derive(Default)]
+struct ProcessWalk {
+	props: HashMap<String, AccountProperties>,
+	sites: Vec<AssertionSite>,
+}
+
+impl ProcessWalk {
+	/// Record a call on an account field: its client-visible effect and its location.
+	fn record(
+		&mut self,
+		field_name: String,
+		method: &str,
+		args: &syn::punctuated::Punctuated<Expr, syn::Token![,]>,
+		span: proc_macro2::Span,
+	) {
+		apply_assertion(
+			method,
+			args,
+			self.props.entry(field_name.clone()).or_default(),
+		);
+		self.sites.push(AssertionSite {
+			field: field_name,
+			method: method.to_owned(),
+			span,
+		});
+	}
+}
+
+fn process_walks(file: &syn::File) -> HashMap<String, ProcessWalk> {
 	let mut result = HashMap::new();
 
 	for item in &file.items {
@@ -294,33 +352,32 @@ pub fn extract_validation_properties(
 			continue;
 		};
 
-		let props = analyse_process_body(&process_fn.block.stmts);
-		result.insert(struct_name, props);
+		result.insert(struct_name, analyse_process_body(&process_fn.block.stmts));
 	}
 
 	result
 }
 
 /// Walk the statements in a `process()` body and collect assertions per field.
-fn analyse_process_body(stmts: &[Stmt]) -> HashMap<String, AccountProperties> {
-	let mut props: HashMap<String, AccountProperties> = HashMap::new();
+fn analyse_process_body(stmts: &[Stmt]) -> ProcessWalk {
+	let mut walk = ProcessWalk::default();
 	let mut bindings: HashMap<String, String> = HashMap::new();
 
 	for stmt in stmts {
-		collect_assertions_from_stmt(stmt, &mut props, &mut bindings);
+		collect_assertions_from_stmt(stmt, &mut walk, &mut bindings);
 	}
 
-	props
+	walk
 }
 
 fn collect_assertions_from_stmt(
 	stmt: &Stmt,
-	props: &mut HashMap<String, AccountProperties>,
+	walk: &mut ProcessWalk,
 	bindings: &mut HashMap<String, String>,
 ) {
 	match stmt {
 		Stmt::Expr(expr, _) => {
-			collect_assertions_from_expr(expr, props, bindings);
+			collect_assertions_from_expr(expr, walk, bindings);
 		}
 
 		Stmt::Local(local) => {
@@ -342,9 +399,9 @@ fn collect_assertions_from_stmt(
 				return;
 			};
 
-			collect_assertions_from_expr(&init.expr, props, bindings);
+			collect_assertions_from_expr(&init.expr, walk, bindings);
 			if let Some((_, diverge)) = &init.diverge {
-				collect_assertions_from_expr(diverge, props, bindings);
+				collect_assertions_from_expr(diverge, walk, bindings);
 			}
 		}
 
@@ -441,39 +498,42 @@ fn remove_pattern_idents(pat: &Pat, bindings: &mut HashMap<String, String>) {
 
 fn collect_assertions_from_expr(
 	expr: &Expr,
-	props: &mut HashMap<String, AccountProperties>,
+	walk: &mut ProcessWalk,
 	bindings: &mut HashMap<String, String>,
 ) {
 	match expr {
 		Expr::MethodCall(mc) => {
 			let method = mc.method.to_string();
+			let pda_target = pda_creation_target(&method, &mc.receiver, bindings);
+			let field_name = resolve_self_field(&mc.receiver, bindings);
 
-			if let Some(field_name) = pda_creation_target(&method, &mc.receiver, bindings) {
-				let entry = props.entry(field_name).or_default();
-				entry.is_pda = true;
-				entry.is_writable = true;
-			} else if let Some(field_name) = resolve_self_field(&mc.receiver, bindings) {
-				let entry = props.entry(field_name).or_default();
-				apply_assertion(&method, &mc.args, entry);
+			// Rust evaluates the receiver, then the arguments, then calls the
+			// method. Walking in that order records call sites in execution
+			// order, so `self.a.assert_data_len(8)?.assert_writable()?` records
+			// `assert_data_len` first.
+			collect_assertions_from_expr(&mc.receiver, walk, bindings);
+
+			for arg in &mc.args {
+				collect_assertions_from_expr(arg, walk, bindings);
 			}
 
-			// Also recurse into the receiver (for chained calls).
-			collect_assertions_from_expr(&mc.receiver, props, bindings);
-
-			// And recurse into arguments.
-			for arg in &mc.args {
-				collect_assertions_from_expr(arg, props, bindings);
+			if let Some(field_name) = pda_target {
+				let entry = walk.props.entry(field_name).or_default();
+				entry.is_pda = true;
+				entry.is_writable = true;
+			} else if let Some(field_name) = field_name {
+				walk.record(field_name, &method, &mc.args, mc.method.span());
 			}
 		}
 
 		Expr::Try(t) => {
-			collect_assertions_from_expr(&t.expr, props, bindings);
+			collect_assertions_from_expr(&t.expr, walk, bindings);
 		}
 
 		Expr::Block(b) => {
 			let mut block_bindings = bindings.clone();
 			for stmt in &b.block.stmts {
-				collect_assertions_from_stmt(stmt, props, &mut block_bindings);
+				collect_assertions_from_stmt(stmt, walk, &mut block_bindings);
 			}
 		}
 
@@ -482,21 +542,21 @@ fn collect_assertions_from_expr(
 			// branch and surrounding block retain their original bindings.
 			let mut then_bindings = bindings.clone();
 			bind_let_bindings(&if_expr.cond, &mut then_bindings);
-			collect_assertions_from_expr(&if_expr.cond, props, &mut then_bindings);
+			collect_assertions_from_expr(&if_expr.cond, walk, &mut then_bindings);
 
 			for stmt in &if_expr.then_branch.stmts {
-				collect_assertions_from_stmt(stmt, props, &mut then_bindings);
+				collect_assertions_from_stmt(stmt, walk, &mut then_bindings);
 			}
 
 			if let Some((_, else_expr)) = &if_expr.else_branch {
 				let mut else_bindings = bindings.clone();
-				collect_assertions_from_expr(else_expr, props, &mut else_bindings);
+				collect_assertions_from_expr(else_expr, walk, &mut else_bindings);
 			}
 		}
 
 		Expr::Let(let_expr) => {
 			bind_let_bindings(expr, bindings);
-			collect_assertions_from_expr(&let_expr.expr, props, bindings);
+			collect_assertions_from_expr(&let_expr.expr, walk, bindings);
 		}
 
 		Expr::Match(match_expr) => {
@@ -508,10 +568,10 @@ fn collect_assertions_from_expr(
 					bind_pattern_idents(&arm.pat, field_name, &mut arm_bindings);
 				}
 
-				collect_assertions_from_expr(&arm.body, props, &mut arm_bindings);
+				collect_assertions_from_expr(&arm.body, walk, &mut arm_bindings);
 			}
 
-			collect_assertions_from_expr(&match_expr.expr, props, bindings);
+			collect_assertions_from_expr(&match_expr.expr, walk, bindings);
 		}
 
 		Expr::Call(call) => {
@@ -520,51 +580,55 @@ fn collect_assertions_from_expr(
 			// account as a PDA; the mutable loader also proves writability.
 			// `with_checked_pda` proves the canonical bump where `with_pda`
 			// proves only the stored bump, and both describe a PDA account.
-			if let Expr::Path(path) = &*call.func {
-				let method = path.path.segments.last().map(|s| s.ident.to_string());
-				if matches!(
-					method.as_deref(),
-					Some(
-						"assert_seeds"
-							| "assert_seeds_with_bump"
-							| "assert_canonical_bump"
-							| "load_pda" | "load_pda_mut"
-							| "with_pda" | "with_stored_bump_pda"
-							| "with_checked_pda"
-					)
+			let generated = if let Expr::Path(path) = &*call.func
+				&& let Some(segment) = path.path.segments.last()
+				&& let method = segment.ident.to_string()
+				&& matches!(
+					method.as_str(),
+					"assert_seeds"
+						| "assert_seeds_with_bump"
+						| "assert_canonical_bump"
+						| "load_pda" | "load_pda_mut"
+						| "with_pda" | "with_stored_bump_pda"
+						| "with_checked_pda"
 				) && let Some(first_arg) = call.args.first()
-					&& let Some(field_name) = resolve_self_field(first_arg, bindings)
-				{
-					let entry = props.entry(field_name).or_default();
-					apply_assertion(method.as_deref().unwrap_or_default(), &call.args, entry);
-				}
-			}
+				&& let Some(field_name) = resolve_self_field(first_arg, bindings)
+			{
+				Some((field_name, method, segment.ident.span()))
+			} else {
+				None
+			};
 
-			collect_assertions_from_expr(&call.func, props, bindings);
+			// The arguments run before the call, so record it after them.
+			collect_assertions_from_expr(&call.func, walk, bindings);
 
 			for arg in &call.args {
-				collect_assertions_from_expr(arg, props, bindings);
+				collect_assertions_from_expr(arg, walk, bindings);
+			}
+
+			if let Some((field_name, method, span)) = generated {
+				walk.record(field_name, &method, &call.args, span);
 			}
 		}
 
 		Expr::Paren(p) => {
-			collect_assertions_from_expr(&p.expr, props, bindings);
+			collect_assertions_from_expr(&p.expr, walk, bindings);
 		}
 
 		Expr::Reference(r) => {
-			collect_assertions_from_expr(&r.expr, props, bindings);
+			collect_assertions_from_expr(&r.expr, walk, bindings);
 		}
 
 		Expr::Unary(unary) => {
-			collect_assertions_from_expr(&unary.expr, props, bindings);
+			collect_assertions_from_expr(&unary.expr, walk, bindings);
 		}
 
 		Expr::Struct(builder) => {
 			for field_name in lamport_moving_fields(builder, bindings) {
-				props.entry(field_name).or_default().is_writable = true;
+				walk.props.entry(field_name).or_default().is_writable = true;
 			}
 			for field in &builder.fields {
-				collect_assertions_from_expr(&field.expr, props, bindings);
+				collect_assertions_from_expr(&field.expr, walk, bindings);
 			}
 		}
 
@@ -731,7 +795,7 @@ fn first_arg_to_known_address(
 }
 
 /// Resolve a known Solana program or sysvar path to its base58 address.
-fn known_address_from_expr(expression: &Expr) -> Option<String> {
+pub(crate) fn known_address_from_expr(expression: &Expr) -> Option<String> {
 	let path_str = expr_to_path_string(expression)?;
 	for &(known_path, known_addr) in KNOWN_ADDRESSES {
 		if path_str.contains(known_path) {
@@ -912,6 +976,55 @@ mod tests {
 		let props = &all["MyAccounts"];
 		assert!(props["sender"].is_signer);
 		assert!(props["sender"].is_writable);
+	}
+
+	#[test]
+	fn records_account_call_sites_in_execution_order() {
+		let source = r"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					self.sender.assert_signer()?
+						.assert_writable()?;
+					let vault = self.vault;
+					CounterState::load_pda(vault, self.authority.assert_signer()?.address())?;
+					self.vault.assert_owner(self.mint.assert_executable()?.address())?;
+					Ok(())
+				}
+			}
+		";
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let all = extract_assertion_sites(&file);
+		let sites: Vec<_> = all["MyAccounts"]
+			.iter()
+			.map(|site| {
+				(
+					site.field.as_str(),
+					site.method.as_str(),
+					site.span.start().line,
+				)
+			})
+			.collect();
+
+		assert_eq!(
+			sites,
+			[
+				("sender", "assert_signer", 4),
+				("sender", "assert_writable", 5),
+				("authority", "assert_signer", 7),
+				("authority", "address", 7),
+				("vault", "load_pda", 7),
+				("mint", "assert_executable", 8),
+				("mint", "address", 8),
+				("vault", "assert_owner", 8),
+			]
+		);
+
+		// Walking order does not change the client-visible properties.
+		let properties = extract_validation_properties(&file);
+		let properties = &properties["MyAccounts"];
+		assert!(properties["sender"].is_signer && properties["sender"].is_writable);
+		assert!(properties["vault"].is_pda);
+		assert!(properties["authority"].is_signer);
 	}
 
 	#[test]

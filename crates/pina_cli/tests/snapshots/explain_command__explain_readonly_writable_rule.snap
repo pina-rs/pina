@@ -1,0 +1,25 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction 4MeRynoBFLczcN7jND2spt4Vvwn5K8kasDeG7vaJU7fjTDDA2YzwFkYUqzTGS4m5UQPFGEDbzqpTqncwwg1rVYVV (slot 62, from file)
+Instruction #0 failed: check_policy (CheckAccounts) in validation_program
+Error: InvalidAccountData
+
+Most likely cause:
+  audit: writable [confirmed, matches the program log] at src/lib.rs:221
+    account #2 (EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1) is read-only in this transaction
+
+Accounts:
+  #   field           signer  writable  address
+  0   authority       yes     no        9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  1   policy          no      no        GyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse
+  2   audit           no      no        EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1
+  3   system_program  no      no        11111111111111111111111111111111
+
+Program logs (last 4 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program log: account has not been marked as writable
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 182 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: invalid account data for instruction

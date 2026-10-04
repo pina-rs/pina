@@ -208,6 +208,13 @@ fn root_help_snapshot() {
 }
 
 #[test]
+fn explain_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["explain", "--help"]);
+	assert_cmd_snapshot!("explain_help", command);
+}
+
+#[test]
 fn build_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["build", "--help"]);

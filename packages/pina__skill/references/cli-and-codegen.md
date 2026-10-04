@@ -21,6 +21,7 @@ pina test --help
 pina dev --help
 pina keys --help
 pina doctor --help
+pina explain --help
 pina completions --help
 pina profile --help
 pina deploy --help
@@ -77,6 +78,15 @@ pina keys show --json
 ```
 
 `doctor --json` keeps stdout valid JSON and returns a failing exit status when required project or SBF prerequisites are unavailable. Its tool requirements follow the clients selected in `pina.toml`.
+
+When a transaction fails with a bare code such as `InvalidAccountData`, ask Pina which check produced it instead of guessing:
+
+```sh
+pina explain <SIGNATURE> --json
+pina explain --transaction-file ./failed.json --json
+```
+
+The report names the failing instruction, decodes the error (built-in, `PinaProgramError`, or the program's `#[error]` variant), and ranks candidate field rules with their `path:line`. Trust a candidate by its `confidence`: `confirmed` is proven by the transaction's flags, account counts, or keys; `checked_against_current_state` reads state that may have changed after the transaction; `possible` needs runtime values such as PDA seeds or argument values. The default network is localnet, so pass `--network` or `--rpc-url` for other clusters. A transaction rejected by preflight never lands and cannot be explained by signature; use the logs from simulation, or send with preflight disabled on a test validator.
 
 Treat program identity changes as security-sensitive. `pina keys sync` validates an existing Ed25519 keypair and updates exactly one parsed `declare_id!`. `pina keys new` creates a local identity; only `pina keys new --force` may rotate an existing one. Never copy or print keypair bytes. On platforms where Pina cannot guarantee private permissions, generate the keypair with trusted platform tooling and then run `pina keys sync --keypair <path>`.
 

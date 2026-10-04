@@ -1,0 +1,22 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction 2tq64No55gaeeRjZQiSwSesBNR5AeJnQZBuTJt4wZVvfaR2xiq2xaGNCtiPEFSDD5HVoetw4RCZEtpYxXJzLSZaH (slot 69, from file)
+Instruction #0 failed in 11111111111111111111111111111111, not in validation_program
+Error: Custom(1) (custom error 1)
+  A custom error of 11111111111111111111111111111111, which this project does not describe.
+
+Accounts:
+  #   field  signer  writable  address
+  0   -      yes     yes       EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1
+  1   -      no      yes       AKkzLhjhyFtM9j7WAhbaqYpFe49cXeJBg2kzLRC2PnNa
+
+Program logs (last 3 lines):
+  Program 11111111111111111111111111111111 invoke [1]
+  Transfer: insufficient lamports 10000000000, need 1000000000000
+  Program 11111111111111111111111111111111 failed: custom program error: 0x1
+
+Notes:
+  - Instruction #0 targets 11111111111111111111111111111111, not `validation_program` (GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn), so its checks are not in this project.

@@ -1,6 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 170
+assertion_line: 207
 info:
   program: pina
   args:
@@ -44,6 +44,8 @@ Commands:
           Inspect or synchronize the current program's identity
   doctor
           Diagnose the current project and development toolchain
+  explain
+          Explain why a transaction to the current program failed
   completions
           Generate shell completion scripts
   test

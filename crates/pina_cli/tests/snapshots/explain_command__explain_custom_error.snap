@@ -1,0 +1,34 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction 3ppGiQzbkCqX3ZRMrkU1ePbiSeLs6Z3ZNkK7hU7Sm3rZyaMRp3brMHeDWv1bTZAyjL24vQMAGs1Wa35TXGKL4YP3 (slot 67, from file)
+Instruction #0 failed: initialize_policy (InitializeAccounts) in validation_program
+Error: ValidationError::InvalidAmount (custom error 2)
+  An instruction amount is outside the absolute limits of this program.
+
+Possible causes (they need runtime values to check):
+  minimum: value >= 1 [possible] at src/lib.rs:97
+    value rules read the decoded instruction data
+  minimum: value <= MAX_POLICY_AMOUNT [possible] at src/lib.rs:98
+    value rules read the decoded instruction data
+  maximum: value >= 1 [possible] at src/lib.rs:104
+    value rules read the decoded instruction data
+  maximum: value <= MAX_POLICY_AMOUNT [possible] at src/lib.rs:105
+    value rules read the decoded instruction data
+
+Where this instruction returns the error:
+  src/lib.rs:99 in InitializePolicyInstruction
+  src/lib.rs:106 in InitializePolicyInstruction
+
+Accounts:
+  #   field           signer  writable  address
+  0   authority       yes     yes       9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  1   policy          no      yes       8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe
+  2   system_program  no      no        11111111111111111111111111111111
+
+Program logs (last 3 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 140 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: custom program error: 0x2
