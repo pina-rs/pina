@@ -1,5 +1,6 @@
 ---
 pina_cli: feat
+pina_skill: docs
 ---
 
 # Render an interactive program map
@@ -17,3 +18,5 @@ The page is drawn as a signal box's interlocking chart. Rows are instructions an
 The page inlines its styles, script, and data and makes no network requests. The data is embedded as JSON escaped for a `<script>` block and rendered as text, so doc comments cannot inject markup. It is written to `<target>/pina/map.html` unless `--output` names another path, and stdout carries only the written path. `--json` prints the data instead: the `pina locks --json` document plus `instructionDetails` and `accountTypes`.
 
 The map is also a library API: `pina_cli::map::map_project`, `build_map`, `render_html`, and `write_html`.
+
+The agent skill's CLI reference (`pina_skill`) documents `pina map` and points agents at `pina map --json` rather than the HTML.
