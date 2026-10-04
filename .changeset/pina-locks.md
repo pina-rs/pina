@@ -1,5 +1,6 @@
 ---
 pina_cli: feat
+pina_skill: docs
 ---
 
 # Report write-lock contention between instructions
@@ -20,3 +21,5 @@ pina locks --deny-hotspots
 `--json` prints a schema-version-1 document of nodes, per-instruction reads and writes, conflicts, and hotspots. `--deny-hotspots` exits with status 1 when a hotspot is not accepted by the new `[locks] allow` list in `pina.toml`, for intentional singletons such as an admin configuration. Every allowed name must be a current hotspot, so the list cannot go stale silently.
 
 The analysis is also a library API, `pina_cli::locks::analyze` and `analyze_project`, and `Project::locks_config` reads the `[locks]` table.
+
+The agent skill's CLI reference (`pina_skill`) documents `pina locks`, how to fix a hotspot, and `[locks] allow`.
