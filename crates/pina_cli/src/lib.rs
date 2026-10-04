@@ -38,6 +38,9 @@ mod dart_events;
 mod generation_manifest;
 mod js_client;
 mod js_events;
+#[cfg(all(test, unix))]
+#[path = "../tests/support/mod.rs"]
+mod test_support;
 mod verifiable;
 
 use std::path::Path;

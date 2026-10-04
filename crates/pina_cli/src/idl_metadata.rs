@@ -1835,19 +1835,7 @@ mod tests {
 
 	#[cfg(unix)]
 	fn fake_runner_with_body(runner: &Path, body: &str) -> PathBuf {
-		use std::os::unix::fs::symlink;
-
-		let mut body_path = runner.as_os_str().to_owned();
-		body_path.push(".body");
-		std::fs::write(PathBuf::from(body_path), format!("{body}\n"))
-			.unwrap_or_else(|error| panic!("runner body write failed: {error}"));
-		if !runner.exists() {
-			let driver =
-				Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/shell-driver.sh");
-			symlink(driver, runner)
-				.unwrap_or_else(|error| panic!("runner driver link failed: {error}"));
-		}
-
+		crate::test_support::write_executable(runner, &format!("#!/bin/sh\n{body}\n")).unwrap();
 		runner.to_path_buf()
 	}
 

@@ -2803,8 +2803,6 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn client_runner_reports_spawn_and_renderer_failures() {
-		use std::os::unix::fs::PermissionsExt;
-
 		let missing = empty_plan("definitely-missing-pina-renderer-command");
 		let idls = [PathBuf::from("program.json")];
 		assert!(matches!(
@@ -2815,10 +2813,11 @@ mod tests {
 		let temp =
 			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let script = temp.path().join("node");
-		std::fs::write(&script, "#!/bin/sh\nprintf 'renderer failed' >&2\nexit 9\n")
-			.unwrap_or_else(|error| panic!("failed to write renderer: {error}"));
-		std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755))
-			.unwrap_or_else(|error| panic!("failed to make renderer executable: {error}"));
+		crate::test_support::write_executable(
+			&script,
+			"#!/bin/sh\nprintf 'renderer failed' >&2\nexit 9\n",
+		)
+		.unwrap();
 		let failing = empty_plan(script.to_string_lossy());
 		let error = run_client_generation(&failing, ClientLanguage::Dart, &idls)
 			.expect_err("renderer failure should be reported");
@@ -3034,8 +3033,6 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn generation_plan_reports_javascript_hardening_failures() {
-		use std::os::unix::fs::PermissionsExt;
-
 		let temp =
 			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		let temp_root = std::fs::canonicalize(temp.path())
@@ -3043,10 +3040,7 @@ mod tests {
 		// A fake `node` that succeeds without rendering anything, so the plan
 		// reaches client hardening with no generated tree to walk.
 		let node = temp_root.join("node");
-		std::fs::write(&node, "#!/bin/sh\nexit 0\n")
-			.unwrap_or_else(|error| panic!("failed to write fake node: {error}"));
-		std::fs::set_permissions(&node, std::fs::Permissions::from_mode(0o755))
-			.unwrap_or_else(|error| panic!("failed to make fake node executable: {error}"));
+		crate::test_support::write_executable(&node, "#!/bin/sh\nexit 0\n").unwrap();
 
 		let program =
 			Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/hello_solana_program");

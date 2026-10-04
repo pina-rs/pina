@@ -920,12 +920,8 @@ mod coverage {
 	/// Writes an executable stand-in for `npx` running an arbitrary shell body.
 	#[cfg(unix)]
 	fn fake_script(dir: &Path, name: &str, body: &str) -> PathBuf {
-		use std::os::unix::fs::PermissionsExt as _;
-
 		let path = dir.join(name);
-		std::fs::write(&path, format!("#!/bin/sh\n{}\n", body)).expect("write script");
-		std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-			.expect("make executable");
+		crate::test_support::write_executable(&path, &format!("#!/bin/sh\n{body}\n")).unwrap();
 		path
 	}
 

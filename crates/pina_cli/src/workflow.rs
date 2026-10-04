@@ -617,14 +617,8 @@ mod tests {
 
 	#[cfg(unix)]
 	fn executable_script(directory: &Path, name: &str, body: &str) -> PathBuf {
-		use std::os::unix::fs::symlink;
-
 		let path = directory.join(name);
-		let mut body_path = path.as_os_str().to_owned();
-		body_path.push(".body");
-		fs::write(PathBuf::from(body_path), format!("{body}\n")).expect("write test script body");
-		let driver = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/shell-driver.sh");
-		symlink(driver, &path).expect("link stable test shell driver");
+		crate::test_support::write_executable(&path, &format!("#!/bin/sh\n{body}\n")).unwrap();
 		path
 	}
 
