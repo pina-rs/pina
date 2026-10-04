@@ -953,7 +953,7 @@ fn hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 #[path = "../../tests/support/rehearse.rs"]
-mod support;
+mod fakes;
 
 #[cfg(test)]
 mod tests;

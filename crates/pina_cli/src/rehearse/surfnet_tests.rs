@@ -23,15 +23,13 @@ fn launch<'a>(
 	}
 }
 
+/// Write a fake Surfpool without this process opening it, so a concurrent
+/// `fork` cannot hold it open and make `exec` fail with "Text file busy".
 #[cfg(unix)]
 fn script(directory: &Path, name: &str, body: &str) -> PathBuf {
-	use std::os::unix::fs::PermissionsExt as _;
-
 	let path = directory.join(name);
-	fs::write(&path, format!("#!/bin/sh\n{body}\n"))
+	crate::test_support::write_executable(&path, &format!("#!/bin/sh\n{body}\n"))
 		.unwrap_or_else(|error| panic!("write fake surfpool: {error}"));
-	fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
-		.unwrap_or_else(|error| panic!("make fake surfpool executable: {error}"));
 	path
 }
 

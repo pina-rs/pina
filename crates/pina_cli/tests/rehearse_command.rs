@@ -9,6 +9,7 @@
 #![cfg(unix)]
 
 #[path = "support/rehearse.rs"]
+mod fakes;
 mod support;
 
 use std::fs;
@@ -19,14 +20,14 @@ use std::process::Command;
 use std::process::Output;
 use std::sync::Arc;
 
-use support::Binary;
-use support::FakeFork;
-use support::FakeRpcServer;
-use support::Fixtures;
-use support::ForkFaults;
-use support::Handler;
-use support::remote_handler;
-use support::serve_forever;
+use fakes::Binary;
+use fakes::FakeFork;
+use fakes::FakeRpcServer;
+use fakes::Fixtures;
+use fakes::ForkFaults;
+use fakes::Handler;
+use fakes::remote_handler;
+use fakes::serve_forever;
 
 fn workspace_root() -> &'static Path {
 	Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -123,12 +124,12 @@ PINA_FAKE_SURFNET_PORT="$port" exec "$PINA_FAKE_SURFNET_EXE" --ignored --exact f
 	}
 }
 
+/// Write a fake executable through the shared helper, which never opens it in
+/// this process, so a concurrent `fork` cannot make its `exec` fail with
+/// "Text file busy".
 fn write_executable(path: &Path, contents: &str) {
-	use std::os::unix::fs::PermissionsExt as _;
-
-	fs::write(path, contents).unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
-	fs::set_permissions(path, fs::Permissions::from_mode(0o755))
-		.unwrap_or_else(|error| panic!("make {} executable: {error}", path.display()));
+	support::write_executable(path, contents)
+		.unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
 }
 
 fn stdout(output: &Output, remote: &FakeRpcServer) -> String {

@@ -17,6 +17,8 @@
 
 #![cfg(all(unix, not(coverage)))]
 
+mod support;
+
 use std::ffi::OsString;
 use std::fs;
 use std::net::TcpListener;
@@ -384,8 +386,6 @@ struct ForkRecorder {
 
 impl ForkRecorder {
 	fn new() -> Self {
-		use std::os::unix::fs::PermissionsExt as _;
-
 		let directory =
 			tempfile::tempdir().unwrap_or_else(|error| panic!("create recorder dir: {error}"));
 		let executable = directory.path().join("surfpool");
@@ -401,10 +401,10 @@ impl ForkRecorder {
 			"#!/bin/sh\nif [ \"$1\" != \"--version\" ]; then\n\techo $$ >> '{}'\nfi\nexec '{real}' \"$@\"\n",
 			pids.display()
 		);
-		fs::write(&executable, script)
+		// Written without this process opening it, so `exec` cannot hit
+		// "Text file busy" from a descriptor a concurrent `fork` inherited.
+		support::write_executable(&executable, &script)
 			.unwrap_or_else(|error| panic!("write the surfpool recorder: {error}"));
-		fs::set_permissions(&executable, fs::Permissions::from_mode(0o755))
-			.unwrap_or_else(|error| panic!("make the recorder executable: {error}"));
 
 		Self {
 			directory,

@@ -2,16 +2,16 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
-use super::support::AUTHORITY;
-use super::support::Binary;
-use super::support::FakeFork;
-use super::support::FakeRpcServer;
-use super::support::Fixtures;
-use super::support::ForkFaults;
-use super::support::PROGRAM_ID;
-use super::support::Reply;
-use super::support::remote_handler;
-use super::support::requests_by_method;
+use super::fakes::AUTHORITY;
+use super::fakes::Binary;
+use super::fakes::FakeFork;
+use super::fakes::FakeRpcServer;
+use super::fakes::Fixtures;
+use super::fakes::ForkFaults;
+use super::fakes::PROGRAM_ID;
+use super::fakes::Reply;
+use super::fakes::remote_handler;
+use super::fakes::requests_by_method;
 use super::*;
 
 fn counter_project() -> PathBuf {
