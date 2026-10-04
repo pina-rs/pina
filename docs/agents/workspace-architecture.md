@@ -11,7 +11,7 @@
 - `packages/codama-renderer-cpi` — Codama visitor for the standalone Pina CPI renderer
 - `crates/pina_lints` — Pina security lints plus the nightly lint driver behind `pina lint`
 - `crates/pina_test` — published Surfpool-backed program test harness
-- `crates/pina_profile` — static CU profiler for compiled SBF programs
+- `crates/pina_profile` — static and trace-driven CU profiler for SBF programs
 
 There are also multiple examples and security fixtures under `examples/` and `security/`.
 

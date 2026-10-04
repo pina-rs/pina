@@ -27,6 +27,7 @@ pub mod migrations;
 pub mod parse;
 mod path_security;
 pub mod profile;
+pub mod profile_trace;
 pub mod project;
 pub mod rehearse;
 pub mod skill;
@@ -37,6 +38,9 @@ mod dart_client;
 mod dart_events;
 mod js_client;
 mod js_events;
+#[cfg(all(test, unix))]
+#[path = "../tests/support/mod.rs"]
+mod test_support;
 mod verifiable;
 
 use std::path::Path;

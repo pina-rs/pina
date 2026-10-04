@@ -46,7 +46,7 @@ The shortcut runs `cargo run -p pina_cli -- ...` against the checked-out source.
 | [`pina doctor`](./doctor.md)           | Diagnose project and toolchain readiness                       | Text or JSON                              |
 | [`pina explain`](./explain.md)         | Explain which account check failed in a transaction            | Text or JSON                              |
 | [`pina completions`](./completions.md) | Generate a shell completion script                             | Shell script                              |
-| [`pina profile`](./profile.md)         | Estimate per-function SBF compute cost                         | Text or JSON                              |
+| [`pina profile`](./profile.md)         | Estimate SBF compute cost, or trace it per line from tests     | Text, JSON, folded stacks, or HTML        |
 | [`pina rehearse`](./rehearse.md)       | Replay real traffic against an upgrade before shipping it      | Text or JSON                              |
 | [`pina deploy`](./deploy.md)           | Plan and execute an explicit cluster deployment                | Plan or JSON                              |
 | [`pina generate`](./generate.md)       | Generate IDLs and Rust, CPI, JavaScript, Dart, and CLI clients | Generated directories                     |
@@ -82,27 +82,27 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 
 ## Streams and exit codes
 
-| Command           | stdout                            | stderr                              |
-| ----------------- | --------------------------------- | ----------------------------------- |
-| `idl`             | JSON when `--output` is omitted   | Progress, extraction counts, errors |
-| `docs`            | Topic index or rendered Markdown  | Errors                              |
-| `init`            | Created path and next steps       | Errors                              |
-| `lint`            | Completion summary                | Cargo progress and lint diagnostics |
-| `build`           | Published artifact summary        | Cargo output and errors             |
-| `verify check`    | Matching hash                     | Mismatch hashes and errors          |
-| `verify record`   | Upstream streamed progress        | Upstream diagnostics and errors     |
-| `generate`        | IDL and client summary            | Renderer output and errors          |
-| `cpi`             | Generated crate summary           | Conversion and renderer errors      |
-| `test`            | Child test-runner output          | Build output and errors             |
-| `dev`             | Surfpool UI and logs              | Build output and errors             |
-| `keys`            | Identity report or change summary | Errors                              |
-| `doctor`          | Diagnostic report                 | Errors                              |
-| `explain`         | Explanation report                | Errors                              |
-| `completions`     | Completion script                 | Errors                              |
-| `profile`         | Report when `--output` is omitted | Errors                              |
-| `rehearse`        | Rehearsal report (text or JSON)   | Progress and errors                 |
-| `deploy`          | Inspectable plan and completion   | Confirmation, progress, errors      |
-| `codama generate` | Completion summary                | Errors and renderer failures        |
+| Command           | stdout                            | stderr                                                  |
+| ----------------- | --------------------------------- | ------------------------------------------------------- |
+| `idl`             | JSON when `--output` is omitted   | Progress, extraction counts, errors                     |
+| `docs`            | Topic index or rendered Markdown  | Errors                                                  |
+| `init`            | Created path and next steps       | Errors                                                  |
+| `lint`            | Completion summary                | Cargo progress and lint diagnostics                     |
+| `build`           | Published artifact summary        | Cargo output and errors                                 |
+| `verify check`    | Matching hash                     | Mismatch hashes and errors                              |
+| `verify record`   | Upstream streamed progress        | Upstream diagnostics and errors                         |
+| `generate`        | IDL and client summary            | Renderer output and errors                              |
+| `cpi`             | Generated crate summary           | Conversion and renderer errors                          |
+| `test`            | Child test-runner output          | Build output and errors                                 |
+| `dev`             | Surfpool UI and logs              | Build output and errors                                 |
+| `keys`            | Identity report or change summary | Errors                                                  |
+| `doctor`          | Diagnostic report                 | Errors                                                  |
+| `explain`         | Explanation report                | Errors                                                  |
+| `completions`     | Completion script                 | Errors                                                  |
+| `profile`         | Report when `--output` is omitted | Errors; `trace` adds build and test output and warnings |
+| `rehearse`        | Rehearsal report (text or JSON)   | Progress and errors                                     |
+| `deploy`          | Inspectable plan and completion   | Confirmation, progress, errors                          |
+| `codama generate` | Completion summary                | Errors and renderer failures                            |
 
 Successful commands exit with code `0`. Operational failures exit with code `1`. Completed comparisons that find a difference exit with code `2`: verification hash mismatches, `profile compare` regressions, and `rehearse` behaviour changes. `rehearse` exits with code `3` when it could compare no transaction. Invalid command-line syntax is rejected by Clap with a non-zero usage error before an operation begins.
 

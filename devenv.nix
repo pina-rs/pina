@@ -1162,6 +1162,7 @@ in
           -p pina_cpi_renderer \
           -p pina_macros \
           -p pina_lints \
+          -p pina_profile \
           -p pina_root \
           -p prop_amm_program \
           -p profile_program \

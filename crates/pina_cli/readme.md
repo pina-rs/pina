@@ -217,6 +217,17 @@ pina profile target/deploy/my_program.so --output report.json
 
 When no binary is supplied, Pina discovers the current project's canonical deploy artifact. Output publication rejects aliases, hardlinks, symbolic links, and reparse points that could overwrite the input program.
 
+`pina profile trace` measures instead of estimating. It builds the program with DWARF line tables, runs the project's Mollusk tests with register tracing, and attributes every executed SBF instruction (1 CU each) to a source line and call stack. Enable `features = ["register-tracing"]` on the program's `mollusk-svm` dev-dependency first.
+
+```bash
+pina profile trace
+pina profile trace --filter increment --instruction increment
+pina profile trace --json -o trace.json
+pina profile trace --folded > stacks.folded
+```
+
+The summary lists each instruction's hottest lines, functions, and syscalls, and a self-contained HTML report with a zoomable icicle chart and annotated source is written to `<target>/pina/trace/<program>.html`. Syscall charges are listed but not included.
+
 ### `pina rehearse`
 
 Replay a deployed program's recent transactions against the build you are about to ship. Pina forks the cluster with Surfpool, runs every transaction against the deployed program and the candidate on identical state, and reports each difference in outcome, decoded account state, and compute units. It exits `2` when behaviour changed and `3` when no transaction could be compared.

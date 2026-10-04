@@ -14,6 +14,9 @@ use std::time::Instant;
 use ed25519_dalek::SigningKey;
 use tempfile::TempDir;
 
+#[cfg(unix)]
+mod support;
+
 struct ProjectFixture {
 	_temp: TempDir,
 	root: PathBuf,
@@ -205,24 +208,16 @@ fn rpc_query_values_are_rejected_without_leaking_them() {
 #[cfg(unix)]
 #[test]
 fn invalid_rpc_targets_fail_before_the_build_boundary() {
-	use std::os::unix::fs::PermissionsExt as _;
-
 	let fixture = ProjectFixture::new();
 	let bin = fixture.root.join("invalid-target-fake-bin");
 	let cargo = bin.join("cargo");
 	let marker = fixture.root.join("unexpected-build.txt");
 	fs::create_dir_all(&bin).unwrap_or_else(|error| panic!("create fake bin: {error}"));
-	fs::write(
+	support::write_executable(
 		&cargo,
 		"#!/bin/sh\nset -eu\nprintf 'invoked\\n' > \"$PINA_DEPLOY_BUILD_MARKER\"\nexit 97\n",
 	)
-	.unwrap_or_else(|error| panic!("write fake cargo: {error}"));
-	let mut permissions = fs::metadata(&cargo)
-		.unwrap_or_else(|error| panic!("stat fake cargo: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&cargo, permissions)
-		.unwrap_or_else(|error| panic!("make fake cargo executable: {error}"));
+	.unwrap();
 	let existing_path = std::env::var_os("PATH").unwrap_or_default();
 	let paths = std::iter::once(bin)
 		.chain(std::env::split_paths(&existing_path))
@@ -372,27 +367,19 @@ fn build_failure_stops_before_final_planning() {
 #[cfg(unix)]
 #[test]
 fn local_deployment_passes_verified_snapshots_and_modeled_arguments_to_solana() {
-	use std::os::unix::fs::PermissionsExt;
-
 	let fixture = ProjectFixture::new();
 	let bin = fixture.root.join("fake-bin");
 	let solana = bin.join("solana");
 	let log = fixture.root.join("solana-args.txt");
 	fs::create_dir_all(&bin).unwrap_or_else(|error| panic!("create fake bin: {error}"));
-	fs::write(
+	support::write_executable(
 		&solana,
 		"#!/bin/sh\nset -eu\npwd > \"$PINA_DEPLOY_TEST_CWD\"\nprintf '%s\\n' \"$@\" > \
 		 \"$PINA_DEPLOY_TEST_LOG\"\ncat \"$3\" > \"$PINA_DEPLOY_TEST_PROGRAM\"\ncat \"$5\" > \
 		 \"$PINA_DEPLOY_TEST_PROGRAM_KEYPAIR\"\ncat \"$7\" > \"$PINA_DEPLOY_TEST_AUTHORITY\"\ncat \
 		 \"$9\" > \"$PINA_DEPLOY_TEST_PAYER\"\n",
 	)
-	.unwrap_or_else(|error| panic!("write fake solana: {error}"));
-	let mut permissions = fs::metadata(&solana)
-		.unwrap_or_else(|error| panic!("stat fake solana: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&solana, permissions)
-		.unwrap_or_else(|error| panic!("make fake solana executable: {error}"));
+	.unwrap();
 	let existing_path = std::env::var_os("PATH").unwrap_or_default();
 	let paths = std::iter::once(bin.clone())
 		.chain(std::env::split_paths(&existing_path))
@@ -478,25 +465,17 @@ fn local_deployment_passes_verified_snapshots_and_modeled_arguments_to_solana() 
 #[cfg(unix)]
 #[test]
 fn solana_child_receives_eof_while_pina_stdin_remains_open() {
-	use std::os::unix::fs::PermissionsExt as _;
-
 	let fixture = ProjectFixture::new();
 	let bin = fixture.root.join("stdin-fake-bin");
 	let solana = bin.join("solana");
 	let marker = fixture.root.join("solana-stdin-eof.txt");
 	fs::create_dir_all(&bin).unwrap_or_else(|error| panic!("create fake bin: {error}"));
-	fs::write(
+	support::write_executable(
 		&solana,
 		"#!/bin/sh\nset -eu\nif IFS= read -r value; then exit 41; fi\nprintf 'eof\\n' > \
 		 \"$PINA_DEPLOY_STDIN_MARKER\"\n",
 	)
-	.unwrap_or_else(|error| panic!("write stdin-probing Solana: {error}"));
-	let mut permissions = fs::metadata(&solana)
-		.unwrap_or_else(|error| panic!("stat fake solana: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&solana, permissions)
-		.unwrap_or_else(|error| panic!("make fake solana executable: {error}"));
+	.unwrap();
 	let existing_path = std::env::var_os("PATH").unwrap_or_default();
 	let paths = std::iter::once(bin)
 		.chain(std::env::split_paths(&existing_path))
@@ -564,18 +543,10 @@ fn solana_child_receives_eof_while_pina_stdin_remains_open() {
 
 #[cfg(unix)]
 fn remote_command(fixture: &ProjectFixture, name: &str, script: &str) -> Command {
-	use std::os::unix::fs::PermissionsExt as _;
-
 	let bin = fixture.root.join(name);
 	let solana = bin.join("solana");
 	fs::create_dir_all(&bin).unwrap_or_else(|error| panic!("create fake bin: {error}"));
-	fs::write(&solana, script).unwrap_or_else(|error| panic!("write fake Solana CLI: {error}"));
-	let mut permissions = fs::metadata(&solana)
-		.unwrap_or_else(|error| panic!("stat fake Solana CLI: {error}"))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(&solana, permissions)
-		.unwrap_or_else(|error| panic!("make fake Solana CLI executable: {error}"));
+	support::write_executable(&solana, script).unwrap();
 	let existing_path = std::env::var_os("PATH").unwrap_or_default();
 	let paths = std::iter::once(bin)
 		.chain(std::env::split_paths(&existing_path))

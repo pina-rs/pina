@@ -1,0 +1,191 @@
+---
+source: crates/pina_profile/tests/trace.rs
+expression: "render(|report, buffer|\n{\n    let mut trimmed = report.clone(); for profile in &mut trimmed.instructions\n    {\n        profile.lines.truncate(3); profile.functions.truncate(3);\n        profile.stacks.truncate(3);\n    } write_trace_json(&trimmed, buffer)\n})"
+---
+{
+  "schemaVersion": 1,
+  "program": "counter_program",
+  "executableSha256": "b944b12c0eab509680a1f78c592f43a799cd83278bf51550a08e1575c54fbeaf",
+  "lineInfo": true,
+  "recordedTraces": 2,
+  "skippedTraces": 0,
+  "releaseBuild": null,
+  "instructions": [
+    {
+      "name": "increment",
+      "instruction": "increment",
+      "discriminator": {
+        "width": 1,
+        "value": 1
+      },
+      "traceIds": [
+        "027248484d2e1d1b"
+      ],
+      "executedInstructions": 133,
+      "syscallInvocations": 2,
+      "unattributedInstructions": 24,
+      "lines": [
+        {
+          "file": "/Users/runner/work/platform-tools/platform-tools/out/rust/library/core/src/array/equality.rs",
+          "line": 150,
+          "executedInstructions": 32,
+          "syscalls": []
+        },
+        {
+          "file": "/Users/runner/work/platform-tools/platform-tools/out/rust/library/core/src/mem/maybe_uninit.rs",
+          "line": 475,
+          "executedInstructions": 14,
+          "syscalls": []
+        },
+        {
+          "file": "crates/pina/src/entry.rs",
+          "line": 316,
+          "executedInstructions": 5,
+          "syscalls": []
+        }
+      ],
+      "functions": [
+        {
+          "name": "spec_eq<u8, u8, 32>",
+          "selfInstructions": 36,
+          "inclusiveInstructions": 36
+        },
+        {
+          "name": "write<&[u8]>",
+          "selfInstructions": 14,
+          "inclusiveInstructions": 14
+        },
+        {
+          "name": "walk_accounts",
+          "selfInstructions": 12,
+          "inclusiveInstructions": 16
+        }
+      ],
+      "syscalls": [
+        {
+          "name": "sol_log_",
+          "invocations": 1
+        },
+        {
+          "name": "sol_sha256",
+          "invocations": 1
+        }
+      ],
+      "stacks": [
+        {
+          "frames": [
+            "entrypoint"
+          ],
+          "executedInstructions": 6
+        },
+        {
+          "frames": [
+            "entrypoint",
+            "__dispatch_entrypoint"
+          ],
+          "executedInstructions": 5
+        },
+        {
+          "frames": [
+            "entrypoint",
+            "__dispatch_entrypoint",
+            "__dispatch"
+          ],
+          "executedInstructions": 4
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "instruction": "initialize",
+      "discriminator": {
+        "width": 1,
+        "value": 0
+      },
+      "traceIds": [
+        "104412a19b50f671"
+      ],
+      "executedInstructions": 252,
+      "syscallInvocations": 4,
+      "unattributedInstructions": 27,
+      "lines": [
+        {
+          "file": "/Users/runner/work/platform-tools/platform-tools/out/rust/library/core/src/ptr/mod.rs",
+          "line": 542,
+          "executedInstructions": 25,
+          "syscalls": []
+        },
+        {
+          "file": "/Users/runner/work/platform-tools/platform-tools/out/rust/library/core/src/array/equality.rs",
+          "line": 150,
+          "executedInstructions": 24,
+          "syscalls": []
+        },
+        {
+          "file": "crates/pina/src/lib.rs",
+          "line": 352,
+          "executedInstructions": 14,
+          "syscalls": []
+        }
+      ],
+      "functions": [
+        {
+          "name": "spec_eq<u8, u8, 32>",
+          "selfInstructions": 29,
+          "inclusiveInstructions": 29
+        },
+        {
+          "name": "init_from_account_view",
+          "selfInstructions": 20,
+          "inclusiveInstructions": 29
+        },
+        {
+          "name": "copy_nonoverlapping<u8>",
+          "selfInstructions": 17,
+          "inclusiveInstructions": 17
+        }
+      ],
+      "syscalls": [
+        {
+          "name": "sol_get_sysvar",
+          "invocations": 1
+        },
+        {
+          "name": "sol_invoke_signed_c",
+          "invocations": 1
+        },
+        {
+          "name": "sol_log_",
+          "invocations": 1
+        },
+        {
+          "name": "sol_sha256",
+          "invocations": 1
+        }
+      ],
+      "stacks": [
+        {
+          "frames": [
+            "entrypoint"
+          ],
+          "executedInstructions": 15
+        },
+        {
+          "frames": [
+            "entrypoint",
+            "__dispatch_entrypoint"
+          ],
+          "executedInstructions": 7
+        },
+        {
+          "frames": [
+            "entrypoint",
+            "__dispatch_entrypoint",
+            "__dispatch"
+          ],
+          "executedInstructions": 2
+        }
+      ]
+    }
+  ]
+}

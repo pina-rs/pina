@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>pina profile trace</title>
+<style>
+	:root {
+		--paper: #f5f1e8;
+		--panel: #fbf9f3;
+		--ink: #1f1b16;
+		--muted: #6c6357;
+		--rule: #d9d0c0;
+		--accent: #c2410c;
+		--cool: #e9e3d6;
+		--sampled: rgba(232, 131, 58, .10);
+		--heat-1: #f6d9a8;
+		--heat-2: #f2b366;
+		--heat-3: #e8833a;
+		--heat-4: #d1521f;
+		--focus: #1d4ed8;
+		--serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+		--mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root {
+			--paper: #14120f;
+			--panel: #1c1915;
+			--ink: #ede5d6;
+			--muted: #a39885;
+			--rule: #3a342b;
+			--accent: #ff8a4c;
+			--cool: #29241e;
+			--sampled: rgba(240, 113, 44, .10);
+			--heat-1: #4a3418;
+			--heat-2: #7a4a16;
+			--heat-3: #b85f1a;
+			--heat-4: #f0712c;
+			--focus: #8ab4ff;
+		}
+	}
+
+	* { box-sizing: border-box; }
+
+	html { background: var(--paper); color: var(--ink); }
+
+	body {
+		margin: 0 auto;
+		max-width: 76rem;
+		padding: 0 clamp(1rem, 3vw, 2.5rem) 4rem;
+		font: 15px/1.5 var(--mono);
+		font-variant-numeric: tabular-nums;
+	}
+
+	a { color: inherit; }
+
+	:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+	.skip { position: absolute; left: -999px; }
+	.skip:focus { left: 1rem; top: 1rem; background: var(--panel); padding: .5rem 1rem; z-index: 2; }
+
+	.masthead {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: end;
+		gap: 1rem 2rem;
+		padding: 2.5rem 0 1.5rem;
+		border-bottom: 3px double var(--rule);
+	}
+
+	.eyebrow {
+		margin: 0;
+		color: var(--accent);
+		font-size: .75rem;
+		letter-spacing: .18em;
+		text-transform: uppercase;
+	}
+
+	h1 {
+		margin: .25rem 0 0;
+		font: 600 clamp(2rem, 6vw, 3.6rem)/1 var(--serif);
+		letter-spacing: -.02em;
+		overflow-wrap: anywhere;
+	}
+
+	h2 {
+		margin: 0 0 .75rem;
+		font: 600 1.35rem/1.2 var(--serif);
+	}
+
+	.meta {
+		margin: 0;
+		display: grid;
+		grid-template-columns: auto auto;
+		gap: .15rem 1rem;
+		color: var(--muted);
+		font-size: .78rem;
+	}
+
+	.meta dt { text-align: right; }
+	.meta dd { margin: 0; overflow-wrap: anywhere; }
+
+	.picker {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		background: var(--paper);
+		border-bottom: 1px solid var(--rule);
+		padding: .75rem 0;
+	}
+
+	[role="tablist"] { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+	[role="tab"] {
+		font: inherit;
+		color: inherit;
+		background: var(--panel);
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		padding: .35rem .9rem;
+		cursor: pointer;
+	}
+
+	[role="tab"] span { color: var(--muted); margin-left: .5rem; }
+
+	[role="tab"][aria-selected="true"] {
+		background: var(--ink);
+		border-color: var(--ink);
+		color: var(--paper);
+	}
+
+	[role="tab"][aria-selected="true"] span { color: inherit; opacity: .75; }
+
+	section { margin-top: 2.5rem; }
+
+	.notice {
+		margin: 1.5rem 0 0;
+		padding: .75rem 1rem;
+		border-left: 4px solid var(--accent);
+		background: var(--panel);
+		font-size: .85rem;
+	}
+
+	.readout {
+		display: grid;
+		grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+		gap: 1px;
+		background: var(--rule);
+		border: 1px solid var(--rule);
+	}
+
+	.readout div { background: var(--panel); padding: 1rem 1.25rem; }
+	.readout b { display: block; font: 600 clamp(1.6rem, 4vw, 2.6rem)/1.1 var(--serif); }
+	.readout div:first-child b { color: var(--accent); font-size: clamp(2.4rem, 7vw, 4.2rem); }
+	.readout small { color: var(--muted); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+
+	.hint { margin: -.25rem 0 .75rem; color: var(--muted); font-size: .8rem; }
+
+	.crumbs { display: flex; flex-wrap: wrap; gap: .25rem; margin-bottom: .5rem; font-size: .8rem; }
+
+	.crumbs button {
+		font: inherit;
+		color: var(--muted);
+		background: none;
+		border: 0;
+		padding: 0 .25rem;
+		cursor: pointer;
+		text-decoration: underline;
+	}
+
+	.crumbs button + button::before { content: "\203A"; margin-right: .5rem; color: var(--muted); display: inline-block; text-decoration: none; }
+
+	.crumbs button:last-child { color: var(--ink); text-decoration: none; cursor: default; }
+
+	.flame {
+		position: relative;
+		border: 1px solid var(--rule);
+		background: var(--panel);
+		overflow: hidden;
+	}
+
+	.frame {
+		position: absolute;
+		height: 22px;
+		margin: 0;
+		padding: 0 .35rem;
+		border: 0;
+		border-right: 1px solid var(--panel);
+		border-bottom: 1px solid var(--panel);
+		font: 12px/22px var(--mono);
+		color: #1f1b16;
+		text-align: left;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		cursor: pointer;
+	}
+
+	.frame:hover, .frame:focus-visible { filter: brightness(1.08) saturate(1.2); z-index: 1; }
+
+	output.detail {
+		display: block;
+		min-height: 1.5em;
+		margin-top: .5rem;
+		color: var(--muted);
+		font-size: .8rem;
+		overflow-wrap: anywhere;
+	}
+
+	.hot { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+
+	.hot li {
+		display: grid;
+		grid-template-columns: 5ch minmax(0, 1fr) 7ch 8ch;
+		gap: 1rem;
+		align-items: center;
+		padding: .4rem 0;
+		border-bottom: 1px solid var(--rule);
+		font-size: .85rem;
+	}
+
+	.rank { color: var(--muted); }
+	.hot a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.num { text-align: right; }
+
+	.bar { height: .55rem; background: var(--cool); }
+	.bar i { display: block; height: 100%; background: var(--heat-3); }
+
+	table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+	th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+	th { color: var(--muted); font-weight: normal; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+	td.num, th.num { text-align: right; }
+	.table-wrap { overflow-x: auto; }
+
+	details.file { border: 1px solid var(--rule); background: var(--panel); margin-bottom: 1rem; }
+
+	details.file > summary {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 8ch 10ch;
+		gap: 1rem;
+		align-items: center;
+		padding: .6rem 1rem;
+		cursor: pointer;
+		font-size: .85rem;
+	}
+
+	details.file > summary span:first-child { overflow-wrap: anywhere; }
+	details.file[open] > summary { border-bottom: 1px solid var(--rule); }
+
+	.code { overflow-x: auto; font-size: 12.5px; line-height: 1.55; tab-size: 4; }
+
+	.line {
+		display: grid;
+		grid-template-columns: 6ch 9ch 6ch minmax(0, 1fr);
+		min-width: max-content;
+	}
+
+	.line > * { padding: 0 .6rem; }
+	.line .cu { text-align: right; color: var(--ink); }
+	.line .no { text-align: right; color: var(--muted); user-select: none; }
+	.line .heat { display: flex; align-items: center; }
+	.line .heat i { display: block; height: .5rem; border-radius: 1px; }
+	.line.sampled { background: var(--sampled); }
+	.line code { font: inherit; white-space: pre; }
+	.line.hot-line { box-shadow: inset 3px 0 0 var(--accent); }
+	.line { scroll-margin-top: 5rem; }
+	.line:target { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+	.tag {
+		display: inline-block;
+		margin-left: 1rem;
+		padding: 0 .4rem;
+		border: 1px solid var(--accent);
+		border-radius: 3px;
+		color: var(--accent);
+		font-size: 11px;
+	}
+
+	.gap {
+		display: block;
+		width: 100%;
+		font: inherit;
+		color: var(--muted);
+		background: var(--cool);
+		border: 0;
+		padding: .1rem 1rem;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.unresolved { padding: .75rem 1rem; color: var(--muted); font-size: .8rem; }
+
+	footer {
+		margin-top: 3rem;
+		padding-top: 1rem;
+		border-top: 3px double var(--rule);
+		color: var(--muted);
+		font-size: .78rem;
+	}
+
+	@media (max-width: 720px) {
+		.masthead { grid-template-columns: 1fr; }
+		.meta dt { text-align: left; }
+		.readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+		.readout div:first-child { grid-column: 1 / -1; }
+		.hot li { grid-template-columns: 4ch minmax(0, 1fr) 6ch; }
+		.hot li .bar { display: none; }
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.frame { transition: left .18s ease, width .18s ease; }
+	}
+</style>
+</head>
+<body>
+<a class="skip" href="#source">Skip to annotated source</a>
+<header class="masthead">
+	<div>
+		<p class="eyebrow">pina profile trace</p>
+		<h1 id="program">Trace report</h1>
+	</div>
+	<dl class="meta" id="meta"></dl>
+</header>
+<nav class="picker" aria-label="Traced instructions">
+	<div role="tablist" id="tabs" aria-label="Instruction"></div>
+</nav>
+<main id="panel" role="tabpanel">
+	<div id="notices"></div>
+	<section aria-label="Totals"><div class="readout" id="readout"></div></section>
+	<section aria-labelledby="flame-title">
+		<h2 id="flame-title">Call stacks</h2>
+		<p class="hint">Width is executed instructions. Select a frame to zoom in; press Escape to return to the root.</p>
+		<nav class="crumbs" id="crumbs" aria-label="Zoom path"></nav>
+		<div class="flame" id="flame" role="group" aria-label="Icicle chart of call stacks"></div>
+		<output class="detail" id="flame-detail"></output>
+	</section>
+	<section aria-labelledby="hot-title">
+		<h2 id="hot-title">Hottest lines</h2>
+		<ol class="hot" id="hot"></ol>
+	</section>
+	<section aria-labelledby="syscall-title" id="syscall-section">
+		<h2 id="syscall-title">Syscalls</h2>
+		<p class="hint">Only the 1&nbsp;CU call instruction is counted; the runtime charges each syscall separately.</p>
+		<div class="table-wrap"><table id="syscalls"></table></div>
+	</section>
+	<section aria-labelledby="source-title" id="source">
+		<h2 id="source-title">Annotated source</h2>
+		<div id="files"></div>
+	</section>
+</main>
+<footer id="footer">Each executed SBF instruction costs 1 CU. Syscall charges are made separately by the runtime and are not included.</footer>
+<script type="application/json" id="trace-data">/*PINA_TRACE_DATA*/</script>
+<script>
+"use strict";
+(() => {
+	const data = JSON.parse(document.getElementById("trace-data").textContent);
+	const report = data.report;
+	const sources = data.sources || {};
+	const ROW = 23;
+	const CONTEXT = 3;
+	let zoomPath = [];
+
+	const el = (tag, props, ...children) => {
+		const node = document.createElement(tag);
+		for (const [key, value] of Object.entries(props || {})) {
+			if (key === "text") node.textContent = value;
+			else if (key === "class") node.className = value;
+			else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+			else node.setAttribute(key, value);
+		}
+		for (const child of children) if (child) node.append(child);
+		return node;
+	};
+	const clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+	const pct = (part, total) => total ? (100 * part / total) : 0;
+	const fmtPct = (part, total) => pct(part, total).toFixed(1) + "%";
+	const shortPath = (path) => {
+		const library = path.indexOf("/library/");
+		if (library >= 0) return path.slice(library + 9);
+		const registry = path.indexOf("/registry/src/");
+		if (registry >= 0) {
+			const rest = path.slice(registry + 14);
+			const slash = rest.indexOf("/");
+			return slash >= 0 ? rest.slice(slash + 1) : rest;
+		}
+		return path;
+	};
+	const hash = (text) => {
+		let value = 2166136261;
+		for (let index = 0; index < text.length; index++) {
+			value ^= text.charCodeAt(index);
+			value = Math.imul(value, 16777619);
+		}
+		return value >>> 0;
+	};
+	const frameColor = (name) => {
+		const value = hash(name);
+		return `hsl(${18 + value % 34} ${62 + (value >> 8) % 24}% ${64 + (value >> 16) % 14}%)`;
+	};
+	const heat = (share) => share > .66 ? "var(--heat-4)" : share > .33 ? "var(--heat-3)" : share > .12 ? "var(--heat-2)" : "var(--heat-1)";
+	const fileId = (file) => "f" + hash(file).toString(36);
+
+	document.getElementById("program").textContent = report.program;
+	document.title = `${report.program} · pina profile trace`;
+	const meta = document.getElementById("meta");
+	const addMeta = (term, value) => meta.append(el("dt", { text: term }), el("dd", { text: value }));
+	addMeta("build", report.executableSha256.slice(0, 16));
+	addMeta("recordings", `${report.recordedTraces - report.skippedTraces} of ${report.recordedTraces}`);
+	addMeta("generator", data.generator);
+
+	const notices = document.getElementById("notices");
+	for (const warning of data.warnings) notices.append(el("p", { class: "notice", text: warning }));
+	if (!report.lineInfo) notices.append(el("p", { class: "notice", text: "The traced build has no DWARF line table, so lines are unavailable." }));
+
+	const tabs = document.getElementById("tabs");
+	const tabButtons = report.instructions.map((profile, index) => {
+		const button = el("button", {
+			role: "tab",
+			id: `tab-${index}`,
+			"aria-controls": "panel",
+			"aria-selected": "false",
+			tabindex: "-1",
+			onclick: () => select(index, true),
+			onkeydown: (event) => {
+				const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+				if (!step) return;
+				event.preventDefault();
+				const next = (index + step + tabButtons.length) % tabButtons.length;
+				tabButtons[next].focus();
+				select(next, true);
+			},
+		}, profile.name, el("span", { text: `${profile.executedInstructions} CU` }));
+		tabs.append(button);
+		return button;
+	});
+
+	function buildTree(profile) {
+		const root = { name: "all", value: 0, children: new Map() };
+		for (const stack of profile.stacks) {
+			let node = root;
+			node.value += stack.executedInstructions;
+			for (const frame of stack.frames) {
+				let child = node.children.get(frame);
+				if (!child) {
+					child = { name: frame, value: 0, children: new Map() };
+					node.children.set(frame, child);
+				}
+				child.value += stack.executedInstructions;
+				node = child;
+			}
+		}
+		return root;
+	}
+
+	function renderFlame(profile) {
+		const tree = buildTree(profile);
+		const flame = document.getElementById("flame");
+		const crumbs = document.getElementById("crumbs");
+		const detail = document.getElementById("flame-detail");
+		let focus = tree;
+		const path = [tree];
+		for (const name of zoomPath) {
+			const next = focus.children.get(name);
+			if (!next) break;
+			focus = next;
+			path.push(next);
+		}
+		zoomPath = path.slice(1).map((node) => node.name);
+		clear(flame);
+		clear(crumbs);
+		path.forEach((node, depth) => {
+			crumbs.append(el("button", {
+				type: "button",
+				text: depth ? node.name : "all stacks",
+				onclick: () => { zoomPath = zoomPath.slice(0, depth); renderFlame(profile); },
+			}));
+		});
+		let maxDepth = 0;
+		const parents = new Map();
+		const place = (node, depth, offset) => {
+			const width = pct(node.value, focus.value);
+			if (width < 0.15) return;
+			maxDepth = Math.max(maxDepth, depth);
+			const label = `${node.name}: ${node.value} CU, ${fmtPct(node.value, profile.executedInstructions)} of the instruction`;
+			const button = el("button", {
+				type: "button",
+				class: "frame",
+				title: label,
+				"aria-label": label,
+				style: `left:${pct(offset, focus.value)}%;width:${width}%;top:${depth * ROW}px;background:${frameColor(node.name)}`,
+				onclick: () => {
+					zoomPath = zoomPath.concat(chainTo(node));
+					renderFlame(profile);
+				},
+				onfocus: () => { detail.value = label; },
+				onmouseenter: () => { detail.value = label; },
+			}, node.name);
+			flame.append(button);
+			let childOffset = offset;
+			const children = [...node.children.values()].sort((left, right) => right.value - left.value);
+			for (const child of children) {
+				parents.set(child, node);
+				place(child, depth + 1, childOffset);
+				childOffset += child.value;
+			}
+		};
+		const chainTo = (node) => {
+			const chain = [];
+			for (let current = node; current && current !== focus; current = parents.get(current)) chain.unshift(current.name);
+			return chain;
+		};
+		const roots = focus === tree ? [...tree.children.values()].sort((left, right) => right.value - left.value) : [focus];
+		let offset = 0;
+		for (const node of roots) {
+			place(node, 0, offset);
+			offset += node.value;
+		}
+		flame.style.height = `${(maxDepth + 1) * ROW}px`;
+		detail.value = `${focus === tree ? "All stacks" : focus.name}: ${focus.value} CU`;
+	}
+
+	function renderReadout(profile) {
+		const readout = document.getElementById("readout");
+		clear(readout);
+		const cell = (value, label) => readout.append(el("div", {}, el("b", { text: String(value) }), el("small", { text: label })));
+		cell(profile.executedInstructions, "CU executed");
+		cell(profile.syscallInvocations, "syscalls");
+		cell(profile.traceIds.length, profile.traceIds.length === 1 ? "run" : "identical runs");
+		cell(profile.lines.length, "source lines");
+	}
+
+	function renderHot(profile) {
+		const hot = document.getElementById("hot");
+		clear(hot);
+		const max = profile.lines.length ? profile.lines[0].executedInstructions : 0;
+		profile.lines.slice(0, 12).forEach((line, index) => {
+			const bar = el("span", { class: "bar" }, el("i", { style: `width:${pct(line.executedInstructions, max)}%` }));
+			hot.append(el("li", {},
+				el("span", { class: "rank", text: `#${index + 1}` }),
+				el("a", { href: `#${fileId(line.file)}-L${line.line}`, text: `${shortPath(line.file)}:${line.line}`, title: line.file, onclick: () => openFile(line.file) }),
+				el("span", { class: "num", text: `${line.executedInstructions} CU` }),
+				bar));
+		});
+		if (profile.unattributedInstructions) {
+			hot.append(el("li", {},
+				el("span", { class: "rank", text: "—" }),
+				el("span", { text: "no line information (compiler-generated code)" }),
+				el("span", { class: "num", text: `${profile.unattributedInstructions} CU` }),
+				el("span", {})));
+		}
+	}
+
+	function renderSyscalls(profile) {
+		const table = document.getElementById("syscalls");
+		const section = document.getElementById("syscall-section");
+		clear(table);
+		section.hidden = profile.syscalls.length === 0;
+		table.append(el("thead", {}, el("tr", {}, el("th", { text: "Syscall" }), el("th", { class: "num", text: "Calls" }), el("th", { text: "Called from" }))));
+		const body = el("tbody");
+		for (const syscall of profile.syscalls) {
+			const sites = profile.lines.filter((line) => line.syscalls.some((entry) => entry.name === syscall.name)).map((line) => `${shortPath(line.file)}:${line.line}`);
+			body.append(el("tr", {}, el("td", { text: syscall.name }), el("td", { class: "num", text: String(syscall.invocations) }), el("td", { text: sites.join(", ") || "no line information" })));
+		}
+		table.append(body);
+	}
+
+	function openFile(file) {
+		const details = document.getElementById(fileId(file));
+		if (details) details.open = true;
+	}
+
+	function renderSource(profile) {
+		const files = document.getElementById("files");
+		clear(files);
+		const byFile = new Map();
+		for (const line of profile.lines) {
+			const entry = byFile.get(line.file) || { total: 0, lines: new Map() };
+			entry.total += line.executedInstructions;
+			entry.lines.set(line.line, line);
+			byFile.set(line.file, entry);
+		}
+		const hottest = new Set(profile.lines.slice(0, 3).map((line) => `${line.file}:${line.line}`));
+		const maxLine = profile.lines.length ? profile.lines[0].executedInstructions : 1;
+		let opened = 0;
+		[...byFile.entries()].sort((left, right) => right[1].total - left[1].total).forEach(([file, entry]) => {
+			const source = sources[file];
+			const summary = el("summary", {},
+				el("span", { text: source ? source.displayPath : shortPath(file), title: file }),
+				el("span", { class: "num", text: `${entry.total} CU` }),
+				el("span", { class: "bar" }, el("i", { style: `width:${pct(entry.total, profile.executedInstructions)}%` })));
+			const details = el("details", { class: "file", id: fileId(file) }, summary);
+			// Open the hottest files whose source resolved; the rest stay collapsed.
+			if (source && opened < 3) {
+				details.open = true;
+				opened++;
+			}
+			const code = el("div", { class: "code" });
+			const row = (number, text) => {
+				const sample = entry.lines.get(number);
+				const cu = sample ? sample.executedInstructions : 0;
+				const share = cu / maxLine;
+				const classes = ["line"];
+				if (cu) classes.push("sampled");
+				if (hottest.has(`${file}:${number}`)) classes.push("hot-line");
+				const bar = el("span", { class: "heat", "aria-hidden": "true" });
+				if (cu) bar.append(el("i", { style: `width:${Math.max(4, 100 * share)}%;background:${heat(share)}` }));
+				const codeCell = el("code", { text: text });
+				if (sample) for (const syscall of sample.syscalls) codeCell.append(el("span", { class: "tag", text: `${syscall.name} ×${syscall.invocations}` }));
+				return el("div", { class: classes.join(" "), id: `${fileId(file)}-L${number}` },
+					el("span", { class: "cu", text: cu ? String(cu) : "" }),
+					bar,
+					el("span", { class: "no", text: String(number) }),
+					codeCell);
+			};
+			if (source) {
+				const sampled = [...entry.lines.keys()].filter((number) => number <= source.lines.length).sort((left, right) => left - right);
+				const visible = new Set();
+				for (const number of sampled) for (let near = number - CONTEXT; near <= number + CONTEXT; near++) if (near >= 1 && near <= source.lines.length) visible.add(near);
+				let number = 1;
+				while (number <= source.lines.length) {
+					if (visible.has(number)) {
+						code.append(row(number, source.lines[number - 1]));
+						number++;
+						continue;
+					}
+					const start = number;
+					while (number <= source.lines.length && !visible.has(number)) number++;
+					const end = number - 1;
+					const gap = el("button", { type: "button", class: "gap", text: `⋯ ${end - start + 1} lines (${start}–${end})` });
+					gap.addEventListener("click", () => {
+						const fragment = document.createDocumentFragment();
+						for (let hidden = start; hidden <= end; hidden++) fragment.append(row(hidden, source.lines[hidden - 1]));
+						gap.replaceWith(fragment);
+					});
+					code.append(gap);
+				}
+			} else {
+				code.append(el("p", { class: "unresolved", text: `Source unavailable for ${file}; showing sampled line numbers.` }));
+				for (const number of [...entry.lines.keys()].sort((left, right) => left - right)) code.append(row(number, ""));
+			}
+			details.append(code);
+			files.append(details);
+		});
+	}
+
+	function select(index, fromUser) {
+		const profile = report.instructions[index];
+		tabButtons.forEach((button, position) => {
+			button.setAttribute("aria-selected", String(position === index));
+			button.tabIndex = position === index ? 0 : -1;
+		});
+		document.getElementById("panel").setAttribute("aria-labelledby", `tab-${index}`);
+		zoomPath = [];
+		renderReadout(profile);
+		renderFlame(profile);
+		renderHot(profile);
+		renderSyscalls(profile);
+		renderSource(profile);
+		if (fromUser) history.replaceState(null, "", `#${encodeURIComponent(profile.name)}`);
+	}
+
+	document.addEventListener("keydown", (event) => {
+		if (event.key !== "Escape" || !zoomPath.length) return;
+		zoomPath = [];
+		const selected = tabButtons.findIndex((button) => button.getAttribute("aria-selected") === "true");
+		renderFlame(report.instructions[selected]);
+	});
+
+	const requested = decodeURIComponent(location.hash.slice(1));
+	const initial = Math.max(0, report.instructions.findIndex((profile) => profile.name === requested));
+	if (report.instructions.length) select(initial, false);
+})();
+</script>
+</body>
+</html>

@@ -6,6 +6,9 @@ use std::process::Command;
 use insta_cmd::assert_cmd_snapshot;
 use tempfile::TempDir;
 
+#[cfg(unix)]
+mod support;
+
 fn workspace_root() -> &'static Path {
 	Path::new(env!("CARGO_MANIFEST_DIR"))
 		.parent()
@@ -71,28 +74,9 @@ fn workspace_relative(path: &Path) -> String {
 fn create_fake_npx(temp_dir: &Path) -> String {
 	#[cfg(unix)]
 	{
-		use std::os::unix::fs::PermissionsExt;
-
 		let path = temp_dir.join("fake-npx.sh");
-		fs::write(&path, "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n").unwrap_or_else(
-			|error| {
-				panic!(
-					"failed to write fake npx script {}: {error}",
-					path.display()
-				)
-			},
-		);
-		let metadata = fs::metadata(&path).unwrap_or_else(|error| {
-			panic!("failed to stat fake npx script {}: {error}", path.display())
-		});
-		let mut permissions = metadata.permissions();
-		permissions.set_mode(0o755);
-		fs::set_permissions(&path, permissions).unwrap_or_else(|error| {
-			panic!(
-				"failed to set executable permissions on fake npx script {}: {error}",
-				path.display()
-			)
-		});
+		support::write_executable(&path, "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n")
+			.unwrap();
 		return workspace_relative(&path);
 	}
 
@@ -111,16 +95,7 @@ fn create_fake_npx(temp_dir: &Path) -> String {
 
 #[cfg(unix)]
 fn create_executable(path: &Path, contents: &str) {
-	use std::os::unix::fs::PermissionsExt;
-
-	fs::write(path, contents)
-		.unwrap_or_else(|error| panic!("failed to write {}: {error}", path.display()));
-	let mut permissions = fs::metadata(path)
-		.unwrap_or_else(|error| panic!("failed to stat {}: {error}", path.display()))
-		.permissions();
-	permissions.set_mode(0o755);
-	fs::set_permissions(path, permissions)
-		.unwrap_or_else(|error| panic!("failed to make {} executable: {error}", path.display()));
+	support::write_executable(path, contents).unwrap();
 }
 
 /// A throwaway Pina project wired to fake `cargo` and `surfpool` scripts.
@@ -516,6 +491,13 @@ fn profile_compare_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["profile", "compare", "--help"]);
 	assert_cmd_snapshot!("profile_compare_help", command);
+}
+
+#[test]
+fn profile_trace_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["profile", "trace", "--help"]);
+	assert_cmd_snapshot!("profile_trace_help", command);
 }
 
 #[test]
