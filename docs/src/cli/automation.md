@@ -85,11 +85,11 @@ pina profile compare /tmp/profile.json --json > /tmp/comparison.json
 jq -e '.status == "unchanged" or .status == "improved"' /tmp/comparison.json
 ```
 
-Rehearse an upgrade against recent traffic; the exit status is 2 when any transaction's outcome or written account state changes:
+Rehearse an upgrade against recent traffic. Gate on the exit status first: it is 0 only when at least one transaction was compared and none changed its outcome or written account state, 2 when behaviour changed, 3 when nothing could be compared, and 1 for an operational failure with empty stdout. A JSON check must require the same three conditions, so a report whose only changes are account state, or that compared nothing, never passes:
 
 ```bash
 pina rehearse --network devnet --json > /tmp/rehearsal.json
-jq -e '.schemaVersion == 1 and .summary.outcomeChanged == 0' /tmp/rehearsal.json
+jq -e '.schemaVersion == 1 and .summary.total > .summary.skipped and .summary.stateChanged == 0 and .summary.outcomeChanged == 0' /tmp/rehearsal.json
 ```
 
 Diagnose project readiness through the versioned JSON contract:
