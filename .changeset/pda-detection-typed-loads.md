@@ -1,5 +1,7 @@
 ---
 pina_cli: breaking
+pina_macros: docs
+pina_skill: docs
 ---
 
 # Detect PDAs behind stored bumps, typed loads, and helpers
@@ -11,6 +13,8 @@ pina_cli: breaking
 - **Helpers are followed.** When `process` passes an account field to a module-level helper function, the helper's assertions count for that field, up to four calls deep. Signers asserted inside helpers are now marked as signers too, so a client no longer builds a transaction the program rejects with `MissingRequiredSignature`. `pina explain` reports a check found in a helper at the helper's own file and line.
 
 `InstructionAccountIr::pda_name` can now be set while `is_pda` is false, for the variable-seed typed load above; `is_pda` keeps meaning that the processor pins the address.
+
+The validation guide shared by the `pina_macros` readme and the agent skill's program-authoring reference (`pina_skill`) now says that inference also reads module-level helpers and typed loads of `#[pda]` account types.
 
 ## Migrating
 
