@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getProposalActivateInstruction } from "../client";
+import {
+	getProposalActivateInstruction,
+	PROPOSAL_ACTIVATE_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -33,5 +36,5 @@ export const proposalActivateCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, PROPOSAL_ACTIVATE_COMPUTE_UNIT_LIMIT);
 	});

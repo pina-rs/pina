@@ -50,5 +50,8 @@ pub(crate) fn run(context: &CliContext, args: RemoveTagArgs) -> Result<(), CliEr
 
 	let accounts = RemoveTag { authority, profile };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(profile_program_client::instructions::REMOVE_TAG_COMPUTE_UNIT_LIMIT),
+	)
 }

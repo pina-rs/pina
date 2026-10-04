@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getAllowsDuplicateReadonlyInstruction } from "../client";
+import {
+	ALLOWS_DUPLICATE_READONLY_COMPUTE_UNIT_LIMIT,
+	getAllowsDuplicateReadonlyInstruction,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -30,5 +33,8 @@ export const allowsDuplicateReadonlyCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(
+			instruction,
+			ALLOWS_DUPLICATE_READONLY_COMPUTE_UNIT_LIMIT,
+		);
 	});

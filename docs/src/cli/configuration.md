@@ -31,6 +31,10 @@ rename = ["value:points"]
 assume_removed = []
 manual = []
 
+# Optional margin applied to recorded compute unit measurements.
+[compute_units]
+margin_percent = 20
+
 # Optional target-specific overrides. Any of output, mode, and scaffold may be set.
 [clients.cpi]
 output = "onchain/cpi"
@@ -118,6 +122,16 @@ The migration policy is not configured here. The version envelope width and the 
 ```
 
 Hand-editing the manifest, `migrations/publications.json`, or generated transition files is never allowed. Individual contracts can still opt out of a recorded policy with an explicit `migrations = false` attribute.
+
+## `[compute_units]` fields
+
+These settings turn the measurements `pina test --record-compute-units` writes to `compute-units.json` into the compute unit limits generated clients request. See [compute unit limits](./generate.md#compute-unit-limits) for the formula and what each client receives.
+
+| Field                          | Required | Default | Meaning                                                                                                                                                                                                                                            |
+| ------------------------------ | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compute_units.margin_percent` | no       | `20`    | Percentage added to each measurement before it is rounded up to a hundred and the compute budget instructions' 300 units are added. Raise it when real inputs cost more than the recorded test fixtures. `margin-percent` is accepted as an alias. |
+
+The margin applies at generation time, so changing it and running `pina generate` updates every limit without recording again.
 
 ## Generation modes
 

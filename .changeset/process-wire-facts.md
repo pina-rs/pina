@@ -1,6 +1,7 @@
 ---
 pina_abi: fix
 pina_cli: fix
+pina_skill: docs
 ---
 
 # Judge instruction process compatibility on wire facts only
@@ -13,3 +14,5 @@ Compatibility now compares wire facts only:
 - `pina migrations create`, `check`, `status`, and IDL generation compare a recorded snapshot with source the same way. A hint-only change is not drift, consumes no version, and does not rewrite the manifest: the recorded hints are carried forward until a wire change rewrites the draft or appends a version.
 
 Nothing in the document format changes, and no stored hash moves. Publication receipts pin only `schemaSha256` and `transitionSha256`, and neither covers a process hint. See ADR 0012 for the reasoning and the alternatives considered.
+
+The agent skill's migrations reference (`pina_skill`) states the same rule: `defaultValue` and `pda` are client hints that never block a published instruction.

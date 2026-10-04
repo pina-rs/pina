@@ -7,3 +7,4 @@ export 'programs/programs.dart';
 export 'types/types.dart';
 
 export 'events/events.dart';
+export 'compute_units.dart';

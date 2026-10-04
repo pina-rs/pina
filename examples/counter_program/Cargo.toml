@@ -26,7 +26,7 @@ pina = { workspace = true, features = ["account-resize", "logs", "derive"] }
 # The tests/ integration tests include src/lib.rs with #[path] (the program
 # is a cdylib only), so the pina features the included source needs must be
 # visible to the test targets too.
-mollusk-svm = { workspace = true, default-features = true }
+mollusk-svm = { workspace = true, default-features = true, features = ["register-tracing"] }
 pina = { workspace = true, features = ["account-resize", "logs", "derive"] }
 solana-account = { workspace = true, default-features = true }
 solana-instruction = { workspace = true, default-features = true }

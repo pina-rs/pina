@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"measurement": "surfpool-simulation-max",
+	"artifactSha256": "06b12b6342b1e03e2a1e76b9f2dc712cbce59ad457bc813dcae1a8c22c6b7309",
+	"instructions": {
+		"claim": {
+			"computeUnits": 18291,
+			"samples": 3
+		},
+		"deposit": {
+			"computeUnits": 24393,
+			"samples": 11
+		},
+		"initializePool": {
+			"computeUnits": 37563,
+			"samples": 13
+		},
+		"openPosition": {
+			"computeUnits": 6087,
+			"samples": 14
+		},
+		"setRewardIndex": {
+			"computeUnits": 2130,
+			"samples": 5
+		},
+		"withdraw": {
+			"computeUnits": 12586,
+			"samples": 3
+		}
+	}
+}

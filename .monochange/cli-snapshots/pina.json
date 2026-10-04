@@ -2822,7 +2822,7 @@
 			"hidden": false,
 			"max_bump": "major",
 			"summary": "Test a Pina program with fast native tests or an isolated Surfpool instance",
-			"description": "Test a Pina program with fast native tests or an isolated Surfpool instance.\n\nThe default workflow builds the actual SBF shared object, verifies that it exists, and runs the project's isolated `tests/surfpool` test package. That package owns an embedded Surfpool instance, so parallel runs use separate ports and teardown remains deterministic. Use --unit for native Rust and Mollusk tests only.",
+			"description": "Test a Pina program with fast native tests or an isolated Surfpool instance.\n\nThe default workflow builds the actual SBF shared object, verifies that it exists, and runs the project's isolated `tests/surfpool` test package. That package owns an embedded Surfpool instance, so parallel runs use separate ports and teardown remains deterministic. Use --unit for native Rust and Mollusk tests only. Use --record-compute-units to measure every instruction for the compute unit limits generated clients request.",
 			"parser": {
 				"flags_are_posix_noncompliant": false,
 				"options_must_precede_arguments": false,
@@ -2901,6 +2901,25 @@
 						"required": false,
 						"repeatable": true,
 						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--record-compute-units"
+					],
+					"canonical_name": "--record-compute-units",
+					"hidden": false,
+					"global": false,
+					"summary": "Measure every instruction in the complete Surfpool suite and write compute-units.json",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
 					}
 				}
 			]
@@ -3003,7 +3022,7 @@
 			"hidden": false,
 			"max_bump": "major",
 			"summary": "Profile compute-unit costs in a compiled SBF program",
-			"description": "Profile compute-unit costs in a compiled SBF program.\n\nPerforms static analysis of an SBF shared object. Text is written to stdout by default. Use --json for machine-readable output and --output to write either format to a file. Use `pina profile compare` to diff a saved baseline report against the current artifact.",
+			"description": "Profile compute-unit costs in a compiled SBF program.\n\nPerforms static analysis of an SBF shared object. Text is written to stdout by default. Use --json for machine-readable output and --output to write either format to a file. Use `pina profile compare` to diff a saved baseline report against the current artifact, and `pina profile trace` to measure executed compute units line by line from the project's Mollusk tests.",
 			"parser": {
 				"flags_are_posix_noncompliant": false,
 				"options_must_precede_arguments": false,
@@ -3181,6 +3200,142 @@
 							"name": "path",
 							"hidden": false,
 							"summary": "Compiled SBF shared object. Omit to discover the current project's artifact",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						}
+					]
+				},
+				{
+					"path": [
+						"profile",
+						"trace"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Measure where each instruction's compute units go, line by line",
+					"description": "Measure where each instruction's compute units go, line by line.\n\nBuilds the program with DWARF line tables, runs its Mollusk tests with register tracing, and attributes every executed SBF instruction to a source line and call stack. Prints a summary per traced instruction and writes a self-contained HTML report to <target>/pina/trace/<program>.html. The program's mollusk-svm dev-dependency must enable the `register-tracing` feature.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the project to discover",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--filter"
+							],
+							"canonical_name": "--filter",
+							"hidden": false,
+							"global": false,
+							"summary": "Run only tests whose names contain TEST (passed to `cargo test`)",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--instruction"
+							],
+							"canonical_name": "--instruction",
+							"hidden": false,
+							"global": false,
+							"summary": "Report only this instruction (any case style, or a label such as `increment #2`)",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--trace-dir"
+							],
+							"canonical_name": "--trace-dir",
+							"hidden": false,
+							"global": false,
+							"summary": "Analyze existing traces in DIR instead of building and running tests",
+							"description": "Analyze existing traces in DIR instead of building and running tests.\n\nAttribution uses the traced build from the project's last `pina profile trace`.",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit the versioned JSON document instead of the text summary",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--folded"
+							],
+							"canonical_name": "--folded",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit Brendan Gregg folded stacks for speedscope, inferno, or flamegraph.pl",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--output",
+								"-o"
+							],
+							"canonical_name": "--output",
+							"hidden": false,
+							"global": false,
+							"summary": "Write the selected output to FILE instead of stdout",
 							"value": {
 								"kind": "string",
 								"required": false,

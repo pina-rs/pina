@@ -105,5 +105,8 @@ pub(crate) fn run(context: &CliContext, args: MultisigCreateArgs) -> Result<(), 
 		member_accounts,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(multisig_program_client::instructions::MULTISIG_CREATE_COMPUTE_UNIT_LIMIT),
+	)
 }

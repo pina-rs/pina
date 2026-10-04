@@ -42,6 +42,6 @@ final class CreateCommand extends Command<void> {
       dataF32: dataF32Value,
       dataF64: dataF64Value,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: createComputeUnitLimit);
   }
 }

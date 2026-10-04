@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getDepositInstructionAsync } from "../client";
+import {
+	DEPOSIT_COMPUTE_UNIT_LIMIT,
+	getDepositInstructionAsync,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -72,5 +75,5 @@ export const depositCommand = registerGlobals(new Command("deposit"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, DEPOSIT_COMPUTE_UNIT_LIMIT);
 	});

@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getAllowsDuplicateMutableInstruction } from "../client";
+import {
+	ALLOWS_DUPLICATE_MUTABLE_COMPUTE_UNIT_LIMIT,
+	getAllowsDuplicateMutableInstruction,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -25,5 +28,8 @@ export const allowsDuplicateMutableCommand = registerGlobals(
 			...[],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(
+			instruction,
+			ALLOWS_DUPLICATE_MUTABLE_COMPUTE_UNIT_LIMIT,
+		);
 	});

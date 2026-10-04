@@ -481,15 +481,14 @@ struct ProcessWalk<'helpers, 'file> {
 	sites: Vec<AssertionSite>,
 }
 
-/// Bind pattern identifiers for `let <pat> = <expr>` forms where `<expr>`
-/// resolves to an account field.
-fn bind_let_bindings(expr: &Expr, bindings: &mut HashMap<String, String>) {
-	let Expr::Let(let_expr) = expr else {
-		return;
-	};
+/// Bring the identifiers `pat` introduces into scope: each one shadows what it
+/// meant before, and aliases `field_name` when the matched value is that
+/// account field.
+fn bind_pattern(pat: &Pat, field_name: Option<&str>, bindings: &mut HashMap<String, String>) {
+	remove_pattern_idents(pat, bindings);
 
-	if let Some(field_name) = resolve_self_field(&let_expr.expr, bindings) {
-		bind_pattern_idents(&let_expr.pat, &field_name, bindings);
+	if let Some(field_name) = field_name {
+		bind_pattern_idents(pat, field_name, bindings);
 	}
 }
 
@@ -501,6 +500,7 @@ fn bind_pattern_idents(pat: &Pat, field_name: &str, bindings: &mut HashMap<Strin
 			bindings.insert(ident.ident.to_string(), field_name.to_owned());
 		}
 		Pat::Reference(reference) => bind_pattern_idents(&reference.pat, field_name, bindings),
+		Pat::Guard(guarded) => bind_pattern_idents(&guarded.pat, field_name, bindings),
 		Pat::Type(typed) => bind_pattern_idents(&typed.pat, field_name, bindings),
 		Pat::Or(or_pattern) => {
 			for alternative in &or_pattern.cases {
@@ -538,6 +538,7 @@ fn remove_pattern_idents(pat: &Pat, bindings: &mut HashMap<String, String>) {
 			bindings.remove(&ident.ident.to_string());
 		}
 		Pat::Reference(reference) => remove_pattern_idents(&reference.pat, bindings),
+		Pat::Guard(guarded) => remove_pattern_idents(&guarded.pat, bindings),
 		Pat::Type(typed) => remove_pattern_idents(&typed.pat, bindings),
 		Pat::Or(or_pattern) => {
 			for alternative in &or_pattern.cases {
@@ -617,24 +618,23 @@ impl<'helpers, 'file> ProcessWalk<'helpers, 'file> {
 					.init
 					.as_ref()
 					.and_then(|init| resolve_self_field(&init.expr, bindings));
-				remove_pattern_idents(&local.pat, bindings);
 
-				// Aliases such as `if let Some(escrow) = &self.escrow` or
-				// `let escrow = self.escrow.as_ref()` capture an account field, so
-				// assertions written against the alias must be attributed back to
-				// the originating field.
-				if let Some(field_name) = field_name {
-					bind_pattern_idents(&local.pat, &field_name, bindings);
+				// The initializer, and the `else` block of a `let … else`, run in
+				// the enclosing scope: a name the pattern rebinds, as in
+				// `let vault = State::load_pda(vault, ..)?`, still means the old
+				// binding there.
+				if let Some(init) = &local.init {
+					self.expr(&init.expr, bindings);
+					if let Some((_, diverge)) = &init.diverge {
+						self.expr(diverge, &mut bindings.clone());
+					}
 				}
 
-				let Some(init) = &local.init else {
-					return;
-				};
-
-				self.expr(&init.expr, bindings);
-				if let Some((_, diverge)) = &init.diverge {
-					self.expr(diverge, bindings);
-				}
+				// Aliases such as `let escrow = self.escrow.as_ref()` capture an
+				// account field, so assertions written against the alias must be
+				// attributed back to the originating field. Any other name the
+				// pattern introduces shadows whatever it meant before.
+				bind_pattern(&local.pat, field_name.as_deref(), bindings);
 			}
 
 			_ => {}
@@ -681,10 +681,10 @@ impl<'helpers, 'file> ProcessWalk<'helpers, 'file> {
 			}
 
 			Expr::If(if_expr) => {
-				// An `if let` alias exists only in the `then` branch. The `else`
-				// branch and surrounding block retain their original bindings.
+				// An `if let` alias exists only in the `then` branch, so the
+				// condition binds into a copy. The `else` branch and the
+				// surrounding block keep their original bindings.
 				let mut then_bindings = bindings.clone();
-				bind_let_bindings(&if_expr.cond, &mut then_bindings);
 				self.expr(&if_expr.cond, &mut then_bindings);
 				self.stmts(&if_expr.then_branch.stmts, &mut then_bindings);
 
@@ -694,23 +694,28 @@ impl<'helpers, 'file> ProcessWalk<'helpers, 'file> {
 			}
 
 			Expr::Let(let_expr) => {
-				bind_let_bindings(expr, bindings);
+				// The scrutinee runs before the pattern binds, in the old scope.
+				let field_name = resolve_self_field(&let_expr.expr, bindings);
 				self.expr(&let_expr.expr, bindings);
+				bind_pattern(&let_expr.pat, field_name.as_deref(), bindings);
 			}
 
 			Expr::Match(match_expr) => {
+				// The scrutinee runs first. Each arm's pattern then binds, its
+				// guard (which syn keeps inside the pattern) runs with those
+				// bindings, and the body of the arm that matches runs last.
 				let scrutinee_field = resolve_self_field(&match_expr.expr, bindings);
+				self.expr(&match_expr.expr, bindings);
 
 				for arm in &match_expr.arms {
 					let mut arm_bindings = bindings.clone();
-					if let Some(field_name) = &scrutinee_field {
-						bind_pattern_idents(&arm.pat, field_name, &mut arm_bindings);
-					}
+					bind_pattern(&arm.pat, scrutinee_field.as_deref(), &mut arm_bindings);
 
+					if let Pat::Guard(guarded) = &arm.pat {
+						self.expr(&guarded.guard, &mut arm_bindings);
+					}
 					self.expr(&arm.body, &mut arm_bindings);
 				}
-
-				self.expr(&match_expr.expr, bindings);
 			}
 
 			Expr::Call(call) => {
@@ -2084,6 +2089,164 @@ mod tests {
 		);
 
 		assert!(fields["flagged"].properties.is_signer);
+	}
+
+	#[test]
+	fn helper_let_initializers_use_the_parameter_they_shadow() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					check(self.state)?;
+					Ok(())
+				}
+			}
+
+			fn check(state: &AccountView) -> ProgramResult {
+				let state = State::load_checked_pda(state, &ID)?;
+				Ok(())
+			}
+		"#,
+		);
+
+		assert!(fields["state"].properties.is_pda);
+		assert_eq!(account_types(&fields["state"]), ["State"]);
+	}
+
+	#[test]
+	fn helper_let_initializers_follow_helpers_on_the_parameter_they_shadow() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					authorize(self.authority)?;
+					Ok(())
+				}
+			}
+
+			fn authorize(account: &AccountView) -> ProgramResult {
+				let account = require_signer(account)?;
+				account.assert_writable()?;
+				Ok(())
+			}
+
+			fn require_signer(account: &AccountView) -> Result<&AccountView, ProgramError> {
+				account.assert_signer()
+			}
+		"#,
+		);
+		let authority = &fields["authority"].properties;
+
+		assert!(authority.is_signer);
+		// The returned value is a new local, not a known account field.
+		assert!(!authority.is_writable);
+	}
+
+	#[test]
+	fn process_let_initializers_use_the_alias_they_shadow() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let vault = self.vault;
+					let vault = PoolVault::load_pda_mut(vault, &ID)?;
+					vault.assert_signer()?;
+					Ok(())
+				}
+			}
+		"#,
+		);
+		let vault = &fields["vault"];
+
+		assert!(vault.properties.is_pda && vault.properties.is_writable);
+		assert_eq!(account_types(vault), ["PoolVault"]);
+		assert!(!vault.properties.is_signer);
+	}
+
+	#[test]
+	fn let_else_blocks_run_before_the_pattern_binds() {
+		let fields = facts_for(
+			r#"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let payer = self.payer;
+					let Some(payer) = lookup(data) else {
+						payer.assert_signer()?;
+						let payer = self.fallback;
+						return Err(ProgramError::InvalidArgument);
+					};
+					payer.assert_writable()?;
+					let Some(escrow) = self.escrow.as_ref() else {
+						return Err(ProgramError::NotEnoughAccountKeys);
+					};
+					escrow.assert_writable()?;
+					Ok(())
+				}
+			}
+		"#,
+		);
+
+		assert!(fields["payer"].properties.is_signer);
+		assert!(!fields["payer"].properties.is_writable);
+		assert!(fields.get("fallback").is_none());
+		assert!(fields["escrow"].properties.is_writable);
+	}
+
+	#[test]
+	fn if_let_patterns_shadow_names_only_after_the_condition() {
+		let source = r"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					let vault = self.vault;
+					if let Some(vault) = lookup(vault.assert_writable()?) {
+						vault.assert_signer()?;
+					}
+					vault.assert_owner(&ID)?;
+					Ok(())
+				}
+			}
+		";
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let site = |method: &str, line| ("vault".to_owned(), method.to_owned(), line, None);
+
+		assert_eq!(
+			sites_of(&[&file]),
+			[site("assert_writable", 5), site("assert_owner", 8)]
+		);
+	}
+
+	#[test]
+	fn match_scrutinees_run_before_guards_and_arms() {
+		let source = r"
+			impl<'a> ProcessAccountInfos<'a> for MyAccounts<'a> {
+				fn process(self, data: &[u8]) -> ProgramResult {
+					match self.config.assert_owner(&ID)?.address() {
+						_ => self.payer.assert_signer()?,
+					}
+					match self.escrow.as_ref() {
+						Some(escrow) if escrow.assert_writable().is_ok() => escrow.assert_signer()?,
+						_ => {}
+					}
+					Ok(())
+				}
+			}
+		";
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let site =
+			|field: &str, method: &str, line| (field.to_owned(), method.to_owned(), line, None);
+
+		assert_eq!(
+			sites_of(&[&file]),
+			[
+				site("config", "assert_owner", 4),
+				site("config", "address", 4),
+				site("payer", "assert_signer", 5),
+				site("escrow", "as_ref", 7),
+				site("escrow", "assert_writable", 8),
+				site("escrow", "is_ok", 8),
+				site("escrow", "assert_signer", 8),
+			]
+		);
 	}
 
 	#[test]

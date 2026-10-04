@@ -13,6 +13,14 @@
 /// Same layout as `CpiTransferInstruction` but with a different discriminator
 /// byte.
 pub const DIRECT_TRANSFER_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `DirectTransfer` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const DIRECT_TRANSFER_MEASURED_COMPUTE_UNITS: u32 = 205;
+/// Compute unit limit to request for a transaction carrying `DirectTransfer`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const DIRECT_TRANSFER_COMPUTE_UNIT_LIMIT: u32 = 600;
 
 /// Accounts.
 #[derive(Clone, Debug)]

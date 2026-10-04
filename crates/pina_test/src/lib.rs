@@ -5,6 +5,7 @@
 //! Surfnet also requests shutdown from `Drop`, including during a panic.
 
 use std::ffi::OsString;
+use std::fmt::Write as _;
 use std::fs::OpenOptions;
 use std::future::Future;
 use std::io::Write as _;
@@ -598,6 +599,40 @@ impl ProgramTest {
 		)
 	}
 
+	/// Submit and confirm a legacy transaction carrying several instructions in
+	/// order, such as a compute-budget instruction followed by a program one.
+	///
+	/// The payer is always the fee payer and first signer; callers provide only
+	/// the additional signers. The transaction is not recorded for the
+	/// benchmark harness, because its consumption is not one instruction's.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, signing, submission, or
+	/// confirmation fails.
+	pub fn send_instructions(
+		&self,
+		instructions: &[Instruction],
+		signers: &[&dyn Signer],
+	) -> Result<Signature, TestError> {
+		self.surfnet.send_instructions(instructions, signers)
+	}
+
+	/// Simulate a legacy transaction carrying `instructions` and return the
+	/// compute units it consumed, which is exactly the limit it needs.
+	///
+	/// # Errors
+	///
+	/// Returns an error when signing or simulation fails, or when the simulated
+	/// transaction fails.
+	pub fn simulate_compute_units(
+		&self,
+		instructions: &[Instruction],
+		signers: &[&dyn Signer],
+	) -> Result<u64, TestError> {
+		self.surfnet.simulate_compute_units(instructions, signers)
+	}
+
 	/// Install exact historical account bytes owned by this program.
 	///
 	/// # Errors
@@ -1157,26 +1192,44 @@ impl OfflineSurfnet {
 			format,
 		)?;
 
-		if let (Some(program), Some(discriminator)) = (benchmark_program, data.first().copied()) {
-			let SimulationOutcome {
-				logs, units, error, ..
-			} = self.simulate(
+		if let Some(program) = benchmark_program.filter(|_| !data.is_empty()) {
+			self.record_transaction_compute_units(
+				program,
 				Instruction::new_with_bytes(program_id, data, accounts),
 				format,
 			)?;
-			if let Some(error) = error {
-				return Err(test_error(
-					"simulate program instruction",
-					format_args!("{error}\n{}", logs.join("\n")),
-				));
-			}
-			let compute_units = units.ok_or_else(|| {
-				test_error("record compute units", "simulation omitted compute units")
-			})?;
-			record_units(program, discriminator, compute_units)?;
 		}
 
 		self.submit_transaction(&transaction)
+	}
+
+	/// Simulate one instruction in `format` and record what it consumed.
+	///
+	/// A failed simulation is recorded as unsuccessful rather than returned,
+	/// so the caller still submits the transaction and a test that expects a
+	/// rejection sees the same execution error with or without recording.
+	fn record_transaction_compute_units(
+		&self,
+		program: &str,
+		instruction: Instruction,
+		format: &TransactionFormat,
+	) -> Result<(), TestError> {
+		if std::env::var_os("PINA_CU_RECORD_FILE").is_none() {
+			return Ok(());
+		}
+
+		let data = instruction.data.clone();
+		let SimulationOutcome { units, error, .. } = self.simulate(instruction, format)?;
+		let compute_units = units.ok_or_else(|| {
+			test_error("record compute units", "simulation omitted compute units")
+		})?;
+
+		write_compute_units(&ComputeUnitSample {
+			program,
+			data: &data,
+			compute_units,
+			success: error.is_none(),
+		})
 	}
 
 	fn send_instruction_with_signers_inner(
@@ -1186,26 +1239,100 @@ impl OfflineSurfnet {
 		record_program: Option<&str>,
 	) -> Result<Signature, TestError> {
 		let rpc = self.inner.rpc_client();
+		let data = instruction.data.clone();
+		let transaction = self.sign_legacy_transaction(&[instruction], signers)?;
+
+		if let Some(program) = record_program.filter(|_| !data.is_empty()) {
+			record_compute_units(&rpc, &transaction, program, &data)?;
+		}
+
+		rpc.send_and_confirm_transaction(&transaction)
+			.map_err(execution_error)
+	}
+
+	/// Sign a legacy transaction carrying `instructions` with the payer first.
+	fn sign_legacy_transaction(
+		&self,
+		instructions: &[Instruction],
+		signers: &[&dyn Signer],
+	) -> Result<Transaction, TestError> {
+		let rpc = self.inner.rpc_client();
 		let payer = self.inner.payer();
-		let benchmark_discriminator = instruction.data.first().copied();
 		let mut transaction_signers: Vec<&dyn Signer> = Vec::with_capacity(signers.len() + 1);
 		transaction_signers.push(payer);
 		transaction_signers.extend_from_slice(signers);
 		let blockhash = rpc
 			.get_latest_blockhash()
 			.map_err(|error| test_error("fetch latest blockhash", error))?;
-		let message = Message::new(&[instruction], Some(&payer.pubkey()));
+		let message = Message::new(instructions, Some(&payer.pubkey()));
 		let mut transaction = Transaction::new_unsigned(message);
 		transaction
 			.try_sign(&transaction_signers, blockhash)
 			.map_err(|error| test_error("sign program transaction", error))?;
 
-		if let (Some(program), Some(discriminator)) = (record_program, benchmark_discriminator) {
-			record_compute_units(&rpc, &transaction, program, discriminator)?;
+		Ok(transaction)
+	}
+
+	/// Sign, submit, and confirm a legacy transaction carrying several
+	/// instructions, in order, with the payer as fee payer and first signer.
+	///
+	/// Nothing is recorded for the benchmark harness: a sample measures one
+	/// instruction, and this transaction's consumption is the sum of all of
+	/// them.
+	///
+	/// # Errors
+	///
+	/// Returns an error when blockhash retrieval, signing, submission, or
+	/// confirmation fails.
+	pub fn send_instructions(
+		&self,
+		instructions: &[Instruction],
+		signers: &[&dyn Signer],
+	) -> Result<Signature, TestError> {
+		let transaction = self.sign_legacy_transaction(instructions, signers)?;
+
+		self.inner
+			.rpc_client()
+			.send_and_confirm_transaction(&transaction)
+			.map_err(execution_error)
+	}
+
+	/// Simulate a legacy transaction carrying `instructions` and return the
+	/// compute units it consumed.
+	///
+	/// This is the figure a transaction's compute unit limit has to cover: a
+	/// transaction whose limit is lower fails, and one whose limit is equal or
+	/// higher has the units it needs.
+	///
+	/// # Errors
+	///
+	/// Returns an error when signing or simulation fails, when the simulated
+	/// transaction fails (with its logs), or when the runtime reports no
+	/// consumption.
+	pub fn simulate_compute_units(
+		&self,
+		instructions: &[Instruction],
+		signers: &[&dyn Signer],
+	) -> Result<u64, TestError> {
+		let transaction = self.sign_legacy_transaction(instructions, signers)?;
+		let simulation = self
+			.inner
+			.rpc_client()
+			.simulate_transaction(&transaction)
+			.map_err(|error| test_error("simulate transaction", error))?
+			.value;
+
+		if let Some(error) = simulation.err {
+			let logs = simulation.logs.unwrap_or_default().join("\n");
+			return Err(test_error(
+				"simulate transaction",
+				format_args!("{error}\n{logs}"),
+			));
 		}
 
-		rpc.send_and_confirm_transaction(&transaction)
-			.map_err(execution_error)
+		simulation
+			.units_consumed
+			.ok_or_else(|| test_error("simulate transaction", "simulation omitted compute units"))
 	}
 
 	/// Submit exact historical bytes and account metas to `program_id`.
@@ -1462,21 +1589,70 @@ fn wire_bytes(transaction: &VersionedTransaction) -> Result<Vec<u8>, TestError> 
 	Ok(wire)
 }
 
-/// Record one measured compute-unit figure for the benchmark harness.
-fn record_units(program: &str, discriminator: u8, compute_units: u64) -> Result<(), TestError> {
-	write_compute_units(program, discriminator, compute_units)
+/// How many leading instruction-data bytes a compute-unit sample keeps.
+///
+/// Pina discriminators are at most eight bytes wide, so this prefix always
+/// contains the whole discriminator whatever width the program declares. The
+/// consumer, which knows the width from the program source, decides how many
+/// of these bytes identify the instruction.
+const RECORDED_DISCRIMINATOR_BYTES: usize = 8;
+
+/// One simulated single-instruction transaction, as the compute-unit record
+/// stores it.
+struct ComputeUnitSample<'data> {
+	/// Benchmark name of the program under measurement.
+	program: &'data str,
+	/// The instruction's complete data; its prefix identifies the instruction.
+	data: &'data [u8],
+	/// Compute units the simulation charged.
+	compute_units: u64,
+	/// Whether the simulated transaction succeeded. A failed transaction
+	/// usually stops early, so its figure says nothing about what the
+	/// instruction costs when it does its work.
+	success: bool,
+}
+
+impl ComputeUnitSample<'_> {
+	/// The JSON line appended to the record file.
+	///
+	/// `discriminator` (the first byte) stays for the benchmark harness, which
+	/// keys single-byte discriminators by it. `discriminatorBytes` carries
+	/// enough of the data to identify a discriminator of any width.
+	fn record(&self) -> serde_json::Value {
+		let prefix = &self.data[..self.data.len().min(RECORDED_DISCRIMINATOR_BYTES)];
+		let discriminator_bytes =
+			prefix
+				.iter()
+				.fold(String::with_capacity(prefix.len() * 2), |mut hex, byte| {
+					let _ = write!(hex, "{byte:02x}");
+					hex
+				});
+
+		serde_json::json!({
+			"program": self.program,
+			"discriminator": self.data.first(),
+			"discriminatorBytes": discriminator_bytes,
+			"computeUnits": self.compute_units,
+			"success": self.success,
+		})
+	}
 }
 
 /// Record the compute units a legacy-encoded transaction consumed.
+///
+/// The transaction is simulated first, so a sample exists whether or not it
+/// succeeds; the record marks which, and the caller still submits the
+/// transaction and reports its real outcome.
 fn record_compute_units(
 	rpc: &solana_rpc_client::rpc_client::RpcClient,
 	transaction: &impl SerializableTransaction,
 	program: &str,
-	discriminator: u8,
+	data: &[u8],
 ) -> Result<(), TestError> {
-	let Some(output) = std::env::var_os("PINA_CU_RECORD_FILE") else {
+	if std::env::var_os("PINA_CU_RECORD_FILE").is_none() {
 		return Ok(());
-	};
+	}
+
 	let simulation = rpc
 		.simulate_transaction(transaction)
 		.map_err(|error| test_error("simulate program instruction", error))?;
@@ -1485,23 +1661,19 @@ fn record_compute_units(
 		.units_consumed
 		.ok_or_else(|| test_error("record compute units", "simulation omitted compute units"))?;
 
-	drop(output);
-	write_compute_units(program, discriminator, compute_units)
+	write_compute_units(&ComputeUnitSample {
+		program,
+		data,
+		compute_units,
+		success: simulation.value.err.is_none(),
+	})
 }
 
-fn write_compute_units(
-	program: &str,
-	discriminator: u8,
-	compute_units: u64,
-) -> Result<(), TestError> {
+fn write_compute_units(sample: &ComputeUnitSample<'_>) -> Result<(), TestError> {
 	let Some(output) = std::env::var_os("PINA_CU_RECORD_FILE") else {
 		return Ok(());
 	};
-	let record = serde_json::json!({
-		"program": program,
-		"discriminator": discriminator,
-		"computeUnits": compute_units,
-	});
+	let record = sample.record();
 	let _guard = BENCHMARK_RECORD_LOCK
 		.lock()
 		.unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -1943,6 +2115,154 @@ mod tests {
 				.install_historical_account(&changed)
 				.unwrap_or_else(|error| panic!("mutate historical fixture: {error}"));
 			assert!(surfnet.assert_accounts_match(&snapshots).is_err());
+
+			surfnet
+				.stop()
+				.unwrap_or_else(|error| panic!("stop offline Surfpool test instance: {error}"));
+		});
+	}
+
+	/// The compute budget program, which sets a transaction's limits.
+	const COMPUTE_BUDGET_PROGRAM: Pubkey =
+		Pubkey::from_str_const("ComputeBudget111111111111111111111111111111");
+
+	/// `ComputeBudgetInstruction::SetComputeUnitLimit(units)`.
+	fn set_compute_unit_limit(units: u64) -> Instruction {
+		let units = u32::try_from(units).unwrap_or_else(|error| panic!("limit fits u32: {error}"));
+		let mut data = vec![2];
+		data.extend_from_slice(&units.to_le_bytes());
+
+		Instruction::new_with_bytes(COMPUTE_BUDGET_PROGRAM, &data, Vec::new())
+	}
+
+	/// `ComputeBudgetInstruction::SetComputeUnitPrice(micro_lamports)`.
+	fn set_compute_unit_price(micro_lamports: u64) -> Instruction {
+		let mut data = vec![3];
+		data.extend_from_slice(&micro_lamports.to_le_bytes());
+
+		Instruction::new_with_bytes(COMPUTE_BUDGET_PROGRAM, &data, Vec::new())
+	}
+
+	/// The smallest limit, at or above `floor`, a transaction carrying the
+	/// limit instruction followed by `rest` succeeds with.
+	///
+	/// Scans upward one unit at a time from `floor`, so the answer is the exact
+	/// boundary rather than a bracket.
+	fn smallest_passing_limit(surfnet: &OfflineSurfnet, floor: u64, rest: &[Instruction]) -> u64 {
+		for limit in floor..floor + 1_000 {
+			let mut instructions = vec![set_compute_unit_limit(limit)];
+			instructions.extend_from_slice(rest);
+
+			if surfnet.simulate_compute_units(&instructions, &[]).is_ok() {
+				return limit;
+			}
+		}
+
+		panic!("no limit within 1,000 units of {floor} let the transaction succeed");
+	}
+
+	#[test]
+	fn records_the_full_discriminator_prefix_and_the_outcome() {
+		let sample = ComputeUnitSample {
+			program: "counter_program",
+			data: &[9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+			compute_units: 1_234,
+			success: false,
+		};
+
+		assert_eq!(
+			sample.record(),
+			serde_json::json!({
+				"program": "counter_program",
+				"discriminator": 9,
+				"discriminatorBytes": "0908070605040302",
+				"computeUnits": 1_234,
+				"success": false,
+			})
+		);
+
+		let short = ComputeUnitSample {
+			program: "counter_program",
+			data: &[1],
+			compute_units: 81,
+			success: true,
+		};
+		assert_eq!(short.record()["discriminatorBytes"], "01");
+		assert_eq!(short.record()["success"], true);
+	}
+
+	/// Find, by search rather than by assumption, what a compute-budget
+	/// instruction adds to a transaction's consumption.
+	///
+	/// A transaction's limit has to cover every instruction it carries,
+	/// including the compute-budget instructions that set the limit and the
+	/// priority fee. This measures one instruction alone, then finds the
+	/// smallest limit that still succeeds once each compute-budget instruction
+	/// is added. `pina_cli`'s `COMPUTE_BUDGET_OVERHEAD` is the sum of the two
+	/// costs pinned here.
+	#[test]
+	fn each_compute_budget_instruction_costs_150_compute_units() {
+		run(async {
+			let mut surfnet = OfflineSurfnet::start()
+				.await
+				.unwrap_or_else(|error| panic!("start offline Surfpool test instance: {error}"));
+			let recipient = Pubkey::new_from_array([7; 32]);
+			let transfer = surfnet.transfer_instruction(&recipient, 1_000_000_000);
+			let measured = surfnet
+				.simulate_compute_units(std::slice::from_ref(&transfer), &[])
+				.unwrap_or_else(|error| panic!("measure the transfer alone: {error}"));
+
+			let with_limit = smallest_passing_limit(&surfnet, 0, std::slice::from_ref(&transfer));
+			let with_limit_and_price =
+				smallest_passing_limit(&surfnet, 0, &[set_compute_unit_price(1), transfer.clone()]);
+
+			assert_eq!(with_limit - measured, 150, "SetComputeUnitLimit cost");
+			assert_eq!(
+				with_limit_and_price - with_limit,
+				150,
+				"SetComputeUnitPrice cost"
+			);
+
+			// The boundary is exact: one unit less fails with the budget
+			// exhausted, and the exact limit lands the transaction.
+			let error = surfnet
+				.send_instructions(
+					&[set_compute_unit_limit(with_limit - 1), transfer.clone()],
+					&[],
+				)
+				.expect_err("a limit one unit short must fail");
+			assert!(
+				matches!(
+					error.transaction_error(),
+					Some(TransactionError::InstructionError(
+						1,
+						InstructionError::ComputationalBudgetExceeded
+					))
+				),
+				"unexpected failure: {error}"
+			);
+			surfnet
+				.send_instructions(&[set_compute_unit_limit(with_limit), transfer], &[])
+				.unwrap_or_else(|error| panic!("the exact limit must succeed: {error}"));
+
+			surfnet
+				.stop()
+				.unwrap_or_else(|error| panic!("stop offline Surfpool test instance: {error}"));
+		});
+	}
+
+	#[test]
+	fn simulating_a_failed_transaction_reports_its_error() {
+		run(async {
+			let mut surfnet = OfflineSurfnet::start()
+				.await
+				.unwrap_or_else(|error| panic!("start offline Surfpool test instance: {error}"));
+			let invalid = Instruction::new_with_bytes(system_program_id(), &[9, 0], Vec::new());
+
+			let error = surfnet
+				.simulate_compute_units(&[invalid], &[])
+				.expect_err("an invalid system instruction must fail simulation");
+			assert_eq!(error.operation(), "simulate transaction");
 
 			surfnet
 				.stop()

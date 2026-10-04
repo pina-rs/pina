@@ -428,16 +428,7 @@ mod tests {
 
 	#[cfg(unix)]
 	fn executable(path: &Path, contents: &str) {
-		use std::os::unix::fs::PermissionsExt;
-
-		std::fs::write(path, contents)
-			.unwrap_or_else(|error| panic!("failed to write fake command: {error}"));
-		let mut permissions = std::fs::metadata(path)
-			.unwrap_or_else(|error| panic!("failed to stat fake command: {error}"))
-			.permissions();
-		permissions.set_mode(0o755);
-		std::fs::set_permissions(path, permissions)
-			.unwrap_or_else(|error| panic!("failed to chmod fake command: {error}"));
+		crate::test_support::write_executable(path, contents).unwrap();
 	}
 
 	#[test]

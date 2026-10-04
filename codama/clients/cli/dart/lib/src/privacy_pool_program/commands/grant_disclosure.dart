@@ -50,6 +50,8 @@ final class GrantDisclosureCommand extends Command<void> {
       viewer: viewer,
       reserved: reservedValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: grantDisclosureComputeUnitLimit);
   }
 }

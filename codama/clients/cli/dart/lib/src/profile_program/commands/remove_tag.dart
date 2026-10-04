@@ -48,6 +48,6 @@ final class RemoveTagCommand extends Command<void> {
       profile: profile,
       index: indexValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: removeTagComputeUnitLimit);
   }
 }

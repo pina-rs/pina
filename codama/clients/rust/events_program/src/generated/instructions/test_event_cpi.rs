@@ -9,6 +9,14 @@
 )]
 
 pub const TEST_EVENT_CPI_DISCRIMINATOR: u8 = 2u8;
+/// Compute units `TestEventCpi` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const TEST_EVENT_CPI_MEASURED_COMPUTE_UNITS: u32 = 263;
+/// Compute unit limit to request for a transaction carrying `TestEventCpi`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const TEST_EVENT_CPI_COMPUTE_UNIT_LIMIT: u32 = 700;
 
 /// Accounts.
 #[derive(Clone, Debug)]

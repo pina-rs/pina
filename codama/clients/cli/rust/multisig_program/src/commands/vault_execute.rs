@@ -52,5 +52,8 @@ pub(crate) fn run(context: &CliContext, args: VaultExecuteArgs) -> Result<(), Cl
 		message_accounts,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(multisig_program_client::instructions::VAULT_EXECUTE_COMPUTE_UNIT_LIMIT),
+	)
 }

@@ -63,6 +63,6 @@ final class ResizeCommand extends Command<void> {
       entryCount: entryCountValue,
       markerCount: markerCountValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: resizeComputeUnitLimit);
   }
 }

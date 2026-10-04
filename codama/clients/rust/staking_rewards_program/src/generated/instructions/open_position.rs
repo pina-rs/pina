@@ -9,6 +9,14 @@
 )]
 
 pub const OPEN_POSITION_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `OpenPosition` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const OPEN_POSITION_MEASURED_COMPUTE_UNITS: u32 = 6087;
+/// Compute unit limit to request for a transaction carrying `OpenPosition`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const OPEN_POSITION_COMPUTE_UNIT_LIMIT: u32 = 7700;
 
 /// Accounts.
 #[derive(Clone, Debug)]

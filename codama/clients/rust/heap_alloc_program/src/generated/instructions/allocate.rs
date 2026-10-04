@@ -10,6 +10,14 @@
 
 /// Instruction data for `Allocate`.
 pub const ALLOCATE_DISCRIMINATOR: u8 = 0u8;
+/// Compute units `Allocate` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const ALLOCATE_MEASURED_COMPUTE_UNITS: u32 = 158;
+/// Compute unit limit to request for a transaction carrying `Allocate`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const ALLOCATE_COMPUTE_UNIT_LIMIT: u32 = 500;
 
 /// Accounts.
 #[derive(Clone, Debug)]
