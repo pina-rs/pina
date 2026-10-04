@@ -59,6 +59,7 @@ walkdir = { workspace = true, default-features = true }
 insta = { workspace = true, features = ["json"], default-features = true }
 insta-cmd = { workspace = true, default-features = true }
 object = { features = ["write", "elf", "std"], workspace = true, default-features = true }
+pina = { workspace = true }
 serde_json = { workspace = true, default-features = true }
 
 [lints]

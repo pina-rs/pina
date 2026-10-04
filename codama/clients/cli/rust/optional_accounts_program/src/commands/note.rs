@@ -37,5 +37,8 @@ pub(crate) fn run(context: &CliContext, args: NoteArgs) -> Result<(), CliError> 
 		note: Some(note),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(optional_accounts_program_client::instructions::NOTE_COMPUTE_UNIT_LIMIT),
+	)
 }

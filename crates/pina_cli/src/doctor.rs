@@ -1025,7 +1025,7 @@ fn sanitized_first_line(bytes: &[u8]) -> Option<String> {
 	))
 }
 
-fn escape_controls(value: &str) -> String {
+pub(crate) fn escape_controls(value: &str) -> String {
 	let mut escaped = String::with_capacity(value.len());
 
 	for character in value.chars() {

@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getRequestDisclosureInstruction } from "../client";
+import {
+	getRequestDisclosureInstruction,
+	REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -80,5 +83,5 @@ export const requestDisclosureCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT);
 	});

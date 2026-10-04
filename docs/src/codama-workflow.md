@@ -47,6 +47,19 @@ Generation is driven entirely by the Pina CLI. `pina generate` discovers a proje
 
 For project-aware generation, `[clients]` in `pina.toml` controls `mode` (`auto`, `create`, `update`, or `overwrite`) and `scaffold`, with optional overrides under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, and `[clients.dart]`. Dart is also the Flutter target. Update mode replaces only generated sources, so user-owned manifests and entrypoints can be customized without being rewritten. See [Project Configuration](./cli/configuration.md) for the complete schema.
 
+### Compute unit budgets
+
+Every example commits a `compute-units.json` recorded by `pina test --record-compute-units`: the most compute units each instruction consumed in a successful Surfpool simulation. IDL generation attaches each measurement and the limit derived from it as a `pinaComputeUnits` plugin node on the instruction (`{ "measured": 379, "limit": 800 }`). Codama's validators and the upstream JavaScript and Dart renderers carry plugin nodes through untouched, so the IDLs stay standard Codama.
+
+The Rust renderer turns each plugin into `<NAME>_MEASURED_COMPUTE_UNITS` and `<NAME>_COMPUTE_UNIT_LIMIT` constants plus a crate-level `set_compute_unit_limit_instruction`. Pina's post-processing adds the same constants and a `get<Program>ComputeUnitLimit(instructions)` helper to the TypeScript and Dart clients, and the generated CLIs request each instruction's limit automatically. An instruction no successful test sent has no measurement, and its clients request the runtime default. See [compute unit limits](./cli/generate.md#compute-unit-limits) for the formula and the staleness warning.
+
+After changing an example, record again before regenerating so its limits describe the current program:
+
+```bash
+pina test --record-compute-units --project examples/counter_program
+pina generate --project examples/counter_program --npx node
+```
+
 ### Solana Kit dependencies
 
 Pina pins `codama-renderers-dart@0.5.6`, which includes upstream support for pre/post-offset collection length codecs, and uses Solana Kit Dart packages at `">=0.10.0 <1.0.0"` — the range the generated sources are verified against. This preserves shared compact headers with multiple dynamic tails in addition to schema normalization, package exports, discriminator enforcement, exact instruction decoding, capacity-aware account decoding, fixed-capacity overflow rejection, canonical boolean, option, and UTF-8 codecs, and wide-enum support. No renderer patch or renderer-specific dependency override is required.

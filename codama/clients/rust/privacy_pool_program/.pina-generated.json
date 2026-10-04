@@ -12,6 +12,7 @@
 		"src/generated/accounts/pool_vault.rs",
 		"src/generated/accounts/requester_registry.rs",
 		"src/generated/accounts/verifying_key_account.rs",
+		"src/generated/compute_budget.rs",
 		"src/generated/errors/mod.rs",
 		"src/generated/errors/privacy_pool_program.rs",
 		"src/generated/instructions/approve_disclosure.rs",

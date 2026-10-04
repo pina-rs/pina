@@ -1,4 +1,8 @@
-<!-- {@pinaIdlCanonicalExamples} -->
+# Pina IDL
+
+## Source Shapes That Extract Cleanly
+
+<!-- {=pinaIdlCanonicalExamples} -->
 
 ### Multi-file layout
 
@@ -89,6 +93,24 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 }
 ```
 
+The equivalent client-visible constraints can be declared next to the fields:
+
+```rust
+#[derive(Accounts)]
+pub struct InitializeAccounts<'a> {
+	#[pina(validate(signer))]
+	pub authority: &'a AccountView,
+
+	#[pina(validate(writable))]
+	pub state: &'a AccountView,
+
+	#[pina(validate(program = system::ID))]
+	pub system_program: &'a AccountView,
+}
+```
+
+Value bounds, owners, data lengths, relationships, and custom hooks remain runtime-only because Codama does not represent them as instruction account metadata.
+
 ### PDA seed helpers
 
 ```rust
@@ -138,12 +160,14 @@ pub struct MyState {
 
 <!-- {/pinaIdlCanonicalExamples} -->
 
-<!-- {@pinaIdlDispatchSupport} -->
+## Extractor Coverage
+
+<!-- {=pinaIdlDispatchSupport} -->
 
 The extractor currently supports these dispatch shapes:
 
+- Generated dispatch: an `#[discriminator(entrypoint)]` enum, whose variants route to `VariantAccounts` unless `#[dispatch(accounts = OtherAccounts)]` overrides them
 - Canonical routed arms: `Variant => Accounts::try_from((program_id, accounts))?.process(data)`
-- Legacy routed arms: `Variant => Accounts::try_from(accounts)?.process(data)`
 - Grouped routed arms: `VariantA | VariantB => SharedAccounts::try_from((program_id, accounts))?.process(data)`
 - Versioned routed arms: `Variant => Instruction::process_versioned(Accounts::try_from((program_id, accounts))?, data)`, the form a hand-written dispatcher uses for an instruction that keeps its migration envelope
 - Accountless arms: `Variant => { let _ = Payload::try_from_bytes(data)?; Ok(()) }`
@@ -151,22 +175,24 @@ The extractor currently supports these dispatch shapes:
 
 Keep in mind:
 
-- Account metadata is inferred for both routed conversion forms. The conversion is read wherever the arm performs it, including when it is bound to a local first. An arm that converts into two different structs has no single account layout and is emitted without accounts. New code should use `Accounts::try_from((program_id, accounts))` so optional slots can recognize the executing program's address.
-- Signer/PDA/default-account inference still depends on direct `self.field.assert_*()` chains inside `impl ProcessAccountInfos`. A field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
-- Writable inference comes from either direct `assert_writable()` chains or mutable `#[derive(Accounts)]` fields such as `&'a mut AccountView`.
+- Account metadata is inferred from the `Accounts::try_from((program_id, accounts))` conversion an arm performs. The conversion is read wherever the arm performs it, including when it is bound to a local first. An arm that converts into two different structs has no single account layout and is emitted without accounts.
+- Signer, writable, and known default-account metadata can be declared with `#[pina(validate(...))]` on `#[derive(Accounts)]` fields. PDA inference still depends on direct validation calls and a field inferred as a PDA must resolve to a declared `#[pda]`; generation fails instead of emitting an incomplete link.
+- Existing direct `assert_signer()`, `assert_writable()`, `assert_address()`, and PDA validation-chain inference remains supported. Writable inference also comes from mutable fields such as `&'a mut AccountView`.
 - If you hide routing or validation behind helper layers, instruction nodes may still exist, but account metadata becomes less complete.
-- Multiple files containing `process_instruction`, malformed or unresolved `#[pda]` attributes, missing package names, and missing unconditional modules are rejected as ambiguous or incomplete inputs.
+- Multiple files containing `process_instruction` or an `#[discriminator(entrypoint)]` enum, malformed or unresolved `#[pda]` attributes, missing package names, and missing unconditional modules are rejected as ambiguous or incomplete inputs.
 
 <!-- {/pinaIdlDispatchSupport} -->
 
-<!-- {@pinaIdlVerificationContract} -->
+## Verification Contract
+
+<!-- {=pinaIdlVerificationContract} -->
 
 `test:idl` treats the generated IDL as an API contract. It checks that:
 
-- every example regenerates deterministically into `codama/idls`, `codama/clients/js`, `codama/clients/rust`, `codama/clients/cpi`, and `codama/clients/dart`
+- every example regenerates deterministically into `codama/idls` and the `codama/clients` tree with `pina generate`
 - generated JSON passes Codama's JS validator
 - generated JS clients typecheck
-- generated Rust clients compile
+- generated Rust, CPI, and Rust CLI clients compile, and the Rust CLI crates pass their tests
 - generated Dart clients resolve with the lockfile, format cleanly, pass static analysis, and pass codec contract tests
 - for every example, generated instruction/account/error counts match the source declarations:
   - `#[instruction]`
@@ -177,9 +203,46 @@ That last count-parity check is important because it catches silent extraction r
 
 <!-- {/pinaIdlVerificationContract} -->
 
-<!-- {@pinaDiscriminatorLayoutDecisionMatrix} -->
+<!-- {=pinaIdlProgramMetadata} -->
 
-## Discriminator layout decision matrix
+## Canonical on-chain IDLs
+
+The existing `pina idl` generation command also provides explicit lifecycle subcommands:
+
+```text
+pina idl generate
+pina idl fetch --cluster <CLUSTER> [--program-id <ADDRESS>]
+pina idl diff --cluster <CLUSTER> [--program-id <ADDRESS>]
+pina idl publish --cluster <CLUSTER> --authority <KEYPAIR>
+```
+
+Bare `pina idl [OPTIONS]` is unchanged and remains equivalent to `pina idl generate [OPTIONS]`.
+
+Publication uses the canonical `idl` seed with direct zlib-compressed UTF-8 JSON. Pina validates the complete Codama document and requires its `program.publicKey` to match the target. Network commands always require an explicit cluster.
+
+The transaction planner is the pinned official package `@solana-program/program-metadata@0.9.0`, invoked through an npx-compatible runner without a shell. `npx` may download that exact version when it is not cached. The adapter was cross-checked against upstream commit `33eb527e124cc4a09d8aae448cd306a9bd87db14`.
+
+Use export mode to inspect or multisig-sign every planned transaction without submitting:
+
+```text
+pina idl publish --cluster mainnet-beta --authority ./authority.json --export
+pina idl publish --cluster mainnet-beta --file ./idl.json \
+  --export <MULTISIG_AUTHORITY> --export-encoding base58 --output ./idl-plan.txt
+```
+
+The output preserves every `[Transaction #N]` block from the official planner. An export authority is a noop signer; it does not require or accept a local authority/payer secret.
+
+Fetch uses raw mode and locally performs bounded zlib, UTF-8, JSON, Codama-schema, and program-address validation. URL/external-account metadata and alternate encodings fail closed rather than causing an unexpected outbound request.
+
+See the mdBook chapter **Pina CLI → Generate and publish IDLs** for authority, rent, buffer, RPC, multisig, exit-status, and failure-recovery details.
+
+<!-- {/pinaIdlProgramMetadata} -->
+
+## Discriminator Layouts
+
+<!-- {=pinaDiscriminatorLayoutDecisionMatrix} -->
+
+### Discriminator layout decision matrix
 
 The discriminator strategy determines byte layout, parser guarantees, and cross-protocol compatibility.
 
@@ -203,10 +266,11 @@ The discriminator strategy determines byte layout, parser guarantees, and cross-
 - Discriminator width only affects the first field bytes.
 - Widths above 8 are rejected at macro expansion time.
 - Wider discriminators improve variant space, but increase CPI payload and account rent by the exact number of bytes.
+- These widths describe discriminators only. The migration version envelope is a separate setting and accepts `u8`, `u16`, or `u32` — never `u64`.
 
 <!-- {/pinaDiscriminatorLayoutDecisionMatrix} -->
 
-<!-- {@pinaDiscriminatorVersionCompatibility} -->
+<!-- {=pinaDiscriminatorVersionCompatibility} -->
 
 ## Discriminators and ABI migrations
 

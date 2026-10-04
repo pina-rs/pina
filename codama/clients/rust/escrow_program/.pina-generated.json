@@ -3,6 +3,7 @@
 		"Cargo.toml",
 		"src/generated/accounts/escrow_state.rs",
 		"src/generated/accounts/mod.rs",
+		"src/generated/compute_budget.rs",
 		"src/generated/errors/escrow_program.rs",
 		"src/generated/errors/mod.rs",
 		"src/generated/instructions/cancel.rs",

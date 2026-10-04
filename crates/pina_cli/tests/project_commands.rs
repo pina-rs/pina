@@ -1031,6 +1031,146 @@ fn generate_rust_override_skips_node_and_deduplicates_clients() {
 	assert!(String::from_utf8_lossy(&output.stdout).contains("Generated 1 client(s)"));
 }
 
+fn compute_units_json(artifact_sha256: &str) -> String {
+	format!(
+		r#"{{
+	"schemaVersion": 1,
+	"measurement": "surfpool-simulation-max",
+	"artifactSha256": "{artifact_sha256}",
+	"instructions": {{
+		"initialize": {{
+			"computeUnits": 1200,
+			"samples": 3
+		}}
+	}}
+}}
+"#
+	)
+}
+
+#[test]
+fn generate_gives_clients_recorded_limits_and_warns_when_the_build_changed() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	let measurements = project.join("compute-units.json");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+	let generate = || {
+		project_command(&project, &cargo, &target)
+			.args(["generate", "--client", "rust"])
+			.output()
+			.unwrap_or_else(|error| panic!("failed to run generate command: {error}"))
+	};
+
+	let build = project_command(&project, &cargo, &target)
+		.arg("build")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run build command: {error}"));
+	assert!(build.status.success());
+
+	// SHA-256 of a different build than the `compiled-sbf` one just published.
+	fs::write(
+		&measurements,
+		compute_units_json("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+	)
+	.unwrap_or_else(|error| panic!("failed to write compute-units.json: {error}"));
+	let stale = generate();
+	let stderr = String::from_utf8_lossy(&stale.stderr);
+	assert!(stale.status.success(), "generation failed: {stderr}");
+	assert!(stderr.contains("was measured against a different build"));
+	assert!(stderr.contains("pina test --record-compute-units"));
+	let initialize = fs::read_to_string(
+		project.join("clients/rust/custom_program/src/generated/instructions/initialize.rs"),
+	)
+	.unwrap_or_else(|error| panic!("failed to read the generated instruction: {error}"));
+	assert!(initialize.contains("pub const INITIALIZE_COMPUTE_UNIT_LIMIT: u32 = 1800;"));
+	assert!(
+		project
+			.join("clients/rust/custom_program/src/generated/compute_budget.rs")
+			.is_file()
+	);
+
+	// SHA-256 of `compiled-sbf`, the build that is current.
+	fs::write(
+		&measurements,
+		compute_units_json("bc4dc0430d4d4b3fe0ccf1a150a8981c45bcc90db35a0fc3b00429c47cfbb9ab"),
+	)
+	.unwrap_or_else(|error| panic!("failed to write compute-units.json: {error}"));
+	let current = generate();
+	assert!(current.status.success());
+	assert!(!String::from_utf8_lossy(&current.stderr).contains("different build"));
+
+	fs::write(&measurements, "{").unwrap_or_else(|error| panic!("failed to corrupt: {error}"));
+	let corrupt = generate();
+	assert!(!corrupt.status.success());
+	assert!(String::from_utf8_lossy(&corrupt.stderr).contains("compute-units.json"));
+}
+
+#[test]
+fn stale_measurements_warn_on_build_and_stop_only_client_generation() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+	fs::write(
+		project.join("compute-units.json"),
+		r#"{"schemaVersion":1,"measurement":"surfpool-simulation-max","instructions":{"initialize":{"computeUnits":1200,"samples":3},"renamed":{"computeUnits":10,"samples":1}}}"#,
+	)
+	.unwrap_or_else(|error| panic!("failed to write compute-units.json: {error}"));
+
+	// The build keeps the declared instruction's budget and warns about the
+	// stale one.
+	let build = project_command(&project, &cargo, &target)
+		.arg("build")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run build command: {error}"));
+	let stderr = String::from_utf8_lossy(&build.stderr);
+	assert!(build.status.success(), "build failed: {stderr}");
+	assert!(stderr.lines().any(|line| {
+		line.starts_with("warning: ")
+			&& line.contains(
+				"compute-units.json measures `renamed`, which the program does not declare, so \
+				 those budgets are ignored",
+			)
+	}));
+	let idl = fs::read_to_string(target.join("idl/custom_program.json"))
+		.unwrap_or_else(|error| panic!("failed to read the built IDL: {error}"));
+	assert!(idl.contains("\"limit\": 1800"));
+	assert_eq!(idl.matches("pinaComputeUnits").count(), 1);
+
+	// Committed clients would silently lose the budget, so generation refuses
+	// and leads with the remedies.
+	let generate = project_command(&project, &cargo, &target)
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generate command: {error}"));
+	let stderr = String::from_utf8_lossy(&generate.stderr);
+	assert!(!generate.status.success());
+	assert!(stderr.contains(
+		"compute-units.json measures `renamed`, which the program does not declare. Run `pina \
+		 test --record-compute-units` to measure the current instructions, or remove the stale \
+		 entries"
+	));
+	assert!(!project.join("clients/rust/custom_program").exists());
+
+	// A file that cannot be read is not stale, so the build still refuses it.
+	fs::write(project.join("compute-units.json"), "{")
+		.unwrap_or_else(|error| panic!("failed to corrupt compute-units.json: {error}"));
+	let corrupt = project_command(&project, &cargo, &target)
+		.arg("build")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run build command: {error}"));
+	let stderr = String::from_utf8_lossy(&corrupt.stderr);
+	assert!(!corrupt.status.success());
+	assert!(
+		stderr.contains("IDL generation failed for `hyphen-package`"),
+		"{stderr}"
+	);
+	assert!(stderr.contains("compute-units.json"), "{stderr}");
+}
+
 #[test]
 fn generate_uses_pina_toml_to_create_a_standalone_cpi_crate() {
 	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));

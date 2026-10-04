@@ -1,0 +1,24 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction 63T6XGyihfHKThEZFe36L5LkmAqJ8uVaqzQ6Po4ovSZPzCCDKk5h8EJGHdyQFP5sbbDwbW2csgfXWbWZWrXDjD7f (slot 61, from file)
+Instruction #0 failed: check_policy (CheckAccounts) in validation_program
+Error: MissingRequiredSignature
+
+Most likely cause:
+  authority: signer [confirmed] at src/lib.rs:214
+    account #0 (9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu) is not a signer of this transaction
+
+Accounts:
+  #   field           signer  writable  address
+  0   authority       no      no        9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  1   policy          no      no        GyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse
+  2   audit           yes     yes       AKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9
+  3   system_program  no      no        11111111111111111111111111111111
+
+Program logs (last 3 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 76 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: missing required signature for instruction

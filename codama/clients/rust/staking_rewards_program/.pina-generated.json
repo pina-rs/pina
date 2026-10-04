@@ -4,6 +4,7 @@
 		"src/generated/accounts/mod.rs",
 		"src/generated/accounts/pool_state.rs",
 		"src/generated/accounts/position_state.rs",
+		"src/generated/compute_budget.rs",
 		"src/generated/errors/mod.rs",
 		"src/generated/errors/staking_rewards_program.rs",
 		"src/generated/instructions/claim.rs",

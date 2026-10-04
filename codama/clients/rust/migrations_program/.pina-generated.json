@@ -5,6 +5,7 @@
 		"src/generated/accounts/manual_state.rs",
 		"src/generated/accounts/mod.rs",
 		"src/generated/accounts/state.rs",
+		"src/generated/compute_budget.rs",
 		"src/generated/events/mod.rs",
 		"src/generated/events/value_changed_event.rs",
 		"src/generated/events/value_changed_event_v0.rs",

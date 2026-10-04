@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getConfigInitializeInstructionAsync } from "../client";
+import {
+	CONFIG_INITIALIZE_COMPUTE_UNIT_LIMIT,
+	getConfigInitializeInstructionAsync,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -40,5 +43,5 @@ export const configInitializeCommand = registerGlobals(
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, CONFIG_INITIALIZE_COMPUTE_UNIT_LIMIT);
 	});

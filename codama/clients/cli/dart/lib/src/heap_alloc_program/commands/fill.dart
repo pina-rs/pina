@@ -36,6 +36,6 @@ final class FillCommand extends Command<void> {
       bytes: bytesValue,
       fill: fillValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: fillComputeUnitLimit);
   }
 }

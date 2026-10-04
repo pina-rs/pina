@@ -42,6 +42,7 @@
 		"lib/src/compact_accounts_program/commands/write.dart",
 		"lib/src/compact_accounts_program/context.dart",
 		"lib/src/compact_accounts_program/main.dart",
+		"lib/src/compute_budget.dart",
 		"lib/src/counter_program/commands/commands.dart",
 		"lib/src/counter_program/commands/fetch.dart",
 		"lib/src/counter_program/commands/increment.dart",
@@ -226,6 +227,7 @@
 		"lib/src/vesting_program/commands/initialize.dart",
 		"lib/src/vesting_program/context.dart",
 		"lib/src/vesting_program/main.dart",
+		"test/compute_budget_test.dart",
 		"test/endpoint_guard_test.dart"
 	]
 }

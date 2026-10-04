@@ -1,6 +1,7 @@
 {
 	"paths": [
 		"Cargo.toml",
+		"src/generated/compute_budget.rs",
 		"src/generated/events/mod.rs",
 		"src/generated/events/my_event.rs",
 		"src/generated/events/my_other_event.rs",

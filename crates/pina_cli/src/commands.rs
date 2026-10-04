@@ -117,6 +117,22 @@ pub(crate) fn run(cli: Cli) {
 			command,
 		} => run_keys(&path, keypair.as_deref(), json, command.as_ref()),
 		Commands::Doctor { path, json } => run_doctor(&path, json),
+		Commands::Explain {
+			signature,
+			transaction_file,
+			network,
+			rpc_url,
+			project,
+			json,
+		} => {
+			let input = unwrap_or_exit(explain_input(
+				signature,
+				transaction_file,
+				network,
+				rpc_url.as_deref(),
+			));
+			run_explain(project, input, json);
+		}
 		Commands::Completions { shell } => {
 			generate(shell, &mut Cli::command(), "pina", &mut std::io::stdout());
 		}
@@ -125,7 +141,14 @@ pub(crate) fn run(cli: Cli) {
 			unit,
 			compatibility,
 			filter,
-		} => run_test(project, unit, compatibility, filter),
+			record_compute_units,
+		} => {
+			if record_compute_units {
+				run_record_compute_units(&project, compatibility);
+			} else {
+				run_test(project, unit, compatibility, filter);
+			}
+		}
 		Commands::Dev {
 			project,
 			network,
@@ -645,6 +668,56 @@ fn run_doctor(path: &Path, json: bool) {
 	}
 }
 
+/// Map the explain flags onto a transaction input.
+///
+/// A signature always needs an endpoint and defaults to localnet. A file needs
+/// none; an explicit network or URL adds current-state checks.
+fn explain_input(
+	signature: Option<String>,
+	transaction_file: Option<PathBuf>,
+	network: Option<pina_cli::explain::Network>,
+	rpc_url: Option<&str>,
+) -> Result<pina_cli::explain::TransactionInput, pina_cli::explain::ExplainError> {
+	use pina_cli::explain::Network;
+	use pina_cli::explain::RpcEndpoint;
+	use pina_cli::explain::TransactionInput;
+
+	let endpoint = match (rpc_url, network) {
+		(Some(url), _) => Some(RpcEndpoint::custom(url)?),
+		(None, Some(network)) => Some(RpcEndpoint::network(network)),
+		(None, None) => None,
+	};
+
+	Ok(match (signature, transaction_file) {
+		(Some(signature), _) => {
+			TransactionInput::Signature {
+				signature,
+				endpoint: endpoint.unwrap_or_else(|| RpcEndpoint::network(Network::Localnet)),
+			}
+		}
+		(None, path) => {
+			TransactionInput::File {
+				// Clap's required `transaction` group guarantees a signature or a
+				// file, and an empty path would fail to read rather than pass.
+				path: path.unwrap_or_default(),
+				endpoint,
+			}
+		}
+	})
+}
+
+fn run_explain(project: PathBuf, input: pina_cli::explain::TransactionInput, json: bool) {
+	let report = unwrap_or_exit(pina_cli::explain::explain(
+		&pina_cli::explain::ExplainOptions { project, input },
+	));
+
+	if json {
+		print_json(&report);
+	} else {
+		print!("{}", report.render_text());
+	}
+}
+
 /// Print the auto-policy and build-script notices shared by `create` and `sync`.
 fn print_migration_notices(output: &pina_cli::migrations::CreateMigrationsOutput) {
 	use pina_cli::migrations::BuildScriptStatus;
@@ -1158,6 +1231,59 @@ fn run_test(project: PathBuf, unit: bool, compatibility: bool, filter: Option<St
 		eprintln!("{} {}", "Error".red().bold(), error);
 		std::process::exit(error.exit_code());
 	}
+}
+
+fn run_record_compute_units(project: &Path, compatibility: bool) {
+	let recording = match pina_cli::workflow::record_compute_units(project, compatibility) {
+		Ok(recording) => recording,
+		Err(error) => {
+			eprintln!("{} {}", "Error".red().bold(), error);
+			std::process::exit(error.exit_code());
+		}
+	};
+
+	println!(
+		"{} Recorded compute units for {} instruction(s) in {}",
+		"✔".green(),
+		recording.measured.len(),
+		recording.path.display(),
+	);
+
+	if !recording.unmeasured.is_empty() {
+		eprintln!(
+			"{} no successful Surfpool test sent {}; generated clients keep the runtime default \
+			 limit for them. Exercise them through `ProgramTest::send` to record a budget.",
+			"warning:".yellow().bold(),
+			backticked(&recording.unmeasured),
+		);
+	}
+
+	if !recording.unmatched.is_empty() {
+		eprintln!(
+			"{} {} recorded instruction data prefix(es) match no instruction discriminator: {}",
+			"warning:".yellow().bold(),
+			recording.unmatched.len(),
+			backticked(&recording.unmatched),
+		);
+	}
+
+	if recording.failed_samples > 0 {
+		println!(
+			"Skipped {} sample(s) from transactions that failed; only successful runs set a budget.",
+			recording.failed_samples,
+		);
+	}
+
+	println!("Run `pina generate` to give the clients the new limits.");
+}
+
+/// Join names as a comma-separated list of code spans.
+fn backticked(names: &[String]) -> String {
+	names
+		.iter()
+		.map(|name| format!("`{name}`"))
+		.collect::<Vec<_>>()
+		.join(", ")
 }
 
 fn run_dev(

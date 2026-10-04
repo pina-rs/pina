@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use clap::ArgGroup;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
@@ -524,6 +525,72 @@ pub(crate) enum Commands {
 		json: bool,
 	},
 
+	/// Explain why a transaction to the current program failed.
+	///
+	/// Reconstructs which `#[derive(Accounts)]` field and which rule most likely
+	/// failed from the transaction (its account flags, error, and logs) and the
+	/// program source, with `path:line` locations. The diagnosis runs off-chain,
+	/// so programs keep their bare error codes and pay no size or compute units
+	/// for it. A produced explanation exits 0, including for a transaction that
+	/// succeeded; a fetch, file, or project failure exits 1.
+	#[command(
+		after_help = "Examples:\n  pina explain <SIGNATURE>\n  pina explain <SIGNATURE> --network \
+		              devnet\n  pina explain <SIGNATURE> --rpc-url http://127.0.0.1:8899 --json\n  \
+		              pina explain --transaction-file ./failed.json\n  pina explain \
+		              --transaction-file ./failed.json --network devnet --project \
+		              ./programs/counter\n\nConfidence:\n  confirmed: provable from the transaction \
+		              alone (signer and writable flags, account counts, duplicate keys, known \
+		              addresses).\n  checked_against_current_state: fails against account state \
+		              read after the transaction; the state may have changed since.\n  possible: \
+		              can return this error but needs runtime values (PDA seeds, argument rules, \
+		              custom expressions).\n\nInputs:\n  A signature is fetched with getTransaction \
+		              at confirmed commitment. --transaction-file reads a saved getTransaction \
+		              result or full JSON-RPC response and works offline; add --network or \
+		              --rpc-url to also check rules against current account state.\n\nNetwork \
+		              safety:\n  The default network is localnet. Pina never queries mainnet unless \
+		              --network mainnet or --rpc-url names it. RPC URLs with credentials, query \
+		              parameters, or fragments are rejected, plaintext http is accepted only for \
+		              a loopback host, redirects are not followed, and no request is retried.",
+		group(ArgGroup::new("transaction").required(true).args(["signature", "transaction_file"]))
+	)]
+	Explain {
+		/// Signature of the transaction to explain.
+		#[arg(value_name = "SIGNATURE")]
+		signature: Option<String>,
+
+		/// Read a saved getTransaction result or JSON-RPC response instead of fetching.
+		#[arg(long, value_name = "PATH")]
+		transaction_file: Option<PathBuf>,
+
+		/// Cluster to query. Defaults to localnet when fetching a signature.
+		#[arg(
+			long,
+			value_enum,
+			conflicts_with = "rpc_url",
+			hide_possible_values = true,
+			value_name = "localnet|devnet|testnet|mainnet"
+		)]
+		network: Option<pina_cli::explain::Network>,
+
+		/// Credential-free HTTP(S) JSON-RPC URL to query instead of a named network.
+		#[arg(long, value_name = "URL")]
+		rpc_url: Option<String>,
+
+		/// Directory inside the program project. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Emit a stable machine-readable JSON document.
+		#[arg(long)]
+		json: bool,
+	},
+
 	/// Generate shell completion scripts.
 	///
 	/// Writes the selected completion script to stdout so it can be redirected,
@@ -544,16 +611,23 @@ pub(crate) enum Commands {
 	/// exists, and runs the project's isolated `tests/surfpool` test package. That
 	/// package owns an embedded Surfpool instance, so parallel runs use separate
 	/// ports and teardown remains deterministic. Use --unit for native Rust and
-	/// Mollusk tests only.
+	/// Mollusk tests only. Use --record-compute-units to measure every
+	/// instruction for the compute unit limits generated clients request.
 	#[command(
 		after_help = "Examples:\n  pina test\n  pina test --filter initialize\n  pina test \
-		              --unit\n  pina test --compatibility\n  pina test --unit --filter \
-		              rejects_wrong_owner\n\nTest layers:\n  --unit keeps the fast native/Mollusk \
-		              loop and does not build SBF.\n  The default builds SBF and runs the ignored \
-		              test in the isolated `tests/surfpool` package.\n\nSafety:\n  Embedded \
-		              Surfpool tests allocate isolated ports and must stop their instance before \
-		              returning. Missing SBF artifacts and incomplete Surfpool test packages are \
-		              hard failures."
+		              --unit\n  pina test --compatibility\n  pina test --record-compute-units\n  \
+		              pina test --unit --filter rejects_wrong_owner\n\nTest layers:\n  --unit \
+		              keeps the fast native/Mollusk loop and does not build SBF.\n  The default \
+		              builds SBF and runs the ignored test in the isolated `tests/surfpool` \
+		              package.\n\nCompute units:\n  --record-compute-units runs the complete \
+		              Surfpool suite and writes compute-units.json beside Cargo.toml: the most \
+		              compute units each instruction consumed in a successful simulation. `pina \
+		              generate` turns each measurement into the limit clients request, adding \
+		              [compute_units] margin_percent (default 20) and the compute budget \
+		              instructions' cost. Commit the file with the clients it produced.\n\nSafety:\n  \
+		              Embedded Surfpool tests allocate isolated ports and must stop their \
+		              instance before returning. Missing SBF artifacts and incomplete Surfpool \
+		              test packages are hard failures."
 	)]
 	Test {
 		/// Project directory or a directory below it. Defaults to the current directory.
@@ -577,6 +651,10 @@ pub(crate) enum Commands {
 		/// Run only tests whose names contain FILTER.
 		#[arg(short, long, value_name = "FILTER")]
 		filter: Option<String>,
+
+		/// Measure every instruction in the complete Surfpool suite and write compute-units.json.
+		#[arg(long, conflicts_with_all = ["unit", "filter"])]
+		record_compute_units: bool,
 	},
 
 	/// Start a persistent Surfpool development network with SBF watch and redeploy.

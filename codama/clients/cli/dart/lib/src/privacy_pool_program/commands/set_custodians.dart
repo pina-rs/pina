@@ -53,6 +53,8 @@ final class SetCustodiansCommand extends Command<void> {
       custodianRegistry: custodianRegistry,
       custodians: custodiansValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: setCustodiansComputeUnitLimit);
   }
 }

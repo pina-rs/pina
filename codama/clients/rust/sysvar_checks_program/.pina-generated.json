@@ -1,6 +1,7 @@
 {
 	"paths": [
 		"Cargo.toml",
+		"src/generated/compute_budget.rs",
 		"src/generated/instructions/mod.rs",
 		"src/generated/instructions/sysvars.rs",
 		"src/generated/mod.rs",

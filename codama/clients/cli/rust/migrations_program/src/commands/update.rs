@@ -67,5 +67,8 @@ pub(crate) fn run(context: &CliContext, args: UpdateArgs) -> Result<(), CliError
 		compact_state: Some(compact_state),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(migrations_program_client::instructions::UPDATE_COMPUTE_UNIT_LIMIT),
+	)
 }

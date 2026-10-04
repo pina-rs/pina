@@ -9,6 +9,14 @@
 )]
 
 pub const PROPOSAL_CREATE_DISCRIMINATOR: u8 = 4u8;
+/// Compute units `ProposalCreate` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const PROPOSAL_CREATE_MEASURED_COMPUTE_UNITS: u32 = 15435;
+/// Compute unit limit to request for a transaction carrying `ProposalCreate`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const PROPOSAL_CREATE_COMPUTE_UNIT_LIMIT: u32 = 18900;
 
 /// Accounts.
 #[derive(Clone, Debug)]

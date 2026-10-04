@@ -9,6 +9,14 @@
 )]
 
 pub const ROTATE_AUTHORITY_DISCRIMINATOR: u8 = 2u8;
+/// Compute units `RotateAuthority` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const ROTATE_AUTHORITY_MEASURED_COMPUTE_UNITS: u32 = 118;
+/// Compute unit limit to request for a transaction carrying `RotateAuthority`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const ROTATE_AUTHORITY_COMPUTE_UNIT_LIMIT: u32 = 500;
 
 /// Accounts.
 #[derive(Clone, Debug)]

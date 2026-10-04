@@ -67,6 +67,8 @@ final class InitializeCommand extends Command<void> {
       entryCount: entryCountValue,
       markerCount: markerCountValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializeComputeUnitLimit);
   }
 }

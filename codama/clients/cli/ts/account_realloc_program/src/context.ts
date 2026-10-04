@@ -5,6 +5,7 @@
 import {
 	type Address,
 	appendTransactionMessageInstructions,
+	type BlockhashLifetimeConstraint,
 	createKeyPairSignerFromBytes,
 	createSolanaRpc,
 	createTransactionMessage,
@@ -14,6 +15,7 @@ import {
 	isAddress,
 	type KeyPairSigner,
 	pipe,
+	setTransactionMessageComputeUnitLimit,
 	setTransactionMessageFeePayerSigner,
 	setTransactionMessageLifetimeUsingBlockhash,
 	signAndSendTransactionMessageWithSigners,
@@ -39,7 +41,11 @@ export interface GlobalOptions {
 	programId?: string;
 	simulate?: boolean;
 	json?: boolean;
+	computeUnitLimit?: string;
 }
+
+/** The most compute units a transaction may request. */
+export const MAX_COMPUTE_UNIT_LIMIT = 1_400_000;
 
 /** Registers the shared global options on one commander command. */
 export function registerGlobals(command: Command): Command {
@@ -54,7 +60,11 @@ export function registerGlobals(command: Command): Command {
 			"--simulate",
 			"Simulate the transaction and print logs instead of sending.",
 		)
-		.option("--json", "Print machine-readable JSON output.");
+		.option("--json", "Print machine-readable JSON output.")
+		.option(
+			"--compute-unit-limit <units>",
+			"Compute unit limit to request instead of the one recorded for the instruction.",
+		);
 }
 
 export class CliError extends Error {}
@@ -65,6 +75,8 @@ export class CliContext {
 	readonly programAddress: Address;
 	readonly simulate: boolean;
 	readonly json: boolean;
+	/** `--compute-unit-limit`, which replaces every instruction's recorded limit. */
+	readonly computeUnitLimit: number | undefined;
 	private readonly cluster: string;
 
 	private constructor(
@@ -73,6 +85,7 @@ export class CliContext {
 		programAddress: Address,
 		simulate: boolean,
 		json: boolean,
+		computeUnitLimit: number | undefined,
 		cluster: string,
 	) {
 		this.rpc = rpc;
@@ -80,6 +93,7 @@ export class CliContext {
 		this.programAddress = programAddress;
 		this.simulate = simulate;
 		this.json = json;
+		this.computeUnitLimit = computeUnitLimit;
 		this.cluster = cluster;
 	}
 
@@ -95,25 +109,35 @@ export class CliContext {
 		const programAddress = options.programId
 			? pubkey("--program-id", options.programId)
 			: ("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS" as Address);
+		const computeUnitLimit = parseComputeUnitLimit(options.computeUnitLimit);
 		return new CliContext(
 			rpc,
 			payer,
 			programAddress,
 			options.simulate ?? false,
 			options.json ?? false,
+			computeUnitLimit,
 			clusterOf(endpoint),
 		);
 	}
 
-	async send(instruction: Instruction): Promise<void> {
+	/**
+	 * Send or simulate one instruction, printing the result.
+	 *
+	 * `recordedLimit` is the compute unit limit the IDL records for the
+	 * instruction. `--compute-unit-limit` replaces it; with neither, the
+	 * transaction requests no limit and the runtime default applies.
+	 */
+	async send(instruction: Instruction, recordedLimit?: number): Promise<void> {
+		const computeUnitLimit = this.computeUnitLimit ?? recordedLimit;
 		const { value: latestBlockhash } = await this.rpc
 			.getLatestBlockhash()
 			.send();
-		const message = pipe(
-			createTransactionMessage({ version: 0 }),
-			(m) => setTransactionMessageFeePayerSigner(this.payer, m),
-			(m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
-			(m) => appendTransactionMessageInstructions([instruction], m),
+		const message = buildTransactionMessage(
+			this.payer,
+			latestBlockhash,
+			instruction,
+			computeUnitLimit,
 		);
 
 		if (this.simulate) {
@@ -128,16 +152,25 @@ export class CliContext {
 				.send();
 			const result = simulation.value;
 			const logs = result.logs ?? [];
+			// The RPC reports consumption as a bigint, which JSON cannot encode;
+			// it never exceeds the transaction limit, so a number is exact.
+			const unitsConsumed = result.unitsConsumed === undefined
+				? null
+				: Number(result.unitsConsumed);
 			if (this.json) {
 				console.log(
-					JSON.stringify({ logs, unitsConsumed: result.unitsConsumed }),
+					JSON.stringify({
+						logs,
+						unitsConsumed,
+						computeUnitLimit: computeUnitLimit ?? null,
+					}),
 				);
 			} else {
 				for (const log of logs) {
 					console.log(log);
 				}
-				if (result.unitsConsumed != null) {
-					console.log(`Consumed ${result.unitsConsumed} compute units`);
+				if (unitsConsumed !== null) {
+					console.log(consumptionSummary(unitsConsumed, computeUnitLimit));
 				}
 			}
 			if (result.err != null) {
@@ -162,6 +195,54 @@ export class CliContext {
 			console.log(`https://explorer.solana.com/tx/${signature58}${suffix}`);
 		}
 	}
+}
+
+/**
+ * The transaction message a command sends: one `SetComputeUnitLimit` first
+ * when a limit is requested, then the command's instruction.
+ */
+export function buildTransactionMessage(
+	payer: KeyPairSigner,
+	latestBlockhash: BlockhashLifetimeConstraint,
+	instruction: Instruction,
+	computeUnitLimit: number | undefined,
+) {
+	return pipe(
+		createTransactionMessage({ version: 0 }),
+		(m) => setTransactionMessageFeePayerSigner(payer, m),
+		(m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
+		(m) => setTransactionMessageComputeUnitLimit(computeUnitLimit, m),
+		(m) => appendTransactionMessageInstructions([instruction], m),
+	);
+}
+
+/**
+ * Parse `--compute-unit-limit`: a whole number of compute units from 1 to
+ * the transaction maximum, or `undefined` when the flag is absent.
+ */
+export function parseComputeUnitLimit(
+	value: string | undefined,
+): number | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	const units = Number(value);
+	if (!/^[0-9]+$/.test(value) || units < 1 || units > MAX_COMPUTE_UNIT_LIMIT) {
+		throw new CliError(
+			`--compute-unit-limit must be a whole number from 1 to ${MAX_COMPUTE_UNIT_LIMIT}`,
+		);
+	}
+	return units;
+}
+
+/** How much of the requested budget a simulation consumed. */
+export function consumptionSummary(
+	consumed: number,
+	computeUnitLimit: number | undefined,
+): string {
+	return computeUnitLimit === undefined
+		? `Consumed ${consumed} compute units (no limit requested; the runtime default applies)`
+		: `Consumed ${consumed} of ${computeUnitLimit} requested compute units`;
 }
 
 export function pubkey(flag: string, value: string): Address {

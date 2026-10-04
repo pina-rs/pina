@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getClaimInstruction } from "../client";
+import { CLAIM_COMPUTE_UNIT_LIMIT, getClaimInstruction } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -48,5 +48,5 @@ export const claimCommand = registerGlobals(new Command("claim"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, CLAIM_COMPUTE_UNIT_LIMIT);
 	});

@@ -172,6 +172,49 @@ fn rendering_without_a_scaffold_writes_and_tracks_sources_only() {
 }
 
 #[test]
+fn requests_the_client_limit_only_for_measured_instructions()
+-> Result<(), Box<dyn std::error::Error>> {
+	let command_for = |plugins: &str| -> Result<String, Box<dyn std::error::Error>> {
+		let json = format!(
+			concat!(
+				r#"{{"kind":"rootNode","standard":"codama","version":"1.0.0","#,
+				r#""program":{{"kind":"programNode","name":"counterProgram","#,
+				r#""publicKey":"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS","version":"0.0.0","#,
+				r#""instructions":[{{"kind":"instructionNode","name":"makeOffer","accounts":[],"#,
+				r#""arguments":[],"plugins":[{plugins}]}}],"accounts":[],"pdas":[]}}}}"#
+			),
+			plugins = plugins,
+		);
+		let root: codama_nodes::RootNode = serde_json::from_str(&json)?;
+		let model = super::model::CliModel::from_root(&root)?;
+		let mut files = render_files(&model, "fixture-client")?;
+
+		Ok(files
+			.remove("src/commands/make_offer.rs")
+			.ok_or("the instruction renders a command")?)
+	};
+
+	let measured = command_for(
+		r#"{"kind":"pluginNode","name":"pinaComputeUnits","payload":{"measured":379,"limit":800}}"#,
+	)?;
+	assert!(
+		measured.contains(
+			"context.send(accounts.instruction(data), \
+			 Some(fixture_client::instructions::MAKE_OFFER_COMPUTE_UNIT_LIMIT))"
+		),
+		"{measured}"
+	);
+
+	let unmeasured = command_for(r#"{"kind":"pluginNode","name":"anchor"}"#)?;
+	assert!(
+		unmeasured.contains("context.send(accounts.instruction(data), None)"),
+		"{unmeasured}"
+	);
+
+	Ok(())
+}
+
+#[test]
 fn render_root_node_enforces_modes_and_safety() {
 	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
 	let temp_root = fs::canonicalize(temp.path())

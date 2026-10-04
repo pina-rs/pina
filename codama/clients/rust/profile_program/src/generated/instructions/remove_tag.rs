@@ -10,6 +10,14 @@
 
 /// Instruction data for `RemoveTag`. Removes the tag at `index`.
 pub const REMOVE_TAG_DISCRIMINATOR: u8 = 3u8;
+/// Compute units `RemoveTag` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const REMOVE_TAG_MEASURED_COMPUTE_UNITS: u32 = 635;
+/// Compute unit limit to request for a transaction carrying `RemoveTag`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const REMOVE_TAG_COMPUTE_UNIT_LIMIT: u32 = 1100;
 
 /// Accounts.
 #[derive(Clone, Debug)]

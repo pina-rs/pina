@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getAllocateInstruction } from "../client";
+import { ALLOCATE_COMPUTE_UNIT_LIMIT, getAllocateInstruction } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -29,5 +29,5 @@ export const allocateCommand = registerGlobals(new Command("allocate"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, ALLOCATE_COMPUTE_UNIT_LIMIT);
 	});

@@ -3,6 +3,7 @@
 		"Cargo.toml",
 		"src/generated/accounts/mod.rs",
 		"src/generated/accounts/state.rs",
+		"src/generated/compute_budget.rs",
 		"src/generated/instructions/create_pda.rs",
 		"src/generated/instructions/forward_rotate_with_pda.rs",
 		"src/generated/instructions/forward_rotate_with_signer.rs",

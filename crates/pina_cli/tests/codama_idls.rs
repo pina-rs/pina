@@ -66,7 +66,9 @@ fn extracted_definition_counts(example_path: &Path) -> (usize, usize, usize) {
 		account_count += extract_account_structs(&file.file)
 			.unwrap_or_else(|e| panic!("extract accounts: {e}"))
 			.len();
-		error_count += extract_error_enums(&file.file).len();
+		error_count += extract_error_enums(&file.file)
+			.unwrap_or_else(|e| panic!("extract errors: {e}"))
+			.len();
 	}
 
 	(instruction_count, account_count, error_count)

@@ -44,5 +44,8 @@ pub(crate) fn run(context: &CliContext, args: IncrementArgs) -> Result<(), CliEr
 
 	let accounts = Increment { authority, counter };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(counter_program_client::instructions::INCREMENT_COMPUTE_UNIT_LIMIT),
+	)
 }

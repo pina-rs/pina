@@ -3,6 +3,7 @@
 		"Cargo.toml",
 		"src/generated/accounts/mod.rs",
 		"src/generated/accounts/sample.rs",
+		"src/generated/compute_budget.rs",
 		"src/generated/errors/account_realloc_program.rs",
 		"src/generated/errors/mod.rs",
 		"src/generated/instructions/initialize.rs",

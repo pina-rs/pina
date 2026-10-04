@@ -157,6 +157,8 @@ final class InitializeCommand extends Command<void> {
       logBump: logBumpValue,
       custodians: custodiansValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializeComputeUnitLimit);
   }
 }

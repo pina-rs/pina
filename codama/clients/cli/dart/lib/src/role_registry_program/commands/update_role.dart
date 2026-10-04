@@ -50,6 +50,8 @@ final class UpdateRoleCommand extends Command<void> {
       roleEntry: roleEntry,
       permissions: permissionsValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: updateRoleComputeUnitLimit);
   }
 }

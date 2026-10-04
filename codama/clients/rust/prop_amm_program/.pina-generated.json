@@ -3,6 +3,7 @@
 		"Cargo.toml",
 		"src/generated/accounts/mod.rs",
 		"src/generated/accounts/oracle_state.rs",
+		"src/generated/compute_budget.rs",
 		"src/generated/errors/mod.rs",
 		"src/generated/errors/prop_amm_program.rs",
 		"src/generated/instructions/initialize.rs",

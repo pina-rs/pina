@@ -1,0 +1,91 @@
+{
+	"slot": 63,
+	"transaction": {
+		"signatures": [
+			"RMKCYYk1EaBxmRRFj36faqckrfC9DN49QMp2vfQd6NH1DF9HvvsABmzdBgu82eukNEnZybDdXSTt3SxNCyfSLyj",
+			"2UzW8BrKnhXgbXw36Y26GtpVhu9Rd3NDnYQdCn3zUpW2oKRuPJNrgdZZp8pSwhpXnxnq89smGyiPQcxrghdQTJPa"
+		],
+		"message": {
+			"header": {
+				"numRequiredSignatures": 2,
+				"numReadonlySignedAccounts": 0,
+				"numReadonlyUnsignedAccounts": 3
+			},
+			"accountKeys": [
+				"AKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9",
+				"9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu",
+				"8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe",
+				"11111111111111111111111111111111",
+				"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+			],
+			"recentBlockhash": "SURFNETxSAFEHASHxxxxxxxxxxxxxxxxxxxxxxxxx2x",
+			"instructions": [
+				{
+					"programIdIndex": 4,
+					"accounts": [
+						1,
+						2,
+						3
+					],
+					"data": "1BbPKgyetp8DyytNUWejx8GDYd",
+					"stackHeight": 1
+				}
+			]
+		}
+	},
+	"meta": {
+		"err": {
+			"InstructionError": [
+				0,
+				"InvalidAccountData"
+			]
+		},
+		"status": {
+			"Err": {
+				"InstructionError": [
+					0,
+					"InvalidAccountData"
+				]
+			}
+		},
+		"fee": 10000,
+		"preBalances": [
+			9999985000,
+			10000000000,
+			0,
+			1,
+			1141440
+		],
+		"postBalances": [
+			9999975000,
+			10000000000,
+			0,
+			1,
+			1141440
+		],
+		"innerInstructions": [],
+		"logMessages": [
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]",
+			"Program log: account has not been marked as writable",
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 196 of 200000 compute units",
+			"Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: invalid account data for instruction"
+		],
+		"preTokenBalances": [],
+		"postTokenBalances": [],
+		"rewards": [],
+		"loadedAddresses": {
+			"writable": [],
+			"readonly": []
+		},
+		"returnData": {
+			"programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
+			"data": [
+				"",
+				"base64"
+			]
+		},
+		"computeUnitsConsumed": 196
+	},
+	"version": "legacy",
+	"blockTime": 1791060106
+}

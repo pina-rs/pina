@@ -62,6 +62,6 @@ final class AddRoleCommand extends Command<void> {
       permissions: permissionsValue,
       bump: bumpValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: addRoleComputeUnitLimit);
   }
 }

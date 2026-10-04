@@ -28,5 +28,5 @@ pub(crate) fn run(context: &CliContext, _args: RequireGteArgs) -> Result<(), Cli
 
 	let accounts = RequireGte {};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

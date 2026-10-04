@@ -2021,6 +2021,7 @@ dependencies = [
 name = "counter-program-surfpool-tests"
 version = "0.0.0"
 dependencies = [
+ "counter-program-client",
  "pina",
  "pina_test",
 ]
@@ -6407,6 +6408,7 @@ dependencies = [
  "monochange_snapshot",
  "object 0.40.0",
  "owo-colors",
+ "pina",
  "pina_abi",
  "pina_cli_renderer",
  "pina_codama_renderer",

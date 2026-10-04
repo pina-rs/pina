@@ -21,6 +21,7 @@ pina test --help
 pina dev --help
 pina keys --help
 pina doctor --help
+pina explain --help
 pina completions --help
 pina profile --help
 pina deploy --help
@@ -67,6 +68,25 @@ TypeScript, Dart, `cli-ts`, and `cli-dart` generation runs the version-pinned Co
 
 The IDL follows the migration policy recorded in `migrations/manifest.json`, the same one the macros expand against, so the program and its clients agree on every envelope. Without a manifest there is no policy, so nothing carries a version byte; record the baseline with `pina migrations create --auto true` before generating clients you intend to keep, because adding the policy later changes their wire format.
 
+## Compute unit budgets
+
+Priority fees are charged per requested compute unit, so clients should request a limit close to what the transaction uses. Record what each instruction costs, then regenerate:
+
+```sh
+pina test --record-compute-units
+pina generate
+```
+
+`pina test --record-compute-units` runs the complete Surfpool suite (it conflicts with `--unit` and `--filter`) and writes `compute-units.json` beside the program's `Cargo.toml`: the most compute units each instruction consumed in a successful simulation, keyed by IDL name, plus the SHA-256 of the measured build. Failed transactions never count. An instruction no successful test sent is left out and named in a warning; send it through `ProgramTest::send`, `send_instruction`, `send_with_signers`, or `send_transaction` in a passing test to measure it. Commit the file with the clients it produced.
+
+IDL generation attaches each measurement as a `pinaComputeUnits` plugin with `{ "measured": n, "limit": m }`, where `limit = round_up_to_100(measured × (100 + margin_percent) / 100) + 300`. `[compute_units] margin_percent` in `pina.toml` defaults to `20`; the 300 units cover `SetComputeUnitLimit` and `SetComputeUnitPrice` (150 each). Generators copy the limit and never recompute it:
+
+- Rust: `<NAME>_MEASURED_COMPUTE_UNITS`, `<NAME>_COMPUTE_UNIT_LIMIT`, and `set_compute_unit_limit_instruction(units)`.
+- TypeScript and Dart: the same constants and `get<Program>ComputeUnitLimit(instructions)`, which sums the program's instructions and returns no limit when one is unmeasured. Pass the result to `setTransactionMessageComputeUnitLimit`. The sum is conservative and ignores other programs' instructions.
+- CLIs: every command requests its instruction's limit; `--compute-unit-limit <UNITS>` overrides it and `--simulate` prints consumption against the limit requested.
+
+Re-record after changing the program. `pina generate` warns when `target/deploy/<library-name>.so` differs from the recorded build, and fails when `compute-units.json` names an instruction the program no longer declares; re-record or delete the stale entry. `pina build`, `pina idl`, and `pina test` warn about stale entries and ignore them, and the recording run never reads the file it replaces.
+
 ## Project diagnostics and identity
 
 Use the versioned diagnostic report before changing a project:
@@ -77,6 +97,15 @@ pina keys show --json
 ```
 
 `doctor --json` keeps stdout valid JSON and returns a failing exit status when required project or SBF prerequisites are unavailable. Its tool requirements follow the clients selected in `pina.toml`.
+
+When a transaction fails with a bare code such as `InvalidAccountData`, ask Pina which check produced it instead of guessing:
+
+```sh
+pina explain <SIGNATURE> --json
+pina explain --transaction-file ./failed.json --json
+```
+
+The report names the failing instruction, decodes the error (built-in, `PinaProgramError`, or the program's `#[error]` variant), and ranks candidate field rules with their `path:line`. Trust a candidate by its `confidence`: `confirmed` is proven by the transaction's flags, account counts, or keys; `checked_against_current_state` reads state that may have changed after the transaction; `possible` needs runtime values such as PDA seeds or argument values. The default network is localnet, so pass `--network` or `--rpc-url` for other clusters. A transaction rejected by preflight never lands and cannot be explained by signature; use the logs from simulation, or send with preflight disabled on a test validator.
 
 Treat program identity changes as security-sensitive. `pina keys sync` validates an existing Ed25519 keypair and updates exactly one parsed `declare_id!`. `pina keys new` creates a local identity; only `pina keys new --force` may rotate an existing one. Never copy or print keypair bytes. On platforms where Pina cannot guarantee private permissions, generate the keypair with trusted platform tooling and then run `pina keys sync --keypair <path>`.
 

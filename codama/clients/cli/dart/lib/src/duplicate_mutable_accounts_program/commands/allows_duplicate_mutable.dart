@@ -25,6 +25,8 @@ final class AllowsDuplicateMutableCommand extends Command<void> {
     final instruction = getAllowsDuplicateMutableInstruction(
       programAddress: context.programAddress,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: allowsDuplicateMutableComputeUnitLimit);
   }
 }

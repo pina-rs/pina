@@ -1,0 +1,21 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction CAy8mQuAggWA89zSDZVfveRtVjCeryevHKcLUAASRKDjhXMZvURULeDfGajUdjz7vQyVt5mxdDhbH7wFTnKEAqY (slot 68, from file)
+Instruction #0 failed: unknown instruction in validation_program
+Error: InvalidInstructionData
+
+Most likely cause:
+  instruction: instruction discriminator [confirmed]
+    the data starts with discriminator 9, which no instruction of `validation_program` declares
+
+Accounts:
+  #   field  signer  writable  address
+  0   -      yes     no        9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+
+Program logs (last 3 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 36 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: invalid instruction data

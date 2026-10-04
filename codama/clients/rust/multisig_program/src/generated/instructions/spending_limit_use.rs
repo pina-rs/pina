@@ -9,6 +9,14 @@
 )]
 
 pub const SPENDING_LIMIT_USE_DISCRIMINATOR: u8 = 13u8;
+/// Compute units `SpendingLimitUse` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const SPENDING_LIMIT_USE_MEASURED_COMPUTE_UNITS: u32 = 7517;
+/// Compute unit limit to request for a transaction carrying `SpendingLimitUse`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const SPENDING_LIMIT_USE_COMPUTE_UNIT_LIMIT: u32 = 9400;
 
 /// Accounts.
 #[derive(Clone, Debug)]

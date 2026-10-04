@@ -9,6 +9,14 @@
 )]
 
 pub const CONFIG_INITIALIZE_DISCRIMINATOR: u8 = 0u8;
+/// Compute units `ConfigInitialize` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const CONFIG_INITIALIZE_MEASURED_COMPUTE_UNITS: u32 = 4543;
+/// Compute unit limit to request for a transaction carrying `ConfigInitialize`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const CONFIG_INITIALIZE_COMPUTE_UNIT_LIMIT: u32 = 5800;
 
 /// Accounts.
 #[derive(Clone, Debug)]

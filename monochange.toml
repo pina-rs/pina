@@ -243,6 +243,12 @@ versioned_files = [
 	{ path = "Cargo.toml", type = "cargo", fields = ["workspace.dependencies.pina_abi.version"] },
 ]
 changelog = { path = "crates/pina_abi/changelog.md", format = "keep_a_changelog" }
+# monochange inserts a new release above the first `## ` heading that starts with
+# `[` or a digit, and appends it at the bottom when no heading matches. The
+# namespaced default title (`abi [0.21.0](…)`) starts with the group id, so it
+# never matched and releases stacked oldest first. This changelog holds only ABI
+# releases, so the heading drops the redundant prefix and keeps newest first.
+changelog_version_title = "[{{ version }}]({{ tag_url }}) ({{ date }})"
 
 [ecosystems.cargo]
 enabled = true

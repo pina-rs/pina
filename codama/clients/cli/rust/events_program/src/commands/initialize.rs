@@ -28,5 +28,8 @@ pub(crate) fn run(context: &CliContext, _args: InitializeArgs) -> Result<(), Cli
 
 	let accounts = Initialize {};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(events_program_client::instructions::INITIALIZE_COMPUTE_UNIT_LIMIT),
+	)
 }

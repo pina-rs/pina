@@ -50,5 +50,8 @@ pub(crate) fn run(context: &CliContext, args: UpdateDigestArgs) -> Result<(), Cl
 
 	let accounts = UpdateDigest { owner, todo };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(todo_program_client::instructions::UPDATE_DIGEST_COMPUTE_UNIT_LIMIT),
+	)
 }

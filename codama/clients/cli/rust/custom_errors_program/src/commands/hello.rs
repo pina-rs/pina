@@ -28,5 +28,5 @@ pub(crate) fn run(context: &CliContext, _args: HelloArgs) -> Result<(), CliError
 
 	let accounts = Hello {};
 
-	context.send(accounts.instruction(data))
+	context.send(accounts.instruction(data), None)
 }

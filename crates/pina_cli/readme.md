@@ -77,6 +77,8 @@ Generation keeps Codama's ergonomic JavaScript string and array types, then adds
 
 Generation defaults to `auto`: initialize an empty client and later update only renderer-owned source directories, preserving customized manifests and entrypoints. Configure `mode` and `scaffold` globally or per client in `pina.toml`, or use `--mode create|update|overwrite` and `--no-scaffold` for a one-off override.
 
+When the program has a `compute-units.json` recorded by `pina test --record-compute-units`, every client requests an evidence-based compute unit limit instead of the runtime default: `limit = round_up_to_100(measured × (100 + margin_percent) / 100) + 300`, where `[compute_units] margin_percent` defaults to `20` and the 300 units cover the `SetComputeUnitLimit` and `SetComputeUnitPrice` instructions. The IDL carries each budget as a `pinaComputeUnits` plugin node. Rust clients get `<NAME>_COMPUTE_UNIT_LIMIT` constants and `set_compute_unit_limit_instruction`, TypeScript and Dart clients get the constants and `get<Program>ComputeUnitLimit(instructions)`, and the generated CLIs request each instruction's limit automatically, with `--compute-unit-limit` to override it. `pina generate` warns when the build in `target/deploy` is not the one the measurements came from.
+
 Generate a standalone Pina CPI crate from any Codama or Anchor IDL:
 
 ```bash
@@ -138,8 +140,9 @@ List bundled reference topics or render one in the terminal.
 
 ```bash
 pina docs
-pina docs pina-overview
 pina docs pina-idl
+pina docs pina-overview
+pina docs pina-validation
 ```
 
 ### `pina init`
@@ -172,7 +175,10 @@ Run native/Mollusk tests quickly, or build SBF and run the generated isolated Su
 pina test --unit
 pina test
 pina test --filter initialize
+pina test --record-compute-units
 ```
+
+`--record-compute-units` runs the complete Surfpool suite and writes `compute-units.json` beside the program's `Cargo.toml`: the most compute units each instruction consumed in a successful simulation, keyed by its IDL name, with the SHA-256 of the measured SBF build. Commit it with the clients `pina generate` derives from it.
 
 ### `pina dev`
 
@@ -183,6 +189,18 @@ pina dev --yes # first run; review and commit the generated txtx.yml
 pina dev
 pina dev --network devnet
 ```
+
+### `pina explain`
+
+Explain why a transaction to the current program failed. Pina checks return bare error codes, and several share `InvalidAccountData`, so the explanation is reconstructed off-chain: the transaction's account flags, error, and logs are matched against the program's `#[derive(Accounts)]` structs and processors to name the field, the rule, and its `path:line`. Each candidate is `confirmed` by the transaction, `checked_against_current_state`, or `possible`.
+
+```bash
+pina explain <SIGNATURE>
+pina explain <SIGNATURE> --network devnet --json
+pina explain --transaction-file ./failed.json
+```
+
+The default network is localnet, nothing is retried, and `--rpc-url` rejects credentials, queries, and fragments and does not follow redirects. `--transaction-file` reads a saved `getTransaction` result and works offline.
 
 ### `pina profile`
 

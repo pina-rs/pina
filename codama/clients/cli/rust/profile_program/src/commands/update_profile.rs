@@ -62,5 +62,8 @@ pub(crate) fn run(context: &CliContext, args: UpdateProfileArgs) -> Result<(), C
 
 	let accounts = UpdateProfile { authority, profile };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(profile_program_client::instructions::UPDATE_PROFILE_COMPUTE_UNIT_LIMIT),
+	)
 }

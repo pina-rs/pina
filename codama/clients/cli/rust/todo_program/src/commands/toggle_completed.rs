@@ -44,5 +44,8 @@ pub(crate) fn run(context: &CliContext, args: ToggleCompletedArgs) -> Result<(),
 
 	let accounts = ToggleCompleted { owner, todo };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(todo_program_client::instructions::TOGGLE_COMPLETED_COMPUTE_UNIT_LIMIT),
+	)
 }

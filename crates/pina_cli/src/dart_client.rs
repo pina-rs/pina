@@ -11,6 +11,7 @@ use heck::ToSnakeCase;
 use serde_json::Value;
 use walkdir::WalkDir;
 
+use crate::client_compute_units::emit_dart_compute_units_module;
 use crate::client_migrations::MigratableAccount;
 use crate::client_migrations::MigrationPlan;
 use crate::compact_capacity::CompactCapacity;
@@ -548,6 +549,7 @@ pub fn harden_generated_dart_clients(
 		}
 
 		emit_dart_migration_helpers(&generated, program, &root)?;
+		emit_dart_compute_units_module(&generated, program, &root)?;
 	}
 
 	Ok(())
