@@ -1,0 +1,23 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction 3kSPqzjvy6Rauh4xmFDFjpRVhmDuEaqjRaGeCMsA2k3eE6414KJ6jofZR4xZHAGKQ8R13mPnzErq61t3ZafevbMT (slot 64, from file)
+Instruction #0 failed: check_policy (CheckAccounts) in validation_program
+Error: NotEnoughAccountKeys
+
+Most likely cause:
+  system_program: required account [confirmed] at src/lib.rs:225
+    the instruction passed 3 account(s), so `CheckAccounts` has no slot #3 for `system_program`
+
+Accounts:
+  #   field      signer  writable  address
+  0   authority  yes     no        9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  1   policy     no      no        GyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse
+  2   audit      no      yes       EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1
+
+Program logs (last 3 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 64 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: insufficient account keys for instruction

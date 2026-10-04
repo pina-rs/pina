@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use clap::ArgGroup;
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
@@ -514,6 +515,72 @@ pub(crate) enum Commands {
 			value_name = "DIR"
 		)]
 		path: PathBuf,
+
+		/// Emit a stable machine-readable JSON document.
+		#[arg(long)]
+		json: bool,
+	},
+
+	/// Explain why a transaction to the current program failed.
+	///
+	/// Reconstructs which `#[derive(Accounts)]` field and which rule most likely
+	/// failed from the transaction (its account flags, error, and logs) and the
+	/// program source, with `path:line` locations. The diagnosis runs off-chain,
+	/// so programs keep their bare error codes and pay no size or compute units
+	/// for it. A produced explanation exits 0, including for a transaction that
+	/// succeeded; a fetch, file, or project failure exits 1.
+	#[command(
+		after_help = "Examples:\n  pina explain <SIGNATURE>\n  pina explain <SIGNATURE> --network \
+		              devnet\n  pina explain <SIGNATURE> --rpc-url http://127.0.0.1:8899 --json\n  \
+		              pina explain --transaction-file ./failed.json\n  pina explain \
+		              --transaction-file ./failed.json --network devnet --project \
+		              ./programs/counter\n\nConfidence:\n  confirmed: provable from the transaction \
+		              alone (signer and writable flags, account counts, duplicate keys, known \
+		              addresses).\n  checked_against_current_state: fails against account state \
+		              read after the transaction; the state may have changed since.\n  possible: \
+		              can return this error but needs runtime values (PDA seeds, argument rules, \
+		              custom expressions).\n\nInputs:\n  A signature is fetched with getTransaction \
+		              at confirmed commitment. --transaction-file reads a saved getTransaction \
+		              result or full JSON-RPC response and works offline; add --network or \
+		              --rpc-url to also check rules against current account state.\n\nNetwork \
+		              safety:\n  The default network is localnet. Pina never queries mainnet unless \
+		              --network mainnet or --rpc-url names it. RPC URLs with credentials, query \
+		              parameters, or fragments are rejected, plaintext http is accepted only for \
+		              a loopback host, redirects are not followed, and no request is retried.",
+		group(ArgGroup::new("transaction").required(true).args(["signature", "transaction_file"]))
+	)]
+	Explain {
+		/// Signature of the transaction to explain.
+		#[arg(value_name = "SIGNATURE")]
+		signature: Option<String>,
+
+		/// Read a saved getTransaction result or JSON-RPC response instead of fetching.
+		#[arg(long, value_name = "PATH")]
+		transaction_file: Option<PathBuf>,
+
+		/// Cluster to query. Defaults to localnet when fetching a signature.
+		#[arg(
+			long,
+			value_enum,
+			conflicts_with = "rpc_url",
+			hide_possible_values = true,
+			value_name = "localnet|devnet|testnet|mainnet"
+		)]
+		network: Option<pina_cli::explain::Network>,
+
+		/// Credential-free HTTP(S) JSON-RPC URL to query instead of a named network.
+		#[arg(long, value_name = "URL")]
+		rpc_url: Option<String>,
+
+		/// Directory inside the program project. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
 
 		/// Emit a stable machine-readable JSON document.
 		#[arg(long)]

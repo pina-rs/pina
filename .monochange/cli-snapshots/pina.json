@@ -2516,6 +2516,125 @@
 		},
 		{
 			"path": [
+				"explain"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Explain why a transaction to the current program failed",
+			"description": "Explain why a transaction to the current program failed.\n\nReconstructs which `#[derive(Accounts)]` field and which rule most likely failed from the transaction (its account flags, error, and logs) and the program source, with `path:line` locations. The diagnosis runs off-chain, so programs keep their bare error codes and pay no size or compute units for it. A produced explanation exits 0, including for a transaction that succeeded; a fetch, file, or project failure exits 1.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--transaction-file"
+					],
+					"canonical_name": "--transaction-file",
+					"hidden": false,
+					"global": false,
+					"summary": "Read a saved getTransaction result or JSON-RPC response instead of fetching",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--network"
+					],
+					"canonical_name": "--network",
+					"hidden": false,
+					"global": false,
+					"summary": "Cluster to query. Defaults to localnet when fetching a signature",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"localnet",
+							"devnet",
+							"testnet",
+							"mainnet"
+						]
+					}
+				},
+				{
+					"names": [
+						"--rpc-url"
+					],
+					"canonical_name": "--rpc-url",
+					"hidden": false,
+					"global": false,
+					"summary": "Credential-free HTTP(S) JSON-RPC URL to query instead of a named network",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the program project. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit a stable machine-readable JSON document",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			],
+			"positionals": [
+				{
+					"name": "signature",
+					"hidden": false,
+					"summary": "Signature of the transaction to explain",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				}
+			]
+		},
+		{
+			"path": [
 				"completions"
 			],
 			"hidden": false,

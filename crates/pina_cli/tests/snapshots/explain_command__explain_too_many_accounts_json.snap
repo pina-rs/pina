@@ -1,0 +1,102 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 70
+expression: document
+---
+{
+  "accounts": [
+    {
+      "absent": false,
+      "address": "9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu",
+      "field": "authority",
+      "index": 0,
+      "signer": true,
+      "writable": false
+    },
+    {
+      "absent": false,
+      "address": "GyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse",
+      "field": "policy",
+      "index": 1,
+      "signer": false,
+      "writable": false
+    },
+    {
+      "absent": false,
+      "address": "EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1",
+      "field": "audit",
+      "index": 2,
+      "signer": false,
+      "writable": true
+    },
+    {
+      "absent": false,
+      "address": "11111111111111111111111111111111",
+      "field": "system_program",
+      "index": 3,
+      "signer": false,
+      "writable": false
+    },
+    {
+      "absent": false,
+      "address": "8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe",
+      "field": null,
+      "index": 4,
+      "signer": false,
+      "writable": false
+    },
+    {
+      "absent": false,
+      "address": "AKkzLhjhyFtM9j7WAhbaqYpFe49cXeJBg2kzLRC2PnNa",
+      "field": null,
+      "index": 5,
+      "signer": false,
+      "writable": false
+    }
+  ],
+  "candidates": [
+    {
+      "accountIndex": 4,
+      "confidence": "confirmed",
+      "field": null,
+      "location": "src/lib.rs:213",
+      "logConfirmed": false,
+      "reason": "the instruction passed 6 accounts, but `CheckAccounts` reads at most 4 (extra: #4, #5)",
+      "rule": "no extra accounts",
+      "scope": "instruction"
+    }
+  ],
+  "errorSites": [],
+  "failure": {
+    "cpi": null,
+    "error": {
+      "code": 4294967294,
+      "description": "More account keys were provided than the instruction expects.",
+      "kind": "pina",
+      "name": "PinaProgramError::TooManyAccountKeys"
+    },
+    "instruction": {
+      "accountsStruct": "CheckAccounts",
+      "name": "check_policy",
+      "rustName": "CheckPolicyInstruction"
+    },
+    "instructionIndex": 0,
+    "programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
+    "targetsProgram": true
+  },
+  "logs": [
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]",
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 94 of 200000 compute units",
+    "Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: custom program error: 0xfffffffe"
+  ],
+  "notes": [],
+  "program": {
+    "name": "validation_program",
+    "programId": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+  },
+  "schemaVersion": 1,
+  "signature": "3KceYTZ6ePgactc6WpDncuo8RAgmqo8fcFtixFFnjaSSQPBjcQxBKBopQJJeg1Vv6ueT6nGWgMoaFDKbAqHLrLEB",
+  "slot": 65,
+  "source": "file",
+  "status": "failed"
+}

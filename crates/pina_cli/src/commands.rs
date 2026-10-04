@@ -117,6 +117,22 @@ pub(crate) fn run(cli: Cli) {
 			command,
 		} => run_keys(&path, keypair.as_deref(), json, command.as_ref()),
 		Commands::Doctor { path, json } => run_doctor(&path, json),
+		Commands::Explain {
+			signature,
+			transaction_file,
+			network,
+			rpc_url,
+			project,
+			json,
+		} => {
+			let input = unwrap_or_exit(explain_input(
+				signature,
+				transaction_file,
+				network,
+				rpc_url.as_deref(),
+			));
+			run_explain(project, input, json);
+		}
 		Commands::Completions { shell } => {
 			generate(shell, &mut Cli::command(), "pina", &mut std::io::stdout());
 		}
@@ -669,6 +685,56 @@ fn run_doctor(path: &Path, json: bool) {
 
 	if !report.is_usable() {
 		std::process::exit(1);
+	}
+}
+
+/// Map the explain flags onto a transaction input.
+///
+/// A signature always needs an endpoint and defaults to localnet. A file needs
+/// none; an explicit network or URL adds current-state checks.
+fn explain_input(
+	signature: Option<String>,
+	transaction_file: Option<PathBuf>,
+	network: Option<pina_cli::explain::Network>,
+	rpc_url: Option<&str>,
+) -> Result<pina_cli::explain::TransactionInput, pina_cli::explain::ExplainError> {
+	use pina_cli::explain::Network;
+	use pina_cli::explain::RpcEndpoint;
+	use pina_cli::explain::TransactionInput;
+
+	let endpoint = match (rpc_url, network) {
+		(Some(url), _) => Some(RpcEndpoint::custom(url)?),
+		(None, Some(network)) => Some(RpcEndpoint::network(network)),
+		(None, None) => None,
+	};
+
+	Ok(match (signature, transaction_file) {
+		(Some(signature), _) => {
+			TransactionInput::Signature {
+				signature,
+				endpoint: endpoint.unwrap_or_else(|| RpcEndpoint::network(Network::Localnet)),
+			}
+		}
+		(None, path) => {
+			TransactionInput::File {
+				// Clap's required `transaction` group guarantees a signature or a
+				// file, and an empty path would fail to read rather than pass.
+				path: path.unwrap_or_default(),
+				endpoint,
+			}
+		}
+	})
+}
+
+fn run_explain(project: PathBuf, input: pina_cli::explain::TransactionInput, json: bool) {
+	let report = unwrap_or_exit(pina_cli::explain::explain(
+		&pina_cli::explain::ExplainOptions { project, input },
+	));
+
+	if json {
+		print_json(&report);
+	} else {
+		print!("{}", report.render_text());
 	}
 }
 

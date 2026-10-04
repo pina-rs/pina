@@ -1,0 +1,6 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 63
+expression: stdout(&text)
+---
+Transaction 3FoYAb2tqt9CgonKFL43m8RbHXqEyED5kc4amzYZgHAKcuR5XJskBrHRFLJ3pyah3ezo33REYmApobAExRvi9jp9 succeeded at slot 70 (from file); there is nothing to explain.

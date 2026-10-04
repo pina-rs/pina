@@ -1,0 +1,26 @@
+---
+source: crates/pina_cli/tests/explain_command.rs
+assertion_line: 64
+expression: stdout(&text)
+---
+Transaction SEnp7rjf92RcHSmLcNGCjrC4bwEQzdz5wx6KqHRLPEfwKLmWfRGumha5oLTBoCWTsugkeHpGgs9nUnzZj5h5xKV (slot 5268, from file)
+Instruction #0 failed: check_policy (CheckAccounts) in validation_program
+Error: InvalidAccountOwner
+
+Possible causes (they need runtime values to check):
+  policy: owner = ID [possible] at src/lib.rs:217
+    the check reads account state; pass --network or --rpc-url to check it against the current state
+  policy: load_pda() [possible] at src/lib.rs:275
+    the account type check reads the account's data at runtime
+
+Accounts:
+  #   field           signer  writable  address
+  0   authority       yes     no        9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu
+  1   policy          no      no        GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB
+  2   audit           no      yes       EdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1
+  3   system_program  no      no        11111111111111111111111111111111
+
+Program logs (last 3 lines):
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn invoke [1]
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn consumed 83 of 200000 compute units
+  Program GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn failed: Invalid account owner

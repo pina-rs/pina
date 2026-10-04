@@ -138,8 +138,9 @@ List bundled reference topics or render one in the terminal.
 
 ```bash
 pina docs
-pina docs pina-overview
 pina docs pina-idl
+pina docs pina-overview
+pina docs pina-validation
 ```
 
 ### `pina init`
@@ -183,6 +184,18 @@ pina dev --yes # first run; review and commit the generated txtx.yml
 pina dev
 pina dev --network devnet
 ```
+
+### `pina explain`
+
+Explain why a transaction to the current program failed. Pina checks return bare error codes, and several share `InvalidAccountData`, so the explanation is reconstructed off-chain: the transaction's account flags, error, and logs are matched against the program's `#[derive(Accounts)]` structs and processors to name the field, the rule, and its `path:line`. Each candidate is `confirmed` by the transaction, `checked_against_current_state`, or `possible`.
+
+```bash
+pina explain <SIGNATURE>
+pina explain <SIGNATURE> --network devnet --json
+pina explain --transaction-file ./failed.json
+```
+
+The default network is localnet, nothing is retried, and `--rpc-url` rejects credentials, queries, and fragments and does not follow redirects. `--transaction-file` reads a saved `getTransaction` result and works offline.
 
 ### `pina profile`
 
