@@ -168,6 +168,7 @@ mod tests {
 			text_vaddr: 0x1000,
 			text_size,
 			symbols,
+			symbol_table: crate::elf::SymbolTable::Full,
 		}
 	}
 

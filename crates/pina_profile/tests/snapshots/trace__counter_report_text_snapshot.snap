@@ -1,0 +1,60 @@
+---
+source: crates/pina_profile/tests/trace.rs
+expression: "render(|report, buffer| write_trace_text(report, buffer))"
+---
+counter_program: 2 traced paths from 2 recorded invocations
+  Each executed SBF instruction costs 1 CU; syscall charges are not included.
+
+increment: 133 CU executed, 2 syscalls
+  Line                                                      CU  Share
+  core/src/array/equality.rs:150                            32  24.1% ██▍
+  <no line information>                                     24  18.0% █▊
+  core/src/mem/maybe_uninit.rs:475                          14  10.5% █
+  crates/pina/src/entry.rs:316                               5   3.8% ▍
+  crates/pina/src/lib.rs:352                                 5   3.8% ▍
+  core/src/result.rs:2066                                    3   2.3% ▎
+  crates/pina/src/entry.rs:124                               3   2.3% ▎
+  crates/pina/src/entry.rs:307                               3   2.3% ▎
+  examples/counter_program/src/lib.rs:58                     3   2.3% ▎
+  examples/counter_program/src/lib.rs:99                     3   2.3% ▎
+  ... 26 more lines
+  Function                                                Self   Total
+  spec_eq<u8, u8, 32>                                       36      36
+  write<&[u8]>                                              14      14
+  walk_accounts                                             12      16
+  entrypoint                                                 6     133
+  __dispatch_entrypoint                                      5     127
+  parse_exact_accounts<2, false>                             5      21
+  __dispatch                                                 4     120
+  add<u8>                                                    4       4
+  Syscall                      Calls  Called from
+  sol_log_                         1  src/logger.rs:117
+  sol_sha256                       1  src/lib.rs:67
+
+initialize: 252 CU executed, 4 syscalls
+  Line                                                      CU  Share
+  <no line information>                                     27  10.7% █▏
+  core/src/ptr/mod.rs:542                                   25   9.9% █
+  core/src/array/equality.rs:150                            24   9.5% █
+  crates/pina/src/lib.rs:352                                14   5.6% ▌
+  src/cpi.rs:668                                             8   3.2% ▍
+  core/src/ptr/const_ptr.rs:915                              6   2.4% ▎
+  crates/pina/src/cpi.rs:1514                                6   2.4% ▎
+  crates/pina/src/entry.rs:316                               6   2.4% ▎
+  crates/pina/src/entry.rs:321                               6   2.4% ▎
+  src/cpi.rs:132                                             6   2.4% ▎
+  ... 63 more lines
+  Function                                                Self   Total
+  spec_eq<u8, u8, 32>                                       29      29
+  init_from_account_view                                    20      29
+  copy_nonoverlapping<u8>                                   17      17
+  entrypoint                                                15     252
+  allocate_with_seed_capacity<4>                            15      91
+  walk_accounts                                             14      27
+  hashes_to_program_address                                 12      31
+  invoke_signed_unchecked                                    9       9
+  Syscall                      Calls  Called from
+  sol_get_sysvar                   1  src/sysvars/mod.rs:84
+  sol_invoke_signed_c              1  <no line information>
+  sol_log_                         1  src/logger.rs:117
+  sol_sha256                       1  src/lib.rs:67

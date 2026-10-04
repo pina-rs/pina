@@ -3762,6 +3762,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gimli"
+version = "0.34.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1033caf0b349c518623b5396bfb2cf0bddf44f0306d543a250e5743297aafd10"
+dependencies = [
+ "fnv",
+ "hashbrown 0.17.1",
+ "indexmap",
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5598,8 +5610,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "283ff0ca84f639081a577c16d2bd705e6a45cce79428965860c5973aae6c2169"
 dependencies = [
  "bincode",
+ "hex",
  "mollusk-svm-error",
  "mollusk-svm-result",
+ "sha2 0.10.9",
  "solana-account 4.3.2",
  "solana-bpf-loader-program",
  "solana-clock 3.1.1",
@@ -6506,9 +6520,13 @@ dependencies = [
 name = "pina_profile"
 version = "0.22.0"
 dependencies = [
+ "gimli",
+ "insta",
  "object 0.40.0",
+ "rustc-demangle",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "tempfile",
  "thiserror 2.0.21",
 ]
