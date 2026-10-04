@@ -229,7 +229,7 @@ Pina snapshots the instruction payload and its positional account list under the
 - every new slot is appended at the end; and
 - every appended slot is optional.
 
-All account properties are part of a slot. A name, signer flag, writable flag, default, PDA, known address, or declarative constraint change is breaking. Create a new instruction discriminator for a breaking process.
+A slot's wire facts are its name, signer flag, writable flag, and optionality, and a change to any of them is breaking. Create a new instruction discriminator for a breaking process. A slot also records two client hints, its known address (`defaultValue`) and its PDA (`pda`), which say what generated clients fill in. A client that passes the address itself sends the same account list, so hints are never compared: a hint-only change is not drift, consumes no version, and leaves the recorded snapshot as it is until a wire change replaces it ([ADR 0012](../adrs/0012-process-wire-facts.md)). Declarative constraints are program semantics and are not recorded at all.
 
 The runtime treats an omitted optional suffix as absent. It never creates an account, signature, writable privilege, or PDA for an old client.
 

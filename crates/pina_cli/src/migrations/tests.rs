@@ -5210,6 +5210,104 @@ fn a_published_unenveloped_instruction_only_appends_optional_accounts() {
 }
 
 #[test]
+fn a_published_instruction_ignores_client_hint_changes() {
+	// Both a snapshot-only instruction and an enveloped one.
+	for instruction_args in ["", ", migrations"] {
+		let fixture = versioned_fixture("instructions");
+		write_versioned_program(
+			&fixture,
+			instruction_args,
+			"value: u8",
+			"pub payer: &'a AccountView",
+			"value: u8",
+		);
+		create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
+		publish_current(&fixture);
+		let manifest_path = fixture.root.join(MANIFEST_PATH);
+		let recorded =
+			std::fs::read(&manifest_path).unwrap_or_else(|error| panic!("read: {error}"));
+
+		// Generated clients now fill in `payer`, but the account list is the
+		// same: the slot gains a `defaultValue` hint and nothing else.
+		write_versioned_program(
+			&fixture,
+			instruction_args,
+			"value: u8",
+			"#[pina(validate(address = system::ID))] pub payer: &'a AccountView",
+			"value: u8",
+		);
+		check_migrations(&fixture.root)
+			.unwrap_or_else(|error| panic!("a hint is not drift ({instruction_args}): {error}"));
+		let output = create_migrations(&fixture.root).unwrap_or_else(|error| {
+			panic!("a hint needs no version ({instruction_args}): {error}")
+		});
+		assert_eq!(output.unchanged_contracts, ["instruction:1:00"]);
+		assert!(output.extended_processes.is_empty() && output.updated_drafts.is_empty());
+		let carried = std::fs::read(&manifest_path).unwrap_or_else(|error| panic!("read: {error}"));
+		assert_eq!(carried, recorded, "the published snapshot keeps its hints");
+
+		// A wire fact still breaks the published account list.
+		write_versioned_program(
+			&fixture,
+			instruction_args,
+			"value: u8",
+			"#[pina(validate(signer))] pub payer: &'a AccountView",
+			"value: u8",
+		);
+		let error = check_migrations(&fixture.root).expect_err("a new signer is drift");
+		assert!(
+			matches!(error, MigrationError::SchemaDrift { .. }),
+			"{error}"
+		);
+		let error = create_migrations(&fixture.root).expect_err("a new signer is breaking");
+		assert!(
+			matches!(error, MigrationError::ProcessChanged { .. }),
+			"{error}"
+		);
+	}
+}
+
+#[test]
+fn an_unpublished_draft_carries_its_hints_until_a_wire_change() {
+	let fixture = versioned_fixture("instructions");
+	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
+	let process = |fixture: &PublicationFixture| {
+		read_manifest(fixture).contracts["instruction:1:00"].versions[0]
+			.process
+			.clone()
+			.unwrap_or_else(|| panic!("an instruction records a process"))
+	};
+
+	write_versioned_program(
+		&fixture,
+		"",
+		"value: u8",
+		"#[pina(validate(address = system::ID))] pub payer: &'a AccountView",
+		"value: u8",
+	);
+	let output = create_migrations(&fixture.root).unwrap_or_else(|error| panic!("hint: {error}"));
+	assert_eq!(output.unchanged_contracts, ["instruction:1:00"]);
+	assert_eq!(process(&fixture).accounts[0].default_value, None);
+
+	// The next wire change replaces the draft, hints included.
+	write_versioned_program(
+		&fixture,
+		"",
+		"value: u8",
+		"#[pina(validate(address = system::ID))] pub payer: &'a mut AccountView",
+		"value: u8",
+	);
+	let output = create_migrations(&fixture.root).unwrap_or_else(|error| panic!("wire: {error}"));
+	assert_eq!(output.updated_drafts, ["instruction:1:00@0"]);
+	let recorded = process(&fixture);
+	assert!(recorded.accounts[0].writable);
+	assert_eq!(
+		recorded.accounts[0].default_value.as_deref(),
+		Some("publicKey:11111111111111111111111111111111")
+	);
+}
+
+#[test]
 fn an_instruction_changes_framing_only_while_unpublished() {
 	let fixture = versioned_fixture("instructions");
 	create_migrations(&fixture.root).unwrap_or_else(|error| panic!("create baseline: {error}"));
