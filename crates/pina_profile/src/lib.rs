@@ -1,14 +1,21 @@
-//! Static CU profiler for Solana SBF programs.
+//! Compute-unit profiler for Solana SBF programs.
 //!
-//! Analyzes compiled `.so` ELF binaries to estimate per-function compute unit
-//! costs without requiring a running validator.
+//! The static profiler analyzes compiled `.so` ELF binaries to estimate
+//! per-function compute unit costs without running them. The dynamic
+//! profiler ([`trace_report`]) attributes every instruction of a recorded
+//! Mollusk register trace to a source line and call stack.
 
 #![allow(missing_docs)]
 pub mod compare;
 pub mod cost;
+pub mod dwarf;
 pub mod elf;
 pub mod output;
 pub mod sbf;
+pub mod syscalls;
+pub mod trace;
+pub mod trace_output;
+pub mod trace_report;
 
 use std::path::Path;
 
@@ -98,4 +105,13 @@ pub enum ProfileError {
 
 	#[error("No SBF text section found in {path}")]
 	NoTextSection { path: std::path::PathBuf },
+
+	#[error(
+		"{debug:?} is not the unstripped build of {executable:?}: their .text sections differ; \
+		 rebuild both together"
+	)]
+	DebugBuildMismatch {
+		executable: std::path::PathBuf,
+		debug: std::path::PathBuf,
+	},
 }

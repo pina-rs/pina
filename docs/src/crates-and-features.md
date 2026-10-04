@@ -11,7 +11,7 @@
 | `pina_cpi_renderer`     | `crates/pina_cpi_renderer`    | Standalone Codama renderer generating Pina CPI client crates.                 |
 | `pina_lints`            | `crates/pina_lints`           | Pina security lints and the driver behind `pina lint`.                        |
 | `pina_test`             | `crates/pina_test`            | Surfpool-backed program test harness.                                         |
-| `pina_profile`          | `crates/pina_profile`         | Static CU profiler for compiled SBF programs.                                 |
+| `pina_profile`          | `crates/pina_profile`         | Static and trace-driven CU profiler for SBF programs.                         |
 | `pina_sdk_ids`          | `crates/pina_sdk_ids`         | Typed constants for well-known Solana program/sysvar IDs.                     |
 | `@pina-rs/codama-nodes` | `packages/nodes-from-pina`    | Pina IDL conversion and normalization for Codama root nodes.                  |
 | `@pina-rs/cli`          | `packages/pina__cli`          | npm launcher for the prebuilt platform-specific CLI packages.                 |
@@ -103,6 +103,7 @@ Commands:
 - `pina doctor [--json]`: diagnose project and toolchain readiness
 - `pina completions <shell>`: generate a shell completion script
 - `pina profile [path.so]`: profile a compiled or discovered SBF binary statically
+- `pina profile trace`: measure executed compute units line by line from Mollusk tests
 - `pina deploy`: plan and execute an explicit cluster deployment
 
 <!-- {/pinaCliCommands} -->
@@ -180,6 +181,14 @@ pina profile compare r.json                        # diff against a saved baseli
 ```
 
 The profiler decodes each SBF instruction opcode and assigns costs: regular instructions cost 1 CU, syscalls cost 100 CU. `pina profile compare` diffs the current artifact against a saved report and exits 2 when the total CU regression reaches both `--fail-cu` (default 500) and `--fail-percent` (default 10), mirroring the CI compute-unit gate.
+
+`pina profile trace` measures instead of estimating. It builds the program with DWARF line tables, runs its Mollusk tests with register tracing, and attributes every executed instruction to a source line and call stack:
+
+```sh
+pina profile trace                          # summary plus an HTML report
+pina profile trace --instruction increment  # one instruction
+pina profile trace --folded > stacks.folded # flame graph input
+```
 
 <!-- {/pinaProfileDescription} -->
 

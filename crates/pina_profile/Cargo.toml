@@ -7,16 +7,20 @@ keywords.workspace = true
 license.workspace = true
 readme = "readme.md"
 repository.workspace = true
-description = "Static CU profiler for Solana SBF programs"
+description = "Static and trace-driven CU profiler for Solana SBF programs"
 
 [dependencies]
+gimli = { workspace = true, features = ["read", "std"] }
 object = { default-features = false, features = ["read", "elf", "std"], workspace = true }
 rustc-demangle = { workspace = true }
 serde = { workspace = true, features = ["derive"], default-features = true }
 serde_json = { workspace = true, default-features = true }
+sha2 = { workspace = true }
 thiserror = { workspace = true, default-features = true }
 
 [dev-dependencies]
+gimli = { workspace = true, features = ["read", "std", "write"] }
+insta = { workspace = true, features = ["json"], default-features = true }
 object = { features = ["read", "elf", "std", "write"], workspace = true, default-features = true }
 tempfile = { workspace = true, default-features = true }
 

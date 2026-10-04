@@ -572,6 +572,35 @@ impl Project {
 		cargo_metadata(&self.root, Some(&manifest_path))
 			.map(|metadata| metadata.workspace_root.as_std_path().to_path_buf())
 	}
+
+	/// Resolve the Cargo workspace root and every member's package directory.
+	///
+	/// # Errors
+	///
+	/// Returns an error when Cargo metadata cannot be loaded.
+	pub fn workspace_layout(&self) -> Result<WorkspaceLayout, ProjectError> {
+		let manifest_path = self.program_dir.join("Cargo.toml");
+		let metadata = cargo_metadata(&self.root, Some(&manifest_path))?;
+
+		Ok(WorkspaceLayout {
+			root: metadata.workspace_root.as_std_path().to_path_buf(),
+			member_dirs: metadata
+				.workspace_packages()
+				.iter()
+				.filter_map(|package| package.manifest_path.parent())
+				.map(|directory| directory.as_std_path().to_path_buf())
+				.collect(),
+		})
+	}
+}
+
+/// A Cargo workspace root and the package directories of its members.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceLayout {
+	/// The workspace root directory.
+	pub root: PathBuf,
+	/// Each member package's directory.
+	pub member_dirs: Vec<PathBuf>,
 }
 
 /// The builtin repository anchor and every declared `[project.paths]` name.

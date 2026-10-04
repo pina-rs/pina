@@ -504,6 +504,13 @@ fn profile_compare_help_snapshot() {
 }
 
 #[test]
+fn profile_trace_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["profile", "trace", "--help"]);
+	assert_cmd_snapshot!("profile_trace_help", command);
+}
+
+#[test]
 fn verify_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["verify", "--help"]);

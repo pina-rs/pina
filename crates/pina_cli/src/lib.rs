@@ -24,6 +24,7 @@ pub mod migrations;
 pub mod parse;
 mod path_security;
 pub mod profile;
+pub mod profile_trace;
 pub mod project;
 pub mod skill;
 pub mod verification;

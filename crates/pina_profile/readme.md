@@ -39,7 +39,18 @@ Solana's SBF instruction set has deterministic CU costs. This tool:
 
 Function names are demangled without the legacy `::h<hash>` suffix, so a function keeps its name across rebuilds. The stripped copy `cargo build-sbf --sbf-out-dir` publishes keeps only exported symbols, so the profiler borrows the full symbol table from the unstripped linker output under `<target>/sbpf-solana-solana/release/` when its `.text` is byte-identical, and otherwise falls back to the exported `.dynsym` entries.
 
-## Limitations
+## Trace-driven profiles
+
+`pina profile trace` uses the dynamic half of this crate. Mollusk's `register-tracing` feature records one register set per executed SBF instruction, and each instruction costs exactly 1 CU:
+
+- `trace` reads the `.regs`/`.insns` files Mollusk writes to `SBF_TRACE_DIR`.
+- `dwarf` maps a program counter to its function (symbol table, demangled) and to the inlined frames and source line DWARF records for it.
+- `trace_report` rebuilds call stacks from `call`, `callx`, and `exit`, names syscalls from their murmur3 call keys (`syscalls`), reads the instruction discriminator through the SIMD-0321 `r2` pointer, and aggregates executed instructions per line, function, and stack.
+- `trace_output` renders the report as text, versioned JSON, or folded stacks.
+
+Syscall charges are made separately by the runtime and are not part of a trace, so syscalls are reported as invocation counts at their call sites.
+
+## Static profile limitations
 
 - **Static analysis only** — does not account for runtime branching or loops
 - **Flat syscall cost** — all syscalls estimated at 100 CU regardless of actual cost

@@ -206,50 +206,15 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 	if options.size_profile.requests_lto() {
 		warn_lto_unavailable(&project);
 	}
-	let manifest_path = project.program_dir.join("Cargo.toml");
-	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
-	let features = options
-		.features
-		.iter()
-		.map(String::as_str)
-		.chain(std::iter::once("bpf-entrypoint"))
-		.collect::<BTreeSet<_>>()
-		.into_iter()
-		.collect::<Vec<_>>()
-		.join(",");
-	let args = build_sbf_args(&project, &manifest_path, &features, options);
-	let command_label = command_label(&cargo, &args);
-	let mut command = Command::new(&cargo);
-	command
-		.current_dir(&project.root)
-		.env("CARGO_TARGET_DIR", &project.target_dir)
-		.args(&args);
-	apply_size_profile(&mut command, options, declared_release_profile(&project));
-
-	let status = command.status().map_err(|source| {
-		BuildError::RunCargo {
-			command: command_label.clone(),
-			source,
-		}
-	})?;
-
-	if !status.success() {
-		return Err(BuildError::CargoFailed {
-			command: command_label,
-			status: status.to_string(),
-		});
-	}
-
-	let compiler_artifact = project
-		.target_dir
-		.join("sbf-build")
-		.join(format!("{}.so", project.library_name));
-
-	if !compiler_artifact.is_file() {
-		return Err(BuildError::MissingArtifact {
-			path: compiler_artifact,
-		});
-	}
+	let compiler_artifact = compile_sbf(
+		&project,
+		options,
+		&SbfCompilation {
+			out_dir: &project.target_dir.join("sbf-build"),
+			line_tables: false,
+			quiet_stdout: false,
+		},
+	)?;
 
 	let idl =
 		generate_idl(&project.program_dir, Some(&project.library_name)).map_err(|source| {
@@ -292,6 +257,111 @@ pub fn build_project_with_options(options: &BuildOptions) -> Result<BuildOutput,
 		sbf_artifact,
 		idl: idl_path,
 	})
+}
+
+/// Where and how one `cargo build-sbf` run writes its artifact.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SbfCompilation<'a> {
+	/// The `--sbf-out-dir` that receives the stripped program.
+	pub(crate) out_dir: &'a Path,
+	/// Emit DWARF line tables and keep the linker output's symbols.
+	pub(crate) line_tables: bool,
+	/// Send the compiler's stdout to stderr so stdout stays machine-readable.
+	pub(crate) quiet_stdout: bool,
+}
+
+/// Run `cargo build-sbf` for `project` and return the stripped program it
+/// published in `compilation.out_dir`.
+///
+/// The unstripped linker output stays under the Cargo target directory; see
+/// [`unstripped_artifact`].
+pub(crate) fn compile_sbf(
+	project: &Project,
+	options: &BuildOptions,
+	compilation: &SbfCompilation<'_>,
+) -> Result<PathBuf, BuildError> {
+	let manifest_path = project.program_dir.join("Cargo.toml");
+	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
+	let features = options
+		.features
+		.iter()
+		.map(String::as_str)
+		.chain(std::iter::once("bpf-entrypoint"))
+		.collect::<BTreeSet<_>>()
+		.into_iter()
+		.collect::<Vec<_>>()
+		.join(",");
+	let args = build_sbf_args(
+		project,
+		&manifest_path,
+		&features,
+		options,
+		compilation.out_dir,
+	);
+	let command_label = command_label(&cargo, &args);
+	let mut command = Command::new(&cargo);
+	command
+		.current_dir(&project.root)
+		.env("CARGO_TARGET_DIR", &project.target_dir)
+		.args(&args);
+	apply_size_profile(&mut command, options, declared_release_profile(project));
+
+	if compilation.line_tables {
+		apply_line_tables(&mut command);
+	}
+
+	if compilation.quiet_stdout {
+		command.stdout(std::io::stderr());
+	}
+
+	let status = command.status().map_err(|source| {
+		BuildError::RunCargo {
+			command: command_label.clone(),
+			source,
+		}
+	})?;
+
+	if !status.success() {
+		return Err(BuildError::CargoFailed {
+			command: command_label,
+			status: status.to_string(),
+		});
+	}
+
+	let artifact = compilation
+		.out_dir
+		.join(format!("{}.so", project.library_name));
+
+	if !artifact.is_file() {
+		return Err(BuildError::MissingArtifact { path: artifact });
+	}
+
+	Ok(artifact)
+}
+
+/// Request DWARF line tables and an unstripped linker output.
+///
+/// Both are Cargo profile overrides, which `cargo build-sbf` passes through
+/// to its Cargo invocation. They override the manifest, including the
+/// `strip = true` that `pina init` scaffolds. Debug information can change
+/// SBF code generation, so callers compare the result with a release build.
+fn apply_line_tables(command: &mut Command) {
+	command
+		.env("CARGO_PROFILE_RELEASE_DEBUG", "line-tables-only")
+		.env("CARGO_PROFILE_RELEASE_STRIP", "none");
+}
+
+/// The unstripped linker output of the project's latest SBF release build.
+pub(crate) fn unstripped_artifact(project: &Project) -> Option<PathBuf> {
+	pina_profile::elf::UNSTRIPPED_ARTIFACT_DIRS
+		.iter()
+		.map(|directory| {
+			project
+				.target_dir
+				.join(directory)
+				.join(format!("{}.so", project.library_name))
+		})
+		.find(|path| path.is_file())
 }
 
 /// Build a project deterministically through Solana Verify 0.5.1.
@@ -579,13 +649,14 @@ fn build_sbf_args(
 	manifest_path: &Path,
 	features: &str,
 	options: &BuildOptions,
+	out_dir: &Path,
 ) -> Vec<OsString> {
 	let mut args = vec![
 		OsString::from("build-sbf"),
 		OsString::from("--manifest-path"),
 		manifest_path.as_os_str().to_owned(),
 		OsString::from("--sbf-out-dir"),
-		project.target_dir.join("sbf-build").into_os_string(),
+		out_dir.as_os_str().to_owned(),
 		OsString::from("--features"),
 		OsString::from(features),
 	];
@@ -1056,10 +1127,16 @@ mod tests {
 			no_default_features: false,
 			size_profile,
 		};
-		build_sbf_args(project, &manifest_path, "bpf-entrypoint", &options)
-			.into_iter()
-			.map(|argument| argument.to_string_lossy().into_owned())
-			.collect()
+		build_sbf_args(
+			project,
+			&manifest_path,
+			"bpf-entrypoint",
+			&options,
+			&project.target_dir.join("sbf-build"),
+		)
+		.into_iter()
+		.map(|argument| argument.to_string_lossy().into_owned())
+		.collect()
 	}
 
 	#[test]
@@ -1083,6 +1160,51 @@ mod tests {
 		assert!(!library_supports_lto(&project));
 		let args = build_args_for(&project, SizeProfile::Production);
 		assert!(!args.contains(&"--lto".to_owned()));
+	}
+
+	#[test]
+	fn line_tables_request_dwarf_and_an_unstripped_linker_output() {
+		let mut command = Command::new("cargo");
+		apply_line_tables(&mut command);
+		let env: Vec<(String, Option<String>)> = command
+			.get_envs()
+			.map(|(key, value)| {
+				(
+					key.to_string_lossy().into_owned(),
+					value.map(|value| value.to_string_lossy().into_owned()),
+				)
+			})
+			.collect();
+
+		assert_eq!(
+			env,
+			[
+				(
+					"CARGO_PROFILE_RELEASE_DEBUG".to_owned(),
+					Some("line-tables-only".to_owned())
+				),
+				(
+					"CARGO_PROFILE_RELEASE_STRIP".to_owned(),
+					Some("none".to_owned())
+				),
+			]
+		);
+	}
+
+	#[test]
+	fn unstripped_artifact_finds_the_linker_output() {
+		let (temp, mut project) =
+			discover_fixture_with_crate_types("unstripped-fixture", "\"cdylib\"");
+		// An ambient CARGO_TARGET_DIR (such as llvm-cov's) must not be touched.
+		project.target_dir = temp.path().join("target");
+		assert_eq!(unstripped_artifact(&project), None);
+
+		let release = project.target_dir.join("sbpf-solana-solana/release");
+		fs::create_dir_all(&release).unwrap_or_else(|error| panic!("create release: {error}"));
+		let artifact = release.join(format!("{}.so", project.library_name));
+		fs::write(&artifact, b"elf").unwrap_or_else(|error| panic!("write artifact: {error}"));
+
+		assert_eq!(unstripped_artifact(&project), Some(artifact));
 	}
 
 	fn profile_env_for(size_profile: SizeProfile) -> Vec<(String, String)> {

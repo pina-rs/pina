@@ -188,6 +188,19 @@ pina profile ./target/deploy/counter_program.so --json --output ./profile.json
 
 When the path is omitted, Pina discovers `<cargo-target>/deploy/<library-name>.so`. The report is a static estimate, not a validator execution trace. Use it for deterministic comparisons and investigate material changes in context. Output files are written atomically and cannot alias the input binary through hardlinks or linked paths.
 
+## Trace-driven CU profiling
+
+To find where an instruction's compute units actually go, trace the project's Mollusk tests:
+
+```sh
+pina profile trace
+pina profile trace --filter increment --instruction increment
+pina profile trace --json > trace.json
+pina profile trace --folded > stacks.folded
+```
+
+The program's `mollusk-svm` dev-dependency must enable `features = ["register-tracing"]`; when no trace is recorded, the error prints the exact line to add. Tests must load the program by name so `SBF_OUT_DIR` can point at the traced build. Every executed SBF instruction costs 1 CU; syscalls are listed by name and call site but their runtime charges are not included. Read the hottest lines and inclusive function costs before changing code, and treat a "debug information changed code generation" warning as a sign that counts are approximate for the deployed build. `--trace-dir <target>/pina/trace/traces` re-analyzes the last run without rebuilding.
+
 # Verified deployments
 
 Use the content-addressed record produced by the deterministic build. Never invent or override its repository, revision, paths, library, or Cargo feature set.
