@@ -16,19 +16,23 @@ pina docs
 
 The binary currently bundles:
 
-| Topic           | Contents                                               |
-| --------------- | ------------------------------------------------------ |
-| `pina-overview` | Framework concepts, crates, features, and workflows.   |
-| `pina-idl`      | IDL extraction rules and supported Rust source shapes. |
+| Topic             | Contents                                                     |
+| ----------------- | ------------------------------------------------------------ |
+| `pina-idl`        | IDL extraction rules and supported Rust source shapes.       |
+| `pina-overview`   | Framework concepts, crates, features, and workflows.         |
+| `pina-validation` | Declarative rules, manual alternatives, and code generation. |
 
 Render one with:
 
 ```bash
-pina docs pina-overview
 pina docs pina-idl
+pina docs pina-overview
+pina docs pina-validation
 ```
 
 Markdown is rendered for the terminal rather than printed as raw source.
+
+Each bundled topic is an mdt consumer of the repository's `templates/*.t.md` providers, so `docs:check` fails when a topic and the template it mirrors disagree.
 
 ## Custom topics
 
