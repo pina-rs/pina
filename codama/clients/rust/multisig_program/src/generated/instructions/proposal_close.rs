@@ -9,6 +9,14 @@
 )]
 
 pub const PROPOSAL_CLOSE_DISCRIMINATOR: u8 = 14u8;
+/// Compute units `ProposalClose` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const PROPOSAL_CLOSE_MEASURED_COMPUTE_UNITS: u32 = 3799;
+/// Compute unit limit to request for a transaction carrying `ProposalClose`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const PROPOSAL_CLOSE_COMPUTE_UNIT_LIMIT: u32 = 4900;
 
 /// Accounts.
 #[derive(Clone, Debug)]

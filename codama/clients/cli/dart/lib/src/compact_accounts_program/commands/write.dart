@@ -45,6 +45,6 @@ final class WriteCommand extends Command<void> {
       index: indexValue,
       value: valueValue,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: writeComputeUnitLimit);
   }
 }

@@ -15,6 +15,9 @@ pina test --unit --filter rejects_wrong_owner
 
 # Verify migration history and run historical compatibility cases.
 pina test --compatibility
+
+# Measure every instruction and record the result in compute-units.json.
+pina test --record-compute-units
 ```
 
 ## Default SBF workflow
@@ -47,13 +50,49 @@ Build historical cases with `HistoricalAccount` and `HistoricalInstruction`. The
 
 For a rejected migration, call `ProgramTest::expect_historical_rejection_with_rollback`. The helper accepts only a program-execution failure. It then compares each protected account with its exact pre-transaction state.
 
+## Recording compute units
+
+Most transactions request the runtime's default compute unit limit, and priority fees are charged per requested unit, so they pay for units they never use. Your Surfpool suite already runs every instruction against the real program, so it can measure what each one costs.
+
+`pina test --record-compute-units` runs the complete Surfpool suite exactly as `pina test` does. While it runs, `pina_test` simulates each single-instruction transaction that `ProgramTest::send`, `send_instruction`, `send_with_signers`, or `send_transaction` submits to the program. When the whole suite passes, Pina writes `compute-units.json` beside the program's `Cargo.toml`:
+
+```json
+{
+	"schemaVersion": 1,
+	"measurement": "surfpool-simulation-max",
+	"artifactSha256": "cd4f4344ca04f181016a16b7694b3ef10a93703e7c259c0be852807df8033614",
+	"instructions": {
+		"increment": {
+			"computeUnits": 379,
+			"samples": 5
+		},
+		"initialize": {
+			"computeUnits": 1704,
+			"samples": 6
+		}
+	}
+}
+```
+
+- Each instruction keeps the most compute units any **successful** sample consumed. A transaction that fails usually stops early, so failed samples never count.
+- Samples are attributed by the program's full discriminator, whatever its width.
+- An instruction no successful test sent is left out, and the command names it. Its clients keep requesting the runtime default until a test exercises it.
+- `artifactSha256` identifies the SBF build the suite measured. `pina generate` warns when `target/deploy/<library-name>.so` is a different build, so you know to record again.
+
+The suite runs unfiltered: `--record-compute-units` conflicts with `--unit` and `--filter`, because a partial run would drop the measurements of the tests it skipped. A failing suite writes nothing.
+
+The recording build never reads the existing `compute-units.json`, because the run replaces it. After you rename or remove an instruction, record again: a plain `pina test`, `pina build`, or `pina idl` warns about the stale entry and ignores it, and `pina generate` refuses to run until it is gone.
+
+Commit `compute-units.json` with the clients it produced. The file is deterministic, so recording again without changing the program produces no diff. `pina generate` turns each measurement into the limit the generated clients request; see [compute unit limits](./generate.md#compute-unit-limits).
+
 ## Options
 
-| Option                  | Meaning                                                   |
-| ----------------------- | --------------------------------------------------------- |
-| `--project <DIR>`       | Project directory or a directory below it                 |
-| `--unit`                | Run only native Rust and Mollusk tests                    |
-| `--compatibility`       | Enable historical fixtures in the complete SBF test suite |
-| `-f, --filter <FILTER>` | Pass a test-name filter to Cargo                          |
+| Option                   | Meaning                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| `--project <DIR>`        | Project directory or a directory below it                                      |
+| `--unit`                 | Run only native Rust and Mollusk tests                                         |
+| `--compatibility`        | Enable historical fixtures in the complete SBF test suite                      |
+| `-f, --filter <FILTER>`  | Pass a test-name filter to Cargo                                               |
+| `--record-compute-units` | Measure every instruction in the complete suite and write `compute-units.json` |
 
 Run `pina test --help` for the authoritative command contract.

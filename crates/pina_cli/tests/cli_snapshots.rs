@@ -186,6 +186,14 @@ case "${1:-}" in
 			test -f "${PINA_SBF_ARTIFACT:?}"
 			printf 'artifact %s\n' "$PINA_SBF_ARTIFACT" >> "$PINA_FAKE_LOG"
 		fi
+		# A recording run must measure the artifact it just built, under the
+		# project's own program name.
+		if [[ -n "${PINA_CU_RECORD_FILE:-}" ]]; then
+			test -z "${PINA_CU_MANIFEST:-}"
+			printf 'recording %s\n' "${PINA_CU_PROGRAM:?}" >> "$PINA_FAKE_LOG"
+			printf '%s\n' "${PINA_FAKE_SAMPLES:-}" >> "$PINA_CU_RECORD_FILE"
+		fi
+		exit "${PINA_FAKE_TEST_STATUS:-0}"
 		;;
 	*) exit 91 ;;
 esac
@@ -772,6 +780,190 @@ fn compatibility_mode_runs_the_complete_surfpool_suite_with_fixture_signal() {
 	assert!(commands.contains("cargo test"));
 	assert!(commands.contains(" -- --ignored --nocapture"));
 	assert!(commands.contains("compatibility enabled"));
+}
+
+#[cfg(unix)]
+fn record_compute_units(project: &FakeWorkflowProject, samples: &[&str]) -> Command {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command
+		.args(["test", "--record-compute-units", "--project"])
+		.arg(&project.project)
+		.env("CARGO", project.project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &project.target)
+		.env("PINA_FAKE_LOG", &project.log)
+		.env("PINA_FAKE_MANIFEST", &project.manifest)
+		.env("PINA_FAKE_TARGET", &project.target)
+		.env("PINA_FAKE_SAMPLES", samples.join("\n"))
+		// A benchmark manifest left in the environment must not redirect the
+		// recording to another artifact.
+		.env("PINA_CU_MANIFEST", "/benchmark/manifest.json");
+	command
+}
+
+#[cfg(unix)]
+fn sample(prefix: &str, compute_units: u64, success: bool) -> String {
+	format!(
+		r#"{{"program":"test_program","discriminator":0,"discriminatorBytes":"{prefix}","computeUnits":{compute_units},"success":{success}}}"#
+	)
+}
+
+#[cfg(unix)]
+#[test]
+fn recording_compute_units_writes_the_maximum_successful_sample_per_instruction() {
+	let project = create_fake_workflow_project("record compute units");
+	let samples = [
+		sample("0001", 900, true),
+		sample("0002", 1_200, true),
+		sample("0003", 5_000, false),
+		sample("07", 300, true),
+	];
+	let output = record_compute_units(
+		&project,
+		&samples.iter().map(String::as_str).collect::<Vec<_>>(),
+	)
+	.output()
+	.unwrap_or_else(|error| panic!("failed to run pina test --record-compute-units: {error}"));
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	let stderr = String::from_utf8_lossy(&output.stderr);
+
+	assert!(
+		output.status.success(),
+		"recording failed: {stdout}\n{stderr}"
+	);
+	assert!(stdout.contains("Recorded compute units for 1 instruction(s)"));
+	assert!(stdout.contains("Skipped 1 sample(s) from transactions that failed"));
+	assert!(stdout.contains("pina generate"));
+	assert!(stderr.contains("match no instruction discriminator: `07`"));
+
+	let commands = fs::read_to_string(&project.log)
+		.unwrap_or_else(|error| panic!("failed to read {}: {error}", project.log.display()));
+	assert!(commands.contains("cargo build-sbf"));
+	assert!(commands.contains("tests/surfpool/Cargo.toml --lib -- --ignored --nocapture"));
+	assert!(commands.contains("recording test_program"));
+
+	let recorded = fs::read_to_string(project.project.join("compute-units.json"))
+		.unwrap_or_else(|error| panic!("failed to read compute-units.json: {error}"));
+	assert_eq!(
+		recorded,
+		"{\n\t\"schemaVersion\": 1,\n\t\"measurement\": \"surfpool-simulation-max\",\n\t\"artifactSha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n\t\"instructions\": {\n\t\t\"initialize\": {\n\t\t\t\"computeUnits\": 1200,\n\t\t\t\"samples\": 2\n\t\t}\n\t}\n}\n"
+	);
+
+	// The IDL now carries the limit: 1,200 × 1.2 = 1,440 → 1,500, plus 300.
+	let idl = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["idl", "--compact", "--path"])
+		.arg(&project.project)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina idl: {error}"));
+	assert!(idl.status.success());
+	assert!(String::from_utf8_lossy(&idl.stdout).contains(
+		r#""plugins":[{"kind":"pluginNode","name":"pinaComputeUnits","payload":{"limit":1800,"measured":1200}}]"#
+	));
+
+	// A run that sends nothing names what it could not measure, and a failing
+	// suite writes nothing.
+	let unmeasured = record_compute_units(&project, &[])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to rerun the recording: {error}"));
+	assert!(unmeasured.status.success());
+	assert!(
+		String::from_utf8_lossy(&unmeasured.stderr)
+			.contains("no successful Surfpool test sent `initialize`")
+	);
+	assert!(!String::from_utf8_lossy(&unmeasured.stdout).contains("Skipped"));
+
+	let before = fs::read(project.project.join("compute-units.json"))
+		.unwrap_or_else(|error| panic!("failed to read compute-units.json: {error}"));
+	let failed = record_compute_units(&project, &[&sample("0001", 900, true)])
+		.env("PINA_FAKE_TEST_STATUS", "7")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run the failing recording: {error}"));
+	assert_eq!(failed.status.code(), Some(7));
+	assert!(String::from_utf8_lossy(&failed.stderr).contains("exited unsuccessfully"));
+	assert_eq!(
+		fs::read(project.project.join("compute-units.json"))
+			.unwrap_or_else(|error| panic!("failed to read compute-units.json: {error}")),
+		before
+	);
+
+	// A measurement for an instruction the program no longer declares is
+	// ignored with a warning by the IDL and by a plain test run.
+	let stale_warning = "measures `renamed`, which the program does not declare, so those budgets \
+	                     are ignored";
+	fs::write(
+		project.project.join("compute-units.json"),
+		r#"{"schemaVersion":1,"measurement":"surfpool-simulation-max","instructions":{"initialize":{"computeUnits":1200,"samples":2},"renamed":{"computeUnits":10,"samples":1}}}"#,
+	)
+	.unwrap_or_else(|error| panic!("failed to write compute-units.json: {error}"));
+	let renamed = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["idl", "--compact", "--path"])
+		.arg(&project.project)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina idl: {error}"));
+	let stderr = String::from_utf8_lossy(&renamed.stderr);
+	assert!(renamed.status.success(), "pina idl failed: {stderr}");
+	assert!(stderr.contains(stale_warning));
+	assert!(
+		String::from_utf8_lossy(&renamed.stdout)
+			.contains(r#""payload":{"limit":1800,"measured":1200}"#)
+	);
+
+	let tested = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["test", "--project"])
+		.arg(&project.project)
+		.env("CARGO", project.project.join("fake-cargo.sh"))
+		.env("CARGO_TARGET_DIR", &project.target)
+		.env("PINA_FAKE_LOG", &project.log)
+		.env("PINA_FAKE_MANIFEST", &project.manifest)
+		.env("PINA_FAKE_TARGET", &project.target)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run pina test: {error}"));
+	let stderr = String::from_utf8_lossy(&tested.stderr);
+	assert!(tested.status.success(), "pina test failed: {stderr}");
+	assert!(stderr.contains(stale_warning));
+
+	// Recording never reads the file it replaces, so the stale entry cannot
+	// stop the run that removes it.
+	let rerecorded = record_compute_units(&project, &[&sample("0001", 900, true)])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to record over stale measurements: {error}"));
+	let stderr = String::from_utf8_lossy(&rerecorded.stderr);
+	assert!(rerecorded.status.success(), "recording failed: {stderr}");
+	assert!(!stderr.contains("renamed"));
+	let recorded = fs::read_to_string(project.project.join("compute-units.json"))
+		.unwrap_or_else(|error| panic!("failed to read compute-units.json: {error}"));
+	assert!(!recorded.contains("renamed"));
+	assert!(recorded.contains("\"computeUnits\": 900"));
+
+	// Not even a file that cannot be parsed stops it.
+	fs::write(project.project.join("compute-units.json"), "{")
+		.unwrap_or_else(|error| panic!("failed to corrupt compute-units.json: {error}"));
+	let repaired = record_compute_units(&project, &[&sample("0001", 900, true)])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to record over a corrupt file: {error}"));
+	assert!(
+		repaired.status.success(),
+		"recording failed: {}",
+		String::from_utf8_lossy(&repaired.stderr)
+	);
+	assert_eq!(
+		fs::read_to_string(project.project.join("compute-units.json"))
+			.unwrap_or_else(|error| panic!("failed to read compute-units.json: {error}")),
+		recorded
+	);
+}
+
+#[test]
+fn recording_compute_units_refuses_partial_suites() {
+	for conflicting in [["--unit"].as_slice(), ["--filter", "initialize"].as_slice()] {
+		let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+			.args(["test", "--record-compute-units"])
+			.args(conflicting)
+			.output()
+			.unwrap_or_else(|error| panic!("failed to run conflicting flags: {error}"));
+
+		assert_eq!(output.status.code(), Some(2), "{conflicting:?}");
+		assert!(String::from_utf8_lossy(&output.stderr).contains("cannot be used with"));
+	}
 }
 
 #[cfg(unix)]

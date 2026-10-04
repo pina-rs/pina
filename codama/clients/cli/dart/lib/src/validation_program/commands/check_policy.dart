@@ -62,6 +62,8 @@ final class CheckPolicyCommand extends Command<void> {
       memo: memoValue,
       approvals: approvalsValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: checkPolicyComputeUnitLimit);
   }
 }

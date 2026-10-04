@@ -2677,7 +2677,7 @@
 			"hidden": false,
 			"max_bump": "major",
 			"summary": "Test a Pina program with fast native tests or an isolated Surfpool instance",
-			"description": "Test a Pina program with fast native tests or an isolated Surfpool instance.\n\nThe default workflow builds the actual SBF shared object, verifies that it exists, and runs the project's isolated `tests/surfpool` test package. That package owns an embedded Surfpool instance, so parallel runs use separate ports and teardown remains deterministic. Use --unit for native Rust and Mollusk tests only.",
+			"description": "Test a Pina program with fast native tests or an isolated Surfpool instance.\n\nThe default workflow builds the actual SBF shared object, verifies that it exists, and runs the project's isolated `tests/surfpool` test package. That package owns an embedded Surfpool instance, so parallel runs use separate ports and teardown remains deterministic. Use --unit for native Rust and Mollusk tests only. Use --record-compute-units to measure every instruction for the compute unit limits generated clients request.",
 			"parser": {
 				"flags_are_posix_noncompliant": false,
 				"options_must_precede_arguments": false,
@@ -2756,6 +2756,25 @@
 						"required": false,
 						"repeatable": true,
 						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--record-compute-units"
+					],
+					"canonical_name": "--record-compute-units",
+					"hidden": false,
+					"global": false,
+					"summary": "Measure every instruction in the complete Surfpool suite and write compute-units.json",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
 					}
 				}
 			]

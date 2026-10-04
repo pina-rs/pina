@@ -48,6 +48,8 @@ final class InitializeCommand extends Command<void> {
       bump: bumpValue,
       digest: digestValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializeComputeUnitLimit);
   }
 }

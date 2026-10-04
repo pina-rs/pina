@@ -55,6 +55,15 @@ struct Cli {
 	#[arg(long, global = true)]
 	json: bool,
 
+	/// Compute unit limit to request instead of the one recorded for the instruction.
+	#[arg(
+		long,
+		global = true,
+		value_name = "UNITS",
+		value_parser = clap::value_parser!(u32).range(1..=1_400_000)
+	)]
+	compute_unit_limit: Option<u32>,
+
 	#[command(subcommand)]
 	command: Command,
 }
@@ -93,6 +102,7 @@ fn run(cli: Cli) -> Result<(), context::CliError> {
 		program_address,
 		cli.simulate,
 		cli.json,
+		cli.compute_unit_limit,
 	)?;
 
 	match cli.command {

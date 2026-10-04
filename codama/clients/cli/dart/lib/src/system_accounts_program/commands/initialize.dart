@@ -30,6 +30,8 @@ final class InitializeCommand extends Command<void> {
       authority: authority,
       wallet: wallet,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: initializeComputeUnitLimit);
   }
 }

@@ -9,6 +9,14 @@
 )]
 
 pub const CHECK_POLICY_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `CheckPolicy` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const CHECK_POLICY_MEASURED_COMPUTE_UNITS: u32 = 965;
+/// Compute unit limit to request for a transaction carrying `CheckPolicy`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const CHECK_POLICY_COMPUTE_UNIT_LIMIT: u32 = 1500;
 
 /// Accounts.
 #[derive(Clone, Debug)]

@@ -45,6 +45,8 @@ final class DeactivateRoleCommand extends Command<void> {
       registryConfig: registryConfig,
       roleEntry: roleEntry,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: deactivateRoleComputeUnitLimit);
   }
 }

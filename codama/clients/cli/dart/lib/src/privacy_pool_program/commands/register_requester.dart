@@ -60,6 +60,8 @@ final class RegisterRequesterCommand extends Command<void> {
       requester: requesterValue,
       maxTier: maxTierValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: registerRequesterComputeUnitLimit);
   }
 }

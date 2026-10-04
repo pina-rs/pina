@@ -25,6 +25,6 @@ final class HelloCommand extends Command<void> {
     final instruction = getHelloInstruction(
       programAddress: context.programAddress,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: helloComputeUnitLimit);
   }
 }

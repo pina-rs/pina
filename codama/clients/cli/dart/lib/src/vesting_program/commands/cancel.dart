@@ -82,6 +82,6 @@ final class CancelCommand extends Command<void> {
       clock: clock,
       beneficiaryAta: beneficiaryAta,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: cancelComputeUnitLimit);
   }
 }

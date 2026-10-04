@@ -1,0 +1,59 @@
+{
+	"schemaVersion": 1,
+	"measurement": "surfpool-simulation-max",
+	"artifactSha256": "7794afd8c4f7d3021a9b692583027b30d683d50d8a4092d24fd7891effd9723f",
+	"instructions": {
+		"approveDisclosure": {
+			"computeUnits": 438,
+			"samples": 2
+		},
+		"cancelDisclosure": {
+			"computeUnits": 121,
+			"samples": 1
+		},
+		"challengeDisclosure": {
+			"computeUnits": 1943,
+			"samples": 1
+		},
+		"deposit": {
+			"computeUnits": 15996,
+			"samples": 5
+		},
+		"grantDisclosure": {
+			"computeUnits": 1893,
+			"samples": 1
+		},
+		"initialize": {
+			"computeUnits": 46616,
+			"samples": 5
+		},
+		"registerRequester": {
+			"computeUnits": 319,
+			"samples": 1
+		},
+		"requestDisclosure": {
+			"computeUnits": 11015,
+			"samples": 3
+		},
+		"resolveChallenge": {
+			"computeUnits": 198,
+			"samples": 1
+		},
+		"setCustodians": {
+			"computeUnits": 243,
+			"samples": 1
+		},
+		"setVerificationKey": {
+			"computeUnits": 15259,
+			"samples": 10
+		},
+		"transfer": {
+			"computeUnits": 104148,
+			"samples": 1
+		},
+		"withdraw": {
+			"computeUnits": 86950,
+			"samples": 1
+		}
+	}
+}

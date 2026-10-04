@@ -53,6 +53,8 @@ final class ConfigInitializeCommand extends Command<void> {
       treasury: treasuryValue,
       creationFee: creationFeeValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: configInitializeComputeUnitLimit);
   }
 }

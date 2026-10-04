@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getCancelInstruction } from "../client";
+import { CANCEL_COMPUTE_UNIT_LIMIT, getCancelInstruction } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -38,5 +38,5 @@ export const cancelCommand = registerGlobals(new Command("cancel"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, CANCEL_COMPUTE_UNIT_LIMIT);
 	});

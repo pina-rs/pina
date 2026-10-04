@@ -34,5 +34,8 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 
 	let accounts = Initialize { authority, wallet };
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(system_accounts_program_client::instructions::INITIALIZE_COMPUTE_UNIT_LIMIT),
+	)
 }

@@ -9,6 +9,14 @@
 )]
 
 pub const TOUCH_DISCRIMINATOR: u8 = 1u8;
+/// Compute units `Touch` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const TOUCH_MEASURED_COMPUTE_UNITS: u32 = 389;
+/// Compute unit limit to request for a transaction carrying `Touch`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const TOUCH_COMPUTE_UNIT_LIMIT: u32 = 800;
 
 /// Accounts.
 #[derive(Clone, Debug)]

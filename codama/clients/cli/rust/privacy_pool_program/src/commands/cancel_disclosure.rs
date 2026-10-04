@@ -43,5 +43,8 @@ pub(crate) fn run(context: &CliContext, args: CancelDisclosureArgs) -> Result<()
 		disclosure_request,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::CANCEL_DISCLOSURE_COMPUTE_UNIT_LIMIT),
+	)
 }

@@ -9,6 +9,14 @@
 )]
 
 pub const RENAME_DISCRIMINATOR: u8 = 3u8;
+/// Compute units `Rename` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const RENAME_MEASURED_COMPUTE_UNITS: u32 = 3102;
+/// Compute unit limit to request for a transaction carrying `Rename`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const RENAME_COMPUTE_UNIT_LIMIT: u32 = 4100;
 
 /// Accounts.
 #[derive(Clone, Debug)]

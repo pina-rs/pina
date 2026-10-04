@@ -126,6 +126,8 @@ final class RequestDisclosureCommand extends Command<void> {
       notice: noticeValue,
       legalBasisHash: legalBasisHashValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: requestDisclosureComputeUnitLimit);
   }
 }

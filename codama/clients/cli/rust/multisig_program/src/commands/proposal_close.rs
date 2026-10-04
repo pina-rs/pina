@@ -50,5 +50,8 @@ pub(crate) fn run(context: &CliContext, args: ProposalCloseArgs) -> Result<(), C
 		clock,
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(multisig_program_client::instructions::PROPOSAL_CLOSE_COMPUTE_UNIT_LIMIT),
+	)
 }

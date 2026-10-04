@@ -96,5 +96,8 @@ pub(crate) fn run(context: &CliContext, args: WithdrawArgs) -> Result<(), CliErr
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::WITHDRAW_COMPUTE_UNIT_LIMIT),
+	)
 }

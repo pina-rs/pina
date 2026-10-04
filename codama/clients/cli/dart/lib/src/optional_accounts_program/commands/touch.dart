@@ -34,6 +34,6 @@ final class TouchCommand extends Command<void> {
       authority: authority,
       store: store,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: touchComputeUnitLimit);
   }
 }

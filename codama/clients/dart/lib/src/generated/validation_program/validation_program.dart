@@ -8,3 +8,4 @@ export 'pdas/pdas.dart';
 export 'programs/programs.dart';
 
 export 'events/events.dart';
+export 'compute_units.dart';

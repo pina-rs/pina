@@ -9,6 +9,14 @@
 )]
 
 pub const APPROVE_DISCLOSURE_DISCRIMINATOR: u8 = 11u8;
+/// Compute units `ApproveDisclosure` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const APPROVE_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 438;
+/// Compute unit limit to request for a transaction carrying `ApproveDisclosure`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT: u32 = 900;
 
 /// Accounts.
 #[derive(Clone, Debug)]

@@ -3,7 +3,10 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getCpiTransferInstruction } from "../client";
+import {
+	CPI_TRANSFER_COMPUTE_UNIT_LIMIT,
+	getCpiTransferInstruction,
+} from "../client";
 import {
 	base58,
 	base58Vec,
@@ -34,5 +37,5 @@ export const cpiTransferCommand = registerGlobals(new Command("cpi_transfer"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, CPI_TRANSFER_COMPUTE_UNIT_LIMIT);
 	});

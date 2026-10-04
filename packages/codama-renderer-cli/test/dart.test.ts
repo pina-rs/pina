@@ -41,4 +41,45 @@ describe("renderDart", () => {
 		expect(sources).not.toMatch(/[^\\]\$\{\(\(\) \{ throw/u);
 		expect(sources).not.toMatch(/[^\\]\$pwnVar/u);
 	});
+
+	it("requests the client's recorded limit only for measured instructions", () => {
+		const root = JSON.parse(
+			readFileSync(join(idls, "counter_program.json"), "utf8"),
+		);
+		for (const instruction of root.program.instructions) {
+			instruction.plugins = instruction.name === "increment"
+				? [{
+					kind: "pluginNode",
+					name: "pinaComputeUnits",
+					payload: { measured: 379, limit: 800 },
+				}]
+				: [];
+		}
+
+		const files = renderDart(extractCliModel(root), {
+			packageName: "pina_cli_apps",
+			clientBarrel: "package:pina_codama_clients/counter_program.dart",
+		});
+
+		expect(
+			files.get("lib/src/counter_program/commands/increment.dart"),
+		).toContain(
+			"await context.send([instruction], recordedLimit: incrementComputeUnitLimit);",
+		);
+		expect(
+			files.get("lib/src/counter_program/commands/initialize.dart"),
+		).toContain("await context.send([instruction]);");
+		expect(files.get("lib/src/counter_program/main.dart")).toContain(
+			"'compute-unit-limit'",
+		);
+		expect(files.get("lib/src/counter_program/context.dart")).toContain(
+			"budgetedTransactionMessage(",
+		);
+		expect(files.get("lib/src/compute_budget.dart")).toContain(
+			"setTransactionMessageComputeUnitLimit(",
+		);
+		expect(files.get("test/compute_budget_test.dart")).toContain(
+			"import 'package:pina_cli_apps/src/compute_budget.dart';",
+		);
+	});
 });

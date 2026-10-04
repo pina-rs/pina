@@ -4,6 +4,7 @@ use std::path::Path;
 use codama_nodes::RootNode;
 use walkdir::WalkDir;
 
+use crate::client_compute_units::emit_js_compute_units_module;
 use crate::client_migrations::MigratableAccount;
 use crate::client_migrations::MigrationPlan;
 use crate::compact_capacity::CompactCapacity;
@@ -343,6 +344,7 @@ pub fn harden_generated_clients(
 		})?;
 
 		emit_js_migration_helpers(&generated, program, &root)?;
+		emit_js_compute_units_module(&generated, &root)?;
 	}
 
 	Ok(())
@@ -1386,7 +1388,8 @@ const decoder = getStructDecoder([
 
 		// Hardening walks the rest of the generated tree too: it writes the
 		// reserved `Migrate` composer beside the real instructions, registers it
-		// in `instructions/index.ts`, and patches the program plugin. Mirror the
+		// in `instructions/index.ts`, patches the program plugin, and exports
+		// the recorded compute unit budgets from the root barrel. Mirror the
 		// real generated layout so the fixture exercises the same paths.
 		let real_generated =
 			workspace.join("codama/clients/js/compact_accounts_program/src/generated");
@@ -1394,6 +1397,7 @@ const decoder = getStructDecoder([
 			.path()
 			.join("compact_accounts_program/src/generated");
 		for relative in [
+			"index.ts",
 			"instructions/index.ts",
 			"programs/compactAccountsProgram.ts",
 		] {

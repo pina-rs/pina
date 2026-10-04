@@ -3,7 +3,7 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getAddRoleInstruction } from "../client";
+import { ADD_ROLE_COMPUTE_UNIT_LIMIT, getAddRoleInstruction } from "../client";
 import {
 	base58,
 	base58Vec,
@@ -40,5 +40,5 @@ export const addRoleCommand = registerGlobals(new Command("add_role"))
 			...[input],
 			{ programAddress: context.programAddress },
 		);
-		await context.send(instruction);
+		await context.send(instruction, ADD_ROLE_COMPUTE_UNIT_LIMIT);
 	});

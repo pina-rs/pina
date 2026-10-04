@@ -141,7 +141,14 @@ pub(crate) fn run(cli: Cli) {
 			unit,
 			compatibility,
 			filter,
-		} => run_test(project, unit, compatibility, filter),
+			record_compute_units,
+		} => {
+			if record_compute_units {
+				run_record_compute_units(&project, compatibility);
+			} else {
+				run_test(project, unit, compatibility, filter);
+			}
+		}
 		Commands::Dev {
 			project,
 			network,
@@ -1216,6 +1223,59 @@ fn run_test(project: PathBuf, unit: bool, compatibility: bool, filter: Option<St
 		eprintln!("{} {}", "Error".red().bold(), error);
 		std::process::exit(error.exit_code());
 	}
+}
+
+fn run_record_compute_units(project: &Path, compatibility: bool) {
+	let recording = match pina_cli::workflow::record_compute_units(project, compatibility) {
+		Ok(recording) => recording,
+		Err(error) => {
+			eprintln!("{} {}", "Error".red().bold(), error);
+			std::process::exit(error.exit_code());
+		}
+	};
+
+	println!(
+		"{} Recorded compute units for {} instruction(s) in {}",
+		"✔".green(),
+		recording.measured.len(),
+		recording.path.display(),
+	);
+
+	if !recording.unmeasured.is_empty() {
+		eprintln!(
+			"{} no successful Surfpool test sent {}; generated clients keep the runtime default \
+			 limit for them. Exercise them through `ProgramTest::send` to record a budget.",
+			"warning:".yellow().bold(),
+			backticked(&recording.unmeasured),
+		);
+	}
+
+	if !recording.unmatched.is_empty() {
+		eprintln!(
+			"{} {} recorded instruction data prefix(es) match no instruction discriminator: {}",
+			"warning:".yellow().bold(),
+			recording.unmatched.len(),
+			backticked(&recording.unmatched),
+		);
+	}
+
+	if recording.failed_samples > 0 {
+		println!(
+			"Skipped {} sample(s) from transactions that failed; only successful runs set a budget.",
+			recording.failed_samples,
+		);
+	}
+
+	println!("Run `pina generate` to give the clients the new limits.");
+}
+
+/// Join names as a comma-separated list of code spans.
+fn backticked(names: &[String]) -> String {
+	names
+		.iter()
+		.map(|name| format!("`{name}`"))
+		.collect::<Vec<_>>()
+		.join(", ")
 }
 
 fn run_dev(

@@ -121,6 +121,8 @@ final class MultisigCreateCommand extends Command<void> {
       configAuthority: configAuthorityValue,
       rentCollector: rentCollectorValue,
     );
-    await context.send([instruction]);
+    await context.send([
+      instruction,
+    ], recordedLimit: multisigCreateComputeUnitLimit);
   }
 }

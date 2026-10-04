@@ -41,6 +41,6 @@ final class IncrementCommand extends Command<void> {
       authority: authority,
       counter: counter,
     );
-    await context.send([instruction]);
+    await context.send([instruction], recordedLimit: incrementComputeUnitLimit);
   }
 }

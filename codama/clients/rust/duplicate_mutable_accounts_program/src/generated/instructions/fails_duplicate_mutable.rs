@@ -9,6 +9,14 @@
 )]
 
 pub const FAILS_DUPLICATE_MUTABLE_DISCRIMINATOR: u8 = 0u8;
+/// Compute units `FailsDuplicateMutable` consumed in its most expensive recorded
+/// Surfpool simulation.
+pub const FAILS_DUPLICATE_MUTABLE_MEASURED_COMPUTE_UNITS: u32 = 57;
+/// Compute unit limit to request for a transaction carrying `FailsDuplicateMutable`:
+/// the measurement plus the project's margin and the cost of the compute budget
+/// instructions. Pass it, or the sum for several instructions, to
+/// `set_compute_unit_limit_instruction`.
+pub const FAILS_DUPLICATE_MUTABLE_COMPUTE_UNIT_LIMIT: u32 = 400;
 
 /// Accounts.
 #[derive(Clone, Debug)]

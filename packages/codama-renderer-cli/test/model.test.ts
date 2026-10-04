@@ -51,6 +51,27 @@ describe("extractCliModel", () => {
 		).toEqual(["authority"]);
 	});
 
+	it("names only instructions that carry a recorded compute unit budget", () => {
+		const root = JSON.parse(
+			readFileSync(join(idls, "counter_program.json"), "utf8"),
+		);
+		root.program.instructions[0].plugins = [
+			{ kind: "pluginNode", name: "anchor" },
+		];
+		root.program.instructions[1].plugins = [
+			{
+				kind: "pluginNode",
+				name: "pinaComputeUnits",
+				payload: { measured: 379, limit: 800 },
+			},
+		];
+
+		const model = extractCliModel(root);
+
+		expect(model.instructions[0]).not.toHaveProperty("computeUnitLimitName");
+		expect(model.instructions[1]?.computeUnitLimitName).toBe("increment");
+	});
+
 	it("rejects unsupported argument shapes", () => {
 		expect(() =>
 			extractCliModel({
