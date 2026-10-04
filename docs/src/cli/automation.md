@@ -42,10 +42,11 @@ pina explain --help
 pina keys --help
 ```
 
-For write-lock contention between instructions:
+For write-lock contention between instructions, and its interactive map:
 
 ```bash
 pina locks --help
+pina map --help
 ```
 
 For framework and extractor constraints:
@@ -104,6 +105,13 @@ Report write-lock contention through the versioned JSON contract, and gate CI on
 pina locks --json > /tmp/pina-locks.json
 jq -e '.hotspots | map(select(.allowed | not)) | length == 0' /tmp/pina-locks.json
 pina locks --deny-hotspots
+```
+
+Read the program map's data, the locks document plus per-instruction and per-account-type detail, without writing its HTML page:
+
+```bash
+pina map --json > /tmp/pina-map.json
+jq -e '.instructionDetails | length > 0' /tmp/pina-map.json
 ```
 
 Diagnose project readiness through the versioned JSON contract:

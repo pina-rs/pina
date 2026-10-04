@@ -196,11 +196,25 @@ pub enum LocksError {
 /// is invalid, its source cannot be parsed, or an allowed name is not one of
 /// its hotspots.
 pub fn analyze_project(start: &Path) -> Result<LockReport, LocksError> {
+	let loaded = load_project(start)?;
+
+	analyze(&loaded.ir, &loaded.allow)
+}
+
+/// A discovered project with its parsed program and `[locks] allow` list.
+pub(crate) struct LoadedProject {
+	pub(crate) project: Project,
+	pub(crate) ir: ProgramIr,
+	pub(crate) allow: Vec<String>,
+}
+
+/// Discover the project at or above `start` and parse its program.
+pub(crate) fn load_project(start: &Path) -> Result<LoadedProject, LocksError> {
 	let project = Project::discover(start)?;
-	let config = project.locks_config()?;
+	let allow = project.locks_config()?.allow;
 	let ir = crate::parse::parse_program(&project.program_dir, None)?;
 
-	analyze(&ir, &config.allow)
+	Ok(LoadedProject { project, ir, allow })
 }
 
 /// Analyse the write locks of `ir`.

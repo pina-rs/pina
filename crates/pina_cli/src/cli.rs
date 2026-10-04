@@ -213,6 +213,42 @@ pub(crate) enum Commands {
 		deny_hotspots: bool,
 	},
 
+	/// Render an interactive map of the program's instructions and account locks.
+	///
+	/// Writes one self-contained HTML file, with no network access, that charts
+	/// which accounts every instruction writes and reads, the hotspots `pina
+	/// locks` reports, and the instructions that block each other. Select an
+	/// instruction or an account for its docs, constraints, PDA derivation, and
+	/// conflicts.
+	#[command(
+		after_help = "Examples:\n  pina map\n  open \"$(pina map)\"\n  pina map --project \
+		              ./programs/privacy_pool\n  pina map --output ./docs/program-map.html\n  pina \
+		              map --json\n\nOutput:\n  The HTML file is written to <target>/pina/map.html \
+		              unless --output names another path. stdout carries only the written path, so \
+		              the command composes with `open` and `xdg-open`; progress goes to stderr. \
+		              --json prints the map's data instead: the `pina locks --json` document plus \
+		              instructionDetails and accountTypes."
+	)]
+	Map {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Write the HTML map to FILE instead of `<target>/pina/map.html`.
+		#[arg(short, long, value_name = "FILE", conflicts_with = "json")]
+		output: Option<PathBuf>,
+
+		/// Print the map's data as a stable machine-readable JSON document instead of writing HTML.
+		#[arg(long)]
+		json: bool,
+	},
+
 	/// Create and verify checked-in ABI migrations.
 	///
 	/// `create` snapshots the current desired schema. It rewrites an unpublished

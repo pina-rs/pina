@@ -219,6 +219,13 @@ fn locks_help_snapshot() {
 }
 
 #[test]
+fn map_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["map", "--help"]);
+	assert_cmd_snapshot!("map_help", command);
+}
+
+#[test]
 fn generate_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["generate", "--help"]);

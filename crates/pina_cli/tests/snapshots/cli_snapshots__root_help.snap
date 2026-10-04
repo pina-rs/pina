@@ -21,6 +21,8 @@ Commands:
           Run Pina's official security lints against the current program
   locks
           Report which instructions can never run in parallel
+  map
+          Render an interactive map of the program's instructions and account locks
   migrations
           Create and verify checked-in ABI migrations
   abi
