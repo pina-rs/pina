@@ -1,0 +1,202 @@
+---
+source: crates/pina_cli/tests/rehearse_command.rs
+expression: "stdout(&output, &remote)"
+---
+{
+  "schemaVersion": 1,
+  "cluster": "http://127.0.0.1:[port]",
+  "programId": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+  "deployedSha256": "1e62155ae2171aab4088e1a3eca14a47f8aee9124db1c55045fb2e9d9bae10fb",
+  "candidateSha256": "d380ef636ae475a8bf10cfd1a8dc93429b21eadfb0d2db1c95f2a6d5e1b1347e",
+  "slot": 2001,
+  "summary": {
+    "total": 4,
+    "unchanged": 0,
+    "cuChanged": 0,
+    "stateChanged": 3,
+    "outcomeChanged": 0,
+    "skipped": 1
+  },
+  "instructions": [
+    {
+      "name": "increment",
+      "samples": 3,
+      "baseline": {
+        "min": 473,
+        "median": 473,
+        "max": 473
+      },
+      "candidate": {
+        "min": 473,
+        "median": 473,
+        "max": 473
+      },
+      "medianDelta": 0
+    }
+  ],
+  "transactions": [
+    {
+      "signature": "2y8JkzTSum83V1nSkpy64WHZv1S8pqWFMJ8YRxP3pqtqgwTBdyKGMwZ1rBsg4auwogTkpoJunSjxcBnj8XG4EECP",
+      "status": "state_changed",
+      "skip": null,
+      "instructions": [
+        {
+          "name": "increment",
+          "baselineUnits": 473,
+          "candidateUnits": 473
+        }
+      ],
+      "baseline": {
+        "error": null,
+        "computeUnits": 473
+      },
+      "candidate": {
+        "error": null,
+        "computeUnits": 473
+      },
+      "accounts": [
+        {
+          "address": "14P1xLXPqLmxipH1tno2oKiS9GQPZJosNuK1AJPe4Ffn",
+          "accountType": "CounterState",
+          "baseline": {
+            "lamports": 967440,
+            "owner": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+            "dataLen": 11
+          },
+          "candidate": {
+            "lamports": 967440,
+            "owner": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+            "dataLen": 11
+          },
+          "fields": [
+            {
+              "name": "count",
+              "baseline": "4",
+              "candidate": "5"
+            }
+          ],
+          "byteRanges": [],
+          "omittedByteRanges": 0
+        }
+      ],
+      "logs": null
+    },
+    {
+      "signature": "3a7DDmRrbHZUWEtRNsr3FwGmpfz7RPbwVjjjkQEu52FEyQHEeuNFQ2TpTtyK3WcR6EVLgotaAj4w8fseSJtYm5TW",
+      "status": "state_changed",
+      "skip": null,
+      "instructions": [
+        {
+          "name": "increment",
+          "baselineUnits": 473,
+          "candidateUnits": 473
+        }
+      ],
+      "baseline": {
+        "error": null,
+        "computeUnits": 473
+      },
+      "candidate": {
+        "error": null,
+        "computeUnits": 473
+      },
+      "accounts": [
+        {
+          "address": "14P1xLXPqLmxipH1tno2oKiS9GQPZJosNuK1AJPe4Ffn",
+          "accountType": "CounterState",
+          "baseline": {
+            "lamports": 967440,
+            "owner": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+            "dataLen": 11
+          },
+          "candidate": {
+            "lamports": 967440,
+            "owner": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+            "dataLen": 11
+          },
+          "fields": [
+            {
+              "name": "count",
+              "baseline": "4",
+              "candidate": "5"
+            }
+          ],
+          "byteRanges": [],
+          "omittedByteRanges": 0
+        }
+      ],
+      "logs": null
+    },
+    {
+      "signature": "5kuKuSTY43rVd1QjzTvgQXrQw4LmfXt3GLkNSgqVo3Huu8C8i9dxsrtQXQqHH1bXSSFiVhwF13VckPuidiWXxCf7",
+      "status": "state_changed",
+      "skip": null,
+      "instructions": [
+        {
+          "name": "increment",
+          "baselineUnits": 473,
+          "candidateUnits": 473
+        }
+      ],
+      "baseline": {
+        "error": null,
+        "computeUnits": 473
+      },
+      "candidate": {
+        "error": null,
+        "computeUnits": 473
+      },
+      "accounts": [
+        {
+          "address": "14P1xLXPqLmxipH1tno2oKiS9GQPZJosNuK1AJPe4Ffn",
+          "accountType": "CounterState",
+          "baseline": {
+            "lamports": 967440,
+            "owner": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+            "dataLen": 11
+          },
+          "candidate": {
+            "lamports": 967440,
+            "owner": "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS",
+            "dataLen": 11
+          },
+          "fields": [
+            {
+              "name": "count",
+              "baseline": "4",
+              "candidate": "5"
+            }
+          ],
+          "byteRanges": [],
+          "omittedByteRanges": 0
+        }
+      ],
+      "logs": null
+    },
+    {
+      "signature": "3vomhkHJBbJj2Bh2myHWQXnoXrE6ZtubEDQhUS9NBfZEt7X8TZpuHejnmT15cWYVzUh8tkTeuEiQUPZxVzgp9jnS",
+      "status": "skipped",
+      "skip": {
+        "reason": "failed_in_both",
+        "detail": "Error processing Instruction 0: instruction requires an uninitialized account"
+      },
+      "instructions": [
+        {
+          "name": "initialize",
+          "baselineUnits": 133,
+          "candidateUnits": 133
+        }
+      ],
+      "baseline": {
+        "error": "Error processing Instruction 0: instruction requires an uninitialized account",
+        "computeUnits": 133
+      },
+      "candidate": {
+        "error": "Error processing Instruction 0: instruction requires an uninitialized account",
+        "computeUnits": 133
+      },
+      "accounts": [],
+      "logs": null
+    }
+  ]
+}

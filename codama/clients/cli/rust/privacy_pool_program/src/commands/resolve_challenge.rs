@@ -12,6 +12,7 @@
 use clap::Args;
 use privacy_pool_program_client::instructions::ResolveChallenge;
 use privacy_pool_program_client::instructions::ResolveChallengeInstructionData;
+use solana_sdk::pubkey::Pubkey;
 
 use crate::context::CliContext;
 use crate::context::CliError;
@@ -22,9 +23,9 @@ pub struct ResolveChallengeArgs {
 	/// zero rejects the request outright.
 	#[arg(long)]
 	approve: u8,
-	/// The `pool_config` account
+	/// The `pool_config` account [default: derived]
 	#[arg(long)]
-	pool_config: String,
+	pool_config: Option<String>,
 	/// The `disclosure_request` account
 	#[arg(long)]
 	disclosure_request: String,
@@ -32,7 +33,16 @@ pub struct ResolveChallengeArgs {
 
 pub(crate) fn run(context: &CliContext, args: ResolveChallengeArgs) -> Result<(), CliError> {
 	let authority = context.payer_pubkey();
-	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
+	let pool_config = match &args.pool_config {
+		Some(value) => CliContext::pubkey("--pool_config", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
 	let data = ResolveChallengeInstructionData::new(|data| {
 		data.approve = args.approve;

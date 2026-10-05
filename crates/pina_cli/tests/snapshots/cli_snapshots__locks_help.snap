@@ -1,0 +1,43 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - locks
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Report which instructions can never run in parallel.
+
+Solana runs two transactions in parallel only when neither write-locks an account the other locks. Pina reads the program source, sorts every instruction account into fixed, keyed, and caller-chosen addresses, and reports hotspots: fixed accounts, such as a PDA whose seeds are all constants, that serialize every instruction writing them.
+
+Usage: pina locks [OPTIONS]
+
+Options:
+  -p, --project <DIR>
+          Directory inside the project to discover. Defaults to the current directory
+
+      --json
+          Emit a stable machine-readable JSON document
+
+      --deny-hotspots
+          Exit with status 1 when a hotspot is not listed in `[locks] allow`
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina locks
+  pina locks --json
+  pina locks --project ./programs/privacy_pool
+  pina locks --deny-hotspots
+
+Accepting a hotspot:
+  List intentional hotspots by account name in `[locks] allow` in pina.toml. Allowed hotspots are still reported; an entry that names no hotspot is an error.
+
+Exit status:
+  1 when --deny-hotspots finds a hotspot that is not allowed, or when the analysis fails.
+
+----- stderr -----

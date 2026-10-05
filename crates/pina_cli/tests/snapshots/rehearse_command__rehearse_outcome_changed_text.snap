@@ -1,0 +1,27 @@
+---
+source: crates/pina_cli/tests/rehearse_command.rs
+expression: "stdout(&output, &remote)"
+---
+Rehearsal of GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS on http://127.0.0.1:[port]
+  deployed   sha256 1e62155ae2171aab4088e1a3eca14a47f8aee9124db1c55045fb2e9d9bae10fb
+  candidate  sha256 c349f65e30470009ed6d4a811946bae7cc3fec321b1cce061e77a5ae0753f319
+  fork slot  2001
+
+1 transaction: 0 unchanged, 0 cu_changed, 0 state_changed, 1 outcome_changed, 0 skipped
+
+Changed transactions:
+  2y8JkzTSum83V1nSkpy64WHZv1S8pqWFMJ8YRxP3pqtqgwTBdyKGMwZ1rBsg4auwogTkpoJunSjxcBnj8XG4EECP  outcome_changed  [increment]
+    baseline   succeeded
+    candidate  failed: Error processing Instruction 0: incorrect program id for instruction
+    compute units 473 -> 30 (-443)
+    baseline logs:
+      Program GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS invoke [1]
+      Program log: Counter incremented
+      Program GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS consumed 473 of 200000 compute units
+      Program GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS success
+    candidate logs:
+      Program GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS invoke [1]
+      Program GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS consumed 30 of 200000 compute units
+      Program GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS failed: incorrect program id for instruction
+
+Behaviour changed in 1 transaction(s). Review the differences, or rerun with --allow-changes to accept them.

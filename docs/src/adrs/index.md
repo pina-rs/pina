@@ -24,6 +24,7 @@ This section captures the durable architectural decisions behind Pina's public m
 | [ADR 0009](./0009-abi-document-versioning.md)            | Accepted | Give `pina_abi` its own release line, pin a committed `abiVersion` to it, reset the document to stored facts, and publish generated JSON Schemas.                       |
 | [ADR 0010](./0010-lean-entrypoint-strategy.md)           | Accepted | Bound the entrypoint account array per program and keep pinocchio as a library; ADR 0011 proposes revisiting its rejection of a dispatcher.                             |
 | [ADR 0011](./0011-dispatch-first-entrypoint.md)          | Proposed | Dispatch on the SIMD-0321 instruction-data pointer before reading accounts, parse only the routed instruction's accounts, and re-verify stored-bump PDAs with `sha256`. |
+| [ADR 0012](./0012-process-wire-facts.md)                 | Accepted | Judge instruction account slots on wire facts only; `defaultValue` and `pda` client hints never block a version.                                                        |
 
 ## How to use this section
 
@@ -36,3 +37,4 @@ Use these ADRs when you need to answer questions like:
 - why token helpers are optional instead of always-on
 - why Miri, compile-fail tests, feature matrices, and compute-unit checks all exist at once
 - why the ABI document's `abiVersion` is a committed value pinned to `pina_abi`'s own release line instead of counting format revisions
+- why a changed PDA or known-address hint on an instruction account never blocks a published version

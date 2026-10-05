@@ -1,0 +1,22 @@
+---
+source: crates/pina_cli/tests/rehearse_command.rs
+expression: "stdout(&output, &remote)"
+---
+Rehearsal of GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS on http://127.0.0.1:[port]
+  deployed   sha256 1e62155ae2171aab4088e1a3eca14a47f8aee9124db1c55045fb2e9d9bae10fb
+  candidate  sha256 1e62155ae2171aab4088e1a3eca14a47f8aee9124db1c55045fb2e9d9bae10fb
+  fork slot  2001
+
+4 transactions: 3 unchanged, 0 cu_changed, 0 state_changed, 0 outcome_changed, 1 skipped
+
+Compute units (transactions that succeeded in both runs):
+┌─────────────┬─────────┬─────────────────────────┬──────────────────────────┬──────────────┐
+│ Instruction ┆ Samples ┆ Baseline min/median/max ┆ Candidate min/median/max ┆ Median delta │
+╞═════════════╪═════════╪═════════════════════════╪══════════════════════════╪══════════════╡
+│ increment   ┆ 3       ┆ 473/473/473             ┆ 473/473/473              ┆ 0            │
+└─────────────┴─────────┴─────────────────────────┴──────────────────────────┴──────────────┘
+
+Skipped transactions:
+  3vomhkHJBbJj2Bh2myHWQXnoXrE6ZtubEDQhUS9NBfZEt7X8TZpuHejnmT15cWYVzUh8tkTeuEiQUPZxVzgp9jnS  failed_in_both: Error processing Instruction 0: instruction requires an uninitialized account
+
+No behaviour changes in 3 compared transaction(s). Compute-unit changes are informational.

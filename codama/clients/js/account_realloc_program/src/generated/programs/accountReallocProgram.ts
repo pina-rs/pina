@@ -35,8 +35,8 @@ import {
 import { getSampleCodec, type Sample, type SampleArgs } from "../accounts";
 import {
 	getInitializeInstructionAsync,
-	getRealloc2Instruction,
-	getReallocInstruction,
+	getRealloc2InstructionAsync,
+	getReallocInstructionAsync,
 	type InitializeAsyncInput,
 	type ParsedInitializeInstruction,
 	type ParsedRealloc2Instruction,
@@ -44,8 +44,8 @@ import {
 	parseInitializeInstruction,
 	parseRealloc2Instruction,
 	parseReallocInstruction,
-	type Realloc2Input,
-	type ReallocInput,
+	type Realloc2AsyncInput,
+	type ReallocAsyncInput,
 } from "../instructions";
 import { getMigrateInstruction, type MigrateInput } from "../instructions";
 
@@ -170,11 +170,13 @@ export type AccountReallocProgramPluginInstructions = {
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	realloc: (
-		input: ReallocInput,
-	) => ReturnType<typeof getReallocInstruction> & SelfPlanAndSendFunctions;
+		input: ReallocAsyncInput,
+	) => ReturnType<typeof getReallocInstructionAsync> & SelfPlanAndSendFunctions;
 	realloc2: (
-		input: Realloc2Input,
-	) => ReturnType<typeof getRealloc2Instruction> & SelfPlanAndSendFunctions;
+		input: Realloc2AsyncInput,
+	) =>
+		& ReturnType<typeof getRealloc2InstructionAsync>
+		& SelfPlanAndSendFunctions;
 };
 
 export type AccountReallocProgramPluginPdas = { sample: typeof findSamplePda };
@@ -203,9 +205,15 @@ export function accountReallocProgramProgram() {
 							getInitializeInstructionAsync(input),
 						),
 					realloc: (input) =>
-						addSelfPlanAndSendFunctions(client, getReallocInstruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getReallocInstructionAsync(input),
+						),
 					realloc2: (input) =>
-						addSelfPlanAndSendFunctions(client, getRealloc2Instruction(input)),
+						addSelfPlanAndSendFunctions(
+							client,
+							getRealloc2InstructionAsync(input),
+						),
 				},
 				pdas: { sample: findSamplePda },
 				identifyAccount: identifyAccountReallocProgramAccount,

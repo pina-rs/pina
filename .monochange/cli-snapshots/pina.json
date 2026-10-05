@@ -301,6 +301,151 @@
 		},
 		{
 			"path": [
+				"locks"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Report which instructions can never run in parallel",
+			"description": "Report which instructions can never run in parallel.\n\nSolana runs two transactions in parallel only when neither write-locks an account the other locks. Pina reads the program source, sorts every instruction account into fixed, keyed, and caller-chosen addresses, and reports hotspots: fixed accounts, such as a PDA whose seeds are all constants, that serialize every instruction writing them.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the project to discover. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit a stable machine-readable JSON document",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--deny-hotspots"
+					],
+					"canonical_name": "--deny-hotspots",
+					"hidden": false,
+					"global": false,
+					"summary": "Exit with status 1 when a hotspot is not listed in `[locks] allow`",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
+				"map"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Render an interactive map of the program's instructions and account locks",
+			"description": "Render an interactive map of the program's instructions and account locks.\n\nWrites one self-contained HTML file, with no network access, that charts which accounts every instruction writes and reads, the hotspots `pina locks` reports, and the instructions that block each other. Select an instruction or an account for its docs, constraints, PDA derivation, and conflicts.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory inside the project to discover. Defaults to the current directory",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--output",
+						"-o"
+					],
+					"canonical_name": "--output",
+					"hidden": false,
+					"global": false,
+					"summary": "Write the HTML map to FILE instead of `<target>/pina/map.html`",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Print the map's data as a stable machine-readable JSON document instead of writing HTML",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				}
+			]
+		},
+		{
+			"path": [
 				"migrations"
 			],
 			"hidden": false,
@@ -2877,7 +3022,7 @@
 			"hidden": false,
 			"max_bump": "major",
 			"summary": "Profile compute-unit costs in a compiled SBF program",
-			"description": "Profile compute-unit costs in a compiled SBF program.\n\nPerforms static analysis of an SBF shared object. Text is written to stdout by default. Use --json for machine-readable output and --output to write either format to a file. Use `pina profile compare` to diff a saved baseline report against the current artifact.",
+			"description": "Profile compute-unit costs in a compiled SBF program.\n\nPerforms static analysis of an SBF shared object. Text is written to stdout by default. Use --json for machine-readable output and --output to write either format to a file. Use `pina profile compare` to diff a saved baseline report against the current artifact, and `pina profile trace` to measure executed compute units line by line from the project's Mollusk tests.",
 			"parser": {
 				"flags_are_posix_noncompliant": false,
 				"options_must_precede_arguments": false,
@@ -3063,6 +3208,317 @@
 							}
 						}
 					]
+				},
+				{
+					"path": [
+						"profile",
+						"trace"
+					],
+					"hidden": false,
+					"max_bump": "major",
+					"summary": "Measure where each instruction's compute units go, line by line",
+					"description": "Measure where each instruction's compute units go, line by line.\n\nBuilds the program with DWARF line tables, runs its Mollusk tests with register tracing, and attributes every executed SBF instruction to a source line and call stack. Prints a summary per traced instruction and writes a self-contained HTML report to <target>/pina/trace/<program>.html. The program's mollusk-svm dev-dependency must enable the `register-tracing` feature.",
+					"parser": {
+						"flags_are_posix_noncompliant": false,
+						"options_must_precede_arguments": false,
+						"option_arg_separators": [
+							" ",
+							"="
+						]
+					},
+					"options": [
+						{
+							"names": [
+								"--project"
+							],
+							"canonical_name": "--project",
+							"hidden": false,
+							"global": false,
+							"summary": "Directory inside the project to discover",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false,
+								"default": "."
+							}
+						},
+						{
+							"names": [
+								"--filter"
+							],
+							"canonical_name": "--filter",
+							"hidden": false,
+							"global": false,
+							"summary": "Run only tests whose names contain TEST (passed to `cargo test`)",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--instruction"
+							],
+							"canonical_name": "--instruction",
+							"hidden": false,
+							"global": false,
+							"summary": "Report only this instruction (any case style, or a label such as `increment #2`)",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--trace-dir"
+							],
+							"canonical_name": "--trace-dir",
+							"hidden": false,
+							"global": false,
+							"summary": "Analyze existing traces in DIR instead of building and running tests",
+							"description": "Analyze existing traces in DIR instead of building and running tests.\n\nAttribution uses the traced build from the project's last `pina profile trace`.",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						},
+						{
+							"names": [
+								"--json"
+							],
+							"canonical_name": "--json",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit the versioned JSON document instead of the text summary",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--folded"
+							],
+							"canonical_name": "--folded",
+							"hidden": false,
+							"global": false,
+							"summary": "Emit Brendan Gregg folded stacks for speedscope, inferno, or flamegraph.pl",
+							"value": {
+								"kind": "flag",
+								"required": false,
+								"repeatable": false,
+								"variadic": false,
+								"enum_values": [
+									"true",
+									"false"
+								]
+							}
+						},
+						{
+							"names": [
+								"--output",
+								"-o"
+							],
+							"canonical_name": "--output",
+							"hidden": false,
+							"global": false,
+							"summary": "Write the selected output to FILE instead of stdout",
+							"value": {
+								"kind": "string",
+								"required": false,
+								"repeatable": true,
+								"variadic": false
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"path": [
+				"rehearse"
+			],
+			"hidden": false,
+			"max_bump": "major",
+			"summary": "Replay a program's recent transactions against an upgrade before shipping it",
+			"description": "Replay a program's recent transactions against an upgrade before shipping it.\n\nFetches the program's most recent transactions (or the ones named with --signature) from the cluster, read-only, and starts a private Surfpool forked from the same RPC endpoint. Each signed transaction is profiled against the deployed program, then again after the candidate is installed in the program's own program data, on one frozen snapshot of every account the transactions touch. Every difference in outcome, written account state, and compute units is reported. Nothing is sent to the cluster and no project file is written.",
+			"parser": {
+				"flags_are_posix_noncompliant": false,
+				"options_must_precede_arguments": false,
+				"option_arg_separators": [
+					" ",
+					"="
+				]
+			},
+			"options": [
+				{
+					"names": [
+						"--project",
+						"-p"
+					],
+					"canonical_name": "--project",
+					"hidden": false,
+					"global": false,
+					"summary": "Directory used for pina.toml or Cargo metadata project discovery",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "."
+					}
+				},
+				{
+					"names": [
+						"--network"
+					],
+					"canonical_name": "--network",
+					"hidden": false,
+					"global": false,
+					"summary": "Rehearse against mainnet, devnet, or testnet",
+					"value": {
+						"kind": "enum",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"enum_values": [
+							"mainnet",
+							"devnet",
+							"testnet"
+						]
+					}
+				},
+				{
+					"names": [
+						"--rpc-url"
+					],
+					"canonical_name": "--rpc-url",
+					"hidden": false,
+					"global": false,
+					"summary": "Rehearse against a credential-free HTTP(S) RPC URL with a host",
+					"description": "Rehearse against a credential-free HTTP(S) RPC URL with a host.\n\nUser information, query parameters, fragments, and control characters are rejected. Surfpool receives the URL in its arguments, so never put a secret anywhere in it.",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--program"
+					],
+					"canonical_name": "--program",
+					"hidden": false,
+					"global": false,
+					"summary": "Candidate SBF shared object. Defaults to target/deploy/<program>.so",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--build"
+					],
+					"canonical_name": "--build",
+					"hidden": false,
+					"global": false,
+					"summary": "Run Pina's project-aware SBF build first and rehearse its artifact",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--limit"
+					],
+					"canonical_name": "--limit",
+					"hidden": false,
+					"global": false,
+					"summary": "Number of recent transactions to replay, from 1 to 1000",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false,
+						"default": "25"
+					}
+				},
+				{
+					"names": [
+						"--signature"
+					],
+					"canonical_name": "--signature",
+					"hidden": false,
+					"global": false,
+					"summary": "Rehearse this transaction instead of the most recent ones. Repeat for more",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--json"
+					],
+					"canonical_name": "--json",
+					"hidden": false,
+					"global": false,
+					"summary": "Emit the stable JSON report (schemaVersion 1) instead of text",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--allow-changes"
+					],
+					"canonical_name": "--allow-changes",
+					"hidden": false,
+					"global": false,
+					"summary": "Exit 0 even when transactions change outcome or state",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
 				}
 			]
 		},

@@ -836,18 +836,41 @@ pub struct ProcessContract {
 
 impl ProcessContract {
 	/// SHA-256 of the canonical JSON representation.
+	///
+	/// The hash identifies the recorded document, client hints included. It is
+	/// not a compatibility key: use [`Self::same_wire`] to compare processes.
 	#[must_use]
 	pub fn sha256(&self) -> String {
 		hash_json(self)
 	}
+
+	/// Whether `other` accepts exactly the same account lists: the same slots
+	/// in the same order, each with the same wire facts.
+	///
+	/// Client hints (`default_value` and `pda`) are ignored; see
+	/// [`ProcessAccount::same_wire`].
+	#[must_use]
+	pub fn same_wire(&self, other: &Self) -> bool {
+		self.accounts.len() == other.accounts.len() && wire_prefix(&self.accounts, &other.accounts)
+	}
+}
+
+/// Whether `prefix` matches the leading slots of `accounts` on the wire.
+fn wire_prefix(prefix: &[ProcessAccount], accounts: &[ProcessAccount]) -> bool {
+	prefix.len() <= accounts.len()
+		&& prefix
+			.iter()
+			.zip(accounts)
+			.all(|(expected, actual)| expected.same_wire(actual))
 }
 
 /// Prove the account-list relationship supported by Pina's default process
 /// compatibility policy.
 ///
-/// Existing slots must remain identical and positional. A destination may
+/// Existing slots must keep their wire facts and positions. A destination may
 /// append optional slots because an old request can represent each appended
-/// value as absent. Every other change fails closed.
+/// value as absent. Every other wire change fails closed. A slot whose client
+/// hints alone changed is unchanged on the wire, so it never blocks a version.
 pub fn classify_process_transition(
 	source: &ProcessContract,
 	destination: &ProcessContract,
@@ -857,15 +880,14 @@ pub fn classify_process_transition(
 	let destination_accounts = u32::try_from(destination.accounts.len())
 		.map_err(|_| "destination process has too many account slots".to_owned())?;
 
-	if source == destination {
+	if source.same_wire(destination) {
 		return Ok(ProcessTransition {
 			kind: ProcessTransitionKind::Unchanged,
 			source_accounts,
 			destination_accounts,
 		});
 	}
-	if destination.accounts.len() >= source.accounts.len()
-		&& destination.accounts[..source.accounts.len()] == source.accounts
+	if wire_prefix(&source.accounts, &destination.accounts)
 		&& destination.accounts[source.accounts.len()..]
 			.iter()
 			.all(|account| account.optional)
@@ -892,6 +914,10 @@ pub fn classify_process_transition(
 ///
 /// A field left at its default (read-only, not a signer, required, no known
 /// address, no PDA) is not written, so a slot records only what sets it apart.
+// These doc comments are emitted into the published JSON Schemas, which are
+// frozen per `abiVersion`, so the compatibility rule is documented on
+// `same_wire` instead: `default_value` and `pda` are client hints that are
+// recorded but never compared.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -916,11 +942,29 @@ pub struct ProcessAccount {
 	pub pda: Option<String>,
 }
 
+impl ProcessAccount {
+	/// Whether `other` is the same slot on the wire: the same name, privileges,
+	/// and optionality.
+	///
+	/// These four facts decide whether an old account list still parses, and
+	/// they alone decide process compatibility. `default_value` and `pda` are
+	/// client-generation hints: the snapshot records what generated clients
+	/// filled in, but a client that passes the address itself sends the same
+	/// account list, so a hint-only difference is never a wire change.
+	#[must_use]
+	pub fn same_wire(&self, other: &Self) -> bool {
+		self.name == other.name
+			&& self.writable == other.writable
+			&& self.signer == other.signer
+			&& self.optional == other.optional
+	}
+}
+
 /// Account-list compatibility proved for an adjacent instruction version.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ProcessTransitionKind {
-	/// The process account ABI is byte-for-byte unchanged.
+	/// Every slot keeps its wire facts and position. Client hints may differ.
 	Unchanged,
 	/// The destination appends only optional slots to the source prefix.
 	AppendOptional,
@@ -2879,6 +2923,55 @@ mod tests {
 			process_account("authority", false),
 		]);
 		assert!(classify_process_transition(&original, &inserted).is_err());
+	}
+
+	#[test]
+	fn process_compatibility_ignores_client_hints() {
+		let original = process(vec![
+			process_account("authority", false),
+			process_account("config", false),
+		]);
+		let mut hinted = original.clone();
+		hinted.accounts[0].default_value = Some("11111111111111111111111111111111".to_owned());
+		hinted.accounts[1].pda = Some("config".to_owned());
+
+		// The hints still reach the recorded document and its hash.
+		assert_ne!(hinted, original);
+		assert_ne!(hinted.sha256(), original.sha256());
+		assert!(hinted.same_wire(&original));
+		for (source, destination) in [(&original, &hinted), (&hinted, &original)] {
+			let proof = classify_process_transition(source, destination).unwrap();
+			assert_eq!(proof.kind, ProcessTransitionKind::Unchanged);
+		}
+
+		let mut appended = hinted.clone();
+		appended.accounts.push(process_account("referrer", true));
+		let proof = classify_process_transition(&original, &appended).unwrap();
+		assert_eq!(proof.kind, ProcessTransitionKind::AppendOptional);
+
+		// Every wire fact still breaks compatibility, hints or not.
+		let wire_changes: [fn(&mut ProcessAccount); 4] = [
+			|account| account.name = "admin".to_owned(),
+			|account| account.writable = true,
+			|account| account.signer = true,
+			|account| account.optional = true,
+		];
+		for change in wire_changes {
+			let mut changed = hinted.clone();
+			change(&mut changed.accounts[0]);
+			assert!(!changed.same_wire(&original));
+			assert!(classify_process_transition(&original, &changed).is_err());
+		}
+
+		let mut reordered = hinted.clone();
+		reordered.accounts.reverse();
+		assert!(!reordered.same_wire(&original));
+		assert!(classify_process_transition(&original, &reordered).is_err());
+
+		let mut shortened = hinted;
+		shortened.accounts.pop();
+		assert!(!shortened.same_wire(&original));
+		assert!(classify_process_transition(&original, &shortened).is_err());
 	}
 
 	#[test]

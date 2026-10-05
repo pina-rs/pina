@@ -4,7 +4,7 @@
 
 import { Command } from "commander";
 import {
-	getRegisterRequesterInstruction,
+	getRegisterRequesterInstructionAsync,
 	REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT,
 } from "../client";
 import {
@@ -26,10 +26,13 @@ export const registerRequesterCommand = registerGlobals(
 		"--max-tier <maxTier>",
 		"Highest tier the entity may file at.",
 	)
-	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
-	.requiredOption(
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
 		"--requester-registry <requesterRegistry>",
-		"The `requester_registry` account",
+		"The `requester_registry` account [default: derived]",
 	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
@@ -37,13 +40,14 @@ export const registerRequesterCommand = registerGlobals(
 			requester: pubkey("--requester", options.requester),
 			maxTier: smallInteger("--max-tier", options.maxTier),
 			authority: context.payer,
-			poolConfig: pubkey("--pool-config", options.poolConfig),
-			requesterRegistry: pubkey(
-				"--requester-registry",
-				options.requesterRegistry,
-			),
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			requesterRegistry: options.requesterRegistry === undefined
+				? undefined
+				: pubkey("--requester-registry", options.requesterRegistry),
 		};
-		const instruction = getRegisterRequesterInstruction(
+		const instruction = await getRegisterRequesterInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

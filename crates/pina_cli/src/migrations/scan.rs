@@ -12,6 +12,7 @@ use pina_abi::MigrationManifest;
 use pina_abi::MigrationVersionType;
 use pina_abi::ProcessAccount;
 use pina_abi::ProcessContract;
+use pina_abi::SchemaVersion;
 
 use super::MigrationError;
 use crate::ir::DefaultValueIr;
@@ -31,6 +32,26 @@ pub(super) struct CurrentContract {
 	pub(super) envelope: bool,
 	pub(super) schema: DataSchema,
 	pub(super) process: Option<ProcessContract>,
+}
+
+impl CurrentContract {
+	/// Whether `version` already records this contract's wire format: the same
+	/// payload layout and, for an instruction, the same account slots.
+	///
+	/// Process client hints (`defaultValue`, `pda`) are not compared, so a
+	/// hint-only change neither drifts nor rewrites the recorded snapshot; the
+	/// hints a snapshot recorded are carried forward until a wire change
+	/// replaces it.
+	pub(super) fn matches_wire(&self, version: &SchemaVersion) -> bool {
+		let recorded = version.process.as_ref();
+		let current = self.process.as_ref();
+
+		version.schema.same_wire(&self.schema)
+			&& recorded.zip(current).map_or(
+				recorded.is_none() && current.is_none(),
+				|(recorded, current)| recorded.same_wire(current),
+			)
+	}
 }
 
 /// One source declaration that explicitly disabled migrations.

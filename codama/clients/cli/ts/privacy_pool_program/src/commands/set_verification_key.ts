@@ -4,7 +4,7 @@
 
 import { Command } from "commander";
 import {
-	getSetVerificationKeyInstruction,
+	getSetVerificationKeyInstructionAsync,
 	SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT,
 } from "../client";
 import {
@@ -35,7 +35,10 @@ export const setVerificationKeyCommand = registerGlobals(
 	.requiredOption("--ic1 <ic1>", "ic1")
 	.requiredOption("--ic2 <ic2>", "ic2")
 	.requiredOption("--ic3 <ic3>", "ic3")
-	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
 	.requiredOption(
 		"--verifying-key-account <verifyingKeyAccount>",
 		"The `verifying_key_account` account",
@@ -59,14 +62,16 @@ export const setVerificationKeyCommand = registerGlobals(
 			ic2: base58("--ic2", options.ic2),
 			ic3: base58("--ic3", options.ic3),
 			authority: context.payer,
-			poolConfig: pubkey("--pool-config", options.poolConfig),
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
 			verifyingKeyAccount: pubkey(
 				"--verifying-key-account",
 				options.verifyingKeyAccount,
 			),
 			systemProgram: pubkey("--system-program", options.systemProgram),
 		};
-		const instruction = getSetVerificationKeyInstruction(
+		const instruction = await getSetVerificationKeyInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

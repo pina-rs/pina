@@ -1025,6 +1025,7 @@ fn sanitized_first_line(bytes: &[u8]) -> Option<String> {
 	))
 }
 
+/// Escape control characters so untrusted text cannot rewrite the terminal.
 pub(crate) fn escape_controls(value: &str) -> String {
 	let mut escaped = String::with_capacity(value.len());
 

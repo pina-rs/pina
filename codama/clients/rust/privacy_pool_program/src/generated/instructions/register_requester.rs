@@ -27,15 +27,19 @@ pub struct RegisterRequester {
 }
 
 impl RegisterRequester {
-	pub fn new(
-		authority: solana_pubkey::Pubkey,
-		pool_config: solana_pubkey::Pubkey,
-		requester_registry: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
 		Self {
 			authority,
-			pool_config,
-			requester_registry,
+			pool_config: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
+			requester_registry: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-requesters".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 		}
 	}
 

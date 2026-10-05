@@ -26,6 +26,7 @@ use crate::parse::entrypoint;
 use crate::parse::error_enum::DeclaredError;
 use crate::parse::error_enum::extract_declared_errors;
 use crate::parse::module_resolver::ResolvedFile;
+use crate::parse::validation::HelperFunctions;
 use crate::parse::validation::extract_assertion_sites;
 
 /// A `path:line` position, with the path relative to the project root.
@@ -255,35 +256,45 @@ pub(crate) fn index(files: Vec<ResolvedFile>, root: &Path) -> Result<SourceIndex
 	let mut instructions = HashMap::new();
 	let mut errors = Vec::new();
 	let mut dispatch = HashMap::new();
-	let mut indexed = Vec::with_capacity(files.len());
+	let paths = files
+		.iter()
+		.map(|resolved| {
+			resolved
+				.path
+				.strip_prefix(root)
+				.unwrap_or(&resolved.path)
+				.to_string_lossy()
+				.replace('\\', "/")
+		})
+		.collect::<Vec<_>>();
+	let syntax = files
+		.iter()
+		.map(|resolved| &resolved.file)
+		.collect::<Vec<_>>();
+	// A processor can pass an account to a helper declared in any module, and a
+	// check found there is located at the helper's own file and line.
+	let helpers = HelperFunctions::collect(&syntax);
 
-	for resolved in files {
-		let path = resolved
-			.path
-			.strip_prefix(root)
-			.unwrap_or(&resolved.path)
-			.to_string_lossy()
-			.replace('\\', "/");
-		let file = resolved.file;
-
+	for (file, path) in syntax.iter().copied().zip(&paths) {
 		for item in &file.items {
 			let Item::Struct(item) = item else {
 				continue;
 			};
 
 			if has_accounts_derive(&item.attrs) {
-				accounts.insert(item.ident.to_string(), accounts_layout(item, &path)?);
+				accounts.insert(item.ident.to_string(), accounts_layout(item, path)?);
 			} else if item.attrs.iter().any(is_instruction_attribute) {
-				instructions.insert(item.ident.to_string(), instruction_rules(item, &path)?);
+				instructions.insert(item.ident.to_string(), instruction_rules(item, path)?);
 			}
 		}
 
-		for (struct_name, sites) in extract_assertion_sites(&file) {
+		for (struct_name, sites) in extract_assertion_sites(file, &helpers) {
 			let sites = sites
 				.into_iter()
 				.map(|site| {
+					let site_path = site.helper_file.map_or(path, |index| &paths[index]);
 					ProcessSite {
-						location: Location::new(&path, site.span),
+						location: Location::new(site_path, site.span),
 						field: site.field,
 						method: site.method,
 					}
@@ -292,22 +303,25 @@ pub(crate) fn index(files: Vec<ResolvedFile>, root: &Path) -> Result<SourceIndex
 			process_sites.insert(struct_name, sites);
 		}
 
-		errors.extend(extract_declared_errors(&file)?);
+		errors.extend(extract_declared_errors(file)?);
 
 		// The generated dispatch reads the same routing facts a hand-written
 		// match spells out; a hand-written match wins, as in IDL extraction.
-		let file_dispatch = match entrypoint::extract_dispatch_map(&file) {
+		let file_dispatch = match entrypoint::extract_dispatch_map(file) {
 			entries if !entries.is_empty() => entries,
-			_ => entrypoint::extract_dispatch_from_attribute(&file),
+			_ => entrypoint::extract_dispatch_from_attribute(file),
 		};
 		for entry in file_dispatch {
 			if let Some(accounts_struct) = entry.accounts_struct {
 				dispatch.insert(entry.variant.to_snake_case(), accounts_struct);
 			}
 		}
-
-		indexed.push((path, file));
 	}
+
+	let indexed = paths
+		.into_iter()
+		.zip(files.into_iter().map(|resolved| resolved.file))
+		.collect();
 
 	Ok(SourceIndex {
 		accounts,

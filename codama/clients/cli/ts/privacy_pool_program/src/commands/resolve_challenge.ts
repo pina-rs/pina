@@ -4,7 +4,7 @@
 
 import { Command } from "commander";
 import {
-	getResolveChallengeInstruction,
+	getResolveChallengeInstructionAsync,
 	RESOLVE_CHALLENGE_COMPUTE_UNIT_LIMIT,
 } from "../client";
 import {
@@ -25,7 +25,10 @@ export const resolveChallengeCommand = registerGlobals(
 		"--approve <approve>",
 		"Nonzero resolves in the requester's favor (execution may proceed);",
 	)
-	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
 	.requiredOption(
 		"--disclosure-request <disclosureRequest>",
 		"The `disclosure_request` account",
@@ -35,13 +38,15 @@ export const resolveChallengeCommand = registerGlobals(
 		const input = {
 			approve: smallInteger("--approve", options.approve),
 			authority: context.payer,
-			poolConfig: pubkey("--pool-config", options.poolConfig),
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
 			disclosureRequest: pubkey(
 				"--disclosure-request",
 				options.disclosureRequest,
 			),
 		};
-		const instruction = getResolveChallengeInstruction(
+		const instruction = await getResolveChallengeInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },
 		);

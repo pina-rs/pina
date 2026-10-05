@@ -53,6 +53,16 @@ pub(crate) fn run(cli: Cli) {
 			build_driver,
 			explain,
 		} => run_lint(project, fix, build_driver, explain),
+		Commands::Locks {
+			project,
+			json,
+			deny_hotspots,
+		} => run_locks(&project, json, deny_hotspots),
+		Commands::Map {
+			project,
+			output,
+			json,
+		} => run_map(&project, output, json),
 		Commands::Snapshot { view, save } => run_snapshot(view, save),
 		Commands::Migrations { command } => run_migrations(command),
 		Commands::Abi { command } => run_abi(command),
@@ -183,7 +193,54 @@ pub(crate) fn run(cli: Cli) {
 						},
 					);
 				}
+				Some(ProfileCommands::Trace {
+					project,
+					filter,
+					instruction,
+					trace_dir,
+					json,
+					folded,
+					output,
+				}) => {
+					run_profile_trace(
+						&pina_cli::profile_trace::TraceOptions {
+							project,
+							filter,
+							trace_dir,
+						},
+						instruction.as_deref(),
+						trace_format(json, folded),
+						output.as_deref(),
+					);
+				}
 			}
+		}
+		Commands::Rehearse {
+			project,
+			network,
+			rpc_url,
+			program,
+			build,
+			limit,
+			signatures,
+			json,
+			allow_changes,
+		} => {
+			run_rehearse(
+				&pina_cli::rehearse::RehearseOptions {
+					project,
+					network: unwrap_or_exit(pina_cli::rehearse::RehearseNetwork::from_flags(
+						network.map(SurfpoolCluster::as_str),
+						rpc_url,
+					)),
+					program,
+					build,
+					limit: usize::from(limit),
+					signatures,
+				},
+				json,
+				allow_changes,
+			);
 		}
 		Commands::Verify {
 			command,
@@ -652,6 +709,43 @@ fn print_migration_history_rebind(recorded: Option<&str>) {
 		 ID.",
 		"⚠".yellow().bold()
 	);
+}
+
+fn run_locks(project: &Path, json: bool, deny_hotspots: bool) {
+	let report = unwrap_or_exit(pina_cli::locks::analyze_project(project));
+
+	if json {
+		print_json(&report);
+	} else {
+		print!("{}", report.render_text());
+	}
+
+	let denied = report.denied_hotspots().count();
+	if deny_hotspots && denied > 0 {
+		eprintln!(
+			"{} {denied} hotspot(s) are not listed in `[locks] allow` in pina.toml",
+			"Error".red().bold()
+		);
+		std::process::exit(1);
+	}
+}
+
+fn run_map(project: &Path, output: Option<PathBuf>, json: bool) {
+	let project_map = unwrap_or_exit(pina_cli::map::map_project(project));
+
+	if json {
+		print_json(&project_map.map);
+		return;
+	}
+
+	let path = output.unwrap_or(project_map.default_output);
+	unwrap_or_exit(pina_cli::map::write_html(&project_map.map, &path));
+	eprintln!(
+		"{} Wrote the program map for {}",
+		"✔".green(),
+		escaped_text(&project_map.map.locks.program)
+	);
+	println!("{}", path.display());
 }
 
 fn run_doctor(path: &Path, json: bool) {
@@ -1311,6 +1405,30 @@ fn run_dev(
 	}
 }
 
+/// Rehearse an upgrade. Progress goes to stderr so `--json` stdout stays a
+/// single document. Exit status: 0 clean, 2 behaviour changed, 1 operational.
+fn run_rehearse(options: &pina_cli::rehearse::RehearseOptions, json: bool, allow_changes: bool) {
+	let report = match pina_cli::rehearse::rehearse(options, &mut std::io::stderr()) {
+		Ok(report) => report,
+		Err(error) => {
+			eprintln!("{} {}", "Error".red().bold(), error);
+			std::process::exit(1);
+		}
+	};
+
+	if json {
+		print_json(&report);
+	} else {
+		print!("{}", report.render_text());
+	}
+
+	let code = report.exit_code(allow_changes);
+
+	if code != 0 {
+		std::process::exit(code);
+	}
+}
+
 #[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)]
 fn run_deploy(
 	project: PathBuf,
@@ -1845,6 +1963,83 @@ fn run_profile_compare(
 
 	if report.exceeds_threshold {
 		std::process::exit(2);
+	}
+}
+
+/// The rendering `pina profile trace` writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TraceFormat {
+	/// The terminal summary, plus the HTML report.
+	Text,
+	/// The versioned JSON document.
+	Json,
+	/// Folded stacks for flame graph tools.
+	Folded,
+}
+
+fn trace_format(json: bool, folded: bool) -> TraceFormat {
+	if json {
+		return TraceFormat::Json;
+	}
+
+	if folded {
+		return TraceFormat::Folded;
+	}
+
+	TraceFormat::Text
+}
+
+fn run_profile_trace(
+	options: &pina_cli::profile_trace::TraceOptions,
+	instruction: Option<&str>,
+	format: TraceFormat,
+	output: Option<&Path>,
+) {
+	use pina_cli::profile_trace;
+
+	let exit = |error: profile_trace::TraceError| -> ! {
+		eprintln!("{} {error}", "Error".red().bold());
+		std::process::exit(error.exit_code());
+	};
+	let mut run = profile_trace::trace_project(options).unwrap_or_else(|error| exit(error));
+
+	for warning in &run.warnings {
+		eprintln!("{} {warning}", "Warning".yellow().bold());
+	}
+
+	if let Some(instruction) = instruction {
+		profile_trace::retain_instruction(&mut run.report, instruction)
+			.unwrap_or_else(|error| exit(error));
+	}
+
+	let mut rendered = Vec::new();
+	let written = match format {
+		TraceFormat::Text => {
+			pina_profile::trace_output::write_trace_text(&run.report, &mut rendered)
+		}
+		TraceFormat::Json => {
+			pina_profile::trace_output::write_trace_json(&run.report, &mut rendered)
+		}
+		TraceFormat::Folded => pina_profile::trace_output::write_folded(&run.report, &mut rendered),
+	};
+	unwrap_or_exit(written);
+
+	match output {
+		Some(path) => {
+			profile_trace::write_output(path, &rendered).unwrap_or_else(|error| exit(error));
+		}
+		None => unwrap_or_exit(std::io::stdout().lock().write_all(&rendered)),
+	}
+
+	if format == TraceFormat::Text {
+		let report = profile_trace::write_html_report(&run).unwrap_or_else(|error| exit(error));
+		let line = format!("\nHTML report: {}", report.display());
+
+		if output.is_some() {
+			eprintln!("{line}");
+		} else {
+			println!("{line}");
+		}
 	}
 }
 

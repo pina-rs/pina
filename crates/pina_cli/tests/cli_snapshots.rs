@@ -212,6 +212,20 @@ fn lint_help_snapshot() {
 }
 
 #[test]
+fn locks_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["locks", "--help"]);
+	assert_cmd_snapshot!("locks_help", command);
+}
+
+#[test]
+fn map_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["map", "--help"]);
+	assert_cmd_snapshot!("map_help", command);
+}
+
+#[test]
 fn generate_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["generate", "--help"]);
@@ -494,6 +508,13 @@ fn profile_compare_help_snapshot() {
 }
 
 #[test]
+fn profile_trace_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["profile", "trace", "--help"]);
+	assert_cmd_snapshot!("profile_trace_help", command);
+}
+
+#[test]
 fn verify_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["verify", "--help"]);
@@ -526,6 +547,13 @@ fn verify_status_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["verify", "status", "--help"]);
 	assert_cmd_snapshot!("verify_status_help", command);
+}
+
+#[test]
+fn rehearse_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["rehearse", "--help"]);
+	assert_cmd_snapshot!("rehearse_help", command);
 }
 
 #[test]

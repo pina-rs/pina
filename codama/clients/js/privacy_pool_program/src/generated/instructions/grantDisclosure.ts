@@ -8,6 +8,7 @@
 
 import {
 	type AccountMeta,
+	type AccountSignerMeta,
 	type Address,
 	combineCodec,
 	type FixedSizeCodec,
@@ -21,6 +22,7 @@ import {
 	type InstructionWithAccounts,
 	type InstructionWithData,
 	type ReadonlyAccount,
+	type ReadonlySignerAccount,
 	type ReadonlyUint8Array,
 	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 	SolanaError,
@@ -31,6 +33,7 @@ import {
 	getAccountMetaFactory,
 	type InstructionAccountInput,
 	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
@@ -60,7 +63,9 @@ export type GrantDisclosureInstruction<
 			TAccountNoteCommitment extends string
 				? ReadonlyAccount<TAccountNoteCommitment>
 				: TAccountNoteCommitment,
-			TAccountViewer extends string ? ReadonlyAccount<TAccountViewer>
+			TAccountViewer extends string ?
+					& ReadonlySignerAccount<TAccountViewer>
+					& AccountSignerMeta<TAccountViewer>
 				: TAccountViewer,
 			...TRemainingAccounts,
 		]
@@ -116,7 +121,7 @@ export type GrantDisclosureInput<
 		InstructionAccountInput,
 	TAccountNoteCommitment extends InstructionAccountInput =
 		InstructionAccountInput,
-	TAccountViewer extends InstructionAccountInput = InstructionAccountInput,
+	TAccountViewer extends InstructionSignerInput = InstructionSignerInput,
 > = {
 	disclosureRequest: TAccountDisclosureRequest;
 	noteCommitment: TAccountNoteCommitment;
@@ -127,7 +132,7 @@ export type GrantDisclosureInput<
 export function getGrantDisclosureInstruction<
 	TAccountDisclosureRequest extends InstructionAccountInput,
 	TAccountNoteCommitment extends InstructionAccountInput,
-	TAccountViewer extends InstructionAccountInput,
+	TAccountViewer extends InstructionSignerInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: GrantDisclosureInput<
@@ -170,7 +175,7 @@ export function getGrantDisclosureInstruction<
 			isSigner: false,
 			isWritable: false,
 		},
-		viewer: { value: input.viewer ?? null, isSigner: false, isWritable: false },
+		viewer: { value: input.viewer ?? null, isSigner: true, isWritable: false },
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,

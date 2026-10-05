@@ -1,0 +1,62 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - profile
+    - trace
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Measure where each instruction's compute units go, line by line.
+
+Builds the program with DWARF line tables, runs its Mollusk tests with register tracing, and attributes every executed SBF instruction to a source line and call stack. Prints a summary per traced instruction and writes a self-contained HTML report to <target>/pina/trace/<program>.html. The program's mollusk-svm dev-dependency must enable the `register-tracing` feature.
+
+Usage: pina profile trace [OPTIONS]
+
+Options:
+      --project <DIR>
+          Directory inside the project to discover
+
+      --filter <TEST>
+          Run only tests whose names contain TEST (passed to `cargo test`)
+
+      --instruction <NAME>
+          Report only this instruction (any case style, or a label such as `increment #2`)
+
+      --trace-dir <DIR>
+          Analyze existing traces in DIR instead of building and running tests.
+          
+          Attribution uses the traced build from the project's last `pina profile trace`.
+
+      --json
+          Emit the versioned JSON document instead of the text summary
+
+      --folded
+          Emit Brendan Gregg folded stacks for speedscope, inferno, or flamegraph.pl
+
+  -o, --output <FILE>
+          Write the selected output to FILE instead of stdout
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina profile trace
+  pina profile trace --project ./programs/counter_program
+  pina profile trace --filter increment --instruction increment
+  pina profile trace --json -o ./trace.json
+  pina profile trace --folded > ./stacks.folded
+  pina profile trace --trace-dir ./target/pina/trace/traces
+
+Cost model:
+  Every executed SBF instruction costs 1 CU. The runtime charges syscalls separately; they are listed by name and call site but their charges are not included.
+
+Setup:
+  Enable tracing in the program's Cargo.toml:
+    [dev-dependencies]
+    mollusk-svm = { version = "0.15", features = ["register-tracing"] }
+
+----- stderr -----

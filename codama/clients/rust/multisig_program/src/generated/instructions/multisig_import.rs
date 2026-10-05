@@ -31,14 +31,17 @@ impl MultisigImport {
 	pub fn new(
 		legacy_multisig: solana_pubkey::Pubkey,
 		legacy_create_key: solana_pubkey::Pubkey,
-		program_config: solana_pubkey::Pubkey,
 		create_key: solana_pubkey::Pubkey,
 		rent_payer: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			legacy_multisig,
 			legacy_create_key,
-			program_config,
+			program_config: solana_pubkey::Pubkey::find_program_address(
+				&["multisig-program-config".as_bytes()],
+				&crate::MULTISIG_PROGRAM_ID,
+			)
+			.0,
 			create_key,
 			multisig: solana_pubkey::Pubkey::find_program_address(
 				&["multisig".as_bytes(), create_key.as_ref()],

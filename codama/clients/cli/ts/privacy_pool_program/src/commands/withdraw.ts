@@ -30,15 +30,21 @@ export const withdrawCommand = registerGlobals(new Command("withdraw"))
 	.requiredOption("--proof-a <proofA>", "proofA")
 	.requiredOption("--proof-b <proofB>", "proofB")
 	.requiredOption("--proof-c <proofC>", "proofC")
-	.requiredOption("--pool-config <poolConfig>", "The `pool_config` account")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
 	.option(
 		"--pool-vault <poolVault>",
 		"The `pool_vault` account [default: derived]",
 	)
-	.requiredOption("--merkle-tree <merkleTree>", "The `merkle_tree` account")
-	.requiredOption(
+	.option(
+		"--merkle-tree <merkleTree>",
+		"The `merkle_tree` account [default: derived]",
+	)
+	.option(
 		"--nullifier-set <nullifierSet>",
-		"The `nullifier_set` account",
+		"The `nullifier_set` account [default: derived]",
 	)
 	.requiredOption(
 		"--verifying-key-account <verifyingKeyAccount>",
@@ -53,12 +59,18 @@ export const withdrawCommand = registerGlobals(new Command("withdraw"))
 			proofA: base58("--proof-a", options.proofA),
 			proofB: base58("--proof-b", options.proofB),
 			proofC: base58("--proof-c", options.proofC),
-			poolConfig: pubkey("--pool-config", options.poolConfig),
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
 			poolVault: options.poolVault === undefined
 				? undefined
 				: pubkey("--pool-vault", options.poolVault),
-			merkleTree: pubkey("--merkle-tree", options.merkleTree),
-			nullifierSet: pubkey("--nullifier-set", options.nullifierSet),
+			merkleTree: options.merkleTree === undefined
+				? undefined
+				: pubkey("--merkle-tree", options.merkleTree),
+			nullifierSet: options.nullifierSet === undefined
+				? undefined
+				: pubkey("--nullifier-set", options.nullifierSet),
 			verifyingKeyAccount: pubkey(
 				"--verifying-key-account",
 				options.verifyingKeyAccount,

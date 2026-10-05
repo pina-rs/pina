@@ -29,12 +29,15 @@ pub struct ResolveChallenge {
 impl ResolveChallenge {
 	pub fn new(
 		authority: solana_pubkey::Pubkey,
-		pool_config: solana_pubkey::Pubkey,
 		disclosure_request: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			authority,
-			pool_config,
+			pool_config: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			disclosure_request,
 		}
 	}

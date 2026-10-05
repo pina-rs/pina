@@ -21,18 +21,36 @@ use crate::context::CliError;
 pub struct Realloc2Args {
 	#[arg(long)]
 	len: u16,
-	/// The `sample1` account
+	/// The `sample1` account [default: derived]
 	#[arg(long)]
-	sample1: String,
-	/// The `sample2` account
+	sample1: Option<String>,
+	/// The `sample2` account [default: derived]
 	#[arg(long)]
-	sample2: String,
+	sample2: Option<String>,
 }
 
 pub(crate) fn run(context: &CliContext, args: Realloc2Args) -> Result<(), CliError> {
 	let authority = context.payer_pubkey();
-	let sample1 = CliContext::pubkey("--sample1", &args.sample1)?;
-	let sample2 = CliContext::pubkey("--sample2", &args.sample2)?;
+	let sample1 = match &args.sample1 {
+		Some(value) => CliContext::pubkey("--sample1", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["sample".as_bytes(), authority.as_ref()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
+	let sample2 = match &args.sample2 {
+		Some(value) => CliContext::pubkey("--sample2", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["sample".as_bytes(), authority.as_ref()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let data = Realloc2InstructionData::new(|data| {
 		data.len.set(args.len);
 	})

@@ -121,6 +121,109 @@ fn profile_program_rejects_non_elf() {
 }
 
 // =========================================================================
+// Stripped artifacts from `cargo build-sbf`
+// =========================================================================
+
+/// A stripped `--sbf-out-dir` copy and its unstripped linker output, built
+/// from `examples/counter_program`. They share one byte-identical `.text`.
+fn fixture(name: &str) -> std::path::PathBuf {
+	Path::new(env!("CARGO_MANIFEST_DIR"))
+		.join("tests/fixtures/trace")
+		.join(name)
+}
+
+/// Lay out `<target>/deploy/counter_program.so` and, optionally, an
+/// intermediate under `<target>/sbpf-solana-solana/release/`.
+fn cargo_target_with(intermediate: Option<&[u8]>) -> (tempfile::TempDir, std::path::PathBuf) {
+	let target = tempfile::tempdir().unwrap_or_else(|e| panic!("temp dir failed: {e}"));
+	let deploy = target.path().join("deploy/counter_program.so");
+	std::fs::create_dir_all(deploy.parent().unwrap_or(target.path()))
+		.unwrap_or_else(|e| panic!("create deploy dir failed: {e}"));
+	std::fs::copy(fixture("counter_program.so"), &deploy)
+		.unwrap_or_else(|e| panic!("copy stripped fixture failed: {e}"));
+
+	if let Some(bytes) = intermediate {
+		let release = target.path().join("sbpf-solana-solana/release");
+		std::fs::create_dir_all(&release)
+			.unwrap_or_else(|e| panic!("create release dir failed: {e}"));
+		std::fs::write(release.join("counter_program.so"), bytes)
+			.unwrap_or_else(|e| panic!("write intermediate failed: {e}"));
+	}
+
+	(target, deploy)
+}
+
+fn function_names(profile: &pina_profile::ProgramProfile) -> Vec<&str> {
+	profile.functions.iter().map(|f| f.name.as_str()).collect()
+}
+
+#[test]
+fn stripped_artifact_borrows_demangled_symbols_from_the_unstripped_build() {
+	let unstripped = std::fs::read(fixture("counter_program.so.debug"))
+		.unwrap_or_else(|e| panic!("read unstripped fixture failed: {e}"));
+	let (_target, deploy) = cargo_target_with(Some(&unstripped));
+
+	let profile =
+		pina_profile::profile_program(&deploy).unwrap_or_else(|e| panic!("profile failed: {e}"));
+	let names = function_names(&profile);
+
+	assert!(names.contains(&"entrypoint"), "{names:?}");
+	assert!(names.contains(&"pina::impls::address_matches"), "{names:?}");
+	assert!(
+		names.iter().all(|name| !name.starts_with("_ZN")),
+		"{names:?}"
+	);
+	assert_eq!(profile.program_name, "counter_program");
+	assert_eq!(
+		profile
+			.functions
+			.iter()
+			.map(|f| f.instruction_count)
+			.sum::<u64>(),
+		profile.total_instructions
+	);
+}
+
+#[test]
+fn stripped_artifact_without_an_intermediate_uses_exported_symbols() {
+	let (_target, deploy) = cargo_target_with(None);
+
+	let profile =
+		pina_profile::profile_program(&deploy).unwrap_or_else(|e| panic!("profile failed: {e}"));
+	let names = function_names(&profile);
+
+	assert!(names.contains(&"entrypoint"), "{names:?}");
+	assert!(!names.contains(&"<entire .text>"), "{names:?}");
+	assert!(
+		!names.contains(&"pina::impls::address_matches"),
+		"{names:?}"
+	);
+}
+
+#[test]
+fn intermediate_with_different_text_is_never_used_for_symbols() {
+	let unrelated = build_sbf_elf(160, &[("unrelated_function", 0, 160)]);
+	let (_target, deploy) = cargo_target_with(Some(&unrelated));
+
+	let profile =
+		pina_profile::profile_program(&deploy).unwrap_or_else(|e| panic!("profile failed: {e}"));
+	let names = function_names(&profile);
+
+	assert!(names.contains(&"entrypoint"), "{names:?}");
+	assert!(!names.contains(&"unrelated_function"), "{names:?}");
+}
+
+#[test]
+fn unreadable_intermediate_is_skipped() {
+	let (_target, deploy) = cargo_target_with(Some(b"not an elf"));
+
+	let profile =
+		pina_profile::profile_program(&deploy).unwrap_or_else(|e| panic!("profile failed: {e}"));
+
+	assert!(function_names(&profile).contains(&"entrypoint"));
+}
+
+// =========================================================================
 // Output format tests (end-to-end through write_profile)
 // =========================================================================
 

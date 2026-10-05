@@ -30,13 +30,16 @@ pub struct SetVerificationKey {
 impl SetVerificationKey {
 	pub fn new(
 		authority: solana_pubkey::Pubkey,
-		pool_config: solana_pubkey::Pubkey,
 		verifying_key_account: solana_pubkey::Pubkey,
 		system_program: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			authority,
-			pool_config,
+			pool_config: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			verifying_key_account,
 			system_program,
 		}

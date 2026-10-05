@@ -21,9 +21,10 @@ use pina_cli::GenerationMode;
 	              'pina init' to start a program, 'pina lint' for the official security lint set, \
 	              'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina \
 	              test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent \
-	              Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' \
-	              for explicit cluster deployment, and 'pina verify' for deployed-program \
-	              verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt \
+	              Surfpool network, 'pina generate' for selected client ecosystems, 'pina \
+	              rehearse' to replay real traffic against an upgrade, 'pina deploy' for explicit \
+	              cluster deployment, and 'pina verify' for deployed-program verification. Use \
+	              'pina cpi' for standalone CPI crates, 'pina import' to adopt \
 	              another program's IDL as one, 'pina doctor' for agent-readable diagnostics, \
 	              'pina keys' for program identity, and 'pina completions' for shell integration. \
 	              Low-level IDL, profiling, and terminal documentation remain available.",
@@ -36,7 +37,8 @@ use pina_cli::GenerationMode;
 	              --program-id SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv --idl ./idl.json\n  \
 	              pina idl --path ./programs/counter_program --output \
 	              ./idls/counter_program.json\n  pina profile ./target/deploy/counter_program.so \
-	              --json\n  pina deploy --cluster localnet --payer ~/.config/solana/id.json \
+	              --json\n  pina rehearse --network devnet\n  pina deploy --cluster localnet \
+	              --payer ~/.config/solana/id.json \
 	              --upgrade-authority ~/.config/solana/id.json --dry-run\n\nAgent discovery:\n  \
 	              Run 'pina <command> --help' for command-specific inputs, outputs, and \
 	              examples.\n  Run 'pina docs' to list the bundled architecture and IDL reference \
@@ -176,6 +178,77 @@ pub(crate) enum Commands {
 		/// reference is available for every lint under `docs/src/lint-reference.md`.
 		#[arg(long, value_name = "LINT")]
 		explain: Option<String>,
+	},
+
+	/// Report which instructions can never run in parallel.
+	///
+	/// Solana runs two transactions in parallel only when neither write-locks
+	/// an account the other locks. Pina reads the program source, sorts every
+	/// instruction account into fixed, keyed, and caller-chosen addresses, and
+	/// reports hotspots: fixed accounts, such as a PDA whose seeds are all
+	/// constants, that serialize every instruction writing them.
+	#[command(
+		after_help = "Examples:\n  pina locks\n  pina locks --json\n  pina locks --project \
+		              ./programs/privacy_pool\n  pina locks --deny-hotspots\n\nAccepting a \
+		              hotspot:\n  List intentional hotspots by account name in `[locks] allow` in \
+		              pina.toml. Allowed hotspots are still reported; an entry that names no \
+		              hotspot is an error.\n\nExit status:\n  1 when --deny-hotspots finds a \
+		              hotspot that is not allowed, or when the analysis fails."
+	)]
+	Locks {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Emit a stable machine-readable JSON document.
+		#[arg(long)]
+		json: bool,
+
+		/// Exit with status 1 when a hotspot is not listed in `[locks] allow`.
+		#[arg(long)]
+		deny_hotspots: bool,
+	},
+
+	/// Render an interactive map of the program's instructions and account locks.
+	///
+	/// Writes one self-contained HTML file, with no network access, that charts
+	/// which accounts every instruction writes and reads, the hotspots `pina
+	/// locks` reports, and the instructions that block each other. Select an
+	/// instruction or an account for its docs, constraints, PDA derivation, and
+	/// conflicts.
+	#[command(
+		after_help = "Examples:\n  pina map\n  open \"$(pina map)\"\n  pina map --project \
+		              ./programs/privacy_pool\n  pina map --output ./docs/program-map.html\n  pina \
+		              map --json\n\nOutput:\n  The HTML file is written to <target>/pina/map.html \
+		              unless --output names another path. stdout carries only the written path, so \
+		              the command composes with `open` and `xdg-open`; progress goes to stderr. \
+		              --json prints the map's data instead: the `pina locks --json` document plus \
+		              instructionDetails and accountTypes."
+	)]
+	Map {
+		/// Directory inside the project to discover. Defaults to the current directory.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Write the HTML map to FILE instead of `<target>/pina/map.html`.
+		#[arg(short, long, value_name = "FILE", conflicts_with = "json")]
+		output: Option<PathBuf>,
+
+		/// Print the map's data as a stable machine-readable JSON document instead of writing HTML.
+		#[arg(long)]
+		json: bool,
 	},
 
 	/// Create and verify checked-in ABI migrations.
@@ -713,7 +786,9 @@ pub(crate) enum Commands {
 	/// Performs static analysis of an SBF shared object. Text is written to
 	/// stdout by default. Use --json for machine-readable output and --output
 	/// to write either format to a file. Use `pina profile compare` to diff a
-	/// saved baseline report against the current artifact.
+	/// saved baseline report against the current artifact, and `pina profile
+	/// trace` to measure executed compute units line by line from the
+	/// project's Mollusk tests.
 	#[command(
 		after_help = "Examples:\n  pina profile\n  pina profile --json\n  pina profile --project \
 		              ./programs/counter_program\n  pina profile \
@@ -721,7 +796,8 @@ pub(crate) enum Commands {
 		              ./target/deploy/counter_program.so --json -o ./profile.json\n  pina profile \
 		              compare ./profile.json\n  pina profile compare ./profile.json \
 		              ./target/deploy/counter_program.so --json\n  pina profile compare \
-		              ./profile.json --fail-cu 100 --fail-percent 5\n\nBaselines:\n  compare \
+		              ./profile.json --fail-cu 100 --fail-percent 5\n  pina profile trace \
+		              --instruction increment\n\nBaselines:\n  compare \
 		              accepts any report written by `pina profile --json`, including the \
 		              versioned baseline document. The exit status is 2 when the total CU \
 		              regression reaches both --fail-cu and --fail-percent, so local runs mirror \
@@ -749,9 +825,108 @@ pub(crate) enum Commands {
 		#[arg(short, long, value_name = "FILE")]
 		output: Option<PathBuf>,
 
-		/// Compare the current artifact against a saved baseline report.
+		/// Compare against a saved baseline, or trace executed compute units.
 		#[command(subcommand)]
 		command: Option<ProfileCommands>,
+	},
+
+	/// Replay a program's recent transactions against an upgrade before shipping it.
+	///
+	/// Fetches the program's most recent transactions (or the ones named with
+	/// --signature) from the cluster, read-only, and starts a private Surfpool
+	/// forked from the same RPC endpoint. Each signed transaction is profiled
+	/// against the deployed program, then again after the candidate is installed
+	/// in the program's own program data, on one frozen snapshot of every account
+	/// the transactions touch. Every difference in outcome, written account
+	/// state, and compute units is reported. Nothing is sent to the cluster and
+	/// no project file is written.
+	#[command(after_help = r"Examples:
+  pina rehearse --network devnet
+  pina rehearse --network mainnet --build --limit 100
+  pina rehearse --rpc-url http://127.0.0.1:8899 --program ./target/deploy/my_program.so
+  pina rehearse --network devnet --signature <SIGNATURE> --signature <SIGNATURE>
+  pina rehearse --network devnet --json > rehearsal.json
+
+Results:
+  unchanged        identical outcome, account state, and compute units
+  cu_changed       identical outcome and state; compute units differ (informational)
+  state_changed    both runs succeed but leave an account different
+  outcome_changed  success and failure swapped, or the error changed
+  skipped          not compared, for example a transaction that fails identically in
+                   both runs because the state it needed has moved on
+
+Exit status:
+  0 when transactions were compared and none changed outcome or state; compute-unit
+    changes alone pass.
+  2 when behaviour changed, unless --allow-changes accepts it.
+  3 when no transaction could be compared, so nothing was verified.
+  1 for operational errors, including any failed RPC request; stdout is then empty.
+
+Requirements:
+  Surfpool 1.6 or newer on PATH, or its path in PINA_SURFPOOL. The deployed program must
+  use the upgradeable loader, as `solana program deploy` and `pina deploy` do.
+
+Network safety:
+  Pina never sends a transaction. A custom URL must be HTTP(S) without user information,
+  queries, or fragments. Surfpool receives it as an argument, so never put a secret
+  anywhere in it. Reports show only the URL's origin.")]
+	Rehearse {
+		/// Directory used for pina.toml or Cargo metadata project discovery.
+		#[arg(
+			short,
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Rehearse against mainnet, devnet, or testnet.
+		#[arg(
+			long,
+			value_enum,
+			conflicts_with = "rpc_url",
+			required_unless_present = "rpc_url",
+			hide_possible_values = true,
+			value_name = "CLUSTER"
+		)]
+		network: Option<SurfpoolCluster>,
+
+		/// Rehearse against a credential-free HTTP(S) RPC URL with a host.
+		///
+		/// User information, query parameters, fragments, and control characters are rejected.
+		/// Surfpool receives the URL in its arguments, so never put a secret anywhere in it.
+		#[arg(long, conflicts_with = "network", value_name = "URL")]
+		rpc_url: Option<String>,
+
+		/// Candidate SBF shared object. Defaults to target/deploy/<program>.so.
+		#[arg(long, value_name = "PROGRAM.SO", conflicts_with = "build")]
+		program: Option<PathBuf>,
+
+		/// Run Pina's project-aware SBF build first and rehearse its artifact.
+		#[arg(long)]
+		build: bool,
+
+		/// Number of recent transactions to replay, from 1 to 1000.
+		#[arg(
+			long,
+			default_value_t = 25,
+			value_parser = clap::value_parser!(u16).range(1..=1000),
+			value_name = "N"
+		)]
+		limit: u16,
+
+		/// Rehearse this transaction instead of the most recent ones. Repeat for more.
+		#[arg(long = "signature", value_name = "SIGNATURE", conflicts_with = "limit")]
+		signatures: Vec<String>,
+
+		/// Emit the stable JSON report (schemaVersion 1) instead of text.
+		#[arg(long)]
+		json: bool,
+
+		/// Exit 0 even when transactions change outcome or state.
+		#[arg(long)]
+		allow_changes: bool,
 	},
 
 	/// Verify deployed programs and publish source-build records.
@@ -928,6 +1103,62 @@ pub(crate) enum ProfileCommands {
 			value_name = "PERCENT"
 		)]
 		fail_percent: f64,
+	},
+
+	/// Measure where each instruction's compute units go, line by line.
+	///
+	/// Builds the program with DWARF line tables, runs its Mollusk tests with
+	/// register tracing, and attributes every executed SBF instruction to a
+	/// source line and call stack. Prints a summary per traced instruction and
+	/// writes a self-contained HTML report to <target>/pina/trace/<program>.html.
+	/// The program's mollusk-svm dev-dependency must enable the
+	/// `register-tracing` feature.
+	#[command(
+		after_help = "Examples:\n  pina profile trace\n  pina profile trace --project \
+		              ./programs/counter_program\n  pina profile trace --filter increment \
+		              --instruction increment\n  pina profile trace --json -o ./trace.json\n  pina \
+		              profile trace --folded > ./stacks.folded\n  pina profile trace --trace-dir \
+		              ./target/pina/trace/traces\n\nCost model:\n  Every executed SBF \
+		              instruction costs 1 CU. The runtime charges syscalls separately; they are \
+		              listed by name and call site but their charges are not included.\n\nSetup:\n  \
+		              Enable tracing in the program's Cargo.toml:\n    [dev-dependencies]\n    \
+		              mollusk-svm = { version = \"0.15\", features = [\"register-tracing\"] }"
+	)]
+	Trace {
+		/// Directory inside the project to discover.
+		#[arg(
+			long,
+			default_value = ".",
+			hide_default_value = true,
+			value_name = "DIR"
+		)]
+		project: PathBuf,
+
+		/// Run only tests whose names contain TEST (passed to `cargo test`).
+		#[arg(long, value_name = "TEST", conflicts_with = "trace_dir")]
+		filter: Option<String>,
+
+		/// Report only this instruction (any case style, or a label such as `increment #2`).
+		#[arg(long, value_name = "NAME")]
+		instruction: Option<String>,
+
+		/// Analyze existing traces in DIR instead of building and running tests.
+		///
+		/// Attribution uses the traced build from the project's last `pina profile trace`.
+		#[arg(long, value_name = "DIR")]
+		trace_dir: Option<PathBuf>,
+
+		/// Emit the versioned JSON document instead of the text summary.
+		#[arg(long, conflicts_with = "folded")]
+		json: bool,
+
+		/// Emit Brendan Gregg folded stacks for speedscope, inferno, or flamegraph.pl.
+		#[arg(long)]
+		folded: bool,
+
+		/// Write the selected output to FILE instead of stdout.
+		#[arg(short, long, value_name = "FILE")]
+		output: Option<PathBuf>,
 	},
 }
 

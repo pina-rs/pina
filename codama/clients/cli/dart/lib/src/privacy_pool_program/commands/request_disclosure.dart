@@ -35,13 +35,13 @@ final class RequestDisclosureCommand extends Command<void> {
       )
       ..addOption(
         'pool_config',
-        mandatory: true,
-        help: "The pool_config account",
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
       )
       ..addOption(
         'requester_registry',
-        mandatory: true,
-        help: "The requester_registry account",
+        mandatory: false,
+        help: "The requester_registry account [default: derived]",
       )
       ..addOption(
         'note_commitment',
@@ -72,14 +72,17 @@ final class RequestDisclosureCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final requester = context.payerAddress;
-    final poolConfig = pubkey(
-      '--pool-config',
-      results['pool_config']! as String,
-    );
-    final requesterRegistry = pubkey(
-      '--requester-registry',
-      results['requester_registry']! as String,
-    );
+    final poolConfig = (results['pool_config'] as String?) != null
+        ? pubkey('--pool-config', results['pool_config']! as String)
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
+    final requesterRegistry = (results['requester_registry'] as String?) != null
+        ? pubkey(
+            '--requester-registry',
+            results['requester_registry']! as String,
+          )
+        : (await findRequesterRegistryPda(
+            programAddress: context.programAddress,
+          )).$1;
     final noteCommitment = pubkey(
       '--note-commitment',
       results['note_commitment']! as String,

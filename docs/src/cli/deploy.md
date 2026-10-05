@@ -9,6 +9,19 @@ pina deploy [OPTIONS] --upgrade-authority <KEYPAIR> --payer <KEYPAIR> \
 
 Run `pina deploy --help` for the authoritative option list.
 
+## Rehearse first
+
+Before upgrading a program that already has users, replay its recent traffic against the new build with [`pina rehearse`](./rehearse.md). It forks the same cluster, runs every recent transaction against the deployed program and the candidate on identical state, and exits `2` when any transaction's outcome or written account state changes:
+
+```bash
+pina rehearse --network devnet --build
+pina deploy --cluster devnet \
+  --upgrade-authority ./keys/devnet-authority.json \
+  --payer ./keys/devnet-payer.json
+```
+
+A rehearsal also proves the runtime loads the new ELF, so an upgrade the cluster would reject fails before anything is sent.
+
 ## Safe planning
 
 Review a deployment without building, contacting an RPC endpoint, or invoking the Solana CLI:
