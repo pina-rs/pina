@@ -4128,6 +4128,61 @@
 						"repeatable": true,
 						"variadic": false
 					}
+				},
+				{
+					"names": [
+						"--rehearse"
+					],
+					"canonical_name": "--rehearse",
+					"hidden": false,
+					"global": false,
+					"summary": "Rehearse the upgrade against the target cluster's recent traffic first",
+					"description": "Rehearse the upgrade against the target cluster's recent traffic first.\n\nRuns before the approval prompt on the exact artifact this plan pins, with `pina rehearse`'s classification. Requires Surfpool 1.6 or newer.",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--rehearse-limit"
+					],
+					"canonical_name": "--rehearse-limit",
+					"hidden": false,
+					"global": false,
+					"summary": "Recent transactions the rehearsal replays, from 1 to 1000 [default: 25]",
+					"value": {
+						"kind": "string",
+						"required": false,
+						"repeatable": true,
+						"variadic": false
+					}
+				},
+				{
+					"names": [
+						"--allow-rehearsal-changes"
+					],
+					"canonical_name": "--allow-rehearsal-changes",
+					"hidden": false,
+					"global": false,
+					"summary": "Deploy even though the rehearsal found behaviour changes you have reviewed",
+					"description": "Deploy even though the rehearsal found behaviour changes you have reviewed.\n\nIt never accepts a rehearsal that compared nothing.",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
 				}
 			]
 		}

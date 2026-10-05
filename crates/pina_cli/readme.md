@@ -276,6 +276,14 @@ pina deploy --project ./programs/my_program --cluster devnet \
 
 Every remote write requires confirmation or `--yes`; named mainnet and custom remote endpoints also require `--allow-mainnet`. Query-bearing RPC URLs are rejected because the external Agave `solana` executable receives its endpoint through process arguments. Keypair reads are size-bounded and, on Unix, require owner-private permissions. The program keypair is validated against `declare_id!` before planning and revalidated immediately before deployment.
 
+Add `--rehearse` to replay the target cluster's recent traffic against the exact artifact the plan pins, before the confirmation prompt. A behaviour change stops the deployment with exit code `2` before anything is sent, unless `--allow-rehearsal-changes` accepts it; a rehearsal that compares nothing, or a first deployment, stops it with exit code `3`:
+
+```bash
+pina deploy --build --rehearse --cluster devnet \
+  --upgrade-authority ./keys/devnet-authority.json \
+  --payer ./keys/devnet-payer.json
+```
+
 ## Library API
 
 <br>

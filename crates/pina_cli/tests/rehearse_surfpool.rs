@@ -5,11 +5,14 @@
 //! cluster's clock jumps far enough ahead that every blockhash has expired.
 //! `pina rehearse` forks that cluster with its own Surfpool and replays the
 //! traffic against the deployed binary and three candidates: the same binary,
-//! a counter whose increment adds two, and an unrelated program.
+//! a counter whose increment adds two, and an unrelated program. A second test
+//! runs `pina deploy --rehearse` against a copy of the counter declared at an
+//! address whose keypair the test holds, and proves a changed upgrade stops
+//! before the deployment command runs.
 //!
-//! The `surfpool` CI job builds every example, and the counter variant, into
-//! `target/surfpool/examples` with `scripts/build-surfpool-examples.sh` before
-//! running this test.
+//! The `surfpool` CI job builds every example, the counter variant, and the
+//! counter deploy copy into `target/surfpool/examples` with
+//! `scripts/build-surfpool-examples.sh` before running these tests.
 //!
 //! The test proves no fork outlives its rehearsal without scanning processes
 //! (CI's shell has no procps): `PINA_SURFPOOL` points at a wrapper that records
@@ -40,6 +43,10 @@ use serde_json::json;
 use solana_address::Address;
 
 const COUNTER_PROGRAM_ID: &str = "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS";
+/// The counter deploy copy's address: the public key of the ed25519 seed
+/// [`DEPLOY_PROGRAM_SEED`]. `scripts/build-surfpool-examples.sh` declares it.
+const DEPLOY_PROGRAM_ID: &str = "7v54NWdBtkjuAFJrLGsS2SXnuk8nKam81mZJeeYxVFi9";
+const DEPLOY_PROGRAM_SEED: u8 = 11;
 const SYSTEM_PROGRAM_ID: &str = "11111111111111111111111111111111";
 const RPC_TIMEOUT: Duration = Duration::from_secs(30);
 const READY_TIMEOUT: Duration = Duration::from_secs(60);
@@ -311,8 +318,14 @@ fn send(cluster: &RemoteCluster, transaction: &[u8]) -> String {
 /// Deploy the counter, initialize one counter, and increment it three times.
 /// Returns the signatures oldest first.
 fn counter_traffic(cluster: &RemoteCluster) -> Vec<String> {
-	let program_id = address(COUNTER_PROGRAM_ID);
-	deploy(cluster, COUNTER_PROGRAM_ID, &artifact("counter_program.so"));
+	counter_traffic_at(cluster, COUNTER_PROGRAM_ID, &artifact("counter_program.so"))
+}
+
+/// [`counter_traffic`] for the counter build in `artifact`, deployed at
+/// `program_id`, the address it declares.
+fn counter_traffic_at(cluster: &RemoteCluster, program_id: &str, artifact: &Path) -> Vec<String> {
+	deploy(cluster, program_id, artifact);
+	let program_id = address(program_id);
 	let authority = SigningKey::from_bytes(&[7; 32]);
 	let authority_address = Address::new_from_array(authority.verifying_key().to_bytes());
 	rpc(
@@ -555,4 +568,145 @@ fn rehearse_detects_upgrade_behaviour_on_real_surfpool() {
 	);
 	assert_eq!(named.status.code(), Some(2));
 	assert_eq!(report(&named)["summary"]["total"], 1);
+}
+
+/// Write an owner-only keypair from `seed` and return its address.
+fn write_keypair(path: &Path, seed: u8) -> String {
+	use std::os::unix::fs::PermissionsExt as _;
+
+	let signing_key = SigningKey::from_bytes(&[seed; 32]);
+	let public = signing_key.verifying_key().to_bytes();
+	let mut bytes = signing_key.to_bytes().to_vec();
+	bytes.extend_from_slice(&public);
+	fs::write(path, Value::from(bytes).to_string())
+		.unwrap_or_else(|error| panic!("write keypair: {error}"));
+	fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+		.unwrap_or_else(|error| panic!("protect keypair: {error}"));
+	bs58::encode(public).into_string()
+}
+
+/// Keypairs for upgrading the counter deploy copy, and where its deployment
+/// command copies the artifact it deploys.
+struct DeployInputs {
+	directory: tempfile::TempDir,
+	program_keypair: PathBuf,
+	authority: PathBuf,
+}
+
+impl DeployInputs {
+	fn new() -> Self {
+		let directory =
+			tempfile::tempdir().unwrap_or_else(|error| panic!("create deploy dir: {error}"));
+		let program_keypair = directory.path().join("program-keypair.json");
+		let authority = directory.path().join("authority.json");
+		assert_eq!(
+			write_keypair(&program_keypair, DEPLOY_PROGRAM_SEED),
+			DEPLOY_PROGRAM_ID
+		);
+		write_keypair(&authority, DEPLOY_PROGRAM_SEED + 1);
+
+		Self {
+			directory,
+			program_keypair,
+			authority,
+		}
+	}
+
+	fn deployed(&self) -> PathBuf {
+		self.directory.path().join("deployed.so")
+	}
+}
+
+/// `pina deploy --rehearse` of `candidate` as the counter deploy copy's
+/// upgrade. The deployment command only copies the artifact it receives.
+fn deploy_rehearsed(
+	remote: &RemoteCluster,
+	recorder: &ForkRecorder,
+	inputs: &DeployInputs,
+	candidate: &Path,
+) -> Output {
+	let deployed = inputs.deployed();
+	assert!(
+		!deployed.to_string_lossy().contains('\''),
+		"paths must not contain single quotes"
+	);
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("deploy")
+		.arg("--project")
+		.arg(artifacts().join("rehearse-deploy/project"))
+		.arg("--program")
+		.arg(candidate)
+		.arg("--program-keypair")
+		.arg(&inputs.program_keypair)
+		.arg("--upgrade-authority")
+		.arg(&inputs.authority)
+		.arg("--payer")
+		.arg(&inputs.authority)
+		.args(["--cluster", &remote.url, "--rehearse", "--remote-command"])
+		.arg(format!(
+			"cp \"$PINA_DEPLOY_PROGRAM\" '{}'",
+			deployed.display()
+		))
+		.env("PINA_SURFPOOL", &recorder.executable)
+		.output()
+		.unwrap_or_else(|error| panic!("run pina deploy --rehearse: {error}"));
+	println!(
+		"$ pina deploy --program {} --cluster {} --rehearse",
+		candidate.display(),
+		remote.url
+	);
+	println!("{}", String::from_utf8_lossy(&output.stdout));
+	eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+	recorder.assert_forks_stopped();
+	output
+}
+
+#[test]
+#[ignore = "starts real Surfpool instances; the surfpool CI job runs it after building examples"]
+fn deploy_rehearsal_stops_a_changed_upgrade_on_real_surfpool() {
+	let remote = RemoteCluster::start();
+	let recorder = ForkRecorder::new();
+	let deployed = artifact("rehearse-deploy/program/counter_deploy_program.so");
+	counter_traffic_at(&remote, DEPLOY_PROGRAM_ID, &deployed);
+	let inputs = DeployInputs::new();
+
+	// An unrelated program rejects every counter instruction, so the
+	// rehearsal stops the deployment before its command runs.
+	let changed = deploy_rehearsed(
+		&remote,
+		&recorder,
+		&inputs,
+		&artifact("hello_solana_program.so"),
+	);
+	let stdout = String::from_utf8_lossy(&changed.stdout);
+	let stderr = String::from_utf8_lossy(&changed.stderr);
+
+	assert_eq!(changed.status.code(), Some(2), "{stderr}");
+	assert!(stdout.starts_with("Deployment plan\n"), "{stdout}");
+	assert!(
+		stdout.contains(
+			"4 transactions: 0 unchanged, 0 cu_changed, 0 state_changed, 4 outcome_changed"
+		),
+		"{stdout}"
+	);
+	assert!(
+		stderr.contains("Deployment stopped before anything was sent"),
+		"{stderr}"
+	);
+	assert!(!inputs.deployed().exists(), "the deployment command ran");
+
+	// The deployed binary rehearses clean, and exactly those bytes deploy.
+	let same = deploy_rehearsed(&remote, &recorder, &inputs, &deployed);
+
+	assert_eq!(
+		same.status.code(),
+		Some(0),
+		"{}",
+		String::from_utf8_lossy(&same.stderr)
+	);
+	assert_eq!(
+		fs::read(inputs.deployed()).ok(),
+		fs::read(&deployed).ok(),
+		"the deployment command received the rehearsed artifact"
+	);
 }

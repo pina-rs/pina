@@ -260,6 +260,9 @@ pub(crate) fn run(cli: Cli) {
 			allow_mainnet,
 			record_publication,
 			remote_command,
+			rehearse,
+			rehearse_limit,
+			allow_rehearsal_changes,
 		} => {
 			run_deploy(
 				project,
@@ -275,6 +278,13 @@ pub(crate) fn run(cli: Cli) {
 				allow_mainnet,
 				record_publication,
 				remote_command,
+				rehearse.then(|| {
+					DeployRehearsal {
+						limit: rehearse_limit
+							.map_or(pina_cli::rehearse::DEFAULT_LIMIT, usize::from),
+						allow_changes: allow_rehearsal_changes,
+					}
+				}),
 			);
 		}
 	}
@@ -1429,6 +1439,13 @@ fn run_rehearse(options: &pina_cli::rehearse::RehearseOptions, json: bool, allow
 	}
 }
 
+/// The `--rehearse` options of `pina deploy`.
+#[derive(Clone, Copy)]
+struct DeployRehearsal {
+	limit: usize,
+	allow_changes: bool,
+}
+
 #[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)]
 fn run_deploy(
 	project: PathBuf,
@@ -1444,6 +1461,7 @@ fn run_deploy(
 	allow_mainnet: bool,
 	record_publication: bool,
 	remote_command: Option<String>,
+	rehearsal: Option<DeployRehearsal>,
 ) {
 	let target = pina_cli::deploy::DeploymentTarget::from_cluster_arg(cluster);
 	let request = pina_cli::deploy::DeploymentRequest {
@@ -1474,12 +1492,55 @@ fn run_deploy(
 		}
 	};
 
-	if json {
-		#[rustfmt::skip]
-		let output = serde_json::to_string_pretty(&plan).unwrap_or_else(|error| panic!("deployment plans contain only JSON-compatible values: {error}"));
-		println!("{output}");
-	} else {
+	if !json {
 		print!("{}", plan.render_text());
+	}
+
+	// The rehearsal runs after planning and before approval. Progress goes to
+	// stderr so `--json` stdout stays one document.
+	let report = rehearsal.map(|options| {
+		pina_cli::deploy::rehearse_deployment(&plan, options.limit, &mut std::io::stderr())
+			.unwrap_or_else(|error| {
+				eprintln!("{} {}", "Error".red().bold(), error);
+				std::process::exit(error.exit_code());
+			})
+	});
+
+	if json {
+		let output = match &report {
+			Some(rehearsal) => {
+				serde_json::to_string_pretty(&pina_cli::deploy::RehearsedDeploymentPlan {
+					plan: &plan,
+					rehearsal,
+				})
+			}
+			None => serde_json::to_string_pretty(&plan),
+		};
+		#[rustfmt::skip]
+		let output = output.unwrap_or_else(|error| panic!("deployment plans contain only JSON-compatible values: {error}"));
+		println!("{output}");
+	} else if let Some(report) = &report {
+		println!();
+		print!("{}", report.render_deploy_text());
+	}
+
+	if let (Some(report), Some(options)) = (&report, rehearsal) {
+		let code = report.exit_code(options.allow_changes);
+
+		if code != 0 {
+			let reason = if code == 2 {
+				"the rehearsal found behaviour changes; review them, then pass \
+				 --allow-rehearsal-changes to deploy anyway"
+			} else {
+				"the rehearsal compared no transaction, so the upgrade is unverified; rehearse \
+				 more traffic with --rehearse-limit, or deploy without --rehearse"
+			};
+			eprintln!(
+				"{} Deployment stopped before anything was sent: {reason}",
+				"Error".red().bold()
+			);
+			std::process::exit(code);
+		}
 	}
 
 	if dry_run {

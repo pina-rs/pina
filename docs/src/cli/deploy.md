@@ -11,20 +11,35 @@ Run `pina deploy --help` for the authoritative option list.
 
 ## Rehearse first
 
-Before upgrading a program that already has users, replay its recent traffic against the new build with [`pina rehearse`](./rehearse.md). It forks the same cluster, runs every recent transaction against the deployed program and the candidate on identical state, and exits `2` when any transaction's outcome or written account state changes:
+Before upgrading a program that already has users, pass `--rehearse`. After printing the plan and before the confirmation prompt, Pina replays the target cluster's recent transactions against the deployed program and the planned artifact on a private Surfpool fork, exactly as [`pina rehearse`](./rehearse.md) does, and prints the rehearsal report below the plan:
 
 ```bash
-pina rehearse --network devnet --build
-pina deploy --cluster devnet \
+pina deploy --build --rehearse --cluster devnet \
   --upgrade-authority ./keys/devnet-authority.json \
   --payer ./keys/devnet-payer.json
 ```
 
+Nothing is sent while the rehearsal runs, and its result decides whether anything is sent at all:
+
+| Rehearsal result                                                           | `pina deploy`                                                                                 |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| At least one transaction compared, no outcome or state changed             | Continues to confirmation and deployment. Compute-unit changes are informational.             |
+| A transaction's outcome or written account state changed                   | Stops with exit code `2`. `--allow-rehearsal-changes` deploys once you have reviewed them.    |
+| No transaction could be compared                                           | Stops with exit code `3`, even with `--allow-rehearsal-changes`. Nothing was verified.        |
+| The program is not deployed on the target yet                              | Stops with exit code `3` before Surfpool starts. Deploy a first version without `--rehearse`. |
+| The rehearsal cannot run: Surfpool missing or too old, an RPC failure, ... | Stops with exit code `1`.                                                                     |
+
 A rehearsal also proves the runtime loads the new ELF, so an upgrade the cluster would reject fails before anything is sent.
+
+The rehearsal replays the cluster the deployment writes to. A named cluster rehearses against its public endpoint (`localnet` is `http://127.0.0.1:8899`). A custom URL is rehearsed through the same endpoint, after the URL checks `pina rehearse --rpc-url` applies, and the report names it by its origin only. `--rehearse-limit <N>` replays the N most recent transactions, from 1 to 1000 (default 25). `--rehearse-limit` and `--allow-rehearsal-changes` require `--rehearse`.
+
+The rehearsed bytes are the deployed bytes. Pina reads the planned artifact once, checks it against the SHA-256 fingerprint the plan pinned, and rehearses that copy; with `--build`, that is the artifact the build just produced. It also refuses a project whose `declare_id!` no longer matches the planned program ID. The deployment later checks its private snapshot against the same fingerprint (see [Build and external requirements](#build-and-external-requirements)), so an artifact replaced during or after the rehearsal stops the deployment instead of reaching the cluster.
+
+With `--dry-run`, a rehearsal reports what the deployment would do and exits with the same codes, so CI can gate an upgrade without deploying it. With `--dry-run --json`, the plan object gains a `rehearsal` key holding the complete [`pina rehearse --json` report](./rehearse.md#json-report). Rehearsal progress goes to stderr in every mode. A rehearsal stopped by a first deployment or an operational error prints no report, and with `--json` no document.
 
 ## Safe planning
 
-Review a deployment without building, contacting an RPC endpoint, or invoking the Solana CLI:
+Review a deployment without building, contacting an RPC endpoint (unless `--rehearse` replays its traffic), or invoking the Solana CLI:
 
 ```bash
 pina deploy \
@@ -98,4 +113,4 @@ If the deploy program starts and then fails, the pending record stays, because t
 
 ## Output contract
 
-Without `--json`, stdout contains the plan and completion status. Diagnostics, confirmation, and child failures use stderr. `--dry-run --json` emits one JSON object to stdout and no progress text. The full accepted RPC host and path appear in both formats and in the Solana argument plan. Missing files, malformed keypairs, program-ID mismatches, ambiguous projects, invalid RPC URLs, rejected confirmations, missing executables, signaled children, and non-zero child exits all fail closed.
+Without `--json`, stdout contains the plan, the rehearsal report with `--rehearse`, and completion status. Diagnostics, confirmation, and child failures use stderr. `--dry-run --json` emits one JSON object to stdout and no progress text. The full accepted RPC host and path appear in both formats and in the Solana argument plan. Missing files, malformed keypairs, program-ID mismatches, ambiguous projects, invalid RPC URLs, rejected confirmations, missing executables, signaled children, and non-zero child exits all fail closed.

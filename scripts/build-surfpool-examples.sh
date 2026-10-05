@@ -98,24 +98,33 @@ while IFS= read -r manifest; do
 done < <(find "$ROOT/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml -print | sort)
 
 # `pina rehearse`'s end-to-end test (crates/pina_cli/tests/rehearse_surfpool.rs)
-# replays counter traffic against a candidate whose increment adds two, which
-# proves a candidate's account-state differences are detected and decoded. The
-# variant is the counter source with that one constant changed, built outside
-# the workspace so it never joins the example inventory. Its artifact keeps the
-# counter's name, so it lands in its own directory.
+# needs two standalone copies of the counter example, built outside the
+# workspace so they never join the example inventory:
+#
+# - a variant whose increment adds two, which proves a candidate's
+#   account-state differences are detected and decoded. Its artifact keeps the
+#   counter's name, so it lands in its own directory.
+# - a counter declared at the address of the ed25519 seed [11; 32], whose
+#   program keypair the test can therefore write, so `pina deploy --rehearse`
+#   can plan an upgrade of it. Its source stays in the output directory as the
+#   project the deployment plans from.
+counter_dir="$ROOT/examples/counter_program"
 variant_source="$(mktemp -d)"
 trap 'rm -rf "$variant_source"' EXIT
-counter_dir="$ROOT/examples/counter_program"
-mkdir -p "$variant_source/src"
-cp -R "$counter_dir/migrations" "$counter_dir/build.rs" "$variant_source/"
-sed 's/\.checked_add(1)/.checked_add(2)/' "$counter_dir/src/lib.rs" >"$variant_source/src/lib.rs"
-if ! grep -q '\.checked_add(2)' "$variant_source/src/lib.rs"; then
-	echo "the counter rehearsal variant no longer patches increment; update this script" >&2
-	exit 1
-fi
-cat >"$variant_source/Cargo.toml" <<MANIFEST
+
+# Copy the counter to the package directory $1 as package $2, applying the
+# sed script $3 to its source and migration manifest.
+standalone_counter() {
+	local package_dir="$1" package="$2" edit="$3"
+	rm -rf -- "$package_dir"
+	mkdir -p "$package_dir/src" "$package_dir/migrations"
+	cp "$counter_dir/build.rs" "$package_dir/"
+	cp "$counter_dir/migrations/publications.json" "$package_dir/migrations/"
+	sed "$edit" "$counter_dir/src/lib.rs" >"$package_dir/src/lib.rs"
+	sed "$edit" "$counter_dir/migrations/manifest.json" >"$package_dir/migrations/manifest.json"
+	cat >"$package_dir/Cargo.toml" <<MANIFEST
 [package]
-name = "counter_program"
+name = "$package"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -131,17 +140,50 @@ pina = { path = "$ROOT/crates/pina", features = ["account-resize", "logs", "deri
 
 [workspace]
 MANIFEST
-cp "$ROOT/Cargo.lock" "$variant_source/Cargo.lock"
+	cp "$ROOT/Cargo.lock" "$package_dir/Cargo.lock"
+}
+
+# Build the standalone package in $1 into the output directory $2. The copies
+# have distinct package names, so they share one target directory.
+build_standalone() {
+	local package_dir="$1" out="$2"
+	rm -rf -- "$out"
+	CARGO_TARGET_DIR="$ROOT/target/surfpool/rehearse-variant-target" "$cargo_build_sbf" \
+		"$tools_install" \
+		--tools-version "$TOOLS_VERSION" \
+		--manifest-path "$package_dir/Cargo.toml" \
+		--features bpf-entrypoint \
+		--sbf-out-dir "$out"
+}
+
+standalone_counter "$variant_source" counter_program 's/\.checked_add(1)/.checked_add(2)/'
+if ! grep -q '\.checked_add(2)' "$variant_source/src/lib.rs"; then
+	echo "the counter rehearsal variant no longer patches increment; update this script" >&2
+	exit 1
+fi
 variant_out="$OUT_DIR/rehearse-variant"
-rm -rf -- "$variant_out"
 echo "Building the counter_program rehearsal variant"
-CARGO_TARGET_DIR="$ROOT/target/surfpool/rehearse-variant-target" "$cargo_build_sbf" \
-	"$tools_install" \
-	--tools-version "$TOOLS_VERSION" \
-	--manifest-path "$variant_source/Cargo.toml" \
-	--features bpf-entrypoint \
-	--sbf-out-dir "$variant_out"
+build_standalone "$variant_source" "$variant_out"
 if [[ ! -f "$variant_out/counter_program.so" ]]; then
 	echo "cargo-build-sbf did not produce the counter rehearsal variant" >&2
+	exit 1
+fi
+
+counter_id="GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS"
+deploy_id="7v54NWdBtkjuAFJrLGsS2SXnuk8nKam81mZJeeYxVFi9"
+deploy_out="$OUT_DIR/rehearse-deploy"
+deploy_project="$deploy_out/project"
+mkdir -p "$deploy_out"
+standalone_counter "$deploy_project" counter_deploy_program "s/$counter_id/$deploy_id/g"
+for redeclared in "$deploy_project/src/lib.rs" "$deploy_project/migrations/manifest.json"; do
+	if ! grep -q "$deploy_id" "$redeclared" || grep -q "$counter_id" "$redeclared"; then
+		echo "the counter deploy copy no longer redeclares its program ID; update this script" >&2
+		exit 1
+	fi
+done
+echo "Building the counter_program deploy rehearsal copy"
+build_standalone "$deploy_project" "$deploy_out/program"
+if [[ ! -f "$deploy_out/program/counter_deploy_program.so" ]]; then
+	echo "cargo-build-sbf did not produce the counter deploy rehearsal copy" >&2
 	exit 1
 fi

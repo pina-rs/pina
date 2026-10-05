@@ -11,6 +11,7 @@ use super::fakes::ForkFaults;
 use super::fakes::PROGRAM_ID;
 use super::fakes::Reply;
 use super::fakes::remote_handler;
+use super::fakes::remote_handler_for;
 use super::fakes::requests_by_method;
 use super::*;
 
@@ -171,6 +172,11 @@ fn endpoints_resolve_clusters_and_label_custom_urls_by_origin() {
 			"https://api.testnet.solana.com",
 			"testnet",
 		),
+		(
+			RehearseCluster::Localnet,
+			"http://127.0.0.1:8899",
+			"localnet",
+		),
 	] {
 		let endpoint = Endpoint::resolve(&RehearseNetwork::Cluster(cluster))
 			.unwrap_or_else(|error| panic!("resolve {label}: {error}"));
@@ -218,6 +224,11 @@ fn selections_validate_limits_and_signatures() {
 		Selection::new(&limited),
 		Ok(Selection::Latest(MAX_LIMIT))
 	));
+	assert!(matches!(
+		Selection::latest(0),
+		Err(RehearseError::InvalidLimit { limit: 0 })
+	));
+	assert!(matches!(Selection::latest(1), Ok(Selection::Latest(1))));
 
 	for invalid in ["not base58!", "1111"] {
 		let error = Selection::new(&options(None, vec![invalid.to_owned()]))
@@ -286,7 +297,12 @@ fn targets_reject_missing_projects_and_invalid_program_ids() {
 	invalid.project = directory.path().to_path_buf();
 
 	assert!(matches!(
-		Target::load(&invalid, &mut io::sink()),
+		Target::new(
+			&Project::discover(directory.path())
+				.unwrap_or_else(|error| panic!("discover the project: {error}")),
+			Path::new("candidate.so"),
+			Binary::Deployed.elf()
+		),
 		Err(RehearseError::InvalidProgramId { .. })
 	));
 
@@ -302,6 +318,106 @@ fn targets_reject_missing_projects_and_invalid_program_ids() {
 		panic!("unexpected error: {error}");
 	};
 	assert!(path.ends_with("deploy/bad_id.so"), "{}", path.display());
+}
+
+#[test]
+fn candidate_rehearsals_check_their_inputs_before_starting_surfpool() {
+	let project = counter_project();
+	let network = RehearseNetwork::Cluster(RehearseCluster::Devnet);
+	let candidate = Binary::Deployed.elf();
+	let request = CandidateRehearsal {
+		project: &project,
+		program_id: AUTHORITY,
+		network: &network,
+		artifact: Path::new("candidate.so"),
+		candidate: &candidate,
+		limit: DEFAULT_LIMIT,
+	};
+	let error = rehearse_candidate(&request, &mut io::sink())
+		.err()
+		.unwrap_or_else(|| panic!("the counter does not declare the planned program"));
+
+	assert!(matches!(
+		&error,
+		RehearseError::ProgramIdChanged { declared, expected }
+			if declared == PROGRAM_ID && expected == AUTHORITY
+	));
+	assert_eq!(
+		error.to_string(),
+		format!("the project now declares program {PROGRAM_ID}, not the planned {AUTHORITY}")
+	);
+
+	let mut unbounded = request;
+	unbounded.limit = 0;
+	assert!(matches!(
+		rehearse_candidate(&unbounded, &mut io::sink()),
+		Err(RehearseError::InvalidLimit { limit: 0 })
+	));
+
+	let mut not_elf = request;
+	not_elf.candidate = &b"not an elf"[..];
+	assert!(matches!(
+		rehearse_candidate(&not_elf, &mut io::sink()),
+		Err(RehearseError::CandidateNotElf { .. })
+	));
+
+	let scratch = tempfile::tempdir().unwrap_or_else(|error| panic!("create scratch dir: {error}"));
+	let absent = scratch.path().join("absent");
+	let mut missing = request;
+	missing.project = &absent;
+	assert!(matches!(
+		rehearse_candidate(&missing, &mut io::sink()),
+		Err(RehearseError::Project(_))
+	));
+}
+
+#[test]
+fn rehearsals_require_the_program_on_the_remote_cluster() {
+	let fixtures = Fixtures::load();
+	let target = target(Binary::Deployed);
+	let deployed = FakeRpcServer::start(remote_handler(&fixtures));
+	let client = JsonRpc::new(&deployed.url, REMOTE_TIMEOUT, true);
+
+	assert!(ensure_deployed(&client, &endpoint(&deployed.url), &target).is_ok());
+	assert_eq!(deployed.methods(), ["getAccountInfo"]);
+	assert_eq!(
+		deployed.requests()[0].1,
+		json!([
+			PROGRAM_ID,
+			{ "encoding": "base64", "dataSlice": { "offset": 0, "length": 0 } }
+		])
+	);
+
+	let elsewhere = FakeRpcServer::start(remote_handler_for(&fixtures, AUTHORITY));
+	let client = JsonRpc::new(&elsewhere.url, REMOTE_TIMEOUT, true);
+	let error = ensure_deployed(&client, &endpoint(&elsewhere.url), &target)
+		.err()
+		.unwrap_or_else(|| panic!("an absent program cannot be rehearsed"));
+	assert!(matches!(
+		&error,
+		RehearseError::ProgramNotFound { program_id, cluster }
+			if program_id == PROGRAM_ID && cluster == "fixture"
+	));
+	assert_eq!(
+		error.to_string(),
+		format!("program {PROGRAM_ID} does not exist on fixture")
+	);
+
+	let failing = FakeRpcServer::start(|_, _| Reply::Error(-32005, "node is behind".to_owned()));
+	let client = JsonRpc::new(&failing.url, REMOTE_TIMEOUT, true);
+	let error = ensure_deployed(&client, &endpoint(&failing.url), &target)
+		.err()
+		.unwrap_or_else(|| panic!("a refused lookup aborts"));
+	assert!(
+		matches!(
+			error,
+			RehearseError::Rpc {
+				method: "getAccountInfo",
+				..
+			}
+		),
+		"{error}"
+	);
 }
 
 #[test]
@@ -565,6 +681,22 @@ fn a_changed_increment_is_a_decoded_state_change() {
 	assert_eq!(
 		tail[1],
 		"00".repeat(Binary::Deployed.elf().len() - Binary::Variant.elf().len())
+	);
+}
+
+#[test]
+fn deploy_reports_name_the_deploy_flags_in_their_verdict() {
+	let (report, _) = report(Binary::Variant);
+	let text = report.render_text();
+	let deploy = report.render_deploy_text();
+
+	assert!(
+		deploy.ends_with("rerun with --allow-rehearsal-changes to accept them.\n"),
+		"{deploy}"
+	);
+	assert_eq!(
+		deploy.replace("--allow-rehearsal-changes", "--allow-changes"),
+		text
 	);
 }
 
@@ -1188,6 +1320,11 @@ fn reports_render_empty_rehearsals_and_omitted_ranges() {
 		all_skipped
 			.render_text()
 			.contains("No transaction was compared")
+	);
+	assert!(
+		all_skipped
+			.render_deploy_text()
+			.ends_with("Replay more or newer traffic with --rehearse-limit.\n")
 	);
 
 	let mut changed = TransactionRehearsal::skipped(

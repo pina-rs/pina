@@ -24,6 +24,11 @@ use url::Host;
 use url::Url;
 
 use crate::project::Project;
+use crate::rehearse::CandidateRehearsal;
+use crate::rehearse::RehearsalReport;
+use crate::rehearse::RehearseCluster;
+use crate::rehearse::RehearseError;
+use crate::rehearse::RehearseNetwork;
 
 const LOCALNET_URL: &str = "http://127.0.0.1:8899";
 const DEVNET_URL: &str = "https://api.devnet.solana.com";
@@ -385,6 +390,21 @@ impl DeploymentPlan {
 	#[must_use]
 	pub fn requires_mainnet_acknowledgement(&self) -> bool {
 		self.target.policy == TargetPolicy::MainnetOrUnknown
+	}
+
+	/// The cluster a rehearsal of this plan replays traffic from: the same
+	/// endpoint the deployment writes to. A custom URL has already passed
+	/// deployment's URL checks, and the rehearsal checks it again with the
+	/// rules `pina rehearse --rpc-url` applies before Surfpool receives it.
+	#[must_use]
+	pub fn rehearsal_network(&self) -> RehearseNetwork {
+		match self.target.named {
+			Some(Cluster::Localnet) => RehearseNetwork::Cluster(RehearseCluster::Localnet),
+			Some(Cluster::Devnet) => RehearseNetwork::Cluster(RehearseCluster::Devnet),
+			Some(Cluster::Testnet) => RehearseNetwork::Cluster(RehearseCluster::Testnet),
+			Some(Cluster::MainnetBeta) => RehearseNetwork::Cluster(RehearseCluster::Mainnet),
+			None => RehearseNetwork::RpcUrl(self.target.rpc_url.clone()),
+		}
 	}
 
 	/// Exact modeled command derived from the validated plan state.
@@ -750,6 +770,105 @@ pub enum DeployError {
 	Build(#[from] crate::build::BuildError),
 }
 
+/// Why `pina deploy --rehearse` could not rehearse a plan.
+#[derive(Debug, Error)]
+pub enum DeploymentRehearsalError {
+	/// The planned artifact no longer matches the plan, or cannot be read.
+	#[error(transparent)]
+	Deploy(#[from] DeployError),
+
+	/// The program is not on the target yet. A first deployment has nothing to
+	/// rehearse against, so it cannot be verified.
+	#[error(
+		"program {program_id} is not deployed on {cluster} yet, so there is no deployed program \
+		 to rehearse against; deploy it the first time without --rehearse"
+	)]
+	FirstDeployment { program_id: String, cluster: String },
+
+	/// The rehearsal itself could not run, boxed to keep this error small.
+	#[error("the rehearsal failed: {0}")]
+	Rehearse(Box<RehearseError>),
+}
+
+impl DeploymentRehearsalError {
+	/// The process exit code: 3 for a first deployment, which leaves the
+	/// upgrade unverified exactly like a rehearsal that compares nothing, and 1
+	/// for operational failures.
+	#[must_use]
+	pub const fn exit_code(&self) -> i32 {
+		match self {
+			Self::FirstDeployment { .. } => 3,
+			Self::Deploy(_) | Self::Rehearse(_) => 1,
+		}
+	}
+}
+
+/// Rehearse the plan's exact artifact against the cluster the plan targets.
+///
+/// The artifact is read once and checked against the digest the plan pinned,
+/// the same digest [`ApprovedDeployment::execute`] checks its private copy
+/// against. The rehearsed bytes are therefore exactly the bytes a later
+/// execution can deploy; a file replaced in between fails one of the checks.
+///
+/// # Errors
+///
+/// Returns an error when the artifact changed or vanished since planning, the
+/// program is not deployed on the target yet, or the rehearsal cannot run.
+/// Behaviour changes are not errors: they are in the report.
+pub fn rehearse_deployment(
+	plan: &DeploymentPlan,
+	limit: usize,
+	progress: &mut dyn Write,
+) -> Result<RehearsalReport, DeploymentRehearsalError> {
+	let artifact = Path::new(plan.program());
+	let candidate = fs::read(artifact).map_err(|_| {
+		DeployError::InvalidFile {
+			kind: "program",
+			path: artifact.to_path_buf(),
+		}
+	})?;
+
+	if <[u8; 32]>::from(Sha256::digest(&candidate)) != plan.program_digest() {
+		return Err(DeployError::InputsChanged.into());
+	}
+
+	let network = plan.rehearsal_network();
+	let request = CandidateRehearsal {
+		project: Path::new(&plan.program_dir),
+		program_id: plan.program_id(),
+		network: &network,
+		artifact,
+		candidate: &candidate,
+		limit,
+	};
+
+	crate::rehearse::rehearse_candidate(&request, progress).map_err(|error| {
+		match error {
+			RehearseError::ProgramNotFound {
+				program_id,
+				cluster,
+			} => {
+				DeploymentRehearsalError::FirstDeployment {
+					program_id,
+					cluster,
+				}
+			}
+			error => DeploymentRehearsalError::Rehearse(Box::new(error)),
+		}
+	})
+}
+
+/// A dry-run plan with the rehearsal that gated it: the document
+/// `pina deploy --dry-run --json --rehearse` prints. The plan's own keys are
+/// unchanged, and `rehearsal` is the complete `pina rehearse --json` report
+/// (`schemaVersion` 1).
+#[derive(Debug, Serialize)]
+pub struct RehearsedDeploymentPlan<'a> {
+	#[serde(flatten)]
+	pub plan: &'a DeploymentPlan,
+	pub rehearsal: &'a RehearsalReport,
+}
+
 /// Resolve and validate an inspectable deployment plan without executing it.
 pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan, DeployError> {
 	let project = Project::discover(&request.project).map_err(|error| {
@@ -1081,6 +1200,8 @@ struct ResolvedTarget {
 	cluster: String,
 	rpc_url: String,
 	policy: TargetPolicy,
+	/// The named cluster, or `None` for a custom URL.
+	named: Option<Cluster>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -1102,6 +1223,7 @@ impl ResolvedTarget {
 						Cluster::Devnet | Cluster::Testnet => TargetPolicy::KnownRemote,
 						Cluster::MainnetBeta => TargetPolicy::MainnetOrUnknown,
 					},
+					named: Some(*cluster),
 				})
 			}
 			DeploymentTarget::RpcUrl(value) => Self::custom(value),
@@ -1182,6 +1304,7 @@ impl ResolvedTarget {
 			} else {
 				TargetPolicy::MainnetOrUnknown
 			},
+			named: None,
 		})
 	}
 }
@@ -1453,6 +1576,10 @@ fn path_string(path: &Path, kind: &'static str) -> Result<String, DeployError> {
 		}
 	})
 }
+
+#[cfg(test)]
+#[path = "deploy_rehearsal_tests.rs"]
+mod rehearsal_tests;
 
 #[cfg(test)]
 mod tests {
