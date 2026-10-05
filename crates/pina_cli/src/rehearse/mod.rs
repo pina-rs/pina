@@ -28,8 +28,11 @@ mod surfnet;
 mod wire;
 
 use std::collections::BTreeSet;
+use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::io;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -111,6 +114,9 @@ pub enum RehearseCluster {
 	Mainnet,
 	Devnet,
 	Testnet,
+	/// A validator on this machine, the target `pina deploy --cluster localnet`
+	/// names. `pina rehearse --network` does not offer it.
+	Localnet,
 }
 
 impl RehearseCluster {
@@ -119,6 +125,7 @@ impl RehearseCluster {
 			Self::Mainnet => "mainnet",
 			Self::Devnet => "devnet",
 			Self::Testnet => "testnet",
+			Self::Localnet => "localnet",
 		}
 	}
 
@@ -127,6 +134,7 @@ impl RehearseCluster {
 			Self::Mainnet => "https://api.mainnet-beta.solana.com",
 			Self::Devnet => "https://api.devnet.solana.com",
 			Self::Testnet => "https://api.testnet.solana.com",
+			Self::Localnet => "http://127.0.0.1:8899",
 		}
 	}
 }
@@ -185,6 +193,24 @@ pub struct RehearseOptions {
 	pub signatures: Vec<String>,
 }
 
+/// Exact candidate bytes to rehearse, for a caller that has already resolved
+/// and fingerprinted the artifact, as `pina deploy --rehearse` does.
+#[derive(Clone, Copy, Debug)]
+pub struct CandidateRehearsal<'a> {
+	/// Directory in or below the project, for the program's IR.
+	pub project: &'a Path,
+	/// The program the caller verified the project declares. A project that
+	/// declares another one by the time it is read is refused.
+	pub program_id: &'a str,
+	pub network: &'a RehearseNetwork,
+	/// Where the candidate was read from, named in diagnostics only.
+	pub artifact: &'a Path,
+	/// The candidate executable, byte for byte.
+	pub candidate: &'a [u8],
+	/// How many recent transactions to fetch, from 1 to [`MAX_LIMIT`].
+	pub limit: usize,
+}
+
 /// Why a rehearsal could not run to completion.
 #[derive(Debug, thiserror::Error)]
 pub enum RehearseError {
@@ -223,6 +249,9 @@ pub enum RehearseError {
 
 	#[error("the project declares an invalid program id {program_id:?}")]
 	InvalidProgramId { program_id: String },
+
+	#[error("the project now declares program {declared}, not the planned {expected}")]
+	ProgramIdChanged { declared: String, expected: String },
 
 	#[error("could not read the candidate program {path}: {source}")]
 	ReadCandidate { path: PathBuf, source: io::Error },
@@ -297,6 +326,49 @@ pub fn rehearse(
 ) -> Result<RehearsalReport, RehearseError> {
 	let endpoint = Endpoint::resolve(&options.network)?;
 	let selection = Selection::new(options)?;
+	let surfpool = surfpool_executable()?;
+	let target = Target::load(options, progress)?;
+
+	run(&endpoint, &selection, &target, &surfpool, progress)
+}
+
+/// Rehearse exact candidate bytes against the program's recent traffic.
+///
+/// This is [`rehearse`] for a caller that owns the artifact: the candidate is
+/// never re-read from disk, so it is exactly the bytes the caller verified.
+///
+/// # Errors
+///
+/// Returns the same errors as [`rehearse`], except that the candidate is not
+/// read or built here, and [`RehearseError::ProgramIdChanged`] when the
+/// project no longer declares `request.program_id`. The candidate is checked
+/// before any process starts.
+pub fn rehearse_candidate(
+	request: &CandidateRehearsal<'_>,
+	progress: &mut dyn Write,
+) -> Result<RehearsalReport, RehearseError> {
+	let endpoint = Endpoint::resolve(request.network)?;
+	let selection = Selection::latest(request.limit)?;
+	let target = Target::new(
+		&Project::discover(request.project)?,
+		request.artifact,
+		request.candidate.to_vec(),
+	)?;
+
+	if target.program_id != request.program_id {
+		return Err(RehearseError::ProgramIdChanged {
+			declared: target.program_id,
+			expected: request.program_id.to_owned(),
+		});
+	}
+
+	let surfpool = surfpool_executable()?;
+
+	run(&endpoint, &selection, &target, &surfpool, progress)
+}
+
+/// The Surfpool executable, once it is proven new enough.
+fn surfpool_executable() -> Result<OsString, RehearseError> {
 	let surfpool = crate::workflow::executable("PINA_SURFPOOL", "surfpool");
 	let (version, _) = crate::workflow::surfpool_version(&surfpool)?;
 
@@ -306,21 +378,32 @@ pub fn rehearse(
 		});
 	}
 
-	let target = Target::load(options, progress)?;
+	Ok(surfpool)
+}
+
+/// Fetch the traffic, fork the cluster, and replay it against both binaries.
+fn run(
+	endpoint: &Endpoint,
+	selection: &Selection,
+	target: &Target,
+	surfpool: &OsStr,
+	progress: &mut dyn Write,
+) -> Result<RehearsalReport, RehearseError> {
 	let remote = JsonRpc::new(&endpoint.url, REMOTE_TIMEOUT, false);
-	let transactions = fetch(&remote, &endpoint, &target, &selection, progress)?;
+	ensure_deployed(&remote, endpoint, target)?;
+	let transactions = fetch(&remote, endpoint, target, selection, progress)?;
 	let directory = tempfile::tempdir().map_err(RehearseError::WorkDirectory)?;
 	let ports = SurfnetPorts::allocate().map_err(RehearseError::WorkDirectory)?;
 	let _ = writeln!(progress, "Starting a Surfpool fork of {}", endpoint.label);
 	let surfnet = Surfnet::start(&SurfnetLaunch {
-		executable: &surfpool,
+		executable: surfpool,
 		fork_url: &endpoint.url,
 		ports,
 		directory: directory.path(),
 		ready_timeout: READY_TIMEOUT,
 		request_timeout: LOCAL_TIMEOUT,
 	})?;
-	let report = replay(surfnet.rpc(), &endpoint, &target, &transactions, progress);
+	let report = replay(surfnet.rpc(), endpoint, target, &transactions, progress);
 	// Stop the fork before its scratch directory is removed.
 	drop(surfnet);
 
@@ -390,13 +473,15 @@ impl Selection {
 			return Ok(Self::Signatures(options.signatures.clone()));
 		}
 
-		if !(1..=MAX_LIMIT).contains(&options.limit) {
-			return Err(RehearseError::InvalidLimit {
-				limit: options.limit,
-			});
+		Self::latest(options.limit)
+	}
+
+	fn latest(limit: usize) -> Result<Self, RehearseError> {
+		if !(1..=MAX_LIMIT).contains(&limit) {
+			return Err(RehearseError::InvalidLimit { limit });
 		}
 
-		Ok(Self::Latest(options.limit))
+		Ok(Self::Latest(limit))
 	}
 }
 
@@ -410,19 +495,9 @@ struct Target {
 }
 
 impl Target {
+	/// Resolve the candidate the options name, building it first if asked.
 	fn load(options: &RehearseOptions, progress: &mut dyn Write) -> Result<Self, RehearseError> {
 		let project = Project::discover(&options.project)?;
-		let auto = crate::migrations::manifest_auto_policy(&project.program_dir);
-		let ir = crate::parse::parse_program_with_auto(&project.program_dir, None, &auto)?;
-		let program_key = rpc::decode_address(&ir.public_key).map_err(|_| {
-			RehearseError::InvalidProgramId {
-				program_id: ir.public_key.clone(),
-			}
-		})?;
-		let catalog = ProgramCatalog::new(
-			&ir,
-			crate::migrations::manifest_version_type(&project.program_dir),
-		);
 		let artifact = if options.build {
 			let _ = writeln!(progress, "Building the candidate with `pina build`");
 			crate::build::build_project(&options.project)?.sbf_artifact
@@ -439,8 +514,27 @@ impl Target {
 			}
 		})?;
 
+		Self::new(&project, &artifact, candidate)
+	}
+
+	/// The project's program with `candidate` as its upgrade.
+	fn new(project: &Project, artifact: &Path, candidate: Vec<u8>) -> Result<Self, RehearseError> {
+		let auto = crate::migrations::manifest_auto_policy(&project.program_dir);
+		let ir = crate::parse::parse_program_with_auto(&project.program_dir, None, &auto)?;
+		let program_key = rpc::decode_address(&ir.public_key).map_err(|_| {
+			RehearseError::InvalidProgramId {
+				program_id: ir.public_key.clone(),
+			}
+		})?;
+		let catalog = ProgramCatalog::new(
+			&ir,
+			crate::migrations::manifest_version_type(&project.program_dir),
+		);
+
 		if !candidate.starts_with(b"\x7fELF") {
-			return Err(RehearseError::CandidateNotElf { path: artifact });
+			return Err(RehearseError::CandidateNotElf {
+				path: artifact.to_path_buf(),
+			});
 		}
 
 		Ok(Self {
@@ -463,6 +557,34 @@ struct Decoded {
 	wire: String,
 	accounts: Vec<[u8; 32]>,
 	instructions: Vec<ProgramInstruction>,
+}
+
+/// Fail before any Surfpool starts when the program does not exist on the
+/// cluster: there is no deployed program to rehearse against.
+fn ensure_deployed(
+	remote: &JsonRpc,
+	endpoint: &Endpoint,
+	target: &Target,
+) -> Result<(), RehearseError> {
+	let account = remote
+		.call(
+			"getAccountInfo",
+			&json!([
+				target.program_id,
+				{ "encoding": "base64", "dataSlice": { "offset": 0, "length": 0 } }
+			]),
+		)
+		.and_then(|value| rpc::parse_account_info(&value))
+		.map_err(endpoint.error("getAccountInfo"))?;
+
+	if account.is_none() {
+		return Err(RehearseError::ProgramNotFound {
+			program_id: target.program_id.clone(),
+			cluster: endpoint.label.clone(),
+		});
+	}
+
+	Ok(())
 }
 
 /// Fetch the transactions to replay from the remote cluster.

@@ -535,8 +535,19 @@ impl RehearsalReport {
 		if self.compared() == 0 { 3 } else { 0 }
 	}
 
-	/// Render the human-readable report.
+	/// Render the human-readable report, as `pina rehearse` prints it.
 	pub fn render_text(&self) -> String {
+		self.render("--allow-changes", "--limit or --signature")
+	}
+
+	/// Render the human-readable report as `pina deploy --rehearse` prints it:
+	/// its verdict names the deploy flags that accept changes or replay more
+	/// traffic.
+	pub fn render_deploy_text(&self) -> String {
+		self.render("--allow-rehearsal-changes", "--rehearse-limit")
+	}
+
+	fn render(&self, accept_flag: &str, traffic_flags: &str) -> String {
 		let mut output = String::new();
 		let summary = &self.summary;
 
@@ -578,14 +589,14 @@ impl RehearsalReport {
 			let _ = writeln!(
 				output,
 				"Behaviour changed in {} transaction(s). Review the differences, or rerun with \
-				 --allow-changes to accept them.",
+				 {accept_flag} to accept them.",
 				summary.state_changed + summary.outcome_changed
 			);
 		} else if self.compared() == 0 {
 			let _ = writeln!(
 				output,
 				"No transaction was compared, so this rehearsal verified nothing about the \
-				 upgrade. Replay more or newer traffic with --limit or --signature."
+				 upgrade. Replay more or newer traffic with {traffic_flags}."
 			);
 		} else {
 			let _ = writeln!(

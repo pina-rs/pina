@@ -107,10 +107,10 @@ Long help includes the input contract, output behavior, defaults, and copyable e
 | `completions`     | Completion script                 | Errors                                                  |
 | `profile`         | Report when `--output` is omitted | Errors; `trace` adds build and test output and warnings |
 | `rehearse`        | Rehearsal report (text or JSON)   | Progress and errors                                     |
-| `deploy`          | Inspectable plan and completion   | Confirmation, progress, errors                          |
+| `deploy`          | Plan, rehearsal, and completion   | Confirmation, progress, errors                          |
 | `codama generate` | Completion summary                | Errors and renderer failures                            |
 
-Successful commands exit with code `0`. Operational failures exit with code `1`. Completed comparisons that find a difference exit with code `2`: verification hash mismatches, `profile compare` regressions, and `rehearse` behaviour changes. `rehearse` exits with code `3` when it could compare no transaction. Invalid command-line syntax is rejected by Clap with a non-zero usage error before an operation begins.
+Successful commands exit with code `0`. Operational failures exit with code `1`. Completed comparisons that find a difference exit with code `2`: verification hash mismatches, `profile compare` regressions, and `rehearse` behaviour changes. `rehearse` exits with code `3` when it could compare no transaction. `deploy --rehearse` stops before sending anything with the same codes: `2` for behaviour changes, and `3` when nothing was compared or the program is not deployed yet. Invalid command-line syntax is rejected by Clap with a non-zero usage error before an operation begins.
 
 For reliable automation, capture stdout only when the command documents it as machine-readable. See [Automation and Agent Usage](./automation.md) for a compact discovery protocol.
 

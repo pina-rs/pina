@@ -969,6 +969,9 @@ Network safety:
     --cluster http://127.0.0.1:8899 \
     --payer ./keys/local-payer.json \
     --upgrade-authority ./keys/local-authority.json --dry-run --json
+  pina deploy --build --rehearse --cluster devnet \
+    --payer ./keys/devnet-payer.json \
+    --upgrade-authority ./keys/devnet-authority.json
 
 Safety:
   No cluster is selected by default. --cluster accepts a named cluster or explicit RPC URL.
@@ -977,7 +980,16 @@ Safety:
   Prefer a named cluster when possible.
   Remote deployment prompts for the word deploy; use --yes only in reviewed automation.
   Mainnet and custom remote deployment additionally require --allow-mainnet.
-  --dry-run never builds or deploys and --json is available only with --dry-run.")]
+  --dry-run never builds or deploys and --json is available only with --dry-run.
+
+Rehearsal:
+  --rehearse replays the target cluster's recent transactions against the exact artifact the
+  plan pins, on a private Surfpool fork, after the plan is printed and before the approval
+  prompt. Nothing is sent while it runs. A behaviour change stops the deployment with exit
+  code 2 unless --allow-rehearsal-changes accepts it; a rehearsal that compares nothing, or a
+  first deployment, stops it with exit code 3; a rehearsal that cannot run exits 1.
+  With --dry-run it reports what a deployment would do and exits with the same codes, and
+  with --json the plan gains a `rehearsal` key holding the `pina rehearse --json` report.")]
 	Deploy {
 		/// Directory used for pina.toml or Cargo metadata project discovery.
 		#[arg(
@@ -1042,6 +1054,28 @@ Safety:
 		/// `PINA_DEPLOY_CLUSTER` environment variables.
 		#[arg(long, value_name = "COMMAND")]
 		remote_command: Option<String>,
+
+		/// Rehearse the upgrade against the target cluster's recent traffic first.
+		///
+		/// Runs before the approval prompt on the exact artifact this plan pins,
+		/// with `pina rehearse`'s classification. Requires Surfpool 1.6 or newer.
+		#[arg(long)]
+		rehearse: bool,
+
+		/// Recent transactions the rehearsal replays, from 1 to 1000 [default: 25].
+		#[arg(
+			long,
+			requires = "rehearse",
+			value_parser = clap::value_parser!(u16).range(1..=1000),
+			value_name = "N"
+		)]
+		rehearse_limit: Option<u16>,
+
+		/// Deploy even though the rehearsal found behaviour changes you have reviewed.
+		///
+		/// It never accepts a rehearsal that compared nothing.
+		#[arg(long, requires = "rehearse")]
+		allow_rehearsal_changes: bool,
 	},
 }
 

@@ -155,6 +155,18 @@ pina deploy \
 jq -e '.program_id and .commands' /tmp/deploy-plan.json
 ```
 
+Rehearse the planned upgrade in the same step. `--rehearse` replays the target cluster's recent traffic against the exact artifact the plan pins and adds the `pina rehearse --json` report under a `rehearsal` key; the plan's own keys are unchanged. Gate on the exit status first: 0 when the rehearsal compared at least one transaction and none changed, 2 when behaviour changed, 3 when nothing could be compared or the program is not deployed yet (no document is printed for a first deployment), and 1 for an operational failure:
+
+```bash
+pina deploy \
+  --project ./programs/counter_program \
+  --cluster devnet \
+  --upgrade-authority ./keys/devnet-authority.json \
+  --payer ./keys/devnet-payer.json \
+  --rehearse --dry-run --json > /tmp/deploy-plan.json
+jq -e '.rehearsal.schemaVersion == 1 and .rehearsal.summary.total > .rehearsal.summary.skipped and .rehearsal.summary.stateChanged == 0 and .rehearsal.summary.outcomeChanged == 0' /tmp/deploy-plan.json
+```
+
 ## Automation rules
 
 - Check the exit status before consuming output.
@@ -180,6 +192,7 @@ jq -e '.program_id and .commands' /tmp/deploy-plan.json
 - `pina dev` is offline unless `--network` or a credential-free HTTP(S) `--rpc-url` is explicitly supplied. The URL is visible in Surfpool's process arguments, so never place a secret anywhere in it.
 - Always inspect `deploy --dry-run --json` before remote automation.
 - Never pass `deploy --yes` until the exact target, program ID, authority, payer, and command plan have been reviewed.
+- Prefer `deploy --rehearse` for upgrades of programs with traffic. Exit codes `2` and `3` mean the deployment stopped before anything was sent. Never pass `--allow-rehearsal-changes` until every `state_changed` and `outcome_changed` transaction has been reviewed, and do not treat `3` as a pass: deploy a first version without `--rehearse` instead.
 - Never put a secret anywhere in a custom deploy RPC URL. Pina rejects user information, queries, and fragments, but accepted hosts and paths remain visible in plan output and process listings because Solana receives the endpoint through `--url`. Prefer named clusters.
 
 ## Stable verification

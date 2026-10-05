@@ -18,9 +18,11 @@ pina rehearse --network devnet --signature <SIGNATURE> --signature <SIGNATURE>
 
 Nothing is sent to the cluster and no project file is written. Pair it with [`pina migrations`](./migrations.md) and [`pina deploy`](./deploy.md): migrations prove the new code can read old data, and a rehearsal proves it still behaves the same on the traffic your users actually send.
 
+To gate the upgrade itself, run the rehearsal as part of the deployment with [`pina deploy --rehearse`](./deploy.md#rehearse-first). It rehearses the exact artifact the deployment plan pins, against the cluster the deployment targets, and stops the deployment before anything is sent when behaviour changes or nothing could be compared.
+
 ## How a rehearsal runs
 
-1. **Fetch.** Pina asks the cluster for the program's most recent signatures (`getSignaturesForAddress`, at `confirmed` commitment) and fetches each transaction exactly as it landed. With `--signature`, only the named transactions are fetched.
+1. **Fetch.** Pina confirms the program exists on the cluster (`getAccountInfo`), so a program that was never deployed fails before any Surfpool starts. It then asks the cluster for the program's most recent signatures (`getSignaturesForAddress`, at `confirmed` commitment) and fetches each transaction exactly as it landed. With `--signature`, only the named transactions are fetched.
 2. **Fork.** Pina starts a private Surfpool forked from the same RPC endpoint, on free loopback ports, inside a temporary directory, and waits up to a minute for it to answer. The fork is always stopped: on success, on error, on panic, and on Unix even when `pina` is interrupted or killed, because Surfpool runs under a small supervisor that stops it as soon as `pina` exits.
 3. **Freeze.** Every account the transactions touch is loaded into the fork in one pass. Accounts that do not exist are marked offline, so the remote is never consulted again: both runs see one frozen snapshot, even on a busy cluster.
 4. **Baseline.** Each signed transaction is profiled against the deployed program. Profiling executes on a throwaway copy of the fork, so nothing commits and every transaction sees the same snapshot.
@@ -68,12 +70,12 @@ The compute-unit table covers transactions that succeeded in both runs, per inst
 
 ## Exit status
 
-| Code | Meaning                                                                                                               |
-| ---- | --------------------------------------------------------------------------------------------------------------------- |
-| `0`  | At least one transaction was compared and none changed outcome or state. Compute-unit changes alone pass.             |
-| `2`  | At least one `state_changed` or `outcome_changed` transaction, without `--allow-changes`                              |
-| `3`  | No transaction was compared: every one was skipped, or there was no traffic. Nothing was verified.                    |
-| `1`  | Operational error: invalid input, missing Surfpool, an RPC failure, a candidate the runtime rejects. Stdout is empty. |
+| Code | Meaning                                                                                                                                               |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | At least one transaction was compared and none changed outcome or state. Compute-unit changes alone pass.                                             |
+| `2`  | At least one `state_changed` or `outcome_changed` transaction, without `--allow-changes`                                                              |
+| `3`  | No transaction was compared: every one was skipped, or there was no traffic. Nothing was verified.                                                    |
+| `1`  | Operational error: invalid input, missing Surfpool, a program that is not deployed, an RPC failure, a candidate the runtime rejects. Stdout is empty. |
 
 This follows the CLI's convention for comparisons (`pina profile compare`, `pina idl diff`, `pina verify check`): `2` means the comparison completed and found a difference. Clap also exits `2` for invalid arguments, but then prints usage to stderr and nothing to stdout. Use `--allow-changes` once the differences are reviewed and intended.
 
@@ -149,7 +151,7 @@ Every key is always present; absent values are `null`. `status` and `skip.reason
 
 ## Network safety
 
-Pina only reads from the cluster: one `getSignaturesForAddress` request and one `getTransaction` request per transaction, each sent exactly once with a timeout. A failed request stops the rehearsal with exit code `1` instead of being retried, so a rate-limited endpoint is not hammered; use a dedicated RPC endpoint or a smaller `--limit` when a public endpoint refuses. That includes JSON-RPC errors returned inside an HTTP 200 response, such as an unhealthy node (`-32005`) or a provider's rate limit. The one exception is `-32015`, the RPC's answer for a transaction it cannot encode in a supported version: that transaction is skipped as `undecodable`. Redirects are not followed. The fork fetches each account the transactions touch from the same endpoint once.
+Pina only reads from the cluster: one `getAccountInfo` request for the program, one `getSignaturesForAddress` request, and one `getTransaction` request per transaction, each sent exactly once with a timeout. A failed request stops the rehearsal with exit code `1` instead of being retried, so a rate-limited endpoint is not hammered; use a dedicated RPC endpoint or a smaller `--limit` when a public endpoint refuses. That includes JSON-RPC errors returned inside an HTTP 200 response, such as an unhealthy node (`-32005`) or a provider's rate limit. The one exception is `-32015`, the RPC's answer for a transaction it cannot encode in a supported version: that transaction is skipped as `undecodable`. Redirects are not followed. The fork fetches each account the transactions touch from the same endpoint once.
 
 A custom `--rpc-url` must use HTTP or HTTPS with a host. Pina rejects user information, query parameters, fragments, and control characters. Surfpool receives the URL as a child-process argument, where local process inspection can reveal it, so never put a secret anywhere in the URL, including its path. Reports show only the URL's origin.
 

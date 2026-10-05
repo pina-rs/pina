@@ -304,11 +304,30 @@ fn read_request(stream: &mut TcpStream) -> String {
 pub fn remote_handler(
 	fixtures: &Fixtures,
 ) -> impl Fn(&str, &Value) -> Reply + Send + Sync + 'static {
+	remote_handler_for(fixtures, PROGRAM_ID)
+}
+
+/// A remote cluster where `program_id` is deployed and the captured traffic
+/// is its history. Any other program does not exist.
+pub fn remote_handler_for(
+	fixtures: &Fixtures,
+	program_id: &str,
+) -> impl Fn(&str, &Value) -> Reply + Send + Sync + 'static {
 	let signatures = fixtures.signatures.clone();
 	let transactions = fixtures.transactions.clone();
+	let program = fixtures.program_account.clone();
+	let program_id = program_id.to_owned();
 
 	move |method, params| {
 		match method {
+			"getAccountInfo" => {
+				let value = if params[0] == program_id.as_str() {
+					program["value"].clone()
+				} else {
+					Value::Null
+				};
+				Reply::Result(json!({ "context": program["context"], "value": value }))
+			}
 			"getSignaturesForAddress" => Reply::Result(signatures.clone()),
 			"getTransaction" => {
 				let signature = params[0].as_str().unwrap_or_default();
@@ -351,6 +370,7 @@ struct ForkState {
 pub struct FakeFork {
 	fixtures: Fixtures,
 	faults: ForkFaults,
+	program_id: String,
 	programdata_address: String,
 	wires: HashMap<String, String>,
 	state: Mutex<ForkState>,
@@ -358,6 +378,11 @@ pub struct FakeFork {
 
 impl FakeFork {
 	pub fn new(faults: ForkFaults) -> Self {
+		Self::for_program(PROGRAM_ID, faults)
+	}
+
+	/// A fork where the captured program is deployed at `program_id`.
+	pub fn for_program(program_id: &str, faults: ForkFaults) -> Self {
 		let fixtures = Fixtures::load();
 		let program_account_data = base64::engine::general_purpose::STANDARD
 			.decode(
@@ -398,6 +423,7 @@ impl FakeFork {
 		Self {
 			fixtures,
 			faults,
+			program_id: program_id.to_owned(),
 			programdata_address,
 			wires,
 			state: Mutex::new(ForkState {
@@ -521,7 +547,7 @@ impl FakeFork {
 	fn account(&self, address: &str) -> Value {
 		let state = self.state();
 
-		if address == PROGRAM_ID && !self.faults.missing_program {
+		if address == self.program_id && !self.faults.missing_program {
 			let mut account = self.fixtures.program_account["value"].clone();
 			account["lamports"] = json!(state.program_lamports);
 
