@@ -1,6 +1,5 @@
 {
 	"paths": [
-		".pina-generated.json",
 		"src/generated/errors/duplicateMutableAccountsProgram.ts",
 		"src/generated/errors/index.ts",
 		"src/generated/index.ts",

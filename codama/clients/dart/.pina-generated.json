@@ -1,6 +1,5 @@
 {
 	"paths": [
-		".pina-generated.json",
 		"lib/src/generated/account_realloc_program/account_realloc_program.dart",
 		"lib/src/generated/account_realloc_program/accounts/accounts.dart",
 		"lib/src/generated/account_realloc_program/accounts/sample.dart",

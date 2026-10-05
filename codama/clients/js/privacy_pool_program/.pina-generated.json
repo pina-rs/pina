@@ -1,6 +1,5 @@
 {
 	"paths": [
-		".pina-generated.json",
 		"src/generated/accounts/custodianRegistry.ts",
 		"src/generated/accounts/disclosureLog.ts",
 		"src/generated/accounts/disclosureRequest.ts",

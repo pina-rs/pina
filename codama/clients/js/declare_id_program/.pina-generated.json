@@ -1,6 +1,5 @@
 {
 	"paths": [
-		".pina-generated.json",
 		"src/generated/index.ts",
 		"src/generated/instructions/index.ts",
 		"src/generated/instructions/initialize.ts",

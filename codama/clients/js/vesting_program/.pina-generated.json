@@ -1,6 +1,5 @@
 {
 	"paths": [
-		".pina-generated.json",
 		"src/generated/accounts/index.ts",
 		"src/generated/accounts/vestingState.ts",
 		"src/generated/errors/index.ts",

@@ -1,6 +1,5 @@
 {
 	"paths": [
-		".pina-generated.json",
 		"src/generated/events/index.ts",
 		"src/generated/events/myEvent.ts",
 		"src/generated/events/myOtherEvent.ts",
