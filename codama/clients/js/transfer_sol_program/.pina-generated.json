@@ -1,0 +1,12 @@
+{
+	"paths": [
+		"src/generated/errors/index.ts",
+		"src/generated/errors/transferSolProgram.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/cpiTransfer.ts",
+		"src/generated/instructions/directTransfer.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/transferSolProgram.ts"
+	]
+}

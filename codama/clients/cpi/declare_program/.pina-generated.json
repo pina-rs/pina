@@ -1,0 +1,10 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/validate_external_program.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

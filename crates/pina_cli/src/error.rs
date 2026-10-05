@@ -105,6 +105,12 @@ pub enum CodamaError {
 	#[error("Refusing unsafe generated-client output path {path}: {reason}")]
 	UnsafeOutput { path: PathBuf, reason: String },
 
+	#[error(
+		"`pina.toml` selects `overwrite` for {language} clients; removing a client tree is an \
+		 operator decision, so request it with `--mode overwrite`"
+	)]
+	ConfiguredOverwrite { language: &'static str },
+
 	#[error("Cannot {mode} generated client at {path}: {reason}")]
 	InvalidGenerationState {
 		path: PathBuf,

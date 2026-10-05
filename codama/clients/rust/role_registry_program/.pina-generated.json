@@ -1,0 +1,21 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/registry_config.rs",
+		"src/generated/accounts/role_entry.rs",
+		"src/generated/compute_budget.rs",
+		"src/generated/errors/mod.rs",
+		"src/generated/errors/role_registry_program.rs",
+		"src/generated/instructions/add_role.rs",
+		"src/generated/instructions/deactivate_role.rs",
+		"src/generated/instructions/initialize.rs",
+		"src/generated/instructions/migrate.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/rotate_admin.rs",
+		"src/generated/instructions/update_role.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

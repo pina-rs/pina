@@ -1,0 +1,19 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/policy_state.rs",
+		"src/generated/compute_budget.rs",
+		"src/generated/errors/mod.rs",
+		"src/generated/errors/validation_program.rs",
+		"src/generated/events/mod.rs",
+		"src/generated/events/policy_checked.rs",
+		"src/generated/instructions/check_policy.rs",
+		"src/generated/instructions/initialize_policy.rs",
+		"src/generated/instructions/migrate.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

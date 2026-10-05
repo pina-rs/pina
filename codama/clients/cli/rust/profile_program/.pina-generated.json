@@ -1,0 +1,15 @@
+{
+	"paths": [
+		".pina-generated",
+		"Cargo.toml",
+		"README.md",
+		"src/commands/add_tag.rs",
+		"src/commands/initialize.rs",
+		"src/commands/mod.rs",
+		"src/commands/remove_tag.rs",
+		"src/commands/update_profile.rs",
+		"src/context.rs",
+		"src/fetch.rs",
+		"src/main.rs"
+	]
+}

@@ -1,0 +1,16 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/add_tag.ts",
+		"src/commands/initialize.ts",
+		"src/commands/remove_tag.ts",
+		"src/commands/update_profile.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/fetch.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

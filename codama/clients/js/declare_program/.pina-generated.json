@@ -1,0 +1,9 @@
+{
+	"paths": [
+		"src/generated/index.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/validateExternalProgram.ts",
+		"src/generated/programs/declareProgram.ts",
+		"src/generated/programs/index.ts"
+	]
+}

@@ -130,6 +130,12 @@ pub struct IdlDiff {
 pub struct ClientOptions {
 	pub npx: String,
 	pub cluster: String,
+	/// The project directory whose `node_modules` the child must not resolve.
+	///
+	/// `npx` prefers a matching local install over the pinned registry fetch,
+	/// so the official-client child runs outside this directory and with its
+	/// `PATH` entries dropped.
+	pub resolver_root: PathBuf,
 }
 
 impl fmt::Debug for ClientOptions {
@@ -138,6 +144,7 @@ impl fmt::Debug for ClientOptions {
 			.debug_struct("ClientOptions")
 			.field("npx", &self.npx)
 			.field("cluster", &"<redacted>")
+			.field("resolver_root", &self.resolver_root.display().to_string())
 			.finish()
 	}
 }
@@ -672,8 +679,17 @@ fn run_official_client_with_limits(
 	max_stdout_bytes: usize,
 	max_stderr_bytes: usize,
 ) -> Result<Vec<u8>, IdlMetadataError> {
-	let mut child = Command::new(&client.npx)
-		.args(args)
+	let mut command = Command::new(&client.npx);
+	command.args(args);
+	// `npx` resolves a matching local install before the pinned registry
+	// fetch, and cwd-relative resolution would reach a committed
+	// `node_modules`, so the child runs isolated from the project.
+	// The binding must outlive the child, or the isolated directory
+	// disappears before the child exits.
+	let _isolated =
+		crate::npm_isolation::isolate_package_child(&mut command, &client.resolver_root)
+			.map_err(run_client_error(client))?;
+	let mut child = command
 		.stdin(Stdio::null())
 		.stdout(Stdio::piped())
 		.stderr(Stdio::piped())
@@ -949,6 +965,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: "npx".to_owned(),
 			cluster: "https://rpc.example.test".to_owned(),
+			resolver_root: PathBuf::from("."),
 		};
 		let debug = format!("{client:?}");
 		assert!(debug.contains("<redacted>"));
@@ -1236,6 +1253,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 
 		let fetched =
@@ -1273,6 +1291,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		let options = PublishOptions {
 			local: &local,
@@ -1327,6 +1346,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		let options = PublishOptions {
 			local: &local,
@@ -1375,6 +1395,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		let options = PublishOptions {
 			local: &local,
@@ -1406,6 +1427,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: "a runner that must never start".to_owned(),
 			cluster: "devnet".to_owned(),
+			resolver_root: PathBuf::from("."),
 		};
 		let keypair = Path::new("authority.json");
 		let multisig = "ProgM6JCCvbYkfKqJYHePx4xxSUSqJp7rh8Lyv7nk7S";
@@ -1461,6 +1483,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: "a runner that must never start".to_owned(),
 			cluster: "devnet".to_owned(),
+			resolver_root: PathBuf::from("."),
 		};
 		let victim = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS";
 		let other = "ProgM6JCCvbYkfKqJYHePx4xxSUSqJp7rh8Lyv7nk7S";
@@ -1510,6 +1533,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		assert!(matches!(
 			publish_idl(&client, &options),
@@ -1520,6 +1544,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		assert!(matches!(
 			publish_idl(&client, &options),
@@ -1537,10 +1562,39 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		let error = run_official_client(&client, &[]).expect_err("client failure must propagate");
 		assert!(error.to_string().contains("baddiagnostic"));
 		assert!(!error.to_string().contains('\u{1}'));
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn official_client_runs_outside_the_project_directory() {
+		let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("{error}"));
+		let project = directory.path().join("project");
+		std::fs::create_dir_all(&project).unwrap_or_else(|error| panic!("{error}"));
+		let runner = fake_runner_script(directory.path(), "pwd");
+		let client = ClientOptions {
+			npx: runner.display().to_string(),
+			cluster: "devnet".to_owned(),
+			resolver_root: project.clone(),
+		};
+
+		let output = run_official_client(&client, &[]).unwrap_or_else(|e| panic!("client: {e}"));
+		let reported = String::from_utf8_lossy(&output).trim().to_owned();
+		let working_directory = Path::new(&reported);
+
+		assert_ne!(
+			working_directory,
+			project.as_path(),
+			"the official client must not run inside the project it fetches for"
+		);
+		assert!(
+			working_directory.is_absolute(),
+			"the reported working directory should be absolute"
+		);
 	}
 
 	#[test]
@@ -1554,6 +1608,7 @@ mod tests {
 				.display()
 				.to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		assert!(matches!(
 			run_official_client(&client, &[OsString::from("; touch never")]),
@@ -1588,6 +1643,7 @@ mod tests {
 			let client = ClientOptions {
 				npx: runner.display().to_string(),
 				cluster: "devnet".to_owned(),
+				resolver_root: directory.path().to_path_buf(),
 			};
 			let result = if stream == "stdout" {
 				run_official_client_with_limits(&client, &[], 4, 64)
@@ -1604,6 +1660,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		assert!(matches!(
 			run_official_client(&client, &[]),
@@ -1681,6 +1738,7 @@ mod tests {
 			let client = ClientOptions {
 				npx: runner.display().to_string(),
 				cluster: "devnet".to_owned(),
+				resolver_root: directory.path().to_path_buf(),
 			};
 			assert!(fetch_idl(&client, program_id).is_err());
 		}
@@ -1692,6 +1750,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		let error = fetch_idl(&client, program_id).expect_err("mismatched program must fail");
 		assert!(
@@ -1705,6 +1764,7 @@ mod tests {
 		let client = ClientOptions {
 			npx: runner.display().to_string(),
 			cluster: "devnet".to_owned(),
+			resolver_root: directory.path().to_path_buf(),
 		};
 		let error = fetch_idl(&client, program_id).expect_err("oversized IDL must fail");
 		assert!(error.to_string().contains("safety limit"));

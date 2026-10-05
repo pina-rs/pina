@@ -147,6 +147,50 @@ fn rejects_idl_names_that_break_rust_identifiers() {
 }
 
 #[test]
+fn rendering_without_a_scaffold_writes_and_tracks_sources_only() {
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+	let temp_root = fs::canonicalize(temp.path())
+		.unwrap_or_else(|error| panic!("canonicalize temp dir: {error}"));
+	let root = temp_root.join("cli");
+	let fixture_root = read_root_node(&fixture("counter_program"))
+		.unwrap_or_else(|error| panic!("fixture: {error}"));
+	let mut sources_only = config();
+	sources_only.scaffold = false;
+
+	render_root_node(&fixture_root, &root, &sources_only)
+		.unwrap_or_else(|error| panic!("render without a scaffold: {error}"));
+
+	let record = fs::read_to_string(root.join(".pina-generated.json"))
+		.unwrap_or_else(|error| panic!("read record: {error}"));
+	assert!(root.join("src/main.rs").is_file());
+	assert!(!root.join("Cargo.toml").exists());
+	assert!(record.contains("src/main.rs"));
+	assert!(
+		!record.contains("Cargo.toml"),
+		"a scaffold that was never written is not tracked: {record}"
+	);
+
+	// A manifest the developer adds afterwards is theirs: an overwrite that
+	// scaffolds around it neither replaces nor records it.
+	fs::write(root.join("Cargo.toml"), "# consumer manifest")
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+	let mut overwrite = config();
+	overwrite.mode = RenderMode::Overwrite;
+	for _ in 0..2 {
+		render_root_node(&fixture_root, &root, &overwrite)
+			.unwrap_or_else(|error| panic!("overwrite with a scaffold: {error}"));
+		assert_eq!(
+			fs::read_to_string(root.join("Cargo.toml"))
+				.unwrap_or_else(|error| panic!("read manifest: {error}")),
+			"# consumer manifest"
+		);
+	}
+	let record = fs::read_to_string(root.join(".pina-generated.json"))
+		.unwrap_or_else(|error| panic!("read record: {error}"));
+	assert!(!record.contains("Cargo.toml"), "{record}");
+}
+
+#[test]
 fn requests_the_client_limit_only_for_measured_instructions()
 -> Result<(), Box<dyn std::error::Error>> {
 	let command_for = |plugins: &str| -> Result<String, Box<dyn std::error::Error>> {
@@ -226,6 +270,16 @@ fn render_root_node_enforces_modes_and_safety() {
 		"refused destinations are left untouched"
 	);
 
+	let mut overwrite_foreign = config();
+	overwrite_foreign.mode = RenderMode::Overwrite;
+	let refusal = render_root_node(&fixture_root(), &foreign, &overwrite_foreign)
+		.expect_err("overwrite must refuse an untracked nonempty destination");
+	assert!(
+		matches!(refusal, super::RenderError::InvalidGenerationState { .. }),
+		"the refusal names the remedy: {refusal}"
+	);
+	assert!(foreign.join("notes.txt").is_file());
+
 	let mut update_generated = config();
 	update_generated.mode = RenderMode::Update;
 	fs::write(root.join("Cargo.toml"), "# custom manifest")
@@ -245,12 +299,55 @@ fn render_root_node_enforces_modes_and_safety() {
 		"create mode must reject a nonempty destination"
 	);
 
+	fs::write(root.join("keep.txt"), "keep")
+		.unwrap_or_else(|error| panic!("write keep file: {error}"));
 	let mut overwrite = config();
 	overwrite.mode = RenderMode::Overwrite;
 	render_root_node(&fixture_root(), &root, &overwrite)
 		.unwrap_or_else(|error| panic!("overwrite mode replaces the crate: {error}"));
-	assert!(root.join("Cargo.toml").is_file());
+	assert_ne!(
+		fs::read_to_string(root.join("Cargo.toml"))
+			.unwrap_or_else(|error| panic!("read manifest: {error}")),
+		"# custom manifest",
+		"the scaffold stays tracked through an update, so overwrite regenerates it"
+	);
 	assert!(root.join(super::MARKER_FILE).is_file());
+	assert!(
+		root.join("keep.txt").is_file(),
+		"untracked files survive the manifest-bounded overwrite"
+	);
+}
+
+#[cfg(unix)]
+#[test]
+fn tracked_overwrite_still_refuses_repository_trees() {
+	use std::os::unix::fs::symlink;
+
+	let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp: {error}"));
+	let temp_root = fs::canonicalize(temp.path())
+		.unwrap_or_else(|error| panic!("canonicalize temp dir: {error}"));
+	let root = read_root_node(&fixture("counter_program"))
+		.unwrap_or_else(|error| panic!("fixture: {error}"));
+
+	// A tracked tree that contains a repository is refused even though
+	// deletion is manifest-bounded.
+	let git_tree = temp_root.join("git-tree");
+	fs::create_dir_all(git_tree.join(".git")).unwrap_or_else(|error| panic!("mkdir: {error}"));
+	super::generation_manifest::write(
+		&git_tree,
+		&std::collections::BTreeSet::from([std::path::PathBuf::from("src/main.rs")]),
+	)
+	.unwrap_or_else(|error| panic!("manifest write: {error}"));
+
+	let mut overwrite = config();
+	overwrite.mode = RenderMode::Overwrite;
+	let refusal = render_root_node(&root, &git_tree, &overwrite)
+		.expect_err("overwrite must refuse a repository tree");
+	assert!(
+		matches!(refusal, super::RenderError::UnsafeOutputPath { .. }),
+		"the guards still apply to tracked trees: {refusal}"
+	);
+	assert!(git_tree.join(".git").is_dir());
 }
 
 #[cfg(unix)]

@@ -74,20 +74,20 @@ Command-line path overrides follow normal shell behavior instead: `pina generate
 
 ## `[clients]` fields
 
-| Field               | Required | Default              | Meaning                                                                                                                       |
-| ------------------- | -------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `clients.output`    | no       | `clients`            | Root directory for generated client ecosystems. Resolved relative to the `pina.toml` directory; anchors and `..` are allowed. |
-| `clients.languages` | no       | `rust`, `typescript` | Which ecosystems to generate: any of `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, and `cli-dart`.               |
-| `clients.mode`      | no       | `auto`               | Default destination policy for every selected client; see the mode table below.                                               |
-| `clients.scaffold`  | no       | `true`               | Whether missing package-level files (manifests, entrypoints) are initialized around the generated sources.                    |
+| Field               | Required | Default              | Meaning                                                                                                                                                                                                                                |
+| ------------------- | -------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clients.output`    | no       | `clients`            | Root directory for generated client ecosystems. Resolved relative to the `pina.toml` directory, and every configured output must resolve inside the project's Git worktree; pass `--output` on the command line to publish outside it. |
+| `clients.languages` | no       | `rust`, `typescript` | Which ecosystems to generate: any of `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, and `cli-dart`.                                                                                                                        |
+| `clients.mode`      | no       | `auto`               | Default destination policy for every selected client; see the mode table below.                                                                                                                                                        |
+| `clients.scaffold`  | no       | `true`               | Whether missing package-level files (manifests, entrypoints) are initialized around the generated sources.                                                                                                                             |
 
 `<target>` in the per-client table below is one of the language names. Dart is the Dart and Flutter target; there is no separate Flutter generator.
 
-| Field                       | Required | Default            | Meaning                                                                                                          |
-| --------------------------- | -------- | ------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `clients.<target>.output`   | no       | target name        | Destination beneath `clients.output`. Anchored values resolve to absolute destinations outside the clients root. |
-| `clients.<target>.mode`     | no       | `clients.mode`     | Destination policy for one target.                                                                               |
-| `clients.<target>.scaffold` | no       | `clients.scaffold` | Scaffold policy for one target.                                                                                  |
+| Field                       | Required | Default            | Meaning                                                                                                             |
+| --------------------------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `clients.<target>.output`   | no       | target name        | Destination beneath `clients.output`. Anchored values may reach anywhere inside the Git worktree, never outside it. |
+| `clients.<target>.mode`     | no       | `clients.mode`     | Destination policy for one target.                                                                                  |
+| `clients.<target>.scaffold` | no       | `clients.scaffold` | Scaffold policy for one target.                                                                                     |
 
 Selecting a CLI target implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`), and projects normally pick one CLI; selecting several prints a warning. CLI apps render into `clients/cli-rust`, `clients/cli-ts`, and `clients/cli-dart` respectively — the Dart CLIs share one package at `cli-dart` with a `bin/<library-name>.dart` executable per program. Override a CLI target under the matching table (`[clients.cli_rust]`, `[clients.cli_ts]`, `[clients.cli_dart]`), using the kebab spelling as a deprecated alias (`[clients.cli-rust]`).
 
@@ -135,16 +135,22 @@ The margin applies at generation time, so changing it and running `pina generate
 
 ## Generation modes
 
-Generation defaults to `mode = "auto"`: it initializes an empty target, then updates only renderer-owned source directories on later runs. Use `mode = "create"` or `mode = "update"` to enforce the expected state, and `mode = "overwrite"` for an explicit complete cleanup. The CLI equivalents are `--mode` and `--no-scaffold`.
+Generation defaults to `mode = "auto"`: it initializes an empty target, then updates only renderer-owned source directories on later runs. Use `mode = "create"` or `mode = "update"` to enforce the expected state. The CLI equivalents are `--mode` and `--no-scaffold`.
 
-| Mode        | Empty or missing destination | Existing nonempty destination               |
-| ----------- | ---------------------------- | ------------------------------------------- |
-| `auto`      | Initial generation           | Update generated source                     |
-| `create`    | Initial generation           | Fail                                        |
-| `update`    | Fail                         | Update generated source                     |
-| `overwrite` | Initial generation           | Delete the complete target, then regenerate |
+| Mode        | Empty or missing destination | Existing nonempty destination                         |
+| ----------- | ---------------------------- | ----------------------------------------------------- |
+| `auto`      | Initial generation           | Update generated source                               |
+| `create`    | Initial generation           | Fail                                                  |
+| `update`    | Fail                         | Update generated source                               |
+| `overwrite` | Initial generation           | Remove the recorded Pina-owned files, then regenerate |
 
-`overwrite` intentionally removes the complete target, including custom files, before rendering. Selecting it in `pina.toml` is treated as explicit authorization for that cleanup. Pina still refuses filesystem roots, git working-tree roots, symbolic-link targets, and output trees containing symbolic links.
+`overwrite` is an operator decision, not a configuration value: `pina.toml` cannot select it, and requesting destructive regeneration takes `--mode overwrite` on the command line. A `pina.toml` ships with the repository, so it is not trusted to authorize removing directories.
+
+Deletion is bounded by a tracked-files record (`.pina-generated.json`) written at each client root: regeneration and `overwrite` remove only the paths a previous Pina run recorded, so files you added to a generated tree survive, and a directory Pina never generated is refused instead of removed. A destination that predates tracked manifests — generated by an older Pina — is refused by `overwrite` with a remedy in the error; remove it by hand once, or generate without `overwrite` once to record its files. Pina still refuses filesystem roots, git working-tree roots, symbolic-link targets, and output trees containing symbolic links.
+
+## Package resolution for renderers
+
+The default `--npx npx` runner resolves the pinned renderer packages through the `npx`/`pnpm dlx` cache, from an isolated working directory with project-local entries removed from `PATH`: a committed `node_modules` in the project can neither shadow the pinned packages nor execute during generation. Passing a Node executable explicitly (`--npx node`, or a path to one) is the project-package mode — the documented way to resolve renderers from the project's own install on purpose, which is also what keeps generation offline.
 
 ## What generation owns versus what it scaffolds
 

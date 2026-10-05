@@ -1,0 +1,13 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/policy_state.rs",
+		"src/generated/instructions/check_policy.rs",
+		"src/generated/instructions/initialize_policy.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

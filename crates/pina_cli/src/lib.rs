@@ -26,6 +26,7 @@ pub mod lint_toolchain;
 pub mod locks;
 pub mod map;
 pub mod migrations;
+mod npm_isolation;
 pub mod parse;
 mod path_security;
 pub mod profile;
@@ -38,6 +39,7 @@ pub mod workflow;
 
 mod dart_client;
 mod dart_events;
+mod generation_manifest;
 mod js_client;
 mod js_events;
 #[cfg(all(test, unix))]

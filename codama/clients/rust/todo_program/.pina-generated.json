@@ -1,0 +1,16 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/todo_state.rs",
+		"src/generated/compute_budget.rs",
+		"src/generated/instructions/initialize.rs",
+		"src/generated/instructions/migrate.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/toggle_completed.rs",
+		"src/generated/instructions/update_digest.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

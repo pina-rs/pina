@@ -28,6 +28,9 @@ pub(crate) fn open_crate_dir(crate_dir: &Path) -> Result<Dir> {
 ///
 /// Creates `src/lib.rs` and `Cargo.toml` when they do not exist yet and never
 /// overwrites either file, so consumers can pin dependencies themselves.
+/// Returns the paths this call created, relative to the crate root. A file
+/// that already existed is left alone and not returned: the developer may
+/// have written it, and Pina records only the files it wrote.
 pub(crate) fn ensure_crate_scaffold(
 	crate_dir: &Dir,
 	crate_path: &Path,
@@ -35,7 +38,9 @@ pub(crate) fn ensure_crate_scaffold(
 	package_name: Option<&str>,
 	generated_folder: &Path,
 	dependency: ScaffoldDependency,
-) -> Result<()> {
+) -> Result<Vec<PathBuf>> {
+	let mut created = Vec::new();
+
 	ensure_relative_directory(crate_dir, crate_path, Path::new("src"))?;
 
 	let generated_module = generated_folder
@@ -50,7 +55,9 @@ pub(crate) fn ensure_crate_scaffold(
 			rust_string_literal(&module_path.to_string_lossy())
 		)
 	};
-	create_scaffold_file(crate_dir, crate_path, Path::new("src/lib.rs"), &lib_rs)?;
+	if create_scaffold_file(crate_dir, crate_path, Path::new("src/lib.rs"), &lib_rs)? {
+		created.push(PathBuf::from("src/lib.rs"));
+	}
 
 	// Default to the source name's own word separator: snake-cased names get
 	// an `_cpi` suffix and hyphenated names keep a `-cpi` suffix.
@@ -86,7 +93,11 @@ pub(crate) fn ensure_crate_scaffold(
 		String::new(),
 	]
 	.join("\n");
-	create_scaffold_file(crate_dir, crate_path, Path::new("Cargo.toml"), &cargo_toml)
+	if create_scaffold_file(crate_dir, crate_path, Path::new("Cargo.toml"), &cargo_toml)? {
+		created.push(PathBuf::from("Cargo.toml"));
+	}
+
+	Ok(created)
 }
 
 /// Writes the generated file map relative to the pinned crate directory.
@@ -105,12 +116,14 @@ pub(crate) fn write_files(
 	})
 }
 
+/// Write `relative` unless it already exists, returning whether it was
+/// written.
 fn create_scaffold_file(
 	crate_dir: &Dir,
 	crate_path: &Path,
 	relative: &Path,
 	content: &str,
-) -> Result<()> {
+) -> Result<bool> {
 	match crate_dir.symlink_metadata(relative) {
 		Ok(metadata) if metadata.file_type().is_symlink() => {
 			return Err(unsafe_output(
@@ -118,12 +131,14 @@ fn create_scaffold_file(
 				"refusing to follow a scaffold-file symlink",
 			));
 		}
-		Ok(_) => return Ok(()),
+		Ok(_) => return Ok(false),
 		Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
 		Err(source) => return Err(read_file_error(&crate_path.join(relative), source)),
 	}
 
-	write_relative_file(crate_dir, crate_path, relative, content, false)
+	write_relative_file(crate_dir, crate_path, relative, content, false)?;
+
+	Ok(true)
 }
 
 fn write_relative_file(

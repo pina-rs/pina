@@ -1,0 +1,14 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/initialize.ts",
+		"src/commands/test_event.ts",
+		"src/commands/test_event_cpi.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

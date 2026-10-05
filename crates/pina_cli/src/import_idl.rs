@@ -364,6 +364,7 @@ fn fetch_cluster(cluster: &str, program_id: &str, npx: &str) -> Result<Vec<u8>, 
 	let client = crate::idl_metadata::ClientOptions {
 		npx: npx.to_string(),
 		cluster: cluster.to_string(),
+		resolver_root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
 	};
 	let value = crate::idl_metadata::fetch_idl(&client, program_id).map_err(|error| {
 		ImportError::Fetch {

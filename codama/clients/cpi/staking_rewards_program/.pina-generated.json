@@ -1,0 +1,18 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/pool_state.rs",
+		"src/generated/accounts/position_state.rs",
+		"src/generated/instructions/claim.rs",
+		"src/generated/instructions/deposit.rs",
+		"src/generated/instructions/initialize_pool.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/open_position.rs",
+		"src/generated/instructions/set_reward_index.rs",
+		"src/generated/instructions/withdraw.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

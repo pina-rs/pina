@@ -113,7 +113,11 @@ fn run_idl_fetch(
 		program_id,
 		local.as_ref(),
 	));
-	let client = pina_cli::idl_metadata::ClientOptions { npx, cluster };
+	let client = pina_cli::idl_metadata::ClientOptions {
+		npx,
+		cluster,
+		resolver_root: project.to_path_buf(),
+	};
 	let value = or_exit(pina_cli::idl_metadata::fetch_idl(&client, &program_id));
 	let pretty = or_exit(serde_json::to_vec_pretty(&value));
 
@@ -155,7 +159,11 @@ fn run_idl_diff(
 		program_id,
 		Some(&local),
 	));
-	let client = pina_cli::idl_metadata::ClientOptions { npx, cluster };
+	let client = pina_cli::idl_metadata::ClientOptions {
+		npx,
+		cluster,
+		resolver_root: project.to_path_buf(),
+	};
 	let on_chain = or_exit(pina_cli::idl_metadata::fetch_idl(&client, &program_id));
 	let difference = pina_cli::idl_metadata::compare_idls(&local, on_chain);
 
@@ -240,6 +248,7 @@ fn run_idl_publish(command: IdlPublishCommand) {
 	let client = pina_cli::idl_metadata::ClientOptions {
 		npx: command.npx,
 		cluster: command.cluster.clone(),
+		resolver_root: command.project.clone(),
 	};
 	let export_encoding = match command.export_encoding {
 		IdlExportEncodingArg::Base58 => "base58",

@@ -1,0 +1,17 @@
+{
+	"paths": [
+		"src/generated/accounts/escrowState.ts",
+		"src/generated/accounts/index.ts",
+		"src/generated/errors/escrowProgram.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/cancel.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/make.ts",
+		"src/generated/instructions/take.ts",
+		"src/generated/pdas/escrow.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/programs/escrowProgram.ts",
+		"src/generated/programs/index.ts"
+	]
+}

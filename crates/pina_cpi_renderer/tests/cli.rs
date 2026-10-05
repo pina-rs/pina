@@ -128,13 +128,37 @@ fn mode_update_refreshes_an_existing_crate() {
 }
 
 #[test]
-fn mode_overwrite_replaces_the_whole_crate() {
+fn mode_overwrite_refuses_a_foreign_directory_and_replaces_tracked_crates() {
 	let scratch = scratch();
-	let output = unique_dir(&scratch, "pina-cpi-cli-overwrite");
-	std::fs::create_dir_all(&output)
+	let foreign = unique_dir(&scratch, "pina-cpi-cli-overwrite-foreign");
+	std::fs::create_dir_all(&foreign)
 		.unwrap_or_else(|error| panic!("failed to create output: {error}"));
-	std::fs::write(Path::new(&output).join("stale.txt"), "old")
+	std::fs::write(Path::new(&foreign).join("stale.txt"), "old")
 		.unwrap_or_else(|error| panic!("failed to write stale file: {error}"));
+
+	// A directory Pina never generated is refused rather than removed.
+	let (success, _, stderr) = run(&[
+		"--idl",
+		&fixture(),
+		"--output",
+		&foreign,
+		"--mode",
+		"overwrite",
+	]);
+	assert!(!success, "overwrite must refuse an untracked destination");
+	assert!(
+		stderr.contains("predates tracked manifests"),
+		"the refusal must name the remedy: {stderr}"
+	);
+	assert!(Path::new(&foreign).join("stale.txt").exists());
+
+	// A crate the renderer generated carries a manifest, so overwrite
+	// replaces its recorded files and leaves foreign ones alone.
+	let output = unique_dir(&scratch, "pina-cpi-cli-overwrite");
+	let (success, _, stderr) = run(&["--idl", &fixture(), "--output", &output, "--mode", "create"]);
+	assert!(success, "{stderr}");
+	std::fs::write(Path::new(&output).join("keep.txt"), "keep")
+		.unwrap_or_else(|error| panic!("failed to write keep file: {error}"));
 
 	let (success, _, stderr) = run(&[
 		"--idl",
@@ -146,7 +170,8 @@ fn mode_overwrite_replaces_the_whole_crate() {
 	]);
 	assert!(success, "{stderr}");
 	assert!(Path::new(&output).join("src/generated/mod.rs").is_file());
-	assert!(!Path::new(&output).join("stale.txt").exists());
+	assert!(Path::new(&output).join("Cargo.toml").is_file());
+	assert!(Path::new(&output).join("keep.txt").exists());
 }
 
 #[test]

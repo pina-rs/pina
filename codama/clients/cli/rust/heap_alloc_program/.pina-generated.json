@@ -1,0 +1,12 @@
+{
+	"paths": [
+		".pina-generated",
+		"Cargo.toml",
+		"README.md",
+		"src/commands/allocate.rs",
+		"src/commands/fill.rs",
+		"src/commands/mod.rs",
+		"src/context.rs",
+		"src/main.rs"
+	]
+}

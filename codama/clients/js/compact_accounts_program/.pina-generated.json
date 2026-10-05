@@ -1,0 +1,23 @@
+{
+	"paths": [
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/journal.ts",
+		"src/generated/errors/compactAccountsProgram.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initialize.ts",
+		"src/generated/instructions/rename.ts",
+		"src/generated/instructions/resize.ts",
+		"src/generated/instructions/write.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/journal.ts",
+		"src/generated/programs/compactAccountsProgram.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/types/index.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA7JournalF4Note.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA7JournalF5Title.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA7JournalF7Entries.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA7JournalF7Markers.ts"
+	]
+}

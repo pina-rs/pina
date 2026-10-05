@@ -1,0 +1,17 @@
+{
+	"paths": [
+		".pina-generated",
+		"Cargo.toml",
+		"README.md",
+		"src/commands/claim.rs",
+		"src/commands/deposit.rs",
+		"src/commands/initialize_pool.rs",
+		"src/commands/mod.rs",
+		"src/commands/open_position.rs",
+		"src/commands/set_reward_index.rs",
+		"src/commands/withdraw.rs",
+		"src/context.rs",
+		"src/fetch.rs",
+		"src/main.rs"
+	]
+}

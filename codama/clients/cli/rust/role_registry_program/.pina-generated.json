@@ -1,0 +1,16 @@
+{
+	"paths": [
+		".pina-generated",
+		"Cargo.toml",
+		"README.md",
+		"src/commands/add_role.rs",
+		"src/commands/deactivate_role.rs",
+		"src/commands/initialize.rs",
+		"src/commands/mod.rs",
+		"src/commands/rotate_admin.rs",
+		"src/commands/update_role.rs",
+		"src/context.rs",
+		"src/fetch.rs",
+		"src/main.rs"
+	]
+}

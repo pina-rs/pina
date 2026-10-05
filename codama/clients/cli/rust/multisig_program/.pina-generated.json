@@ -1,0 +1,26 @@
+{
+	"paths": [
+		".pina-generated",
+		"Cargo.toml",
+		"README.md",
+		"src/commands/config_authority_execute.rs",
+		"src/commands/config_execute.rs",
+		"src/commands/config_initialize.rs",
+		"src/commands/config_update.rs",
+		"src/commands/mod.rs",
+		"src/commands/multisig_create.rs",
+		"src/commands/multisig_import.rs",
+		"src/commands/proposal_activate.rs",
+		"src/commands/proposal_approve.rs",
+		"src/commands/proposal_cancel.rs",
+		"src/commands/proposal_close.rs",
+		"src/commands/proposal_create.rs",
+		"src/commands/proposal_reject.rs",
+		"src/commands/proposal_revoke.rs",
+		"src/commands/spending_limit_use.rs",
+		"src/commands/vault_execute.rs",
+		"src/context.rs",
+		"src/fetch.rs",
+		"src/main.rs"
+	]
+}

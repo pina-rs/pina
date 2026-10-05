@@ -1,0 +1,14 @@
+{
+	"paths": [
+		"src/generated/events/index.ts",
+		"src/generated/events/myEvent.ts",
+		"src/generated/events/myOtherEvent.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initialize.ts",
+		"src/generated/instructions/testEvent.ts",
+		"src/generated/instructions/testEventCpi.ts",
+		"src/generated/programs/eventsProgram.ts",
+		"src/generated/programs/index.ts"
+	]
+}

@@ -1,0 +1,10 @@
+{
+	"paths": [
+		"src/generated/index.ts",
+		"src/generated/instructions/allocate.ts",
+		"src/generated/instructions/fill.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/programs/heapAllocProgram.ts",
+		"src/generated/programs/index.ts"
+	]
+}

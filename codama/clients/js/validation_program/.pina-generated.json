@@ -1,0 +1,18 @@
+{
+	"paths": [
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/policyState.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/errors/validationProgram.ts",
+		"src/generated/events/index.ts",
+		"src/generated/events/policyChecked.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/checkPolicy.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initializePolicy.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/policy.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/validationProgram.ts"
+	]
+}

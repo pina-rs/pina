@@ -1,0 +1,16 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/create_pda.ts",
+		"src/commands/forward_rotate_with_pda.ts",
+		"src/commands/forward_rotate_with_signer.ts",
+		"src/commands/hello.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/fetch.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

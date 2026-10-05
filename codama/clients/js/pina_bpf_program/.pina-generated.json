@@ -1,0 +1,17 @@
+{
+	"paths": [
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/state.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/createPda.ts",
+		"src/generated/instructions/forwardRotateWithPda.ts",
+		"src/generated/instructions/forwardRotateWithSigner.ts",
+		"src/generated/instructions/hello.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/pdas/authority.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/state.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/pinaBpfProgram.ts"
+	]
+}

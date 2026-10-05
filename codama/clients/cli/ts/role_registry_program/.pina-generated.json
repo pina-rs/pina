@@ -1,0 +1,17 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/add_role.ts",
+		"src/commands/deactivate_role.ts",
+		"src/commands/initialize.ts",
+		"src/commands/rotate_admin.ts",
+		"src/commands/update_role.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/fetch.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}

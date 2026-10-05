@@ -1265,6 +1265,14 @@ fn run_generate(
 	);
 	println!("  IDL     {}", generated.idl.display());
 	println!("  Clients {}", generated.clients_dir.display());
+	for target in &generated.targets {
+		println!(
+			"  {:<7} {} ({})",
+			target.language.as_str(),
+			target.path.display(),
+			target.mode.as_str()
+		);
+	}
 }
 
 #[allow(clippy::too_many_arguments)]

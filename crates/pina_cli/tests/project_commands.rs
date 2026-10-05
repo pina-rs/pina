@@ -1257,7 +1257,9 @@ fn generate_preserves_scaffolds_on_update_and_replaces_them_on_overwrite() {
 		"overwrite generation failed: {}",
 		String::from_utf8_lossy(&overwrite.stderr)
 	);
-	assert!(!crate_dir.join("keep.txt").exists());
+	// Untracked files survive; the scaffold manifest is tracked, so it is
+	// removed and re-scaffolded with the renderer's own content.
+	assert!(crate_dir.join("keep.txt").is_file());
 	assert!(
 		fs::read_to_string(crate_dir.join("Cargo.toml"))
 			.unwrap_or_else(|error| panic!("failed to read replaced manifest: {error}"))
@@ -1389,10 +1391,20 @@ fn generate_real_typescript_and_dart_clients_preserves_scaffold_until_overwrite(
 	);
 	assert!(typescript.join("src/generated/index.ts").is_file());
 	assert!(dart.join("lib/src/generated/custom_program").is_dir());
+	// Scaffold files are tracked, so overwrite removes and (with
+	// `--no-scaffold`) does not recreate them; the developer's untracked
+	// files survive, and both trees now record what Pina owns.
 	assert!(!typescript.join("package.json").exists());
-	assert!(!typescript.join("keep.txt").exists());
+	assert!(typescript.join("keep.txt").exists());
 	assert!(!dart.join("pubspec.yaml").exists());
-	assert!(!dart.join("keep.txt").exists());
+	assert!(dart.join("keep.txt").exists());
+	assert!(typescript.join(".pina-generated.json").is_file());
+	assert!(dart.join(".pina-generated.json").is_file());
+	assert!(
+		fs::read_to_string(typescript.join(".pina-generated.json"))
+			.unwrap_or_else(|error| panic!("failed to read manifest: {error}"))
+			.contains("src/generated/index.ts")
+	);
 }
 
 #[test]
@@ -1428,6 +1440,161 @@ fn generate_typescript_uses_custom_library_identity() {
 		fs::read_to_string(project.join("clients/typescript/custom_program/package.json"))
 			.unwrap_or_else(|error| panic!("failed to read TypeScript package: {error}"));
 	assert!(package.contains("custom-program-client"));
+}
+
+#[test]
+fn generate_refuses_overwrite_and_outside_outputs_configured_in_pina_toml() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\noutput = \"clients\"\nlanguages = [\"typescript\"]\nmode = \"overwrite\"\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let cargo = fake_cargo(temp.path());
+	let npx = fake_npx(temp.path());
+
+	let refused = project_command(&project, &cargo, &target)
+		.arg("generate")
+		.arg("--npx")
+		.arg(&npx)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		!refused.status.success(),
+		"a configured `overwrite` must be refused without the flag"
+	);
+	let stderr = String::from_utf8_lossy(&refused.stderr);
+	assert!(
+		stderr.contains("--mode overwrite"),
+		"the refusal must name the operator flag: {stderr}"
+	);
+
+	// The operator flag carries the destructive decision.
+	let allowed = project_command(&project, &cargo, &target)
+		.args(["generate", "--npx"])
+		.arg(&npx)
+		.arg("--mode")
+		.arg("overwrite")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+	assert!(
+		allowed.status.success(),
+		"the flag selects overwrite: {}",
+		String::from_utf8_lossy(&allowed.stderr)
+	);
+
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\noutput = \"../outside\"\nlanguages = [\"typescript\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let escaped = project_command(&project, &cargo, &target)
+		.arg("generate")
+		.arg("--npx")
+		.arg(&npx)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		!escaped.status.success(),
+		"a configured escape outside the project must be refused"
+	);
+	let stderr = String::from_utf8_lossy(&escaped.stderr);
+	assert!(
+		stderr.contains("must stay inside") && stderr.contains("--output"),
+		"the refusal must name the boundary and the operator flag: {stderr}"
+	);
+
+	// A per-client output is joined onto the clients directory, so one that
+	// climbs back out with `..` must be refused like any other escape.
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\noutput = \"clients\"\nlanguages = [\"typescript\"]\n\n[clients.typescript]\noutput = \
+		 \"../../outside\"\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let climbed = project_command(&project, &cargo, &target)
+		.arg("generate")
+		.arg("--npx")
+		.arg(&npx)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		!climbed.status.success(),
+		"a per-client output that climbs outside the project must be refused"
+	);
+	let stderr = String::from_utf8_lossy(&climbed.stderr);
+	assert!(
+		stderr.contains("must stay inside"),
+		"the refusal must name the boundary: {stderr}"
+	);
+	assert!(
+		!temp.path().join("outside").exists(),
+		"nothing may be written outside the project"
+	);
+
+	// The operator flag may target anywhere outside the project.
+	let outside = temp.path().join("outside");
+	let flagged = project_command(&project, &cargo, &target)
+		.args(["generate", "--npx"])
+		.arg(&npx)
+		.arg("--output")
+		.arg(&outside)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+	assert!(
+		flagged.status.success(),
+		"the --output flag publishes outside the project: {}",
+		String::from_utf8_lossy(&flagged.stderr)
+	);
+}
+
+#[test]
+fn generate_allows_workspace_anchored_outputs_inside_the_repository() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let repository = temp.path().join("repository");
+	let project = repository.join("programs").join("counter");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\noutput = \"{{root}}/generated\"\nlanguages = [\"typescript\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	let mut init = Command::new("git");
+	sanitize_git_environment(&mut init);
+	init.current_dir(&repository)
+		.args(["init", "--quiet"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to init fixture repository: {error}"));
+
+	let cargo = fake_cargo(temp.path());
+	let npx = fake_npx(temp.path());
+	let generated = project_command(&project, &cargo, &target_dir(temp.path()))
+		.args(["generate", "--npx"])
+		.arg(&npx)
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		generated.status.success(),
+		"an anchored output inside the worktree generates: {}",
+		String::from_utf8_lossy(&generated.stderr)
+	);
+	assert!(
+		repository
+			.join("generated/typescript/custom_program/package.json")
+			.is_file(),
+		"the anchored output lands inside the repository"
+	);
+}
+
+fn target_dir(root: &Path) -> PathBuf {
+	root.join("custom-target")
 }
 
 #[test]
@@ -1935,8 +2102,33 @@ fn generate_overwrite_replaces_a_foreign_entrypoint_and_no_scaffold_omits_manife
 	)
 	.unwrap_or_else(|error| panic!("failed to write foreign entrypoint: {error}"));
 
-	let output = project_command(&project, &cargo, &target)
+	// A destination Pina never generated is refused rather than removed.
+	let refused = project_command(&project, &cargo, &target)
 		.args(["generate", "--mode", "overwrite", "--no-scaffold"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+	assert!(
+		!refused.status.success(),
+		"overwrite must refuse an untracked destination"
+	);
+	assert!(
+		String::from_utf8_lossy(&refused.stderr).contains("predates tracked manifests"),
+		"the refusal must name the remedy: {}",
+		String::from_utf8_lossy(&refused.stderr)
+	);
+	assert!(seeded.join("stale.rs").is_file());
+	assert!(
+		project
+			.join("clients/rust/custom_program/src/lib.rs")
+			.is_file()
+	);
+
+	// After a tracked generation, overwrite replaces the paths Pina owns
+	// and leaves a developer's additions alone.
+	fs::remove_dir_all(project.join("clients/rust/custom_program"))
+		.unwrap_or_else(|error| panic!("failed to clear destination: {error}"));
+	let output = project_command(&project, &cargo, &target)
+		.args(["generate", "--no-scaffold"])
 		.output()
 		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
 	assert!(
@@ -1944,16 +2136,37 @@ fn generate_overwrite_replaces_a_foreign_entrypoint_and_no_scaffold_omits_manife
 		"generation failed: {}",
 		String::from_utf8_lossy(&output.stderr)
 	);
+	fs::write(
+		project.join("clients/rust/custom_program/notes.rs"),
+		"// keep\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to write consumer file: {error}"));
 
+	let overwrite = project_command(&project, &cargo, &target)
+		.args(["generate", "--mode", "overwrite", "--no-scaffold"])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
 	assert!(
-		!seeded.join("stale.rs").exists(),
-		"overwrite must clear stale generated source"
+		overwrite.status.success(),
+		"overwrite generation failed: {}",
+		String::from_utf8_lossy(&overwrite.stderr)
 	);
+
 	assert!(
 		!project
 			.join("clients/rust/custom_program/Cargo.toml")
 			.exists(),
 		"--no-scaffold must not write a crate manifest"
+	);
+	assert!(
+		project
+			.join("clients/rust/custom_program/notes.rs")
+			.is_file(),
+		"untracked files survive the tracked overwrite"
+	);
+	assert!(
+		seeded.join("mod.rs").is_file(),
+		"tracked generated sources are regenerated"
 	);
 }
 

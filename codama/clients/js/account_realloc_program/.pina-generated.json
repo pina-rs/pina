@@ -1,0 +1,19 @@
+{
+	"paths": [
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/sample.ts",
+		"src/generated/errors/accountReallocProgram.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/initialize.ts",
+		"src/generated/instructions/realloc.ts",
+		"src/generated/instructions/realloc2.ts",
+		"src/generated/pdas/index.ts",
+		"src/generated/pdas/sample.ts",
+		"src/generated/programs/accountReallocProgram.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/types/index.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA6SampleF6Values.ts"
+	]
+}

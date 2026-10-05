@@ -1,0 +1,18 @@
+{
+	"paths": [
+		"Cargo.toml",
+		"src/generated/accounts/mod.rs",
+		"src/generated/accounts/sample.rs",
+		"src/generated/compute_budget.rs",
+		"src/generated/errors/account_realloc_program.rs",
+		"src/generated/errors/mod.rs",
+		"src/generated/instructions/initialize.rs",
+		"src/generated/instructions/migrate.rs",
+		"src/generated/instructions/mod.rs",
+		"src/generated/instructions/realloc.rs",
+		"src/generated/instructions/realloc2.rs",
+		"src/generated/mod.rs",
+		"src/generated/programs.rs",
+		"src/lib.rs"
+	]
+}

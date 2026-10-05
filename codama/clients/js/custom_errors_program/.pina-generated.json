@@ -1,0 +1,17 @@
+{
+	"paths": [
+		"src/generated/errors/customErrorsProgram.ts",
+		"src/generated/errors/index.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/hello.ts",
+		"src/generated/instructions/helloNext.ts",
+		"src/generated/instructions/helloNoMsg.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/requireEq.ts",
+		"src/generated/instructions/requireGt.ts",
+		"src/generated/instructions/requireGte.ts",
+		"src/generated/instructions/requireNeq.ts",
+		"src/generated/programs/customErrorsProgram.ts",
+		"src/generated/programs/index.ts"
+	]
+}

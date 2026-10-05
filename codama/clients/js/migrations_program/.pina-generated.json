@@ -1,0 +1,21 @@
+{
+	"paths": [
+		"src/generated/accounts/compactState.ts",
+		"src/generated/accounts/index.ts",
+		"src/generated/accounts/manualState.ts",
+		"src/generated/accounts/state.ts",
+		"src/generated/events/index.ts",
+		"src/generated/events/valueChangedEvent.ts",
+		"src/generated/events/valueChangedEventV0.ts",
+		"src/generated/index.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/relay.ts",
+		"src/generated/instructions/update.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/migrationsProgram.ts",
+		"src/generated/types/index.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA11ManualStateF4Code.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA12CompactStateF4Name.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA12CompactStateF4Tags.ts"
+	]
+}
