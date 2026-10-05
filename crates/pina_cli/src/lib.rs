@@ -31,6 +31,7 @@ mod path_security;
 pub mod profile;
 pub mod profile_trace;
 pub mod project;
+pub mod rehearse;
 pub mod skill;
 pub mod verification;
 pub mod workflow;

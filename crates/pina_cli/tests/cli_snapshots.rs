@@ -550,6 +550,13 @@ fn verify_status_help_snapshot() {
 }
 
 #[test]
+fn rehearse_help_snapshot() {
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	command.args(["rehearse", "--help"]);
+	assert_cmd_snapshot!("rehearse_help", command);
+}
+
+#[test]
 fn deploy_help_snapshot() {
 	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 	command.args(["deploy", "--help"]);

@@ -10,7 +10,7 @@ exit_code: 0
 ----- stdout -----
 Build, test, inspect, and generate artifacts for Pina Solana programs.
 
-Use 'pina init' to start a program, 'pina lint' for the official security lint set, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt another program's IDL as one, 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, and terminal documentation remain available.
+Use 'pina init' to start a program, 'pina lint' for the official security lint set, 'pina build' for its SBF binary and IDL, 'pina test' for SBF integration, 'pina test --unit' for the fast native/Mollusk loop, 'pina dev' for a persistent Surfpool network, 'pina generate' for selected client ecosystems, 'pina rehearse' to replay real traffic against an upgrade, 'pina deploy' for explicit cluster deployment, and 'pina verify' for deployed-program verification. Use 'pina cpi' for standalone CPI crates, 'pina import' to adopt another program's IDL as one, 'pina doctor' for agent-readable diagnostics, 'pina keys' for program identity, and 'pina completions' for shell integration. Low-level IDL, profiling, and terminal documentation remain available.
 
 Usage: pina <COMMAND>
 
@@ -57,6 +57,8 @@ Commands:
           Start a persistent Surfpool development network with SBF watch and redeploy
   profile
           Profile compute-unit costs in a compiled SBF program
+  rehearse
+          Replay a program's recent transactions against an upgrade before shipping it
   verify
           Verify deployed programs and publish source-build records
   deploy
@@ -85,6 +87,7 @@ Examples:
   pina import switchboard --program-id SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv --idl ./idl.json
   pina idl --path ./programs/counter_program --output ./idls/counter_program.json
   pina profile ./target/deploy/counter_program.so --json
+  pina rehearse --network devnet
   pina deploy --cluster localnet --payer ~/.config/solana/id.json --upgrade-authority ~/.config/solana/id.json --dry-run
 
 Agent discovery:

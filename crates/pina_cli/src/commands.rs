@@ -215,6 +215,33 @@ pub(crate) fn run(cli: Cli) {
 				}
 			}
 		}
+		Commands::Rehearse {
+			project,
+			network,
+			rpc_url,
+			program,
+			build,
+			limit,
+			signatures,
+			json,
+			allow_changes,
+		} => {
+			run_rehearse(
+				&pina_cli::rehearse::RehearseOptions {
+					project,
+					network: unwrap_or_exit(pina_cli::rehearse::RehearseNetwork::from_flags(
+						network.map(SurfpoolCluster::as_str),
+						rpc_url,
+					)),
+					program,
+					build,
+					limit: usize::from(limit),
+					signatures,
+				},
+				json,
+				allow_changes,
+			);
+		}
 		Commands::Verify {
 			command,
 			solana_verify,
@@ -1367,6 +1394,30 @@ fn run_dev(
 	if let Err(error) = pina_cli::workflow::dev_project(&options) {
 		eprintln!("{} {}", "Error".red().bold(), error);
 		std::process::exit(error.exit_code());
+	}
+}
+
+/// Rehearse an upgrade. Progress goes to stderr so `--json` stdout stays a
+/// single document. Exit status: 0 clean, 2 behaviour changed, 1 operational.
+fn run_rehearse(options: &pina_cli::rehearse::RehearseOptions, json: bool, allow_changes: bool) {
+	let report = match pina_cli::rehearse::rehearse(options, &mut std::io::stderr()) {
+		Ok(report) => report,
+		Err(error) => {
+			eprintln!("{} {}", "Error".red().bold(), error);
+			std::process::exit(1);
+		}
+	};
+
+	if json {
+		print_json(&report);
+	} else {
+		print!("{}", report.render_text());
+	}
+
+	let code = report.exit_code(allow_changes);
+
+	if code != 0 {
+		std::process::exit(code);
 	}
 }
 

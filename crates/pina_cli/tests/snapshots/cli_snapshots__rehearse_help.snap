@@ -1,0 +1,84 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - rehearse
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Replay a program's recent transactions against an upgrade before shipping it.
+
+Fetches the program's most recent transactions (or the ones named with --signature) from the cluster, read-only, and starts a private Surfpool forked from the same RPC endpoint. Each signed transaction is profiled against the deployed program, then again after the candidate is installed in the program's own program data, on one frozen snapshot of every account the transactions touch. Every difference in outcome, written account state, and compute units is reported. Nothing is sent to the cluster and no project file is written.
+
+Usage: pina rehearse [OPTIONS]
+
+Options:
+  -p, --project <DIR>
+          Directory used for pina.toml or Cargo metadata project discovery
+
+      --network <CLUSTER>
+          Rehearse against mainnet, devnet, or testnet
+
+      --rpc-url <URL>
+          Rehearse against a credential-free HTTP(S) RPC URL with a host.
+          
+          User information, query parameters, fragments, and control characters are rejected. Surfpool receives the URL in its arguments, so never put a secret anywhere in it.
+
+      --program <PROGRAM.SO>
+          Candidate SBF shared object. Defaults to target/deploy/<program>.so
+
+      --build
+          Run Pina's project-aware SBF build first and rehearse its artifact
+
+      --limit <N>
+          Number of recent transactions to replay, from 1 to 1000
+          
+          [default: 25]
+
+      --signature <SIGNATURE>
+          Rehearse this transaction instead of the most recent ones. Repeat for more
+
+      --json
+          Emit the stable JSON report (schemaVersion 1) instead of text
+
+      --allow-changes
+          Exit 0 even when transactions change outcome or state
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina rehearse --network devnet
+  pina rehearse --network mainnet --build --limit 100
+  pina rehearse --rpc-url http://127.0.0.1:8899 --program ./target/deploy/my_program.so
+  pina rehearse --network devnet --signature <SIGNATURE> --signature <SIGNATURE>
+  pina rehearse --network devnet --json > rehearsal.json
+
+Results:
+  unchanged        identical outcome, account state, and compute units
+  cu_changed       identical outcome and state; compute units differ (informational)
+  state_changed    both runs succeed but leave an account different
+  outcome_changed  success and failure swapped, or the error changed
+  skipped          not compared, for example a transaction that fails identically in
+                   both runs because the state it needed has moved on
+
+Exit status:
+  0 when transactions were compared and none changed outcome or state; compute-unit
+    changes alone pass.
+  2 when behaviour changed, unless --allow-changes accepts it.
+  3 when no transaction could be compared, so nothing was verified.
+  1 for operational errors, including any failed RPC request; stdout is then empty.
+
+Requirements:
+  Surfpool 1.6 or newer on PATH, or its path in PINA_SURFPOOL. The deployed program must
+  use the upgradeable loader, as `solana program deploy` and `pina deploy` do.
+
+Network safety:
+  Pina never sends a transaction. A custom URL must be HTTP(S) without user information,
+  queries, or fragments. Surfpool receives it as an argument, so never put a secret
+  anywhere in it. Reports show only the URL's origin.
+
+----- stderr -----

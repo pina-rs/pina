@@ -268,6 +268,20 @@ Use `pina verify record --export [AUTHORITY] --output verification.tx` when anot
 
 `pina verify submit --program-id <ADDRESS> --uploader <ADDRESS>` submits an existing record to the official mainnet remote verifier. `pina verify status --program-id <ADDRESS>` is the corresponding read-only mainnet status query. Never place credentials in an RPC URL; the URL is necessarily visible in child-process arguments.
 
+## Rehearse an upgrade
+
+Before upgrading a deployed program, replay its recent traffic against the candidate:
+
+```sh
+pina rehearse --network devnet --build
+pina rehearse --network mainnet --limit 100 --json > rehearsal.json
+pina rehearse --rpc-url http://127.0.0.1:8899 --signature <SIGNATURE>
+```
+
+Pina fetches the program's recent transactions read-only, forks the same endpoint with Surfpool, and profiles every signed transaction against the deployed program and then the candidate on one frozen snapshot. Statuses are `unchanged`, `cu_changed` (informational), `state_changed`, `outcome_changed`, and `skipped`. A transaction that fails identically in both runs is skipped as `failed_in_both`: its state moved on and it says nothing about the upgrade. Different errors in both runs are an outcome change, because error codes are part of the program's contract.
+
+Exit code `2` means behaviour changed: inspect each `state_changed` account diff (fields are decoded from the IR) and each `outcome_changed` log excerpt before deploying. Use `--allow-changes` only for reviewed, intended changes. Exit code `3` means no transaction could be compared, so the upgrade is unverified: rehearse more or newer traffic rather than treating it as a pass. Exit code `1` is an operational failure, including any failed RPC request and a candidate the runtime refuses to load, which an upgrade would also reject. Requests are never retried, so do not loop the command against a rate-limited endpoint.
+
 ## Safe deployment
 
 Plan deployments before permitting a write:
