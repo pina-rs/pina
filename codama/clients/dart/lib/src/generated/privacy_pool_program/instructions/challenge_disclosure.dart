@@ -113,7 +113,7 @@ Instruction getChallengeDisclosureInstruction({
     accounts: [
       AccountMeta(address: disclosureRequest, role: AccountRole.writable),
       AccountMeta(address: noteCommitment, role: AccountRole.readonly),
-      AccountMeta(address: viewer, role: AccountRole.readonly),
+      AccountMeta(address: viewer, role: AccountRole.readonlySigner),
       AccountMeta(address: clock, role: AccountRole.readonly),
     ],
     data: getChallengeDisclosureInstructionDataEncoder().encode(

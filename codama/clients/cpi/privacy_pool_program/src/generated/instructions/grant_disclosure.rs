@@ -30,7 +30,7 @@ pub struct GrantDisclosure<'account> {
 	pub note_commitment: &'account AccountView,
 
 	/// CPI account `viewer`.
-	/// Required privileges: read-only.
+	/// Required privileges: read-only and signer.
 	pub viewer: &'account AccountView,
 
 	/// Instruction arguments encoded and sent as CPI data for `grant_disclosure`.
@@ -77,7 +77,7 @@ impl<'account> GrantDisclosure<'account> {
 		let accounts: [CpiHandle<'_>; 3] = [
 			CpiHandle::writable(self.disclosure_request)?,
 			CpiHandle::readonly(self.note_commitment),
-			CpiHandle::readonly(self.viewer),
+			CpiHandle::readonly_signer(self.viewer),
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);

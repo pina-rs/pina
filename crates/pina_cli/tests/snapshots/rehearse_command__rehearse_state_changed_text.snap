@@ -1,0 +1,36 @@
+---
+source: crates/pina_cli/tests/rehearse_command.rs
+expression: "stdout(&text, &remote)"
+---
+Rehearsal of GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS on http://127.0.0.1:[port]
+  deployed   sha256 1e62155ae2171aab4088e1a3eca14a47f8aee9124db1c55045fb2e9d9bae10fb
+  candidate  sha256 d380ef636ae475a8bf10cfd1a8dc93429b21eadfb0d2db1c95f2a6d5e1b1347e
+  fork slot  2001
+
+4 transactions: 0 unchanged, 0 cu_changed, 3 state_changed, 0 outcome_changed, 1 skipped
+
+Compute units (transactions that succeeded in both runs):
+┌─────────────┬─────────┬─────────────────────────┬──────────────────────────┬──────────────┐
+│ Instruction ┆ Samples ┆ Baseline min/median/max ┆ Candidate min/median/max ┆ Median delta │
+╞═════════════╪═════════╪═════════════════════════╪══════════════════════════╪══════════════╡
+│ increment   ┆ 3       ┆ 473/473/473             ┆ 473/473/473              ┆ 0            │
+└─────────────┴─────────┴─────────────────────────┴──────────────────────────┴──────────────┘
+
+Changed transactions:
+  2y8JkzTSum83V1nSkpy64WHZv1S8pqWFMJ8YRxP3pqtqgwTBdyKGMwZ1rBsg4auwogTkpoJunSjxcBnj8XG4EECP  state_changed  [increment]
+    compute units 473 -> 473 (0)
+    account 14P1xLXPqLmxipH1tno2oKiS9GQPZJosNuK1AJPe4Ffn (CounterState)
+      count: 4 -> 5
+  3a7DDmRrbHZUWEtRNsr3FwGmpfz7RPbwVjjjkQEu52FEyQHEeuNFQ2TpTtyK3WcR6EVLgotaAj4w8fseSJtYm5TW  state_changed  [increment]
+    compute units 473 -> 473 (0)
+    account 14P1xLXPqLmxipH1tno2oKiS9GQPZJosNuK1AJPe4Ffn (CounterState)
+      count: 4 -> 5
+  5kuKuSTY43rVd1QjzTvgQXrQw4LmfXt3GLkNSgqVo3Huu8C8i9dxsrtQXQqHH1bXSSFiVhwF13VckPuidiWXxCf7  state_changed  [increment]
+    compute units 473 -> 473 (0)
+    account 14P1xLXPqLmxipH1tno2oKiS9GQPZJosNuK1AJPe4Ffn (CounterState)
+      count: 4 -> 5
+
+Skipped transactions:
+  3vomhkHJBbJj2Bh2myHWQXnoXrE6ZtubEDQhUS9NBfZEt7X8TZpuHejnmT15cWYVzUh8tkTeuEiQUPZxVzgp9jnS  failed_in_both: Error processing Instruction 0: instruction requires an uninitialized account
+
+Behaviour changed in 3 transaction(s). Review the differences, or rerun with --allow-changes to accept them.

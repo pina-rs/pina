@@ -96,3 +96,52 @@ while IFS= read -r manifest; do
 		exit 1
 	fi
 done < <(find "$ROOT/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml -print | sort)
+
+# `pina rehearse`'s end-to-end test (crates/pina_cli/tests/rehearse_surfpool.rs)
+# replays counter traffic against a candidate whose increment adds two, which
+# proves a candidate's account-state differences are detected and decoded. The
+# variant is the counter source with that one constant changed, built outside
+# the workspace so it never joins the example inventory. Its artifact keeps the
+# counter's name, so it lands in its own directory.
+variant_source="$(mktemp -d)"
+trap 'rm -rf "$variant_source"' EXIT
+counter_dir="$ROOT/examples/counter_program"
+mkdir -p "$variant_source/src"
+cp -R "$counter_dir/migrations" "$counter_dir/build.rs" "$variant_source/"
+sed 's/\.checked_add(1)/.checked_add(2)/' "$counter_dir/src/lib.rs" >"$variant_source/src/lib.rs"
+if ! grep -q '\.checked_add(2)' "$variant_source/src/lib.rs"; then
+	echo "the counter rehearsal variant no longer patches increment; update this script" >&2
+	exit 1
+fi
+cat >"$variant_source/Cargo.toml" <<MANIFEST
+[package]
+name = "counter_program"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+bpf-entrypoint = []
+
+[dependencies]
+pina = { path = "$ROOT/crates/pina", features = ["account-resize", "logs", "derive"] }
+
+[workspace]
+MANIFEST
+cp "$ROOT/Cargo.lock" "$variant_source/Cargo.lock"
+variant_out="$OUT_DIR/rehearse-variant"
+rm -rf -- "$variant_out"
+echo "Building the counter_program rehearsal variant"
+CARGO_TARGET_DIR="$ROOT/target/surfpool/rehearse-variant-target" "$cargo_build_sbf" \
+	"$tools_install" \
+	--tools-version "$TOOLS_VERSION" \
+	--manifest-path "$variant_source/Cargo.toml" \
+	--features bpf-entrypoint \
+	--sbf-out-dir "$variant_out"
+if [[ ! -f "$variant_out/counter_program.so" ]]; then
+	echo "cargo-build-sbf did not produce the counter rehearsal variant" >&2
+	exit 1
+fi

@@ -1,0 +1,41 @@
+---
+source: crates/pina_cli/tests/cli_snapshots.rs
+info:
+  program: pina
+  args:
+    - map
+    - "--help"
+---
+success: true
+exit_code: 0
+----- stdout -----
+Render an interactive map of the program's instructions and account locks.
+
+Writes one self-contained HTML file, with no network access, that charts which accounts every instruction writes and reads, the hotspots `pina locks` reports, and the instructions that block each other. Select an instruction or an account for its docs, constraints, PDA derivation, and conflicts.
+
+Usage: pina map [OPTIONS]
+
+Options:
+  -p, --project <DIR>
+          Directory inside the project to discover. Defaults to the current directory
+
+  -o, --output <FILE>
+          Write the HTML map to FILE instead of `<target>/pina/map.html`
+
+      --json
+          Print the map's data as a stable machine-readable JSON document instead of writing HTML
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Examples:
+  pina map
+  open "$(pina map)"
+  pina map --project ./programs/privacy_pool
+  pina map --output ./docs/program-map.html
+  pina map --json
+
+Output:
+  The HTML file is written to <target>/pina/map.html unless --output names another path. stdout carries only the written path, so the command composes with `open` and `xdg-open`; progress goes to stderr. --json prints the map's data instead: the `pina locks --json` document plus instructionDetails and accountTypes.
+
+----- stderr -----

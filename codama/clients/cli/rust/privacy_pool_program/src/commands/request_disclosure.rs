@@ -12,6 +12,7 @@
 use clap::Args;
 use privacy_pool_program_client::instructions::RequestDisclosure;
 use privacy_pool_program_client::instructions::RequestDisclosureInstructionData;
+use solana_sdk::pubkey::Pubkey;
 
 use crate::context::CliContext;
 use crate::context::CliError;
@@ -36,12 +37,12 @@ pub struct RequestDisclosureArgs {
 	/// Hash of the legal basis; nonzero required above tier 0.
 	#[arg(long)]
 	legal_basis_hash: String,
-	/// The `pool_config` account
+	/// The `pool_config` account [default: derived]
 	#[arg(long)]
-	pool_config: String,
-	/// The `requester_registry` account
+	pool_config: Option<String>,
+	/// The `requester_registry` account [default: derived]
 	#[arg(long)]
-	requester_registry: String,
+	requester_registry: Option<String>,
 	/// The `note_commitment` account
 	#[arg(long)]
 	note_commitment: String,
@@ -61,8 +62,26 @@ pub(crate) fn run(context: &CliContext, args: RequestDisclosureArgs) -> Result<(
 	let notice = CliContext::bytes::<96>("--notice", &args.notice)?;
 	let legal_basis_hash = CliContext::bytes::<32>("--legal_basis_hash", &args.legal_basis_hash)?;
 	let requester = context.payer_pubkey();
-	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
-	let requester_registry = CliContext::pubkey("--requester_registry", &args.requester_registry)?;
+	let pool_config = match &args.pool_config {
+		Some(value) => CliContext::pubkey("--pool_config", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
+	let requester_registry = match &args.requester_registry {
+		Some(value) => CliContext::pubkey("--requester_registry", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-requesters".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
 	let system_program = CliContext::pubkey("--system_program", &args.system_program)?;

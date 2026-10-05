@@ -40,8 +40,8 @@ final class MultisigImportCommand extends Command<void> {
       )
       ..addOption(
         'program_config',
-        mandatory: true,
-        help: "The program_config account",
+        mandatory: false,
+        help: "The program_config account [default: derived]",
       )
       ..addOption(
         'multisig',
@@ -71,10 +71,11 @@ final class MultisigImportCommand extends Command<void> {
       results['legacy_multisig']! as String,
     );
     final legacyCreateKey = context.payerAddress;
-    final programConfig = pubkey(
-      '--program-config',
-      results['program_config']! as String,
-    );
+    final programConfig = (results['program_config'] as String?) != null
+        ? pubkey('--program-config', results['program_config']! as String)
+        : (await findProgramConfigPda(
+            programAddress: context.programAddress,
+          )).$1;
     final createKey = context.payerAddress;
     final multisig = (results['multisig'] as String?) != null
         ? pubkey('--multisig', results['multisig']! as String)

@@ -40,9 +40,9 @@ pub struct MultisigImportArgs {
 	/// The `legacy_multisig` account
 	#[arg(long)]
 	legacy_multisig: String,
-	/// The `program_config` account
+	/// The `program_config` account [default: derived]
 	#[arg(long)]
-	program_config: String,
+	program_config: Option<String>,
 	/// The `multisig` account [default: derived]
 	#[arg(long)]
 	multisig: Option<String>,
@@ -59,7 +59,16 @@ pub(crate) fn run(context: &CliContext, args: MultisigImportArgs) -> Result<(), 
 	let rent_collector = CliContext::pubkey("--rent_collector", &args.rent_collector)?;
 	let legacy_multisig = CliContext::pubkey("--legacy_multisig", &args.legacy_multisig)?;
 	let legacy_create_key = context.payer_pubkey();
-	let program_config = CliContext::pubkey("--program_config", &args.program_config)?;
+	let program_config = match &args.program_config {
+		Some(value) => CliContext::pubkey("--program_config", value)?,
+		None => {
+			Pubkey::find_program_address(
+				&["multisig-program-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
+	};
 	let create_key = context.payer_pubkey();
 	let multisig = match &args.multisig {
 		Some(value) => CliContext::pubkey("--multisig", value)?,

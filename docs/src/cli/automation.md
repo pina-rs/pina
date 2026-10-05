@@ -32,6 +32,7 @@ For project testing and a persistent local network:
 pina lint --help
 pina test --help
 pina dev --help
+pina rehearse --help
 ```
 
 For project diagnostics, failed transactions, and identity:
@@ -40,6 +41,13 @@ For project diagnostics, failed transactions, and identity:
 pina doctor --help
 pina explain --help
 pina keys --help
+```
+
+For write-lock contention between instructions, and its interactive map:
+
+```bash
+pina locks --help
+pina map --help
 ```
 
 For framework and extractor constraints:
@@ -77,11 +85,41 @@ pina profile ./target/deploy/counter_program.so --json > /tmp/profile.json
 jq -e '.functions | type == "array"' /tmp/profile.json
 ```
 
+Trace executed compute units from the project's Mollusk tests as JSON. Build and test output goes to stderr, so stdout stays a single JSON document; a failing test run exits with the test runner's status:
+
+```bash
+pina profile trace --json > /tmp/trace.json
+jq -e '.schemaVersion == 1 and (.instructions | length > 0)' /tmp/trace.json
+jq '.instructions[] | {name, executedInstructions, syscalls}' /tmp/trace.json
+```
+
 Diff the current build against a saved baseline; the exit status is 2 when a total CU regression reaches both `--fail-cu` and `--fail-percent`:
 
 ```bash
 pina profile compare /tmp/profile.json --json > /tmp/comparison.json
 jq -e '.status == "unchanged" or .status == "improved"' /tmp/comparison.json
+```
+
+Rehearse an upgrade against recent traffic. Gate on the exit status first: it is 0 only when at least one transaction was compared and none changed its outcome or written account state, 2 when behaviour changed, 3 when nothing could be compared, and 1 for an operational failure with empty stdout. A JSON check must require the same three conditions, so a report whose only changes are account state, or that compared nothing, never passes:
+
+```bash
+pina rehearse --network devnet --json > /tmp/rehearsal.json
+jq -e '.schemaVersion == 1 and .summary.total > .summary.skipped and .summary.stateChanged == 0 and .summary.outcomeChanged == 0' /tmp/rehearsal.json
+```
+
+Report write-lock contention through the versioned JSON contract, and gate CI on hotspots that `[locks] allow` does not accept:
+
+```bash
+pina locks --json > /tmp/pina-locks.json
+jq -e '.hotspots | map(select(.allowed | not)) | length == 0' /tmp/pina-locks.json
+pina locks --deny-hotspots
+```
+
+Read the program map's data, the locks document plus per-instruction and per-account-type detail, without writing its HTML page:
+
+```bash
+pina map --json > /tmp/pina-map.json
+jq -e '.instructionDetails | length > 0' /tmp/pina-map.json
 ```
 
 Diagnose project readiness through the versioned JSON contract:
@@ -129,6 +167,8 @@ jq -e '.program_id and .commands' /tmp/deploy-plan.json
 - Inspect `pina docs` before requesting a topic.
 - Never use the input `.so` path as the profile output path.
 - Treat exit code `2` from `verify check` or `verify record` as a verified hash mismatch, not an operational failure.
+- Treat exit code `2` from `rehearse` as a completed rehearsal that found behaviour changes; read `transactions[].status` from the JSON report. Exit code `3` means no transaction could be compared, so nothing was verified; it is never a pass. Exit code `1` is an operational failure with empty stdout. Never pass `--allow-changes` until every `state_changed` and `outcome_changed` transaction has been reviewed.
+- `pina rehearse` sends each RPC request once and stops on the first failure. Do not loop it against a rate-limited public endpoint; use a dedicated endpoint or a smaller `--limit`.
 - Run `pina build --verify` first and pass its printed content-addressed JSON path to `pina verify record --build-record`.
 - Never infer a repository, revision, cluster, authority, or uploader. The build record binds source provenance; every network target and signing identity remains explicit.
 - Use `--yes` only for a reviewed record plan. Mainnet submissions additionally require `--acknowledge-mainnet`; transaction export requires neither flag.

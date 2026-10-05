@@ -1,0 +1,41 @@
+---
+source: crates/pina_cli/tests/locks.rs
+expression: report.render_text()
+---
+multisig_program (5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc)
+15 instructions; accounts: 3 fixed, 3 keyed, 54 caller-chosen; 1 hotspot (0 allowed)
+
+Hotspots
+  A fixed account has one address for every caller, so every instruction that
+  writes it takes the same write lock.
+
+  program_config
+    address  GyAudv6F9kQirHntXGVdYdBDMr2fbrdrgakYyN74gbV8
+    seeds    "multisig-program-config"
+    writers  config_initialize, config_update
+    readers  multisig_create, multisig_import
+    Every `config_initialize` and `config_update` in the cluster runs one at a time; the 2 instructions that read it wait for each one.
+
+Conflicts
+                               1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+   1 config_initialize         ●  ●  ●  ●  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·
+   2 config_update             ●  ●  ●  ●  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·
+   3 multisig_create           ●  ●  ◐  ◐  ·  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ·  ·
+   4 multisig_import           ●  ●  ◐  ◐  ·  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ·  ·
+   5 proposal_create           ·  ·  ·  ·  ◐  ·  ·  ·  ·  ·  ◐  ◐  ·  ·  ·
+   6 proposal_activate         ·  ·  ◐  ◐  ·  ·  ·  ·  ·  ·  ·  ◐  ◐  ·  ·
+   7 proposal_approve          ·  ·  ◐  ◐  ·  ·  ·  ·  ·  ·  ·  ◐  ◐  ·  ·
+   8 proposal_reject           ·  ·  ◐  ◐  ·  ·  ·  ·  ·  ·  ·  ◐  ◐  ·  ·
+   9 proposal_revoke           ·  ·  ◐  ◐  ·  ·  ·  ·  ·  ·  ·  ◐  ◐  ·  ·
+  10 proposal_cancel           ·  ·  ◐  ◐  ·  ·  ·  ·  ·  ·  ·  ◐  ◐  ·  ·
+  11 vault_execute             ·  ·  ◐  ◐  ◐  ·  ·  ·  ·  ·  ◐  ◐  ◐  ·  ·
+  12 config_execute            ·  ·  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ·  ·
+  13 config_authority_execute  ·  ·  ◐  ◐  ·  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ◐  ·  ·
+  14 spending_limit_use        ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ◐  ·
+  15 proposal_close            ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·
+
+Legend
+  ●  always  both lock a fixed account and at least one writes it: never in parallel
+  ◐  may     both lock a keyed PDA, or a fixed account one of them may omit, and
+             at least one writes it: they wait only when the addresses match
+  ·  none    no shared write lock Pina can prove; caller-chosen accounts are never compared

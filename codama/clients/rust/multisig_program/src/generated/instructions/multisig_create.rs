@@ -36,13 +36,16 @@ pub struct MultisigCreate {
 
 impl MultisigCreate {
 	pub fn new(
-		program_config: solana_pubkey::Pubkey,
 		create_key: solana_pubkey::Pubkey,
 		rent_payer: solana_pubkey::Pubkey,
 		member_accounts: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
-			program_config,
+			program_config: solana_pubkey::Pubkey::find_program_address(
+				&["multisig-program-config".as_bytes()],
+				&crate::MULTISIG_PROGRAM_ID,
+			)
+			.0,
 			create_key,
 			multisig: solana_pubkey::Pubkey::find_program_address(
 				&["multisig".as_bytes(), create_key.as_ref()],

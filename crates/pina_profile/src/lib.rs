@@ -1,14 +1,21 @@
-//! Static CU profiler for Solana SBF programs.
+//! Compute-unit profiler for Solana SBF programs.
 //!
-//! Analyzes compiled `.so` ELF binaries to estimate per-function compute unit
-//! costs without requiring a running validator.
+//! The static profiler analyzes compiled `.so` ELF binaries to estimate
+//! per-function compute unit costs without running them. The dynamic
+//! profiler ([`trace_report`]) attributes every instruction of a recorded
+//! Mollusk register trace to a source line and call stack.
 
 #![allow(missing_docs)]
 pub mod compare;
 pub mod cost;
+pub mod dwarf;
 pub mod elf;
 pub mod output;
 pub mod sbf;
+pub mod syscalls;
+pub mod trace;
+pub mod trace_output;
+pub mod trace_report;
 
 use std::path::Path;
 
@@ -31,6 +38,11 @@ pub use output::OutputFormat;
 /// Returns a [`ProgramProfile`] containing per-function CU estimates and
 /// binary metadata.
 ///
+/// A stripped artifact (such as `target/deploy/<lib>.so`) only exports
+/// `entrypoint`, so its function names are recovered from the unstripped
+/// `cargo build-sbf` intermediate when that file's `.text` is byte-identical;
+/// see [`elf::unstripped_symbols`]. Otherwise the exported symbols are used.
+///
 /// # Errors
 ///
 /// Returns a [`ProfileError`] if the file cannot be read, is not a valid ELF,
@@ -45,7 +57,15 @@ pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
 	})?;
 
 	// Parse ELF and analyze functions
-	let elf_info = elf::parse_elf(&data, path)?;
+	let mut elf_info = elf::parse_elf(&data, path)?;
+
+	if elf_info.symbol_table == elf::SymbolTable::Dynamic
+		&& let Some(symbols) = elf::unstripped_symbols(path, &elf_info)
+	{
+		elf_info.symbols = symbols;
+		elf_info.symbol_table = elf::SymbolTable::Full;
+	}
+
 	let functions = sbf::analyze_functions(&elf_info);
 
 	// Calculate totals
@@ -65,7 +85,11 @@ pub fn profile_program(path: &Path) -> Result<ProgramProfile, ProfileError> {
 }
 
 /// Errors produced during profiling.
+///
+/// New variants can be added in a minor release, so a `match` needs a
+/// wildcard arm.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ProfileError {
 	#[error("IO error at {path}: {source}")]
 	Io {
@@ -81,4 +105,13 @@ pub enum ProfileError {
 
 	#[error("No SBF text section found in {path}")]
 	NoTextSection { path: std::path::PathBuf },
+
+	#[error(
+		"{debug:?} is not the unstripped build of {executable:?}: their .text sections differ; \
+		 rebuild both together"
+	)]
+	DebugBuildMismatch {
+		executable: std::path::PathBuf,
+		debug: std::path::PathBuf,
+	},
 }

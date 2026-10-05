@@ -1,0 +1,78 @@
+---
+source: crates/pina_cli/tests/locks.rs
+expression: report.render_text()
+---
+privacy_pool_program (DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D)
+13 instructions; accounts: 8 fixed, 3 keyed, 19 caller-chosen; 7 hotspots (0 allowed)
+
+Hotspots
+  A fixed account has one address for every caller, so every instruction that
+  writes it takes the same write lock.
+
+  pool_config
+    address  Ft792WYvArLSrWesc8wpDEvpSH31Tg58pdCnVT984gh7
+    seeds    "privacy-pool-config"
+    writers  initialize, deposit
+    readers  set_verification_key, set_custodians, register_requester, withdraw, request_disclosure, resolve_challenge, approve_disclosure
+    Every `initialize` and `deposit` in the cluster runs one at a time; the 7 instructions that read it wait for each one.
+
+  pool_vault
+    address  6LrkwS21BztDA2C2GtWqgMMB8MJtkkkDkYFb5Ys7hom9
+    seeds    "privacy-pool-vault"
+    writers  initialize, deposit, withdraw
+    Every `initialize`, `deposit`, and `withdraw` in the cluster runs one at a time.
+
+  merkle_tree
+    address  BLquaQVntisnQpUoLpzbcFGDN9eG9Qf12TZZS5KVLaLz
+    seeds    "privacy-pool-tree"
+    writers  initialize, deposit, transfer
+    readers  withdraw
+    Every `initialize`, `deposit`, and `transfer` in the cluster runs one at a time; `withdraw` waits for each one.
+
+  nullifier_set
+    address  Fme1vL3wChyjUdumDR9vhf1kxqp6V1vVBhn4eywLmvwj
+    seeds    "privacy-pool-nullifiers"
+    writers  initialize, withdraw, transfer
+    Every `initialize`, `withdraw`, and `transfer` in the cluster runs one at a time.
+
+  custodian_registry
+    address  Eb9uxkG5FB23MJvaEX1mEjieVVF5F7S883V3bF2bLtNW
+    seeds    "privacy-pool-custodians"
+    writers  initialize, set_custodians
+    readers  approve_disclosure
+    Every `initialize` and `set_custodians` in the cluster runs one at a time; `approve_disclosure` waits for each one.
+
+  requester_registry
+    address  CFqVX5qTz2p6xdTYwuqWuZ45g5acr6oRBfawUEcxVnn7
+    seeds    "privacy-pool-requesters"
+    writers  initialize, register_requester
+    readers  request_disclosure
+    Every `initialize` and `register_requester` in the cluster runs one at a time; `request_disclosure` waits for each one.
+
+  disclosure_log
+    address  FbPmX65NPgn3oJMTD7P7anZpnCxftJAcM5pGDQoyEjw1
+    seeds    "privacy-pool-log"
+    writers  initialize, approve_disclosure
+    Every `initialize` and `approve_disclosure` in the cluster runs one at a time.
+
+Conflicts
+                           1  2  3  4  5  6  7  8  9 10 11 12 13
+   1 initialize            ●  ●  ●  ●  ●  ●  ●  ●  ·  ·  ●  ●  ·
+   2 set_verification_key  ●  ◐  ·  ·  ●  ◐  ◐  ·  ·  ·  ·  ·  ·
+   3 set_custodians        ●  ·  ●  ·  ●  ·  ·  ·  ·  ·  ·  ●  ·
+   4 register_requester    ●  ·  ·  ●  ●  ·  ·  ●  ·  ·  ·  ·  ·
+   5 deposit               ●  ●  ●  ●  ●  ●  ●  ●  ◐  ◐  ●  ●  ·
+   6 withdraw              ●  ◐  ·  ·  ●  ●  ●  ·  ·  ·  ·  ·  ·
+   7 transfer              ●  ◐  ·  ·  ●  ●  ●  ◐  ◐  ◐  ·  ·  ·
+   8 request_disclosure    ●  ·  ·  ●  ●  ·  ◐  ◐  ◐  ◐  ◐  ◐  ◐
+   9 grant_disclosure      ·  ·  ·  ·  ◐  ·  ◐  ◐  ◐  ◐  ◐  ◐  ◐
+  10 challenge_disclosure  ·  ·  ·  ·  ◐  ·  ◐  ◐  ◐  ◐  ◐  ◐  ◐
+  11 resolve_challenge     ●  ·  ·  ·  ●  ·  ·  ◐  ◐  ◐  ◐  ◐  ◐
+  12 approve_disclosure    ●  ·  ●  ·  ●  ·  ·  ◐  ◐  ◐  ◐  ●  ◐
+  13 cancel_disclosure     ·  ·  ·  ·  ·  ·  ·  ◐  ◐  ◐  ◐  ◐  ◐
+
+Legend
+  ●  always  both lock a fixed account and at least one writes it: never in parallel
+  ◐  may     both lock a keyed PDA, or a fixed account one of them may omit, and
+             at least one writes it: they wait only when the addresses match
+  ·  none    no shared write lock Pina can prove; caller-chosen accounts are never compared

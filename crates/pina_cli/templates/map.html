@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="generator" content="pina map">
+<title>@@TITLE@@ · interlocking chart</title>
+<style>
+:root {
+	--paper: #f3eee1;
+	--paper-deep: #e9e1cf;
+	--card: #fbf8f0;
+	--ink: #1d1a15;
+	--ink-soft: #4d473c;
+	--rule: #cdc2a9;
+	--rule-faint: rgba(29, 26, 21, 0.06);
+	--red: #b3261e;
+	--red-wash: #f5d9d1;
+	--amber: #8a5400;
+	--amber-wash: #f4e3bd;
+	--blue: #1f4f86;
+	--blue-wash: #d9e4f1;
+	--spare: #fffdf7;
+	--focus: #1f4f86;
+	--serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+	--mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+	--cell: 2.3rem;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--paper: #14130f;
+		--paper-deep: #1d1b16;
+		--card: #1a1914;
+		--ink: #efe7d3;
+		--ink-soft: #b8af99;
+		--rule: #3b372d;
+		--rule-faint: rgba(239, 231, 211, 0.05);
+		--red: #ff7b67;
+		--red-wash: #3e1a14;
+		--amber: #f0b44b;
+		--amber-wash: #392a0e;
+		--blue: #8db9e9;
+		--blue-wash: #15283e;
+		--spare: #1b1a15;
+		--focus: #8db9e9;
+	}
+}
+
+* { box-sizing: border-box; }
+
+body {
+	margin: 0;
+	background-color: var(--paper);
+	background-image: linear-gradient(var(--rule-faint) 1px, transparent 1px);
+	background-size: 100% 1.75rem;
+	color: var(--ink);
+	font: 16px/1.5 var(--serif);
+	-webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; color: inherit; }
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+.page {
+	max-width: 88rem;
+	margin: 0 auto;
+	padding: 2.5rem clamp(1rem, 4vw, 3rem) 4rem;
+}
+
+/* Header: an engraved frame plate. */
+.plate {
+	display: grid;
+	gap: 1.25rem;
+	padding-bottom: 1.75rem;
+	border-bottom: 3px double var(--ink);
+}
+
+.eyebrow {
+	margin: 0;
+	font: 600 0.72rem/1 var(--mono);
+	letter-spacing: 0.22em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+h1 {
+	margin: 0.35rem 0 0;
+	font-size: clamp(2rem, 5vw, 3.4rem);
+	font-weight: 600;
+	line-height: 1.05;
+	letter-spacing: -0.01em;
+	overflow-wrap: anywhere;
+}
+
+.program-id {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: 0.6rem;
+	font: 0.85rem/1.4 var(--mono);
+	color: var(--ink-soft);
+}
+
+.program-id code { overflow-wrap: anywhere; }
+
+.copy {
+	padding: 0.15rem 0.55rem;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: var(--card);
+	font: 0.7rem/1.4 var(--mono);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.copy:hover { border-color: var(--ink); }
+
+.counts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.counts li {
+	display: grid;
+	min-width: 6.5rem;
+	padding: 0.55rem 0.8rem 0.6rem;
+	border: 1px solid var(--ink);
+	background: var(--card);
+	box-shadow: 3px 3px 0 var(--ink);
+}
+
+.counts strong { font: 600 1.6rem/1 var(--mono); }
+
+.counts span {
+	margin-top: 0.3rem;
+	font: 0.68rem/1 var(--mono);
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+.counts .is-hot { border-color: var(--red); box-shadow: 3px 3px 0 var(--red); }
+.counts .is-hot strong { color: var(--red); }
+
+.lede { max-width: 46rem; margin: 0; color: var(--ink-soft); font-size: 1.05rem; }
+
+/* Hotspot plates: enamel signs with a red band. */
+.section-title {
+	display: flex;
+	align-items: baseline;
+	gap: 0.75rem;
+	margin: 2.5rem 0 1rem;
+	font-size: 1.35rem;
+	font-weight: 600;
+}
+
+.section-title small {
+	font: 0.72rem/1 var(--mono);
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+.hotspots {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+	gap: 0.9rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.hotspot {
+	display: grid;
+	gap: 0.45rem;
+	width: 100%;
+	padding: 0.9rem 1rem 1rem;
+	border: 1px solid var(--ink);
+	border-top: 0.45rem solid var(--red);
+	background: var(--card);
+	text-align: left;
+	cursor: pointer;
+	transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.hotspot:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--ink); }
+.hotspot.is-allowed { border-top-color: var(--ink-soft); }
+.hotspot-name { font: 600 1rem/1.2 var(--mono); overflow-wrap: anywhere; }
+.hotspot-cost { font-size: 0.95rem; line-height: 1.4; }
+.hotspot-meta { font: 0.72rem/1.4 var(--mono); color: var(--ink-soft); }
+
+.calm {
+	margin: 0;
+	padding: 1rem 1.1rem;
+	border: 1px dashed var(--rule);
+	background: var(--card);
+	max-width: 46rem;
+}
+
+/* The chart and its side panel. */
+.layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(17rem, 25rem);
+	gap: 1.5rem;
+	align-items: start;
+}
+
+.chart-frame {
+	min-width: 0;
+	border: 1px solid var(--ink);
+	background: var(--card);
+}
+
+.legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem 1.1rem;
+	margin: 0;
+	padding: 0.7rem 0.9rem;
+	border-bottom: 1px solid var(--rule);
+	font: 0.72rem/1.3 var(--mono);
+	color: var(--ink-soft);
+	list-style: none;
+}
+
+.legend li { display: flex; align-items: center; gap: 0.4rem; }
+
+.scroller { overflow-x: auto; overscroll-behavior-x: contain; }
+
+table.chart {
+	border-collapse: separate;
+	border-spacing: 0;
+	font-family: var(--mono);
+	font-size: 0.8rem;
+}
+
+.chart th, .chart td { padding: 0; }
+
+.chart thead th { vertical-align: bottom; border-bottom: 2px solid var(--ink); }
+
+.corner {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	min-width: 11rem;
+	padding: 0 0.75rem 0.6rem !important;
+	background: var(--card);
+	text-align: left;
+	font: 600 0.68rem/1 var(--mono);
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+/* Column heads are lever plates of one height, coloured like a signal
+   frame: red for a hotspot, black for other fixed accounts, blue for keyed
+   PDAs, white for the spare (caller-chosen) levers. */
+.lever {
+	display: grid;
+	grid-template-rows: 1fr auto;
+	justify-items: center;
+	align-items: end;
+	gap: 0.35rem;
+	width: var(--cell);
+	height: 10.5rem;
+	padding: 0.4rem 0 0.45rem;
+	border: 0;
+	border-top: 0.4rem solid var(--ink);
+	background: transparent;
+	cursor: pointer;
+}
+
+.lever.is-hot { border-top-color: var(--red); }
+.lever.is-keyed { border-top-color: var(--blue); }
+.lever.is-spare { width: auto; padding-inline: 0.6rem; border-top: 0.4rem solid var(--rule); cursor: default; }
+
+.lever-label {
+	writing-mode: vertical-rl;
+	transform: rotate(180deg);
+	max-height: 8.6rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.74rem;
+}
+
+.lever-number { font-size: 0.62rem; color: var(--ink-soft); }
+
+.row-head {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	background: var(--card);
+	border-right: 1px solid var(--rule);
+}
+
+.row-button {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	width: 100%;
+	min-height: var(--cell);
+	padding: 0 0.75rem;
+	border: 0;
+	border-left: 0.3rem solid transparent;
+	background: transparent;
+	font: 0.82rem/1.2 var(--mono);
+	text-align: left;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.row-number { min-width: 1.4rem; font-size: 0.66rem; color: var(--ink-soft); }
+
+.chart tbody tr {
+	animation: rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+	animation-delay: calc(var(--i, 0) * 28ms);
+}
+
+.chart tbody td {
+	width: var(--cell);
+	height: var(--cell);
+	text-align: center;
+	border-bottom: 1px solid var(--rule-faint);
+}
+
+.chart tbody tr:nth-child(4n) td { border-bottom-color: var(--rule); }
+
+.spare-cell {
+	min-width: 4.5rem;
+	padding: 0 0.6rem !important;
+	font-size: 0.68rem;
+	color: var(--ink-soft);
+	white-space: nowrap;
+}
+
+/* Lock marks: filled for a write, outlined for a read, a notch for a signer. */
+.mark {
+	position: relative;
+	display: inline-block;
+	width: 0.85rem;
+	height: 0.85rem;
+	border: 2px solid var(--ink);
+	vertical-align: middle;
+}
+
+.mark.is-write { background: var(--ink); }
+.is-hot-column .mark.is-write { background: var(--red); border-color: var(--red); }
+.mark.is-optional { border-style: dashed; }
+.mark.is-write.is-optional { background: transparent; box-shadow: inset 0 0 0 2px var(--ink); }
+
+.mark.is-signer::after {
+	content: "";
+	position: absolute;
+	right: -0.4rem;
+	top: -0.4rem;
+	width: 0.42rem;
+	height: 0.42rem;
+	border: 2px solid var(--card);
+	border-radius: 50%;
+	background: var(--blue);
+}
+
+/* Tracing a row: conflicting rows light up, causes are outlined, and the
+   rest fade. Cells fade rather than rows because a sticky row header
+   ignores its row's opacity. */
+.chart tbody tr > * { transition: opacity 120ms ease; }
+.chart.is-tracing tbody tr:not([data-relation]):not([data-touch]) > * { opacity: 0.38; }
+.chart tr[data-touch="write"] .row-button { border-left-color: var(--ink); font-weight: 700; }
+.chart tr[data-touch="read"] .row-button { border-left-color: var(--rule); }
+.chart td[data-selected], .chart th[data-selected] .lever { background-color: var(--paper-deep); }
+
+.chart tr[data-relation="self"] .row-button { border-left-color: var(--ink); font-weight: 700; }
+.chart tr[data-relation="always"] .row-button { border-left-color: var(--red); }
+.chart tr[data-relation="always"] td, .chart tr[data-relation="always"] .row-head { background-color: var(--red-wash); }
+.chart tr[data-relation="may"] .row-button { border-left-color: var(--amber); }
+
+.chart tr[data-relation="may"] td, .chart tr[data-relation="may"] .row-head {
+	background-image: repeating-linear-gradient(135deg, var(--amber-wash) 0 6px, transparent 6px 11px);
+}
+
+.chart th[data-cause="always"] .lever, .chart td[data-cause="always"] { box-shadow: inset 2px 0 0 var(--red), inset -2px 0 0 var(--red); }
+.chart th[data-cause="may"] .lever, .chart td[data-cause="may"] { box-shadow: inset 2px 0 0 var(--amber), inset -2px 0 0 var(--amber); }
+
+.row-button[aria-current] { background: var(--paper-deep); }
+.lever[aria-current] { background: var(--paper-deep); }
+
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.row-button:focus-visible, .lever:focus-visible { outline-offset: -3px; }
+
+/* The side panel: a reference card for the selection. */
+.panel {
+	position: sticky;
+	top: 1rem;
+	max-height: calc(100vh - 2rem);
+	overflow: auto;
+	padding: 1.2rem 1.25rem 1.4rem;
+	border: 1px solid var(--ink);
+	background: var(--card);
+	box-shadow: 6px 6px 0 var(--ink);
+}
+
+.panel h2 {
+	margin: 0.3rem 0 0.6rem;
+	font-size: 1.55rem;
+	line-height: 1.15;
+	overflow-wrap: anywhere;
+}
+
+.panel h3 {
+	margin: 1.3rem 0 0.5rem;
+	padding-bottom: 0.25rem;
+	border-bottom: 1px solid var(--rule);
+	font: 600 0.7rem/1 var(--mono);
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: var(--ink-soft);
+}
+
+.panel p { margin: 0 0 0.6rem; }
+.docs { color: var(--ink-soft); }
+.cost { display: block; margin: 0 0 0.8rem; }
+code { font-family: var(--mono); font-size: 0.86em; }
+.hotspot-cost code, .cost code { padding: 0 0.2em; background: var(--paper-deep); }
+
+.badge {
+	display: inline-block;
+	padding: 0.12rem 0.5rem;
+	border: 1px solid currentColor;
+	font: 600 0.66rem/1.5 var(--mono);
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.badge.is-fixed { color: var(--ink); }
+.badge.is-hot { color: var(--red); }
+.badge.is-keyed { color: var(--blue); }
+.badge.is-caller { color: var(--ink-soft); }
+.badge.is-always { color: var(--red); }
+.badge.is-may { color: var(--amber); }
+
+.items { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+
+.item {
+	display: grid;
+	gap: 0.3rem;
+	padding: 0.55rem 0.65rem;
+	border: 1px solid var(--rule);
+	background: var(--spare);
+}
+
+.item-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font: 0.82rem/1.3 var(--mono); }
+.item-head strong { margin-right: auto; overflow-wrap: anywhere; }
+.item .docs, .item .meta { font-size: 0.85rem; }
+.meta { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-soft); overflow-wrap: anywhere; }
+
+.chip {
+	padding: 0.05rem 0.4rem;
+	border-radius: 999px;
+	background: var(--paper-deep);
+	font: 0.66rem/1.5 var(--mono);
+	white-space: nowrap;
+}
+
+.chip.is-write { background: var(--ink); color: var(--card); }
+.chip.is-signer { background: var(--blue-wash); color: var(--blue); }
+
+.link {
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.15em;
+	cursor: pointer;
+}
+
+.links { display: flex; flex-wrap: wrap; gap: 0.35rem 0.75rem; font: 0.82rem/1.4 var(--mono); }
+
+/* PDA derivation: seeds feed the program id into one address. */
+.derivation { display: grid; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
+
+.derivation li {
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	padding: 0.4rem 0.6rem;
+	border-left: 3px solid var(--ink);
+	background: var(--spare);
+	font: 0.8rem/1.35 var(--mono);
+	overflow-wrap: anywhere;
+}
+
+.derivation .is-variable { border-left-color: var(--blue); }
+.derivation .is-result { border-left-color: var(--red); font-weight: 600; }
+.derivation small { color: var(--ink-soft); }
+
+.slot {
+	padding: 0 0.35rem;
+	border: 1px dashed var(--blue);
+	color: var(--blue);
+}
+
+.address { font: 0.8rem/1.4 var(--mono); overflow-wrap: anywhere; }
+
+footer {
+	margin-top: 3rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--rule);
+	font: 0.72rem/1.5 var(--mono);
+	color: var(--ink-soft);
+}
+
+@keyframes rise {
+	from { opacity: 0; transform: translateY(6px); }
+	to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+@media (max-width: 62rem) {
+	.layout { grid-template-columns: minmax(0, 1fr); }
+	.panel { position: static; max-height: none; }
+}
+
+@media (max-width: 30rem) {
+	.page { padding-top: 1.5rem; }
+	.corner { min-width: 0; }
+	.counts li { min-width: calc(50% - 0.3rem); }
+	.row-number { display: none; }
+	.row-name { max-width: 8.5rem; overflow: hidden; text-overflow: ellipsis; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+	<header class="plate">
+		<div>
+			<p class="eyebrow">Interlocking chart</p>
+			<h1 id="program-name"></h1>
+			<div class="program-id">
+				<code id="program-id"></code>
+				<button type="button" class="copy" data-copy-target="program-id">Copy</button>
+			</div>
+		</div>
+		<ul class="counts" id="counts" aria-label="Program summary"></ul>
+		<p class="lede">Solana runs two transactions side by side only when neither one write-locks an account the other touches. Each column is an account, each row an instruction. Rows that lock the same account block each other, like levers in a signal box.</p>
+	</header>
+
+	<h2 class="section-title">Hotspots <small id="hotspot-note"></small></h2>
+	<div id="hotspots"></div>
+
+	<h2 class="section-title">Lock chart <small>Hover, focus, or select a row</small></h2>
+	<div class="layout">
+		<section class="chart-frame" aria-labelledby="chart-caption">
+			<ul class="legend" aria-label="Legend">
+				<li><span class="mark is-write" aria-hidden="true"></span> writes</li>
+				<li><span class="mark" aria-hidden="true"></span> reads</li>
+				<li><span class="mark is-signer" aria-hidden="true"></span> signs</li>
+				<li><span class="mark is-optional" aria-hidden="true"></span> optional</li>
+				<li><span class="badge is-hot">red lever</span> hotspot</li>
+				<li><span class="badge is-always">always</span> never in parallel</li>
+				<li><span class="badge is-may">may</span> only for the same seeds</li>
+			</ul>
+			<div class="scroller">
+				<table class="chart" id="chart">
+					<caption id="chart-caption" class="sr-only">Accounts each instruction locks, and the instructions it conflicts with</caption>
+				</table>
+			</div>
+		</section>
+		<aside class="panel" id="panel" aria-live="polite" aria-label="Selection details"></aside>
+	</div>
+
+	<footer>Generated by <code>pina map</code> from the program source. Accounts the caller chooses are never compared: Pina cannot know whether two transactions pass the same one.</footer>
+</main>
+
+<script type="application/json" id="pina-map-data">@@DATA@@</script>
+<script>
+"use strict";
+(() => {
+	const data = JSON.parse(document.getElementById("pina-map-data").textContent);
+	const chart = document.getElementById("chart");
+	const panel = document.getElementById("panel");
+
+	const el = (tag, className, text) => {
+		const node = document.createElement(tag);
+		if (className) node.className = className;
+		if (text !== undefined) node.textContent = text;
+		return node;
+	};
+	const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+	const nodes = new Map(data.nodes.map((node) => [node.id, node]));
+	const hotspots = new Map(data.hotspots.map((hotspot) => [hotspot.node, hotspot]));
+	const details = new Map(data.instructionDetails.map((detail) => [detail.name, detail]));
+	const types = new Map(data.accountTypes.filter((type) => type.pda).map((type) => [type.pda, type]));
+	const names = data.instructions.map((instruction) => instruction.name);
+
+	// Every conflict seen from each side, so a row knows who it blocks.
+	const relations = new Map(names.map((name) => [name, new Map()]));
+	for (const conflict of data.conflicts) {
+		const [first, second] = conflict.instructions;
+		relations.get(first).set(second, conflict);
+		relations.get(second).set(first, conflict);
+	}
+
+	// Shared accounts become columns: hotspots, then other fixed, then keyed.
+	const rank = (node) => hotspots.has(node.id) ? 0 : node.class === "fixed" ? 1 : 2;
+	const columns = data.nodes.filter((node) => node.class !== "caller").sort((a, b) => rank(a) - rank(b));
+
+	const locks = new Map(data.instructions.map((instruction) => {
+		const byNode = new Map();
+		for (const [list, write] of [[instruction.writes, true], [instruction.reads, false]]) {
+			for (const lock of list) {
+				const seen = byNode.get(lock.node);
+				byNode.set(lock.node, {
+					write: write || (seen?.write ?? false),
+					signer: lock.signer || (seen?.signer ?? false),
+					optional: lock.optional && (seen?.optional ?? true),
+				});
+			}
+		}
+		return [instruction.name, byNode];
+	}));
+
+	// The hotspot's cost as prose with each instruction set in code, ready
+	// for `append`.
+	const cost = (hotspot) => {
+		const { writers, readers } = hotspot;
+		const parts = ["Every "];
+		writers.forEach((name, index) => {
+			if (index > 0) parts.push(index < writers.length - 1 ? ", " : writers.length > 2 ? ", and " : " and ");
+			parts.push(el("code", "", name));
+		});
+		parts.push(" in the cluster runs one at a time");
+		if (readers.length === 1) parts.push("; ", el("code", "", readers[0]), " waits for each one");
+		if (readers.length > 1) parts.push(`; the ${readers.length} instructions that read it wait for each one`);
+		parts.push(".");
+		return parts;
+	};
+	const costLine = (className, hotspot) => {
+		const line = el("span", className);
+		line.append(...cost(hotspot));
+		return line;
+	};
+
+	function renderHeader() {
+		document.getElementById("program-name").textContent = data.program;
+		document.getElementById("program-id").textContent = data.programId;
+		const counts = document.getElementById("counts");
+		const denied = data.hotspots.filter((hotspot) => !hotspot.allowed).length;
+		for (const [value, label, hot] of [
+			[data.instructions.length, "instructions", false],
+			[data.nodes.length, "accounts", false],
+			[data.nodes.filter((node) => node.pda).length, "PDAs", false],
+			[data.hotspots.length, "hotspots", denied > 0],
+		]) {
+			const item = el("li", hot ? "is-hot" : "");
+			item.append(el("strong", "", String(value)), el("span", "", label));
+			counts.append(item);
+		}
+	}
+
+	function renderHotspots() {
+		const target = document.getElementById("hotspots");
+		const allowed = data.hotspots.length - data.hotspots.filter((hotspot) => !hotspot.allowed).length;
+		document.getElementById("hotspot-note").textContent = data.hotspots.length ? `${plural(data.hotspots.length, "fixed account")}, ${allowed} allowed` : "";
+		if (!data.hotspots.length) {
+			target.append(el("p", "calm", "No instruction writes an account with a fixed address, so unrelated users never queue behind each other."));
+			return;
+		}
+		const list = el("ul", "hotspots");
+		for (const hotspot of data.hotspots) {
+			const button = el("button", `hotspot${hotspot.allowed ? " is-allowed" : ""}`);
+			button.type = "button";
+			button.append(
+				el("span", "hotspot-name", hotspot.allowed ? `${hotspot.name} (allowed)` : hotspot.name),
+				costLine("hotspot-cost", hotspot),
+				el("span", "hotspot-meta", `${plural(hotspot.writers.length, "writer")} · ${plural(hotspot.readers.length, "reader")}`),
+			);
+			button.addEventListener("click", () => selectNode(hotspot.node));
+			const item = el("li");
+			item.append(button);
+			list.append(item);
+		}
+		target.append(list);
+	}
+
+	function renderChart() {
+		const head = el("thead");
+		const headRow = el("tr");
+		headRow.append(el("th", "corner", "Instruction"));
+		columns.forEach((node, index) => {
+			const th = el("th");
+			th.scope = "col";
+			th.dataset.node = node.id;
+			const lever = el("button", `lever${hotspots.has(node.id) ? " is-hot" : node.class === "keyed" ? " is-keyed" : ""}`);
+			lever.type = "button";
+			lever.setAttribute("aria-label", `${node.name}, ${hotspots.has(node.id) ? "hotspot" : `${node.class} account`}`);
+			lever.append(el("span", "lever-label", node.name), el("span", "lever-number", String(index + 1)));
+			lever.addEventListener("click", () => selectNode(node.id));
+			lever.addEventListener("keydown", (event) => moveFocus(event, "button.lever", "ArrowLeft", "ArrowRight"));
+			th.append(lever);
+			headRow.append(th);
+		});
+		const spare = el("th");
+		spare.scope = "col";
+		const spareLever = el("span", "lever is-spare");
+		spareLever.append(el("span", "lever-label", "caller-chosen"));
+		spare.append(spareLever);
+		headRow.append(spare);
+		head.append(headRow);
+
+		const body = el("tbody");
+		data.instructions.forEach((instruction, index) => {
+			const row = el("tr");
+			row.dataset.instruction = instruction.name;
+			row.style.setProperty("--i", String(index));
+			const rowHead = el("th", "row-head");
+			rowHead.scope = "row";
+			const button = el("button", "row-button");
+			button.type = "button";
+			button.title = instruction.name;
+			button.append(el("span", "row-number", String(index + 1)), el("span", "row-name", instruction.name));
+			button.addEventListener("click", () => selectInstruction(instruction.name));
+			button.addEventListener("focus", () => highlight({ instruction: instruction.name }));
+			button.addEventListener("blur", () => highlight(selection));
+			button.addEventListener("keydown", (event) => moveFocus(event, ".row-button", "ArrowUp", "ArrowDown"));
+			rowHead.append(button);
+			row.append(rowHead);
+			row.addEventListener("pointerenter", () => highlight({ instruction: instruction.name }));
+
+			const byNode = locks.get(instruction.name);
+			for (const node of columns) {
+				const cell = el("td");
+				cell.dataset.node = node.id;
+				if (hotspots.has(node.id)) cell.classList.add("is-hot-column");
+				const lock = byNode.get(node.id);
+				if (lock) {
+					const mark = el("span", `mark${lock.write ? " is-write" : ""}${lock.signer ? " is-signer" : ""}${lock.optional ? " is-optional" : ""}`);
+					mark.setAttribute("role", "img");
+					mark.setAttribute("aria-label", `${lock.write ? "writes" : "reads"} ${node.name}${lock.signer ? ", signs" : ""}${lock.optional ? ", optional" : ""}`);
+					cell.append(mark);
+				}
+				row.append(cell);
+			}
+			const callers = [...instruction.writes, ...instruction.reads].filter((lock) => nodes.get(lock.node).class === "caller");
+			const writes = callers.filter((lock) => instruction.writes.includes(lock)).length;
+			row.append(el("td", "spare-cell", callers.length ? `${writes}w ${callers.length - writes}r` : "–"));
+			body.append(row);
+		});
+		body.addEventListener("pointerleave", () => highlight(selection));
+		chart.append(head, body);
+	}
+
+	function moveFocus(event, selector, previous, next) {
+		const all = [...chart.querySelectorAll(selector)];
+		const index = all.indexOf(event.currentTarget);
+		const targets = { [previous]: index - 1, [next]: index + 1, Home: 0, End: all.length - 1 };
+		if (!(event.key in targets)) return;
+		event.preventDefault();
+		all[Math.max(0, Math.min(all.length - 1, targets[event.key]))].focus();
+	}
+
+	const setData = (element, key, value) => {
+		if (value) element.dataset[key] = value;
+		else delete element.dataset[key];
+	};
+
+	// Light up what a row or a lever touches. For an instruction: every row
+	// it conflicts with and the accounts behind each conflict. For an
+	// account: every row that locks it. Everything else fades.
+	function highlight({ instruction, node } = {}) {
+		chart.classList.toggle("is-tracing", Boolean(instruction || node));
+		const related = instruction ? relations.get(instruction) : new Map();
+		const causes = new Map();
+		for (const conflict of related.values()) {
+			for (const id of conflict.nodes) {
+				if (causes.get(id) !== "always") causes.set(id, conflict.kind);
+			}
+		}
+		for (const row of chart.tBodies[0].rows) {
+			const name = row.dataset.instruction;
+			const lock = node ? locks.get(name).get(node) : undefined;
+			setData(row, "relation", name === instruction ? "self" : related.get(name)?.kind);
+			setData(row, "touch", lock && (lock.write ? "write" : "read"));
+		}
+		for (const cell of chart.querySelectorAll("[data-node]")) {
+			setData(cell, "cause", causes.get(cell.dataset.node));
+			cell.toggleAttribute("data-selected", cell.dataset.node === node);
+		}
+	}
+
+	// The panel's subject, which the chart returns to when the pointer leaves.
+	let selection = {};
+
+	function markSelection(instruction, node) {
+		const setCurrent = (button, current) => {
+			if (current) button.setAttribute("aria-current", "true");
+			else button.removeAttribute("aria-current");
+		};
+		for (const row of chart.tBodies[0].rows) {
+			setCurrent(row.querySelector(".row-button"), row.dataset.instruction === instruction);
+		}
+		for (const lever of chart.tHead.querySelectorAll("button.lever")) {
+			setCurrent(lever, lever.parentElement.dataset.node === node);
+		}
+	}
+
+	function heading(eyebrow, title, badges) {
+		panel.replaceChildren();
+		panel.append(el("p", "eyebrow", eyebrow), el("h2", "", title));
+		const row = el("p");
+		for (const [text, kind] of badges) row.append(el("span", `badge is-${kind}`, text), " ");
+		if (badges.length) panel.append(row);
+	}
+
+	function docs(lines) {
+		const text = lines.join(" ").trim();
+		if (text) panel.append(el("p", "docs", text));
+	}
+
+	function linkList(title, entries) {
+		if (!entries.length) return;
+		panel.append(el("h3", "", title));
+		const links = el("div", "links");
+		for (const [label, onClick, note] of entries) {
+			const wrap = el("span");
+			const link = el("button", "link", label);
+			link.type = "button";
+			link.addEventListener("click", onClick);
+			wrap.append(link);
+			if (note) wrap.append(el("span", "meta", ` ${note}`));
+			links.append(wrap);
+		}
+		panel.append(links);
+	}
+
+	function selectInstruction(name) {
+		selection = { instruction: name };
+		markSelection(name, null);
+		highlight(selection);
+		const detail = details.get(name);
+		heading("Instruction", name, []);
+		docs(detail.docs);
+
+		const conflicts = [...relations.get(name)];
+		for (const [kind, title] of [["always", "Never runs alongside"], ["may", "May wait for"]]) {
+			linkList(title, conflicts.filter(([, conflict]) => conflict.kind === kind).map(([other, conflict]) => [
+				other === name ? `${other} (itself)` : other,
+				() => selectInstruction(other),
+				`via ${conflict.nodes.map((id) => nodes.get(id).name).join(", ")}`,
+			]));
+		}
+		if (!conflicts.length) panel.append(el("p", "docs", "No write lock Pina can prove is shared with any other instruction."));
+
+		panel.append(el("h3", "", "Accounts"));
+		const list = el("ul", "items");
+		for (const account of detail.accounts) {
+			const node = nodes.get(account.node);
+			const item = el("li", "item");
+			const head = el("div", "item-head");
+			const slot = el("button", "link", account.slot);
+			slot.type = "button";
+			slot.addEventListener("click", () => selectNode(account.node));
+			const strong = el("strong");
+			strong.append(slot);
+			head.append(strong, el("span", `chip${account.writable ? " is-write" : ""}`, account.writable ? "writes" : "reads"));
+			if (account.signer) head.append(el("span", "chip is-signer", "signs"));
+			if (account.optional) head.append(el("span", "chip", "optional"));
+			head.append(el("span", `badge is-${hotspots.has(node.id) ? "hot" : node.class}`, node.class));
+			item.append(head);
+			if (account.pda) item.append(el("span", "meta", `PDA ${account.pda}`));
+			if (account.constraints.length) item.append(el("span", "meta", account.constraints.join(" · ")));
+			if (account.docs.length) item.append(el("span", "docs", account.docs.join(" ")));
+			list.append(item);
+		}
+		panel.append(list);
+
+		if (detail.arguments.length) {
+			panel.append(el("h3", "", "Arguments"));
+			const list = el("ul", "items");
+			for (const argument of detail.arguments) {
+				const item = el("li", "item");
+				const head = el("div", "item-head");
+				head.append(el("strong", "", argument.name), el("span", "chip", argument.type));
+				item.append(head);
+				if (argument.docs.length) item.append(el("span", "docs", argument.docs.join(" ")));
+				list.append(item);
+			}
+			panel.append(list);
+		}
+	}
+
+	function selectNode(id) {
+		selection = { node: id };
+		highlight(selection);
+		markSelection(null, id);
+		const node = nodes.get(id);
+		const hotspot = hotspots.get(id);
+		const badges = [[node.class === "caller" ? "caller-chosen" : node.class, node.class]];
+		if (hotspot) badges.push([hotspot.allowed ? "allowed hotspot" : "hotspot", "hot"]);
+		heading(node.pda ? "PDA account" : "Account", node.name, badges);
+
+		const type = node.pda ? types.get(node.pda) : undefined;
+		if (type) {
+			panel.append(el("p", "meta", `Account type ${type.name}`));
+			docs(type.docs);
+		}
+		if (hotspot) panel.append(costLine("cost", hotspot));
+		if (node.class === "keyed") panel.append(el("p", "docs", "Two transactions lock the same account only when they pass the same seed values."));
+		if (node.class === "caller") panel.append(el("p", "docs", "The caller picks this address, so Pina never compares it across transactions."));
+
+		if (node.seeds.length) {
+			panel.append(el("h3", "", "Derivation"));
+			const list = el("ol", "derivation");
+			for (const seed of node.seeds) {
+				const item = el("li", seed.kind === "variable" ? "is-variable" : "");
+				if (seed.kind === "variable") {
+					item.append(el("span", "slot", `${seed.name}: ${seed.type}`), el("small", "", "seed you pass"));
+				} else {
+					item.append(el("span", "", seed.text === null ? `0x${seed.hex}` : `"${seed.text}"`));
+					if (seed.text !== null) item.append(el("small", "", `0x${seed.hex}`));
+				}
+				list.append(item);
+			}
+			const programItem = el("li");
+			programItem.append(el("span", "", "program id"), el("small", "", data.programId));
+			list.append(programItem);
+			const result = el("li", "is-result");
+			const pending = node.class === "fixed" ? "not derivable from these seeds" : "one address per set of seed values";
+			result.append(el("span", "", node.address ?? pending));
+			list.append(result);
+			panel.append(list);
+		} else if (node.address) {
+			panel.append(el("h3", "", "Address"), el("p", "address", node.address));
+		}
+
+		const users = data.instructions
+			.map((instruction) => [instruction.name, locks.get(instruction.name).get(id)])
+			.filter(([, lock]) => lock);
+		linkList("Written by", users.filter(([, lock]) => lock.write).map(([name]) => [name, () => selectInstruction(name), ""]));
+		linkList("Read by", users.filter(([, lock]) => !lock.write).map(([name]) => [name, () => selectInstruction(name), ""]));
+
+		if (type && type.fields.length) {
+			panel.append(el("h3", "", "Fields"));
+			const fields = el("ul", "items");
+			for (const field of type.fields) {
+				const item = el("li", "item");
+				const head = el("div", "item-head");
+				head.append(el("strong", "", field.name), el("span", "chip", field.type));
+				item.append(head);
+				fields.append(item);
+			}
+			panel.append(fields);
+		}
+	}
+
+	function introduce() {
+		heading("Reading the chart", "Pick a row or a lever", []);
+		panel.append(
+			el("p", "", "Hover or focus an instruction to see every instruction it blocks. Red rows can never run at the same time; amber rows collide only when they pass the same seeds."),
+			el("p", "docs", "Columns are accounts. A red lever is a hotspot: a fixed address some instruction writes, so all of that traffic runs one transaction at a time."),
+		);
+	}
+
+	document.addEventListener("click", (event) => {
+		const button = event.target.closest("[data-copy-target]");
+		if (!button || !navigator.clipboard) return;
+		navigator.clipboard.writeText(document.getElementById(button.dataset.copyTarget).textContent).then(() => {
+			button.textContent = "Copied";
+			setTimeout(() => { button.textContent = "Copy"; }, 1200);
+		}, () => {});
+	});
+
+	renderHeader();
+	renderHotspots();
+	renderChart();
+	introduce();
+})();
+</script>
+</body>
+</html>

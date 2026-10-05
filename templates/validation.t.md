@@ -137,7 +137,7 @@ self.system_program.assert_program(&system::ID)?;
 
 You can also write an ordinary function returning `ProgramResult`, call it at the boundary, or manually implement `PinaValidate` when the `validation` feature is enabled. Prefer the form that keeps the security contract easiest to audit.
 
-Codama generation supports both styles. `pina idl` reads declarative `signer` and `writable` rules plus known `address`, `program`, and `sysvar` constants from `#[derive(Accounts)]`. Existing direct `assert_signer`, `assert_writable`, `assert_address`, and PDA validation-chain inference remains supported. Runtime-only value bounds, owners, data lengths, relationships, and custom hooks do not have Codama account-meta equivalents; they stay on-chain constraints and do not prevent IDL or client generation.
+Codama generation supports both styles. `pina idl` reads declarative `signer` and `writable` rules plus known `address`, `program`, and `sysvar` constants from `#[derive(Accounts)]`. Direct `assert_signer`, `assert_writable`, `assert_address`, and PDA validation-chain inference remains supported, including validation inside module-level helper functions the processor passes an account to, and typed loads of `#[pda]` account types such as `as_account::<T>()`. Runtime-only value bounds, owners, data lengths, relationships, and custom hooks do not have Codama account-meta equivalents; they stay on-chain constraints and do not prevent IDL or client generation.
 
 <!-- {/pinaValidationAlternativesAndCodegen} -->
 

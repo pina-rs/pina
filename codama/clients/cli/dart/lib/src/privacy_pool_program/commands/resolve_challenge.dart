@@ -18,8 +18,8 @@ final class ResolveChallengeCommand extends Command<void> {
       )
       ..addOption(
         'pool_config',
-        mandatory: true,
-        help: "The pool_config account",
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
       )
       ..addOption(
         'disclosure_request',
@@ -39,10 +39,9 @@ final class ResolveChallengeCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final authority = context.payerAddress;
-    final poolConfig = pubkey(
-      '--pool-config',
-      results['pool_config']! as String,
-    );
+    final poolConfig = (results['pool_config'] as String?) != null
+        ? pubkey('--pool-config', results['pool_config']! as String)
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final disclosureRequest = pubkey(
       '--disclosure-request',
       results['disclosure_request']! as String,

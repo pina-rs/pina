@@ -43,6 +43,7 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
+import { findPoolConfigPda, findRequesterRegistryPda } from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
@@ -170,6 +171,194 @@ export function getRequestDisclosureInstructionDataCodec(): FixedSizeCodec<
 		getRequestDisclosureInstructionDataEncoder(),
 		getRequestDisclosureInstructionDataDecoder(),
 	);
+}
+
+export type RequestDisclosureAsyncInput<
+	TAccountRequester extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+> = {
+	requester: TAccountRequester;
+	poolConfig?: TAccountPoolConfig;
+	requesterRegistry?: TAccountRequesterRegistry;
+	noteCommitment: TAccountNoteCommitment;
+	disclosureRequest: TAccountDisclosureRequest;
+	systemProgram: TAccountSystemProgram;
+	clock: TAccountClock;
+	bump: RequestDisclosureInstructionDataArgs["bump"];
+	nonce: RequestDisclosureInstructionDataArgs["nonce"];
+	tier: RequestDisclosureInstructionDataArgs["tier"];
+	commitment: RequestDisclosureInstructionDataArgs["commitment"];
+	noticeLen: RequestDisclosureInstructionDataArgs["noticeLen"];
+	notice: RequestDisclosureInstructionDataArgs["notice"];
+	legalBasisHash: RequestDisclosureInstructionDataArgs["legalBasisHash"];
+};
+
+export async function getRequestDisclosureInstructionAsync<
+	TAccountRequester extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RequestDisclosureAsyncInput<
+		TAccountRequester,
+		TAccountPoolConfig,
+		TAccountRequesterRegistry,
+		TAccountNoteCommitment,
+		TAccountDisclosureRequest,
+		TAccountSystemProgram,
+		TAccountClock
+	>,
+	config?: { programAddress?: TProgramAddress },
+): Promise<
+	RequestDisclosureInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountRequester,
+			InstructionAccountInputAddress<TAccountRequester>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
+	>
+> {
+	// Program address.
+	const programAddress = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		requester: {
+			value: input.requester ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		requesterRegistry: {
+			value: input.requesterRegistry ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		noteCommitment: {
+			value: input.noteCommitment ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		disclosureRequest: {
+			value: input.disclosureRequest ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.poolConfig.value) {
+		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+	}
+	if (!accounts.requesterRegistry.value) {
+		accounts.requesterRegistry.value = await findRequesterRegistryPda({
+			programAddress,
+		});
+	}
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("requester", accounts.requester),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
+			getAccountMeta("noteCommitment", accounts.noteCommitment),
+			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("clock", accounts.clock),
+		],
+		data: getRequestDisclosureInstructionDataEncoder().encode(
+			args as RequestDisclosureInstructionDataArgs,
+		),
+		programAddress,
+	} as RequestDisclosureInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountRequester,
+			InstructionAccountInputAddress<TAccountRequester>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNoteCommitment,
+			InstructionAccountInputAddress<TAccountNoteCommitment>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
+	>);
 }
 
 export type RequestDisclosureInput<

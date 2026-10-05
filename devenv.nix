@@ -1022,6 +1022,15 @@ in
           -- \
           --ignored \
           --nocapture
+        # `pina rehearse` replays real counter traffic between two Surfpool
+        # instances, using the counter and its rehearsal variant built above.
+        cargo test \
+          --locked \
+          -p pina_cli \
+          --test rehearse_surfpool \
+          -- \
+          --ignored \
+          --nocapture
         # The hand-written migrations suite is not driven by `pina test`, so it
         # needs the artifact path the build script just produced.
         migrations_out="''${SBF_OUT_DIR:-$DEVENV_ROOT/target/surfpool/examples}"
@@ -1157,6 +1166,7 @@ in
           -p pina_cpi_renderer \
           -p pina_macros \
           -p pina_lints \
+          -p pina_profile \
           -p pina_root \
           -p prop_amm_program \
           -p profile_program \

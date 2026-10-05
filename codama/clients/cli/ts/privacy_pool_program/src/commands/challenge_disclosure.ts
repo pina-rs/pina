@@ -30,7 +30,6 @@ export const challengeDisclosureCommand = registerGlobals(
 		"--note-commitment <noteCommitment>",
 		"The `note_commitment` account",
 	)
-	.requiredOption("--viewer <viewer>", "The `viewer` account")
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
@@ -41,7 +40,7 @@ export const challengeDisclosureCommand = registerGlobals(
 				options.disclosureRequest,
 			),
 			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
-			viewer: pubkey("--viewer", options.viewer),
+			viewer: context.payer,
 			clock: pubkey("--clock", options.clock),
 		};
 		const instruction = getChallengeDisclosureInstruction(

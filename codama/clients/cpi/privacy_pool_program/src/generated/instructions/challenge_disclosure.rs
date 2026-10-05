@@ -30,7 +30,7 @@ pub struct ChallengeDisclosure<'account> {
 	pub note_commitment: &'account AccountView,
 
 	/// CPI account `viewer`.
-	/// Required privileges: read-only.
+	/// Required privileges: read-only and signer.
 	pub viewer: &'account AccountView,
 
 	/// CPI account `clock`.
@@ -81,7 +81,7 @@ impl<'account> ChallengeDisclosure<'account> {
 		let accounts: [CpiHandle<'_>; 4] = [
 			CpiHandle::writable(self.disclosure_request)?,
 			CpiHandle::readonly(self.note_commitment),
-			CpiHandle::readonly(self.viewer),
+			CpiHandle::readonly_signer(self.viewer),
 			CpiHandle::readonly(self.clock),
 		];
 		let data = self.ix.to_bytes()?;

@@ -27,8 +27,8 @@ final class SetVerificationKeyCommand extends Command<void> {
       ..addOption('ic3', mandatory: true, help: "ic3")
       ..addOption(
         'pool_config',
-        mandatory: true,
-        help: "The pool_config account",
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
       )
       ..addOption(
         'verifying_key_account',
@@ -53,10 +53,9 @@ final class SetVerificationKeyCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final authority = context.payerAddress;
-    final poolConfig = pubkey(
-      '--pool-config',
-      results['pool_config']! as String,
-    );
+    final poolConfig = (results['pool_config'] as String?) != null
+        ? pubkey('--pool-config', results['pool_config']! as String)
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final verifyingKeyAccount = pubkey(
       '--verifying-key-account',
       results['verifying_key_account']! as String,

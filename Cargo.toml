@@ -255,6 +255,7 @@ light-poseidon = { default-features = false, version = "0.4.0" }
 flate2 = { default-features = true, version = "1.1.2" }
 fs2 = { default-features = false, version = "^0.4" }
 getrandom = { default-features = false, version = "0.4.2" }
+gimli = { default-features = false, version = "^0.34.0" }
 heck = { default-features = false, version = "^0.5" }
 http = { default-features = false, version = "^1" }
 insta = { default-features = false, version = "^1" }
@@ -289,6 +290,7 @@ quote = { default-features = false, version = "^1" }
 # `rand_core` and does not satisfy the bound. Move this with ark-std, not alone.
 rand = { default-features = false, version = "0.8.5" }
 rayon = { default-features = false, version = "^1.10" }
+rustc-demangle = { default-features = false, version = "^0.1.28" }
 same-file = { default-features = false, version = "^1" }
 schemars = { default-features = false, version = "^1", features = ["derive"] }
 semver = { default-features = false, version = "^1" }

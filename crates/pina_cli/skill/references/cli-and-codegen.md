@@ -17,6 +17,8 @@ pina idl publish --help
 pina docs --help
 pina init --help
 pina lint --help
+pina locks --help
+pina map --help
 pina test --help
 pina dev --help
 pina keys --help
@@ -108,6 +110,20 @@ pina explain --transaction-file ./failed.json --json
 The report names the failing instruction, decodes the error (built-in, `PinaProgramError`, or the program's `#[error]` variant), and ranks candidate field rules with their `path:line`. Trust a candidate by its `confidence`: `confirmed` is proven by the transaction's flags, account counts, or keys; `checked_against_current_state` reads state that may have changed after the transaction; `possible` needs runtime values such as PDA seeds or argument values. The default network is localnet, so pass `--network` or `--rpc-url` for other clusters. A transaction rejected by preflight never lands and cannot be explained by signature; use the logs from simulation, or send with preflight disabled on a test validator.
 
 Treat program identity changes as security-sensitive. `pina keys sync` validates an existing Ed25519 keypair and updates exactly one parsed `declare_id!`. `pina keys new` creates a local identity; only `pina keys new --force` may rotate an existing one. Never copy or print keypair bytes. On platforms where Pina cannot guarantee private permissions, generate the keypair with trusted platform tooling and then run `pina keys sync --keypair <path>`.
+
+## Write-lock contention
+
+Check which instructions can never run in parallel before a state layout hardens:
+
+```sh
+pina locks
+pina locks --json
+pina locks --deny-hotspots
+```
+
+A writable PDA whose seeds are all constants has one address, so every instruction that writes it serializes all of its traffic across the cluster. `pina locks` lists these hotspots with their derived addresses, writers, and readers, then an instruction conflict matrix (`●` always, `◐` may, `·` none). Fix a hotspot by sharding the PDA with a variable seed, moving hot fields into per-user accounts, or declaring accounts an instruction only reads as read-only. Accept an intentional singleton, such as an admin configuration, by listing its name in `[locks] allow` in `pina.toml`; an entry that names no hotspot fails the command. `--deny-hotspots` exits with status 1 on any hotspot that is not allowed.
+
+`pina map` renders the same analysis as one self-contained HTML page (default `<target>/pina/map.html`; stdout is only the path, so `open "$(pina map)"` works) for a human to explore: a lock chart of instructions against accounts, hotspot plates, conflict tracing, and per-instruction and per-account detail. Agents should read `pina map --json` or `pina locks --json` rather than the HTML.
 
 ## Deterministic build artifacts
 
@@ -217,6 +233,19 @@ pina profile ./target/deploy/counter_program.so --json --output ./profile.json
 
 When the path is omitted, Pina discovers `<cargo-target>/deploy/<library-name>.so`. The report is a static estimate, not a validator execution trace. Use it for deterministic comparisons and investigate material changes in context. Output files are written atomically and cannot alias the input binary through hardlinks or linked paths.
 
+## Trace-driven CU profiling
+
+To find where an instruction's compute units actually go, trace the project's Mollusk tests:
+
+```sh
+pina profile trace
+pina profile trace --filter increment --instruction increment
+pina profile trace --json > trace.json
+pina profile trace --folded > stacks.folded
+```
+
+The program's `mollusk-svm` dev-dependency must enable `features = ["register-tracing"]`; when no trace is recorded, the error prints the exact line to add. Tests must load the program by name so `SBF_OUT_DIR` can point at the traced build. Every executed SBF instruction costs 1 CU; syscalls are listed by name and call site but their runtime charges are not included. Read the hottest lines and inclusive function costs before changing code, and treat a "debug information changed code generation" warning as a sign that counts are approximate for the deployed build. `--trace-dir <target>/pina/trace/traces` re-analyzes the last run without rebuilding.
+
 # Verified deployments
 
 Use the content-addressed record produced by the deterministic build. Never invent or override its repository, revision, paths, library, or Cargo feature set.
@@ -238,6 +267,20 @@ pina verify record \
 Use `pina verify record --export [AUTHORITY] --output verification.tx` when another signer or multisig must submit the transaction. Export performs Pina's deployed-hash preflight but never submits or rebuilds the repository, does not require `--yes` or `--acknowledge-mainnet`, and writes only the validated base58 or base64 transaction payload. Remote verification begins only after the exported transaction is submitted.
 
 `pina verify submit --program-id <ADDRESS> --uploader <ADDRESS>` submits an existing record to the official mainnet remote verifier. `pina verify status --program-id <ADDRESS>` is the corresponding read-only mainnet status query. Never place credentials in an RPC URL; the URL is necessarily visible in child-process arguments.
+
+## Rehearse an upgrade
+
+Before upgrading a deployed program, replay its recent traffic against the candidate:
+
+```sh
+pina rehearse --network devnet --build
+pina rehearse --network mainnet --limit 100 --json > rehearsal.json
+pina rehearse --rpc-url http://127.0.0.1:8899 --signature <SIGNATURE>
+```
+
+Pina fetches the program's recent transactions read-only, forks the same endpoint with Surfpool, and profiles every signed transaction against the deployed program and then the candidate on one frozen snapshot. Statuses are `unchanged`, `cu_changed` (informational), `state_changed`, `outcome_changed`, and `skipped`. A transaction that fails identically in both runs is skipped as `failed_in_both`: its state moved on and it says nothing about the upgrade. Different errors in both runs are an outcome change, because error codes are part of the program's contract.
+
+Exit code `2` means behaviour changed: inspect each `state_changed` account diff (fields are decoded from the IR) and each `outcome_changed` log excerpt before deploying. Use `--allow-changes` only for reviewed, intended changes. Exit code `3` means no transaction could be compared, so the upgrade is unverified: rehearse more or newer traffic rather than treating it as a pass. Exit code `1` is an operational failure, including any failed RPC request and a candidate the runtime refuses to load, which an upgrade would also reject. Requests are never retried, so do not loop the command against a rate-limited endpoint.
 
 ## Safe deployment
 

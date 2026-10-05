@@ -13,8 +13,16 @@ final class Realloc2Command extends Command<void> {
   Realloc2Command() {
     argParser
       ..addOption('len', mandatory: true, help: "len")
-      ..addOption('sample1', mandatory: true, help: "The sample1 account")
-      ..addOption('sample2', mandatory: true, help: "The sample2 account");
+      ..addOption(
+        'sample1',
+        mandatory: false,
+        help: "The sample1 account [default: derived]",
+      )
+      ..addOption(
+        'sample2',
+        mandatory: false,
+        help: "The sample2 account [default: derived]",
+      );
   }
 
   @override
@@ -29,8 +37,18 @@ final class Realloc2Command extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final authority = context.payerAddress;
-    final sample1 = pubkey('--sample1', results['sample1']! as String);
-    final sample2 = pubkey('--sample2', results['sample2']! as String);
+    final sample1 = (results['sample1'] as String?) != null
+        ? pubkey('--sample1', results['sample1']! as String)
+        : (await findSamplePda(
+            seeds: SampleSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
+    final sample2 = (results['sample2'] as String?) != null
+        ? pubkey('--sample2', results['sample2']! as String)
+        : (await findSamplePda(
+            seeds: SampleSeeds(authority: authority),
+            programAddress: context.programAddress,
+          )).$1;
     final lenValue = integer('--len', results['len']! as String);
     final instruction = getRealloc2Instruction(
       programAddress: context.programAddress,
