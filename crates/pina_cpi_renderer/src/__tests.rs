@@ -322,6 +322,30 @@ fn scaffold_never_overwrites_consumer_files() {
 		.unwrap_or_else(|error| panic!("reads: {error}"));
 	assert_eq!(lib_rs, "// pinned\n");
 
+	// The render did not write the consumer's files, so it does not record
+	// them, and a later overwrite leaves them in place.
+	let record = fs::read_to_string(crate_dir.join(".pina-generated.json"))
+		.unwrap_or_else(|error| panic!("reads: {error}"));
+	assert!(!record.contains("Cargo.toml"), "{record}");
+	assert!(!record.contains("src/lib.rs"), "{record}");
+
+	let overwrite = RenderConfig {
+		mode: RenderMode::Overwrite,
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &crate_dir, &overwrite)
+		.unwrap_or_else(|error| panic!("overwrites: {error}"));
+	assert_eq!(
+		fs::read_to_string(crate_dir.join("src/lib.rs"))
+			.unwrap_or_else(|error| panic!("reads: {error}")),
+		"// pinned\n"
+	);
+	assert!(
+		fs::read_to_string(crate_dir.join("Cargo.toml"))
+			.unwrap_or_else(|error| panic!("reads: {error}"))
+			.starts_with("[package]\nname = \"pinned\"")
+	);
+
 	fs::remove_dir_all(&crate_dir).unwrap_or_else(|error| panic!("cleans up: {error}"));
 }
 

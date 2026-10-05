@@ -131,12 +131,14 @@ fn load(root: &Path) -> BTreeSet<PathBuf> {
 }
 
 /// Renders record plain file paths, so `.` is as illegitimate as `..`: on its
-/// own it names the client root.
+/// own it names the client root. The record never lists a manifest, its own
+/// or a nested client's: a file snapshot sees the manifest the renderer just
+/// wrote, but each run rewrites a manifest in place rather than removing it.
 fn is_tracked_entry(path: &Path) -> bool {
 	!path.as_os_str().is_empty()
 		&& path
 			.components()
-			.all(|component| matches!(component, Component::Normal(_)))
+			.all(|component| matches!(component, Component::Normal(name) if name != MANIFEST_FILE))
 }
 
 #[cfg(test)]
@@ -171,6 +173,8 @@ mod tests {
 				PathBuf::from("lib/barrel.dart"),
 				PathBuf::from("../escape"),
 				PathBuf::from("./escape"),
+				PathBuf::from(MANIFEST_FILE),
+				Path::new("nested").join(MANIFEST_FILE),
 			],
 		);
 
@@ -181,6 +185,27 @@ mod tests {
 		assert!(
 			!contents.contains("escape"),
 			"untrusted entries are dropped"
+		);
+		assert!(
+			!contents.contains(MANIFEST_FILE),
+			"a manifest never records itself or a nested manifest: {contents}"
+		);
+	}
+
+	#[test]
+	fn a_self_entry_in_an_older_record_is_dropped_on_the_next_append() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+		put(
+			&root.join(MANIFEST_FILE),
+			"{\"paths\": [\".pina-generated.json\", \"index.ts\"]}",
+		);
+
+		append(root, &[PathBuf::from("helpers.ts")]);
+
+		assert_eq!(
+			read_manifest(root),
+			"{\n  \"paths\": [\n    \"helpers.ts\",\n    \"index.ts\"\n  ]\n}\n"
 		);
 	}
 

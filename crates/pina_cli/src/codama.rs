@@ -266,8 +266,12 @@ function isTrackedEntry(entry) {
 		return false;
 	}
 	// Renders record plain file paths, so `.` is never legitimate: on its own it
-	// names the client root, which a removal would then take as a whole.
-	return !entry.split(/[\\/]/).some((part) => part === ".." || part === "." || part === "");
+	// names the client root, which a removal would then take as a whole. A
+	// manifest, this root's or a nested client's, is rewritten rather than
+	// removed, so it is never a tracked entry either.
+	return !entry.split(/[\\/]/).some((part) =>
+		part === ".." || part === "." || part === "" || part === MANIFEST_FILE
+	);
 }
 
 function record(root, path) {

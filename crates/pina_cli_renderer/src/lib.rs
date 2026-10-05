@@ -149,23 +149,31 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	fs::write(crate_dir.join(MARKER_FILE), MARKER_CONTENT)
 		.map_err(|source| write_file_error(&crate_dir.join(MARKER_FILE), source))?;
 
-	// An update leaves the scaffold as the developer has it, but the scaffold
-	// stays tracked: it is still a file this renderer created.
 	let scaffold = if config.scaffold {
 		emit::render_scaffold(&model, &config.client_package, &config.client_path)
 	} else {
 		BTreeMap::new()
 	};
 
-	if mode != RenderMode::Update {
-		write_missing_files(crate_dir, &scaffold)?;
-	}
-
 	// Every path this renderer owns, whether this run wrote it or an earlier
 	// one did, so the next overwrite removes exactly these files.
 	let mut tracked = std::collections::BTreeSet::from([PathBuf::from(MARKER_FILE)]);
 	tracked.extend(files.keys().map(PathBuf::from));
-	tracked.extend(scaffold.keys().map(PathBuf::from));
+
+	if mode != RenderMode::Update {
+		tracked.extend(write_missing_files(crate_dir, &scaffold)?);
+	}
+
+	// An update leaves the scaffold as the developer has it, and a scaffold
+	// file an earlier render created stays tracked through it.
+	if let Some(previous) = &manifest {
+		tracked.extend(
+			scaffold
+				.keys()
+				.map(PathBuf::from)
+				.filter(|path| previous.tracks_file(crate_dir, path)),
+		);
+	}
 
 	generation_manifest::write(crate_dir, &tracked)
 }
@@ -383,7 +391,11 @@ fn write_files(crate_dir: &Path, files: &BTreeMap<String, String>) -> Result<()>
 	Ok(())
 }
 
-fn write_missing_files(crate_dir: &Path, files: &BTreeMap<String, String>) -> Result<()> {
+/// Write each file in `files` that does not exist yet, returning the paths
+/// written. An existing file is left alone and not returned: the developer
+/// may have written it, and Pina records only the files it wrote.
+fn write_missing_files(crate_dir: &Path, files: &BTreeMap<String, String>) -> Result<Vec<PathBuf>> {
+	let mut written = Vec::new();
 	for (relative, contents) in files {
 		let destination = crate_dir.join(relative);
 		if destination.exists() {
@@ -394,8 +406,9 @@ fn write_missing_files(crate_dir: &Path, files: &BTreeMap<String, String>) -> Re
 		}
 		fs::write(&destination, contents)
 			.map_err(|source| write_file_error(&destination, source))?;
+		written.push(PathBuf::from(relative));
 	}
-	Ok(())
+	Ok(written)
 }
 
 fn read_file_error(path: &Path, source: std::io::Error) -> RenderError {

@@ -68,9 +68,9 @@ trap '
 
 # `pina generate` keeps configured outputs inside the Git worktree, and it
 # refuses a worktree that holds the home directory, so a stand-in home has to
-# sit outside the repository.
+# sit outside the repository. `TMPDIR` may point inside it, so use `/tmp`.
 if [[ -z "${HOME:-}" ]]; then
-	HOME="$(mktemp -d "${TMPDIR:-/tmp}/pina-home-XXXXXX")"
+	HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
 	export HOME
 fi
 mkdir -p "$HOME"

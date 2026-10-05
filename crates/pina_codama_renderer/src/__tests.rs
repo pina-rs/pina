@@ -1368,6 +1368,48 @@ fn generation_modes_preserve_or_replace_scaffolds() {
 }
 
 #[test]
+fn hand_written_scaffold_files_are_never_tracked_or_overwritten() {
+	let root = load_fixture_root("hello_solana_program");
+	let crate_dir = unique_temp_dir("pina-codama-render-hand-written");
+	fs::create_dir_all(crate_dir.join("src"))
+		.unwrap_or_else(|error| panic!("src dir failed: {error}"));
+	fs::write(crate_dir.join("Cargo.toml"), "# consumer manifest\n")
+		.unwrap_or_else(|error| panic!("manifest write failed: {error}"));
+	fs::write(crate_dir.join("src/lib.rs"), "// consumer entrypoint\n")
+		.unwrap_or_else(|error| panic!("entrypoint write failed: {error}"));
+
+	// The overwrite refusal for an untracked tree tells the developer to
+	// render once without `overwrite`; that render must not claim their files.
+	render_root_node(&root, &crate_dir, &RenderConfig::default())
+		.unwrap_or_else(|error| panic!("initial render failed: {error}"));
+	let record = fs::read_to_string(crate_dir.join(".pina-generated.json"))
+		.unwrap_or_else(|error| panic!("record read failed: {error}"));
+	assert!(record.contains("src/generated/mod.rs"), "{record}");
+	assert!(!record.contains("Cargo.toml"), "{record}");
+	assert!(!record.contains("src/lib.rs"), "{record}");
+
+	let overwrite = RenderConfig {
+		mode: RenderMode::Overwrite,
+		..RenderConfig::default()
+	};
+	render_root_node(&root, &crate_dir, &overwrite)
+		.unwrap_or_else(|error| panic!("overwrite failed: {error}"));
+	assert_eq!(
+		fs::read_to_string(crate_dir.join("Cargo.toml"))
+			.unwrap_or_else(|error| panic!("manifest read failed: {error}")),
+		"# consumer manifest\n"
+	);
+	assert_eq!(
+		fs::read_to_string(crate_dir.join("src/lib.rs"))
+			.unwrap_or_else(|error| panic!("entrypoint read failed: {error}")),
+		"// consumer entrypoint\n"
+	);
+
+	fs::remove_dir_all(crate_dir)
+		.unwrap_or_else(|error| panic!("hand-written fixture cleanup failed: {error}"));
+}
+
+#[test]
 fn trees_without_a_manifest_keep_whole_directory_replacement() {
 	let root = load_fixture_root("hello_solana_program");
 	let crate_dir = unique_temp_dir("pina-codama-render-untracked");

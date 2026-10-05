@@ -1060,9 +1060,9 @@ in
         # which the nix shell does not export on every runner. The stand-in
         # sits outside the repository: `pina generate` keeps configured outputs
         # inside the Git worktree and refuses a worktree that holds the home
-        # directory.
+        # directory. `TMPDIR` may point inside the repository, so use `/tmp`.
         if [ -z "''${HOME:-}" ]; then
-          HOME="$(mktemp -d "''${TMPDIR:-/tmp}/pina-home-XXXXXX")"
+          HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
           export HOME
         fi
         mkdir -p "$HOME"

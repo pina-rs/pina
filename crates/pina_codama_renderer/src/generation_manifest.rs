@@ -45,6 +45,17 @@ impl GenerationManifest {
 		})
 	}
 
+	/// Return whether the record lists `path` and it is still a file under
+	/// `root`.
+	///
+	/// A render that leaves an existing scaffold file alone keeps it tracked
+	/// only through this check, so a file at a scaffold path that no earlier
+	/// render recorded stays the developer's.
+	pub(crate) fn tracks_file(&self, root: &Path, path: &Path) -> bool {
+		self.paths.iter().any(|entry| entry == path)
+			&& fs::symlink_metadata(root.join(path)).is_ok_and(|metadata| metadata.is_file())
+	}
+
 	/// Remove the tracked paths under `prefix` inside `root`.
 	///
 	/// Entries are re-validated here as well as at load time, so a manifest
@@ -106,12 +117,14 @@ fn manifest_entry(path: &Path) -> String {
 /// Return whether `path` is a plain relative entry a manifest may record.
 ///
 /// Renders record file paths made of normal components only, so `.` is as
-/// illegitimate as `..`: on its own it names the client root.
+/// illegitimate as `..`: on its own it names the client root. The record
+/// never lists a manifest, its own or a nested client's: each run rewrites a
+/// manifest in place, and a removal would erase the history it holds.
 fn is_tracked_entry(path: &Path) -> bool {
 	!path.as_os_str().is_empty()
 		&& path
 			.components()
-			.all(|component| matches!(component, Component::Normal(_)))
+			.all(|component| matches!(component, Component::Normal(name) if name != MANIFEST_FILE))
 }
 
 /// Remove directories that became empty up to, but never including, `root`.
@@ -237,7 +250,11 @@ mod tests {
 			"C:\\escape",
 			".",
 			"./foreign.txt",
+			MANIFEST_FILE,
+			"nested/.pina-generated.json",
 		]);
+		put(&root.join(MANIFEST_FILE), "{}");
+		put(&root.join("nested").join(MANIFEST_FILE), "{}");
 
 		let all = Path::new("");
 		GenerationManifest::remove_under(&manifest, root, all).unwrap_or_else(|e| panic!("{e}"));
@@ -251,8 +268,39 @@ mod tests {
 			"untracked file must survive"
 		);
 		assert!(
+			root.join(MANIFEST_FILE).is_file() && root.join("nested").join(MANIFEST_FILE).is_file(),
+			"manifests are never removed as tracked files"
+		);
+		assert!(
 			!root.join("src/generated").exists(),
 			"emptied directories are pruned"
+		);
+	}
+
+	#[test]
+	fn only_recorded_paths_that_are_still_files_are_tracked() {
+		let temp = tempfile::TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let root = temp.path();
+		put(&root.join("Cargo.toml"), "recorded");
+		put(&root.join("src/lib.rs"), "hand-written");
+		put(
+			&root.join("src/generated/mod.rs/inner.rs"),
+			"a directory now",
+		);
+		let manifest = manifest_with(&["Cargo.toml", "src/generated/mod.rs", "README.md"]);
+
+		assert!(manifest.tracks_file(root, Path::new("Cargo.toml")));
+		assert!(
+			!manifest.tracks_file(root, Path::new("src/lib.rs")),
+			"a file the record never listed stays the developer's"
+		);
+		assert!(
+			!manifest.tracks_file(root, Path::new("src/generated/mod.rs")),
+			"a recorded path that is no longer a file is not tracked"
+		);
+		assert!(
+			!manifest.tracks_file(root, Path::new("README.md")),
+			"a recorded file that was deleted is not tracked"
 		);
 	}
 

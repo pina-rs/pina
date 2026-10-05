@@ -10,13 +10,16 @@ use crate::write_file_error;
 
 /// Create the missing scaffold files around the generated sources.
 ///
-/// Returns the scaffold's paths relative to `crate_dir`, whether or not they
-/// already existed, because Pina owns those locations either way.
+/// Returns the paths this call created, relative to `crate_dir`. A file that
+/// already existed is left alone and not returned: the developer may have
+/// written it, and Pina records only the files it wrote.
 pub(crate) fn ensure_crate_scaffold(
 	crate_dir: &Path,
 	program_name: &str,
 	uses_compact_accounts: bool,
 ) -> Result<Vec<PathBuf>> {
+	let mut created = Vec::new();
+
 	fs::create_dir_all(crate_dir.join("src")).map_err(|source| {
 		RenderError::WriteFile {
 			path: crate_dir.to_path_buf(),
@@ -34,6 +37,7 @@ pub(crate) fn ensure_crate_scaffold(
 				}
 			},
 		)?;
+		created.push(PathBuf::from("src/lib.rs"));
 	}
 
 	let cargo_toml_path = crate_dir.join("Cargo.toml");
@@ -65,12 +69,10 @@ thiserror = {{ workspace = true, default-features = true }}
 		);
 		fs::write(&cargo_toml_path, cargo_toml)
 			.map_err(|source| write_file_error(&cargo_toml_path, source))?;
+		created.push(PathBuf::from("Cargo.toml"));
 	}
 
-	Ok(vec![
-		PathBuf::from("src/lib.rs"),
-		PathBuf::from("Cargo.toml"),
-	])
+	Ok(created)
 }
 
 pub(crate) fn write_files(base: &Path, files: BTreeMap<PathBuf, String>) -> Result<()> {

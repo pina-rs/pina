@@ -192,6 +192,17 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 			&config.generated_folder,
 			config.scaffold_dependency,
 		)?);
+
+		// A scaffold file an earlier render created stays tracked when this
+		// render leaves it alone.
+		if let Some(previous) = &manifest {
+			tracked.extend(
+				[Path::new("src/lib.rs"), Path::new("Cargo.toml")]
+					.into_iter()
+					.filter(|path| previous.tracks_file(crate_dir, path))
+					.map(Path::to_path_buf),
+			);
+		}
 	}
 
 	if config.delete_folder_before_rendering {

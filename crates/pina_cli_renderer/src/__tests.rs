@@ -169,6 +169,25 @@ fn rendering_without_a_scaffold_writes_and_tracks_sources_only() {
 		!record.contains("Cargo.toml"),
 		"a scaffold that was never written is not tracked: {record}"
 	);
+
+	// A manifest the developer adds afterwards is theirs: an overwrite that
+	// scaffolds around it neither replaces nor records it.
+	fs::write(root.join("Cargo.toml"), "# consumer manifest")
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+	let mut overwrite = config();
+	overwrite.mode = RenderMode::Overwrite;
+	for _ in 0..2 {
+		render_root_node(&fixture_root, &root, &overwrite)
+			.unwrap_or_else(|error| panic!("overwrite with a scaffold: {error}"));
+		assert_eq!(
+			fs::read_to_string(root.join("Cargo.toml"))
+				.unwrap_or_else(|error| panic!("read manifest: {error}")),
+			"# consumer manifest"
+		);
+	}
+	let record = fs::read_to_string(root.join(".pina-generated.json"))
+		.unwrap_or_else(|error| panic!("read record: {error}"));
+	assert!(!record.contains("Cargo.toml"), "{record}");
 }
 
 #[test]
