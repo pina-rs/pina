@@ -39,6 +39,7 @@ onlyBuiltDependencies:
 overrides:
   "brace-expansion@>=4.0.0 <5.0.12": 5.0.12
   "picomatch@>=4.0.0 <4.0.4": 4.0.4
+  "source-map-js@>=1.0.0 <1.2.2": 1.2.2
   "vite@>=7.0.0 <=7.3.4": 7.3.5
   "ws@>=8.0.0 <8.21.0": 8.21.0
 
