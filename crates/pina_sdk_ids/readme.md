@@ -3,7 +3,7 @@
 <p align="center">
 	<img
 		src="https://raw.githubusercontent.com/pina-rs/pina/main/.github/assets/logo.png"
-		alt="The Pina logo: a low-poly origami pineapple"
+		alt="Pina: a woven pineapple with an S at its centre"
 		width="140"
 	>
 </p>
