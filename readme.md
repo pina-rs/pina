@@ -4,7 +4,7 @@
 	<a href="./.github/assets/README.md">
 		<img
 			src="./.github/assets/logo.png"
-			alt="Pina: a woven pineapple with an S at its centre"
+			alt="Pina: a pineapple made from interlocking ribbons"
 			width="180"
 		>
 	</a>
