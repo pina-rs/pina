@@ -1,4 +1,4 @@
-# pina
+<h1 align="center">pina</h1>
 
 <p align="center">
 	<a href="./.github/assets/README.md">
