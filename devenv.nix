@@ -944,7 +944,7 @@ in
           "$DEVENV_ROOT/target/framework-comparison" \
           --update-doc
       '';
-      description = "Rebuild the Pina, Pinocchio, Quasar and Anchor v2 fixtures, measure size and compute units, and refresh docs/src/framework-comparison.md.";
+      description = "Rebuild the Pina, Pinocchio, Quasar, Anchor v1 and Anchor v2 fixtures, measure size and compute units, and refresh docs/src/framework-comparison.md and the readme comparison tables.";
       binary = "bash";
     };
     "benchmark:frameworks:check" = {

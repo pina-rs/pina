@@ -1,8 +1,8 @@
 # Framework comparison
 
-Builds the same two programs — a hello world and a PDA counter — with Pina, hand-written Pinocchio, Quasar, and Anchor v2, then records what each costs on-chain: deployed size in bytes and the compute units the instruction actually consumes.
+Builds the same two programs — a hello world and a PDA counter — with Pina, hand-written Pinocchio, Quasar, Anchor v1, and Anchor v2, then records what each costs on-chain: deployed size in bytes and the compute units the instruction actually consumes.
 
-The published tables live in [docs/src/framework-comparison.md](../../docs/src/framework-comparison.md). Regenerate them with one command:
+The published tables live in [docs/src/framework-comparison.md](../../docs/src/framework-comparison.md) and in the readme's generated region. Regenerate both with one command:
 
 ```sh
 devenv shell -- benchmark:frameworks
@@ -13,12 +13,12 @@ devenv shell -- benchmark:frameworks
 - `programs/<program>/<framework>/` — one standalone crate per row of the table. Each declares its own `[workspace]` so the foreign framework revisions they pin stay out of the root workspace lockfile.
 - `verifier/` — a host-side Mollusk harness that loads a compiled `.so`, runs the instruction flow, and reports the charged compute units. It also proves the flow worked, so a fast number from a program that errors out can never be recorded as a result.
 
-`scripts/benchmark-frameworks.ts` drives both: it builds every fixture with `cargo build-sbf --lto` under one shared release profile, runs the verifier, and rewrites the generated region of the docs page. Both cargo invocations pass `--locked`, which pins dependency resolution to the committed lockfiles; the toolchain and build environment can still differ between machines.
+`scripts/benchmark-frameworks.ts` drives both: it builds every fixture with `cargo build-sbf --lto` under one shared release profile, runs the verifier, and rewrites the generated regions of the docs page and the readme. Both cargo invocations pass `--locked`, which pins dependency resolution to the committed lockfiles; the toolchain and build environment can still differ between machines.
 
 ## Adding a framework or a program
 
 1. Add the crate under `programs/<program>/<framework>/`, with its own `[workspace]` and a pinned dependency revision.
-2. Add an entry to `frameworksFor()` in `scripts/benchmark-frameworks.ts`: the directory, the label shown in the table, the artifact stem, and the instruction data each instruction expects.
+2. Add an entry to `frameworksFor()` in `scripts/benchmark-frameworks.ts`: the directory, the label and version shown in the table, the artifact stem, and the instruction data each instruction expects.
 
 Instruction data is per framework because the frameworks disagree about how to name instructions. Pina, Pinocchio, and Quasar number them from zero; Anchor hashes the handler name into an eight-byte discriminator. Two details are worth knowing before editing those entries:
 

@@ -2,7 +2,7 @@
 //! flow, and proves the flow still works.
 //!
 //! The comparison harness compiles the same hello-world and counter semantics
-//! with four frameworks. Size alone is a poor proxy for cost, so every program
+//! with five frameworks. Size alone is a poor proxy for cost, so every program
 //! is executed here in a Mollusk VM and charged for the compute units it
 //! actually consumes.
 //!
@@ -20,7 +20,8 @@
 //! The counter's account layout is described on the command line rather than
 //! assumed, because the frameworks disagree: Pina, Pinocchio and Quasar store a
 //! one-byte discriminator then the bump then the count, while Anchor prefixes an
-//! eight-byte discriminator and pads its payload for alignment.
+//! eight-byte discriminator — packed to seventeen bytes under v1's borsh and
+//! padded to twenty-four under v2's alignment rules.
 //!
 //! Output is one JSON object on stdout. A non-zero exit means the program
 //! failed functionally, which the harness treats as a measurement error rather

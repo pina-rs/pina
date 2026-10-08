@@ -6,15 +6,15 @@ Deployed program size determines rent, and rent is paid in SOL. A Pina program i
 
 Same toolchain for every row: `cargo-build-sbf` (Agave 4.2.2), `sbpf-solana-solana` target, equivalent program semantics — a single-instruction hello world, and a PDA counter with `initialize`/`increment`.
 
-| Framework                   | Hello world | Counter   |
-| --------------------------- | ----------- | --------- |
-| Quasar                      | 2,520       | 7,808     |
-| Pinocchio (hand-written)    | 3,160       | 6,512     |
-| **Pina**                    | **1,616**   | **7,592** |
-| Anchor v2 (`lang-v2`, rc.1) | 1,880       | 8,696     |
-| Anchor (v1, 1.2.0)          | 55,752      | 122,160   |
+| Framework                | Hello world | Counter   |
+| ------------------------ | ----------- | --------- |
+| Quasar                   | 2,520       | 7,808     |
+| Pinocchio (hand-written) | 3,160       | 6,512     |
+| **Pina**                 | **1,616**   | **7,592** |
+| Anchor v2 (`lang-v2`)    | 1,880       | 8,696     |
+| Anchor v1                | 74,416      | 139,408   |
 
-[Framework comparison](./framework-comparison.md) holds the generated version of this table together with the compute units each instruction consumes, and `benchmark:frameworks` rebuilds and rewrites it. The headline: a v1 Anchor program is more than ten times the size of any of the others, and LTO makes it _larger_ rather than smaller.
+[Framework comparison](./framework-comparison.md) holds the generated version of this table — Anchor v1 at 1.2.1, Anchor v2 at 2.0.0-rc.1, Quasar at revision `b0de7db` — together with the compute units each instruction consumes, and `benchmark:frameworks` rebuilds and rewrites it. The headline: a v1 Anchor program is more than an order of magnitude larger than any of the others, and LTO makes it _larger_ rather than smaller.
 
 Pina's hello world is smaller than the hand-written Pinocchio program, which carries pinocchio's full account deserializer and its out-of-line error conversion. Its counter is 1,080 bytes over Pinocchio's, mostly derive-generated validation that the hand-written program does not perform.
 

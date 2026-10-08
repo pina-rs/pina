@@ -1,12 +1,12 @@
 # Framework comparison
 
-Two programs, built with four frameworks, measured two ways. Size decides what a deployment costs in rent; compute units decide how much of a transaction's budget the instruction spends. Both tables below are produced by one command:
+Two programs, built with five frameworks, measured two ways. Size decides what a deployment costs in rent; compute units decide how much of a transaction's budget the instruction spends. Both tables below are produced by one command:
 
 ```sh
 devenv shell -- benchmark:frameworks
 ```
 
-That command rebuilds every program and rewrites the generated region of this page, so the published numbers cannot drift from the code that produced them.
+That command rebuilds every program and rewrites the generated region of this page and of the repository readme, so the published numbers cannot drift from the code that produced them.
 
 ## What is measured
 
@@ -37,29 +37,33 @@ See [Program size](./program-size.md) for why those settings matter and what eac
 
 ### Hello world
 
-| Framework                   | Size (bytes) | `hello` CU | vs Pinocchio size |
-| --------------------------- | -----------: | ---------: | ----------------: |
-| Pina                        |        1,616 |        136 |              −49% |
-| Pinocchio (hand-written)    |        3,160 |        111 |               +0% |
-| Quasar                      |        2,520 |        115 |              −20% |
-| Anchor v2 (`lang-v2`, rc.1) |        1,880 |        127 |              −41% |
+| Framework                | Version       | Size (bytes) | `hello` CU | vs Pinocchio size |
+| ------------------------ | ------------- | -----------: | ---------: | ----------------: |
+| Pina                     | 0.23.0        |        1,616 |        136 |              −49% |
+| Pinocchio (hand-written) | 0.11.2        |        3,160 |        111 |               +0% |
+| Quasar                   | rev `b0de7db` |        2,520 |        115 |              −20% |
+| Anchor v1                | 1.2.1         |       74,416 |        421 |            +2255% |
+| Anchor v2 (`lang-v2`)    | 2.0.0-rc.1    |        1,880 |        127 |              −41% |
 
 ### Counter
 
-| Framework                   | Size (bytes) | `initialize` CU | `increment` CU | vs Pinocchio size |
-| --------------------------- | -----------: | --------------: | -------------: | ----------------: |
-| Pina                        |        7,592 |           1,694 |            360 |              +17% |
-| Pinocchio (hand-written)    |        6,512 |           1,490 |          1,721 |               +0% |
-| Quasar                      |        7,808 |           3,488 |            330 |              +20% |
-| Anchor v2 (`lang-v2`, rc.1) |        8,696 |           3,458 |          2,117 |              +34% |
+| Framework                | Version       | Size (bytes) | `initialize` CU | `increment` CU | vs Pinocchio size |
+| ------------------------ | ------------- | -----------: | --------------: | -------------: | ----------------: |
+| Pina                     | 0.23.0        |        7,592 |           1,694 |            360 |              +17% |
+| Pinocchio (hand-written) | 0.11.2        |        6,512 |           1,490 |          1,721 |               +0% |
+| Quasar                   | rev `b0de7db` |        7,808 |           3,488 |            330 |              +20% |
+| Anchor v1                | 1.2.1         |      139,408 |          12,676 |         10,374 |            +2041% |
+| Anchor v2 (`lang-v2`)    | 2.0.0-rc.1    |        8,696 |           3,458 |          2,117 |              +34% |
 
 <!-- END GENERATED: framework-comparison -->
 
 ## Reading the numbers
 
-**The account layouts are not identical in every row.** Pina, Pinocchio and Quasar store the counter as `discriminator, bump, count` — ten bytes. Anchor v2 prefixes an eight-byte discriminator, which makes its account twenty-four bytes after alignment, so its `initialize` pays more for the `create_account` CPI. That is inherent to the framework's account model rather than a tuning choice, and it is the main reason Anchor's counter numbers are not directly comparable instruction-for-instruction.
+**The account layouts are not identical in every row.** Pina, Pinocchio and Quasar store the counter as `discriminator, bump, count` — ten bytes. Anchor v1 prefixes an eight-byte discriminator and borsh-packs the payload, making its account seventeen bytes; Anchor v2 prefixes the same eight bytes but pads the payload out to its alignment, making it twenty-four. Both `initialize` rows pay more for the `create_account` CPI accordingly. That is inherent to each framework's account model rather than a tuning choice, and it is the main reason Anchor's counter numbers are not directly comparable instruction-for-instruction.
 
-**Pina and Pinocchio receive the PDA bump as an instruction argument**; Quasar and Anchor derive it from the declared seeds on-chain. Deriving a bump costs a PDA search the other two avoid, so `initialize` is not purely a framework overhead comparison.
+**Anchor v1's size is its dependency stack, not its logic.** The v1 line builds on `solana-program` with std, a heap, and borsh, so even a one-instruction hello world carries tens of kilobytes of runtime the SBF deployer uploads and rents. That is the cost the `no_std` frameworks in the other rows exist to avoid.
+
+**Pina and Pinocchio receive the PDA bump as an instruction argument**; Quasar and both Anchor lines derive it from the declared seeds on-chain. Deriving a bump costs a PDA search the other two avoid, so `initialize` is not purely a framework overhead comparison.
 
 **The Pinocchio row is the floor.** It is hand-written `pinocchio` with no framework at all, and it is the number a framework has to justify. Pina's gap to it is the cost of derive-generated dispatch and validation.
 
@@ -73,6 +77,6 @@ The distinction between the two builders is the one to keep in mind when reading
 devenv shell -- benchmark:frameworks
 ```
 
-The command needs the Agave SBF toolchain (for `cargo build-sbf`) and network access on the first run, because the Quasar and Anchor v2 programs depend on pinned revisions of their upstream repositories. Both revisions are pinned in the fixture manifests, and each fixture is a standalone crate so those dependencies never enter the workspace lockfile.
+The command needs the Agave SBF toolchain (for `cargo build-sbf`) and network access on the first run, because the Quasar and Anchor programs depend on pinned revisions or versions of their upstream releases. The Anchor v1 fixtures pin the latest stable `anchor-lang` and the v2 fixture pins the tag the current pre-release was cut from; Quasar pins a revision because it publishes no versioned crates. Every fixture is a standalone crate so those dependencies never enter the workspace lockfile.
 
 Regenerating rewrites the tables in whatever alignment the script emits, so follow it with `fix:format` to restore dprint's column alignment.

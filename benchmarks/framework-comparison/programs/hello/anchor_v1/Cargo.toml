@@ -1,0 +1,21 @@
+[package]
+name = "hello_anchor_v1"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = ["no-log-ix-name"]
+no-log-ix-name = []
+no-entrypoint = []
+
+[dependencies]
+anchor-lang = "=1.2.1"
+
+[lints.rust.unexpected_cfgs]
+level = "allow"
