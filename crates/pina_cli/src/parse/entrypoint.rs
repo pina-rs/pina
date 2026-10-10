@@ -234,6 +234,37 @@ pub fn has_process_instruction(file: &File) -> bool {
 	})
 }
 
+/// The doc comment on a hand-written `process_instruction` function.
+///
+/// The function is the program's entrypoint surface, so its doc comment
+/// documents the program itself and is lowered into the program-level IDL
+/// docs. Inner `mod` declarations are searched the same way
+/// [`extract_dispatch_map`] searches them.
+pub fn extract_process_instruction_docs(file: &File) -> Vec<String> {
+	for item in &file.items {
+		match item {
+			Item::Fn(f) if f.sig.ident == "process_instruction" => {
+				return crate::parse::doc_comments::extract_docs(&f.attrs);
+			}
+			Item::Mod(m) => {
+				let Some((_, items)) = &m.content else {
+					continue;
+				};
+				for inner in items {
+					if let Item::Fn(f) = inner
+						&& f.sig.ident == "process_instruction"
+					{
+						return crate::parse::doc_comments::extract_docs(&f.attrs);
+					}
+				}
+			}
+			_ => {}
+		}
+	}
+
+	Vec::new()
+}
+
 fn extract_from_fn_body(stmts: &[Stmt], entries: &mut Vec<DispatchEntry>) {
 	for stmt in stmts {
 		let Stmt::Expr(expr, _) = stmt else {
@@ -881,5 +912,62 @@ mod tests {
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
 		assert!(!has_dispatch_attribute(&file));
 		assert!(extract_dispatch_from_attribute(&file).is_empty());
+	}
+
+	#[test]
+	fn extracts_process_instruction_docs() {
+		// A top-level entrypoint function contributes its own doc comment.
+		let top_level = r#"
+			/// The hand-written dispatch documents the program.
+			pub fn process_instruction(
+				program_id: &Address,
+				accounts: &mut [AccountView],
+				data: &[u8],
+			) -> ProgramResult {
+				Ok(())
+			}
+		"#;
+		let file = syn::parse_file(top_level).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		assert_eq!(
+			extract_process_instruction_docs(&file),
+			vec!["The hand-written dispatch documents the program.".to_owned()]
+		);
+
+		// An entrypoint function inside a module is found the same way.
+		let in_module = r#"
+			/// Module docs that do not belong to the function.
+			pub mod entrypoint {
+				/// Module-wrapped dispatch docs.
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &mut [AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(in_module).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		assert_eq!(
+			extract_process_instruction_docs(&file),
+			vec!["Module-wrapped dispatch docs.".to_owned()]
+		);
+
+		// An undocumented function and an undocumented file both stay empty.
+		let undocumented = r#"
+			pub fn process_instruction(
+				program_id: &Address,
+				accounts: &mut [AccountView],
+				data: &[u8],
+			) -> ProgramResult {
+				Ok(())
+			}
+		"#;
+		let file = syn::parse_file(undocumented).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		assert!(extract_process_instruction_docs(&file).is_empty());
+
+		let file =
+			syn::parse_file("pub fn other() {}").unwrap_or_else(|e| panic!("parse failed: {e}"));
+		assert!(extract_process_instruction_docs(&file).is_empty());
 	}
 }

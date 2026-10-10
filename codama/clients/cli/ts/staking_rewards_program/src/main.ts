@@ -15,7 +15,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("staking-rewards-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for stakingRewardsProgram");
+	.description(
+		"Staking account and rewards-bookkeeping scaffold built with pina.\n\nThis example demonstrates the account and validation shape of a staking\nlifecycle:\n- initialize a rewards pool with a stake vault and a reward vault\n- open per-user positions\n- deposit stake tokens into the stake vault and withdraw them back out\n- update reward bookkeeping against a position account and release\naccrued rewards from the reward vault\n\nThis is not a staking product. Deposits and withdrawals do move real stake\ntokens to and from the pool's stake vault, and claims release real reward\ntokens from the reward vault, but the example still defines no reward\nemissions, funding, or solvency: the index only moves when the admin calls\n`SetRewardIndex`, and nothing refills the vaults. See the example README\nand the book's production-readiness guide before adapting it for\nproduction use.",
+	);
 program.addCommand(initializePoolCommand);
 program.addCommand(openPositionCommand);
 program.addCommand(depositCommand);

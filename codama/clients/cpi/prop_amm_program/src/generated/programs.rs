@@ -11,6 +11,26 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Prop AMM oracle example ported from Anchor v2's `prop-amm` benchmark.
+///
+/// The upstream benchmark combines a tiny oracle account with a hand-written
+/// assembly fast path for the hot `Update` instruction. This pina port keeps
+/// the program semantics and validation model, but intentionally stays inside
+/// the workspace's safe Rust constraints:
+///
+/// - no handwritten assembly
+/// - no unstable features
+/// - no `unsafe`
+///
+/// That means this example is best read as a **semantic port** and a
+/// framework-comparison fixture rather than a byte-for-byte benchmark clone.
+///
+/// ## Instructions
+///
+/// - `Initialize` — create and initialize an oracle account
+/// - `Update` — allow a fixed global updater to publish a new price
+/// - `RotateAuthority` — let the oracle authority rotate its control key
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const PROP_AMM_PROGRAM_ID: Address =
 	pina::address!("55555555555555555555555555555555555555555555");
 

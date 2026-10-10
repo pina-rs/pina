@@ -2,7 +2,7 @@
 	"name": "validation-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for validationProgram",
+	"description": "Complete declarative-validation example for Pina",
 	"type": "module",
 	"bin": {
 		"validation-program-cli": "./src/main.ts"

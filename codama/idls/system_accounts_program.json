@@ -7,6 +7,12 @@
 		"name": "systemAccountsProgram",
 		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 		"version": "0.0.0",
+		"docs": [
+			"Anchor `system-accounts` parity example ported to pina.",
+			"",
+			"Verifies a signer authority plus a wallet account owned by the system",
+			"program."
+		],
 		"instructions": [
 			{
 				"kind": "instructionNode",

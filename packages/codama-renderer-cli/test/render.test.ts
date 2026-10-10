@@ -59,6 +59,14 @@ describe("renderTypeScript", () => {
 		const main = files.get("src/main.ts")!;
 		expect(main).toContain("program.addCommand(initializeCommand);");
 		expect(main).toContain("program.addCommand(fetchCommand);");
+		// The program's own documentation becomes the app's description.
+		const model = extractCliModel(
+			JSON.parse(readFileSync(join(idls, "counter_program.json"), "utf8")),
+		);
+		expect(model.docs.length).toBeGreaterThan(0);
+		expect(main).toContain(
+			`.description(${JSON.stringify(model.docs.join("\n"))})`,
+		);
 
 		const client = files.get("src/client.ts")!;
 		expect(client).toContain(

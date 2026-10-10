@@ -13,7 +13,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("profile-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for profileProgram");
+	.description(
+		"Profile program — demonstrates `PinaPod`'s bounded fields in fixed account\nstate.\n\nPina validates the complete `PinaPod` representation before exposing a\nzero-copy view:\n\n- **`String<32>` / `String<128>`** — UTF-8 text with a one-byte length\nprefix and fixed inline capacity.\n- **`Vec<u64, 8>`** — up to eight `u64` values with a two-byte count.\n- **`Option<T>`** — fixed-size optional data backed by `PodOption` in the\ngenerated zero-copy view. Used here for an optional favourite tag.\n- **`PodBool`** — a single-byte boolean for the `active` flag.\n\n## Instructions\n\n| Variant         | Description                                  |\n|-----------------|----------------------------------------------|\n| `Initialize`    | Create a new profile PDA for the signer.     |\n| `UpdateProfile` | Replace the profile name and bio.            |\n| `AddTag`        | Append a tag to the profile's tag list.      |\n| `RemoveTag`     | Remove the tag at the given index.           |",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(updateProfileCommand);
 program.addCommand(addTagCommand);

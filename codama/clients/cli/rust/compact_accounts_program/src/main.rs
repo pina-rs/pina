@@ -19,7 +19,11 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for compactAccountsProgram
+/// A focused compact-account lifecycle example.
+///
+/// [`Journal`] stores a fixed header and only the active bytes of its title,
+/// entries, markers, and optional note. Mutations use one atomic patch that
+/// plans rent adjustment, reallocation, and validated encoding together.
 #[derive(Debug, Parser)]
 #[command(name = "compact-accounts-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

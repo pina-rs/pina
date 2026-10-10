@@ -19,7 +19,14 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for validationProgram
+/// Complete declarative-validation example for Pina.
+///
+/// The program validates each boundary independently:
+///
+/// - `#[instruction]` validates client-supplied values after decoding.
+/// - `#[derive(Accounts)]` validates the incoming account list after parsing.
+/// - `#[account]` validates stored state after initialization and loading.
+/// - `#[event]` validates an event before the program can emit or transport it.
 #[derive(Debug, Parser)]
 #[command(name = "validation-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

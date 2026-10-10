@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'account-realloc-program-cli',
-      "Command-line interface for accountReallocProgram",
+      "Anchor `realloc` parity example ported to pina.\n\nThe original Anchor fixture creates one global `sample` PDA. This secure\nadaptation deliberately derives one sample per authority instead. A resize\nrequest must therefore prove ownership through both the signer and the\ncanonical `[b\"sample\", authority]` PDA; it cannot resize an arbitrary\nprogram-owned account merely by presenting it as writable.",
     )
     ..argParser.addOption(
       'url',

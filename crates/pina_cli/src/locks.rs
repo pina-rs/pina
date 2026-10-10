@@ -906,6 +906,7 @@ mod tests {
 
 	fn program(instructions: Vec<InstructionIr>) -> ProgramIr {
 		ProgramIr {
+			docs: Vec::new(),
 			name: "locks_program".to_owned(),
 			public_key: PROGRAM_ID.to_owned(),
 			pinapod_enums: Vec::new(),

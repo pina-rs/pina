@@ -2,7 +2,7 @@
 	"name": "declare-id-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for declareIdProgram",
+	"description": "Anchor `declare-id` parity example ported to pina",
 	"type": "module",
 	"bin": {
 		"declare-id-program-cli": "./src/main.ts"

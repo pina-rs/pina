@@ -11,6 +11,18 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Token escrow program built with pina.
+///
+/// Flow:
+/// 1. **Make** — the maker deposits token A into a PDA-owned vault and records
+/// the desired amount of token B in the escrow state.
+/// 2. **Take** — the taker sends token B to the maker's ATA, then the vault
+/// releases token A to the taker's ATA. The escrow is closed and rent is
+/// returned to the maker.
+/// 3. **Cancel** — the maker aborts the offer before a taker appears: the
+/// vault returns the full token A balance to the maker's ATA, then the
+/// vault and the escrow close and both rents return to the maker.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const ESCROW_PROGRAM_ID: Address =
 	pina::address!("4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT");
 

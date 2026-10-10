@@ -97,7 +97,7 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// @@ABOUT@@
+@@ABOUT@@
 #[derive(Debug, Parser)]
 #[command(name = "@@BIN_NAME@@", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {
@@ -203,7 +203,7 @@ fn emit_main(model: &CliModel) -> String {
 		&[
 			("@@HEADER@@", GENERATED_HEADER.to_string()),
 			("@@PROGRAM_CAMEL@@", model.program_camel.clone()),
-			("@@ABOUT@@", model.about.clone()),
+			("@@ABOUT@@", about_docs(model)),
 			("@@BIN_NAME@@", model.bin_name.clone()),
 			("@@PROGRAM_ADDRESS@@", model.program_address.clone()),
 			(
@@ -1432,6 +1432,20 @@ limit automatically; the others request none, so the runtime default applies.
 		program_version = model.program_version,
 		package_name = model.package_name,
 	)
+}
+
+/// The `Cli` struct's doc comment: the program's full documentation when the
+/// IDL carries it, else the single-line description.
+///
+/// clap derives `about` from the first paragraph and `long_about` from the
+/// whole comment, so a documented program shows its module docs as the
+/// additional description in `--help` while `-h` stays one line.
+fn about_docs(model: &CliModel) -> String {
+	if model.docs.is_empty() {
+		format!("/// {}", model.about)
+	} else {
+		doc_lines(&model.docs, 0)
+	}
 }
 
 fn doc_lines(docs: &[String], indent_level: usize) -> String {

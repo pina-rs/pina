@@ -11,6 +11,11 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `system-accounts` parity example ported to pina.
+///
+/// Verifies a signer authority plus a wallet account owned by the system
+/// program.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const SYSTEM_ACCOUNTS_PROGRAM_ID: Address =
 	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 

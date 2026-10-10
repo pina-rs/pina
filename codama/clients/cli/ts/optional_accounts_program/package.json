@@ -2,7 +2,7 @@
 	"name": "optional-accounts-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for optionalAccountsProgram",
+	"description": "Optional accounts program — demonstrates `Option<&AccountView>` fields",
 	"type": "module",
 	"bin": {
 		"optional-accounts-program-cli": "./src/main.ts"

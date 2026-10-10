@@ -16,7 +16,9 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("custom-errors-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for customErrorsProgram");
+	.description(
+		"Anchor `errors` parity example ported to pina.\n\nThis adaptation keeps the key behavior: deterministic custom error codes\nand explicit guard helpers that return those errors.",
+	);
 program.addCommand(helloCommand);
 program.addCommand(helloNoMsgCommand);
 program.addCommand(helloNextCommand);

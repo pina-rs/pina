@@ -10,6 +10,8 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("declare-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for declareProgram");
+	.description(
+		'Anchor `declare-program` parity example ported to pina.\n\nThis adaptation focuses on the core behavior that maps to pina directly:\nvalidating that an "external program" account matches an expected program\nID before executing cross-program logic.',
+	);
 program.addCommand(validateExternalProgramCommand);
 program.parseAsync(process.argv);

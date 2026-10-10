@@ -7,6 +7,13 @@
 		"name": "eventsProgram",
 		"publicKey": "2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy",
 		"version": "0.0.0",
+		"docs": [
+			"Anchor `events` parity example ported to pina.",
+			"",
+			"Anchor's event transport (`emit!`, `emit_cpi!`) is framework-specific. This",
+			"parity port focuses on the event type definitions and deterministic",
+			"serialization/discriminator behavior in pina."
+		],
 		"instructions": [
 			{
 				"kind": "instructionNode",

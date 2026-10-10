@@ -2,7 +2,7 @@
 	"name": "declare-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for declareProgram",
+	"description": "Anchor `declare-program` parity example ported to pina",
 	"type": "module",
 	"bin": {
 		"declare-program-cli": "./src/main.ts"

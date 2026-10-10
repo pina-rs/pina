@@ -19,7 +19,13 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for accountReallocProgram
+/// Anchor `realloc` parity example ported to pina.
+///
+/// The original Anchor fixture creates one global `sample` PDA. This secure
+/// adaptation deliberately derives one sample per authority instead. A resize
+/// request must therefore prove ownership through both the signer and the
+/// canonical `[b"sample", authority]` PDA; it cannot resize an arbitrary
+/// program-owned account merely by presenting it as writable.
 #[derive(Debug, Parser)]
 #[command(name = "account-realloc-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

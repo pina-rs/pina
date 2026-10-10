@@ -67,6 +67,8 @@ pub struct CliModel {
 	pub program_address: String,
 	/// Program version from the IDL.
 	pub program_version: String,
+	/// Full program documentation from the IDL, one line per entry.
+	pub docs: Vec<String>,
 	/// Single-line description built from the program docs or name.
 	pub about: String,
 	pub instructions: Vec<InstructionModel>,
@@ -269,6 +271,7 @@ impl CliModel {
 
 		Ok(Self {
 			about: about_for(program),
+			docs: program.docs.iter().cloned().collect(),
 			bin_name: format!("{}-cli", program_snake.to_kebab_case()),
 			package_name: format!("{program_snake}_cli"),
 			program_camel,

@@ -2,7 +2,7 @@
 	"name": "heap-alloc-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for heapAllocProgram",
+	"description": "Heap allocation example — an opt-in heap entrypoint built with pina",
 	"type": "module",
 	"bin": {
 		"heap-alloc-program-cli": "./src/main.ts"

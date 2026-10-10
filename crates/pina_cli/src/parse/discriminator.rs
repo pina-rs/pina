@@ -3,6 +3,7 @@ use syn::Item;
 use syn::ext::IdentExt;
 
 use crate::error::IdlError;
+use crate::parse::doc_comments::extract_docs;
 
 /// A parsed `#[discriminator]` enum.
 #[derive(Debug, Clone)]
@@ -13,6 +14,8 @@ pub struct DiscriminatorEnum {
 	pub repr_size: usize,
 	/// Whether this enum declares the program entrypoint.
 	pub entrypoint: bool,
+	/// The enum's doc comment.
+	pub docs: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -291,6 +294,7 @@ pub fn extract_discriminator_enums(file: &File) -> Result<Vec<DiscriminatorEnum>
 			variants,
 			repr_size,
 			entrypoint,
+			docs: extract_docs(&item_enum.attrs),
 		});
 	}
 
@@ -589,5 +593,29 @@ mod tests {
 
 			assert_eq!(enums[0].entrypoint, expected, "wrong flag for `{source}`");
 		}
+	}
+
+	#[test]
+	fn extracts_the_enum_doc_comment() {
+		let source = r#"
+			/// Routes each instruction to its accounts struct.
+			///
+			/// Second paragraph.
+			#[discriminator(entrypoint)]
+			pub enum Probe {
+				A = 0,
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let enums = extract_discriminator_enums(&file).expect("extraction succeeds");
+
+		assert_eq!(
+			enums[0].docs,
+			vec![
+				"Routes each instruction to its accounts struct.".to_owned(),
+				String::new(),
+				"Second paragraph.".to_owned(),
+			]
+		);
 	}
 }

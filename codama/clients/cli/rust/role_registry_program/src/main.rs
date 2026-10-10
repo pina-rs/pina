@@ -19,7 +19,13 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for roleRegistryProgram
+/// Role-based registry and configuration scaffold built with pina.
+///
+/// This example shows a practical administrative flow:
+/// - initialize a registry config PDA
+/// - register per-role PDA entries
+/// - update role permissions
+/// - deactivate or rotate administrative control
 #[derive(Debug, Parser)]
 #[command(name = "role-registry-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

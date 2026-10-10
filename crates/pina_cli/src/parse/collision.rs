@@ -223,6 +223,7 @@ mod tests {
 
 	fn make_program(accounts: Vec<AccountIr>, instructions: Vec<InstructionIr>) -> ProgramIr {
 		ProgramIr {
+			docs: Vec::new(),
 			name: "test".to_owned(),
 			public_key: "1111111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],

@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'declare-program-cli',
-      "Command-line interface for declareProgram",
+      "Anchor `declare-program` parity example ported to pina.\n\nThis adaptation focuses on the core behavior that maps to pina directly:\nvalidating that an \"external program\" account matches an expected program\nID before executing cross-program logic.",
     )
     ..argParser.addOption(
       'url',

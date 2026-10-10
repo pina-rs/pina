@@ -11,6 +11,14 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Todo program example built with pina.
+///
+/// This example demonstrates a compact PDA-backed account with three
+/// instruction paths:
+/// - `Initialize`: creates a todo account for an authority.
+/// - `ToggleCompleted`: flips the completion flag.
+/// - `UpdateDigest`: updates a fixed-size digest payload.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const TODO_PROGRAM_ID: Address = pina::address!("Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd");
 
 /// Marker for the `todoProgram` program used by generated CPI builders.

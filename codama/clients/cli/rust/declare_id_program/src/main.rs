@@ -18,7 +18,10 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for declareIdProgram
+/// Anchor `declare-id` parity example ported to pina.
+///
+/// Anchor's test validates that a program-id mismatch is rejected. In pina,
+/// that check occurs in `parse_instruction`.
 #[derive(Debug, Parser)]
 #[command(name = "declare-id-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

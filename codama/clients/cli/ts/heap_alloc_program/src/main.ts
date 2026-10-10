@@ -11,7 +11,9 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("heap-alloc-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for heapAllocProgram");
+	.description(
+		"Heap allocation example — an opt-in heap entrypoint built with pina.\n\nEvery other Pina example uses [`nostd_entrypoint!`], whose\n`pinocchio::no_allocator!` makes dynamic allocation impossible. This program\ninstead uses [`nostd_entrypoint_alloc!`], which installs\n`pinocchio::default_allocator!` — a `BumpAllocator` over the runtime heap\nregion — so `alloc` is available:\n\n- **`extern crate alloc`** — the standard `no_std` allocator crate, giving\nthis program `Box` and `Vec`.\n- **A heap round-trip** — `Allocate` boxes a `u64`, reads it back through\nthe heap pointer, and rejects the transaction if the value did not\nsurvive. A successful call is proof the allocator works, because the\nprogram has no other way to produce the answer.\n- **The heap budget** — `Fill` allocates a caller-chosen byte count, so a\ntransaction can exceed the runtime's default 32 KiB frame once it asks for\na larger one with `TransactionConfig::with_heap_size`.\n\n## Instructions\n\n| Variant | Description |\n| --- | --- |\n| `Allocate` | Box a `u64` and read it back through the heap. |\n| `Fill` | Allocate, fill, and sum a heap buffer of `bytes` bytes. |\n\n## What this demonstrates about the heap\n\n`BumpAllocator` never reclaims memory: its `dealloc` is a no-op, so a\ntransaction's peak heap use is the sum of every allocation it makes over its\nlifetime, not the sum of the ones still alive. Both instructions drop what\nthey allocate, and nothing is returned to the heap. The heap is also\ntransaction-scoped — nothing allocated here is visible to another\ntransaction — so anything that must persist belongs in account data\nthrough the zero-copy account types, not here.\n\nRoutes the instruction discriminator to its handler.",
+	);
 program.addCommand(allocateCommand);
 program.addCommand(fillCommand);
 program.parseAsync(process.argv);

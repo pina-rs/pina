@@ -7,6 +7,15 @@
 		"name": "accountReallocProgram",
 		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 		"version": "0.0.0",
+		"docs": [
+			"Anchor `realloc` parity example ported to pina.",
+			"",
+			"The original Anchor fixture creates one global `sample` PDA. This secure",
+			"adaptation deliberately derives one sample per authority instead. A resize",
+			"request must therefore prove ownership through both the signer and the",
+			"canonical `[b\"sample\", authority]` PDA; it cannot resize an arbitrary",
+			"program-owned account merely by presenting it as writable."
+		],
 		"accounts": [
 			{
 				"kind": "accountNode",

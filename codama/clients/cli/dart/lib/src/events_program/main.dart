@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'events-program-cli',
-      "Command-line interface for eventsProgram",
+      "Anchor `events` parity example ported to pina.\n\nAnchor's event transport (`emit!`, `emit_cpi!`) is framework-specific. This\nparity port focuses on the event type definitions and deterministic\nserialization/discriminator behavior in pina.",
     )
     ..argParser.addOption(
       'url',

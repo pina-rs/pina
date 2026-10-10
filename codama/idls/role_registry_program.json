@@ -7,6 +7,15 @@
 		"name": "roleRegistryProgram",
 		"publicKey": "3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX",
 		"version": "0.0.0",
+		"docs": [
+			"Role-based registry and configuration scaffold built with pina.",
+			"",
+			"This example shows a practical administrative flow:",
+			"- initialize a registry config PDA",
+			"- register per-role PDA entries",
+			"- update role permissions",
+			"- deactivate or rotate administrative control"
+		],
 		"accounts": [
 			{
 				"kind": "accountNode",

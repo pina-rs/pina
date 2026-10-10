@@ -6,6 +6,13 @@
 /// Top-level IR for a single program crate.
 #[derive(Debug, Clone)]
 pub struct ProgramIr {
+	/// Program-level documentation lowered onto the IDL's program node.
+	///
+	/// The crate's module docs (`//!`) lead, followed by the doc comment on
+	/// the entrypoint surface — the hand-written `process_instruction`
+	/// function or the `#[discriminator(entrypoint)]` enum that generates it.
+	/// Generated clients use these lines as the program's main description.
+	pub docs: Vec<String>,
 	pub name: String,
 	pub public_key: String,
 	pub pinapod_enums: Vec<PinaPodEnumIr>,

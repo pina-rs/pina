@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'validation-program-cli',
-      "Command-line interface for validationProgram",
+      "Complete declarative-validation example for Pina.\n\nThe program validates each boundary independently:\n\n- `#[instruction]` validates client-supplied values after decoding.\n- `#[derive(Accounts)]` validates the incoming account list after parsing.\n- `#[account]` validates stored state after initialization and loading.\n- `#[event]` validates an event before the program can emit or transport it.",
     )
     ..argParser.addOption(
       'url',

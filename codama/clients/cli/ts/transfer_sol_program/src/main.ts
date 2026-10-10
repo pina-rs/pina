@@ -11,7 +11,9 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("transfer-sol-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for transferSolProgram");
+	.description(
+		"Transfer SOL — demonstrates CPI and direct lamport transfers with pina.\n\nThis example shows two ways to move SOL between accounts:\n\n1. **CPI Transfer** (`TransferInstruction::CpiTransfer`) — calls the system\nprogram's `Transfer` instruction via Cross-Program Invocation. This is\nthe standard approach when the sender is an externally-owned account (a\nwallet). Requires the system program account in the transaction.\n\n2. **Direct Transfer** (`TransferInstruction::DirectTransfer`) — directly\nmanipulates lamport balances using pina's `LamportTransfer` trait. This\nworks **only when the sender is owned by this program**, since only the\nowning program may debit an account's lamports.\n\n## Key pina features demonstrated\n\n- **Instruction data payloads** — the `#[instruction]` macro creates\nzero-copy structs with a discriminator and typed fields (`PodU64`).\n- **`system::instructions::Transfer`** — pina re-exports pinocchio-system's\nstruct-based CPI helpers.\n- **`LamportTransfer` trait** — `account.send_owned(&ID, lamports, recipient)` for\nprogram-owned account transfers without CPI.\n- **Custom error types** — `#[error]` macro for program-specific errors with\nautomatic `ProgramError::Custom` conversion.",
+	);
 program.addCommand(cpiTransferCommand);
 program.addCommand(directTransferCommand);
 program.parseAsync(process.argv);

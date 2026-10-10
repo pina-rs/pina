@@ -7,6 +7,12 @@
 		"name": "customErrorsProgram",
 		"publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
 		"version": "0.0.0",
+		"docs": [
+			"Anchor `errors` parity example ported to pina.",
+			"",
+			"This adaptation keeps the key behavior: deterministic custom error codes",
+			"and explicit guard helpers that return those errors."
+		],
 		"instructions": [
 			{
 				"kind": "instructionNode",

@@ -19,7 +19,9 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for floatAccountsProgram
+/// Anchor `floats` parity example ported to pina.
+///
+/// Demonstrates float fields in account data plus an authority-gated update.
 #[derive(Debug, Parser)]
 #[command(name = "float-accounts-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

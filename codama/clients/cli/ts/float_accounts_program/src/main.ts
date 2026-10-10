@@ -11,7 +11,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("float-accounts-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for floatAccountsProgram");
+	.description(
+		"Anchor `floats` parity example ported to pina.\n\nDemonstrates float fields in account data plus an authority-gated update.",
+	);
 program.addCommand(createCommand);
 program.addCommand(updateCommand);
 program.addCommand(fetchCommand);

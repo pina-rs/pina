@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'compact-accounts-program-cli',
-      "Command-line interface for compactAccountsProgram",
+      "A focused compact-account lifecycle example.\n\n[`Journal`] stores a fixed header and only the active bytes of its title,\nentries, markers, and optional note. Mutations use one atomic patch that\nplans rent adjustment, reallocation, and validated encoding together.",
     )
     ..argParser.addOption(
       'url',

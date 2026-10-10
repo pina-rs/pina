@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'float-accounts-program-cli',
-      "Command-line interface for floatAccountsProgram",
+      "Anchor `floats` parity example ported to pina.\n\nDemonstrates float fields in account data plus an authority-gated update.",
     )
     ..argParser.addOption(
       'url',

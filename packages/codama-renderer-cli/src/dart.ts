@@ -931,7 +931,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
     '${model.programKebab}-cli',
-    ${dartString(model.about)},
+    ${dartString(model.docs.join("\n") || model.about)},
   )
     ..argParser.addOption(
         'url',

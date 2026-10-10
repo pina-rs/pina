@@ -2,7 +2,7 @@
 	"name": "multisig-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for multisigProgram",
+	"description": "An ambitious multisig wallet built with pina",
 	"type": "module",
 	"bin": {
 		"multisig-program-cli": "./src/main.ts"

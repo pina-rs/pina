@@ -11,6 +11,28 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Hello Solana — minimal pina program example.
+///
+/// This is the simplest possible Solana program built with pina. It
+/// demonstrates the basic structure every pina program follows:
+///
+/// 1. Declare a program ID with [`declare_id!`].
+/// 2. Define an instruction discriminator enum with [`#[discriminator]`].
+/// 3. Define instruction data structs with [`#[instruction]`].
+/// 4. Define an accounts struct with [`#[derive(Accounts)]`].
+/// 5. Implement [`ProcessAccountInfos`] to hold the instruction logic.
+/// 6. Wire up the entrypoint with [`nostd_entrypoint!`] and
+/// [`parse_instruction`].
+///
+/// When invoked, this program simply logs "Hello, Solana!".
+///
+/// The top-level instruction router.
+///
+/// 1. `parse_instruction` reads the discriminator byte from `data` and
+/// converts it into `HelloInstruction`, verifying the program ID.
+/// 2. The `match` dispatches to the appropriate accounts struct which
+/// handles validation and execution.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const HELLO_SOLANA_PROGRAM_ID: Address =
 	pina::address!("DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A");
 

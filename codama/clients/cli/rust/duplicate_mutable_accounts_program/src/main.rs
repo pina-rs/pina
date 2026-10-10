@@ -18,7 +18,10 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for duplicateMutableAccountsProgram
+/// Anchor `duplicate-mutable-accounts` parity example ported to pina.
+///
+/// Anchor enforces duplicate mutable account constraints in the account parser.
+/// In pina this check should be explicit in program logic.
 #[derive(Debug, Parser)]
 #[command(name = "duplicate-mutable-accounts-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

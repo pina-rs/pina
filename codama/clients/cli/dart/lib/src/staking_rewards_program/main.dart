@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'staking-rewards-program-cli',
-      "Command-line interface for stakingRewardsProgram",
+      "Staking account and rewards-bookkeeping scaffold built with pina.\n\nThis example demonstrates the account and validation shape of a staking\nlifecycle:\n- initialize a rewards pool with a stake vault and a reward vault\n- open per-user positions\n- deposit stake tokens into the stake vault and withdraw them back out\n- update reward bookkeeping against a position account and release\naccrued rewards from the reward vault\n\nThis is not a staking product. Deposits and withdrawals do move real stake\ntokens to and from the pool's stake vault, and claims release real reward\ntokens from the reward vault, but the example still defines no reward\nemissions, funding, or solvency: the index only moves when the admin calls\n`SetRewardIndex`, and nothing refills the vaults. See the example README\nand the book's production-readiness guide before adapting it for\nproduction use.",
     )
     ..argParser.addOption(
       'url',

@@ -12,7 +12,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("prop-amm-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for propAmmProgram");
+	.description(
+		"Prop AMM oracle example ported from Anchor v2's `prop-amm` benchmark.\n\nThe upstream benchmark combines a tiny oracle account with a hand-written\nassembly fast path for the hot `Update` instruction. This pina port keeps\nthe program semantics and validation model, but intentionally stays inside\nthe workspace's safe Rust constraints:\n\n- no handwritten assembly\n- no unstable features\n- no `unsafe`\n\nThat means this example is best read as a **semantic port** and a\nframework-comparison fixture rather than a byte-for-byte benchmark clone.\n\n## Instructions\n\n- `Initialize` — create and initialize an oracle account\n- `Update` — allow a fixed global updater to publish a new price\n- `RotateAuthority` — let the oracle authority rotate its control key",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(updateCommand);
 program.addCommand(rotateAuthorityCommand);

@@ -75,6 +75,9 @@ pub(crate) fn try_ir_to_root_node_with_migrations(
 	migrations: Option<&IdlMigrationMetadata>,
 ) -> Result<RootNode, IdlError> {
 	let mut program = ProgramNode::new(ir.name.as_str(), ir.public_key.as_str());
+	if !ir.docs.is_empty() {
+		program.docs = ir.docs.clone().into();
+	}
 
 	for pinapod_enum in &ir.pinapod_enums {
 		let normalized_name = CamelCaseString::new(&pinapod_enum.name);
@@ -737,6 +740,7 @@ mod tests {
 		};
 
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			name: "capacity_program".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
@@ -778,8 +782,45 @@ mod tests {
 	}
 
 	#[test]
+	fn lowers_program_docs_onto_the_program_node() {
+		let ir = ProgramIr {
+			docs: vec![
+				"Escrow program.".to_owned(),
+				String::new(),
+				"Holds funds until both parties approve.".to_owned(),
+			],
+			name: "documented_program".to_owned(),
+			public_key: "11111111111111111111111111111111".to_owned(),
+			pinapod_enums: vec![],
+			accounts: vec![],
+			events: Vec::new(),
+			instructions: vec![],
+			errors: vec![],
+			pdas: vec![],
+		};
+
+		let root =
+			ir_to_root_node(&ir).unwrap_or_else(|error| panic!("IDL codegen failed: {error}"));
+		let docs = root
+			.program
+			.docs
+			.iter()
+			.map(String::as_str)
+			.collect::<Vec<_>>();
+		assert_eq!(
+			docs,
+			vec![
+				"Escrow program.",
+				"",
+				"Holds funds until both parties approve."
+			]
+		);
+	}
+
+	#[test]
 	fn rejects_source_types_in_reserved_capacity_namespace() {
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			name: "reserved_program".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![PinaPodEnumIr {
@@ -935,6 +976,7 @@ mod tests {
 			repr_size: 1,
 		};
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			events: Vec::new(),
 			name: "discriminator_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
@@ -994,6 +1036,7 @@ mod tests {
 			repr_size: 1,
 		};
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			events: Vec::new(),
 			name: "migration_program".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
@@ -1122,6 +1165,7 @@ mod tests {
 			}
 		};
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			name: "migration_program".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
@@ -1225,6 +1269,7 @@ mod tests {
 			}
 		};
 		let mut ir = ProgramIr {
+			docs: Vec::new(),
 			name: "migration_program".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
@@ -1295,6 +1340,7 @@ mod tests {
 	#[test]
 	fn migratable_events_require_checked_in_metadata() {
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			name: "migration_program".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
@@ -1329,6 +1375,7 @@ mod tests {
 	#[test]
 	fn optional_accounts_never_carry_default_values() {
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			name: "optional_pda_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],
@@ -1422,6 +1469,7 @@ mod tests {
 			}
 		};
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			name: "positions".to_owned(),
 			public_key: "11111111111111111111111111111111".to_owned(),
 			pinapod_enums: vec![],
@@ -1491,6 +1539,7 @@ mod tests {
 
 		let build_ir = |accounts: Vec<InstructionAccountIr>| {
 			ProgramIr {
+				docs: Vec::new(),
 				name: "strategy_program".to_string(),
 				public_key: "11111111111111111111111111111111".to_string(),
 				pinapod_enums: vec![],
@@ -1538,6 +1587,7 @@ mod tests {
 	#[test]
 	fn rejects_unresolved_pod_collection_layouts() {
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			events: Vec::new(),
 			name: "unsupported_collection_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
@@ -1571,6 +1621,7 @@ mod tests {
 	#[test]
 	fn lowers_local_pinapod_enums() {
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			events: Vec::new(),
 			name: "pinapod_enum_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
@@ -1631,6 +1682,7 @@ mod tests {
 	#[test]
 	fn lowers_pda_instruction_account_default_from_account_seed() {
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			name: "default_program".to_string(),
 			public_key: "11111111111111111111111111111111".to_string(),
 			pinapod_enums: vec![],

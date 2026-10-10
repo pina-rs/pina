@@ -11,6 +11,14 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Role-based registry and configuration scaffold built with pina.
+///
+/// This example shows a practical administrative flow:
+/// - initialize a registry config PDA
+/// - register per-role PDA entries
+/// - update role permissions
+/// - deactivate or rotate administrative control
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const ROLE_REGISTRY_PROGRAM_ID: Address =
 	pina::address!("3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX");
 

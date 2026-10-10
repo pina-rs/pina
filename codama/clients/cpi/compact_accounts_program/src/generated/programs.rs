@@ -11,6 +11,12 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// A focused compact-account lifecycle example.
+///
+/// [`Journal`] stores a fixed header and only the active bytes of its title,
+/// entries, markers, and optional note. Mutations use one atomic patch that
+/// plans rent adjustment, reallocation, and validated encoding together.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const COMPACT_ACCOUNTS_PROGRAM_ID: Address =
 	pina::address!("85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn");
 

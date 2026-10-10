@@ -19,7 +19,17 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for vestingProgram
+/// Vesting schedule with cliff and linear unlock, built with pina.
+///
+/// This example demonstrates a complete vesting lifecycle:
+/// - initialize a vesting schedule and fund its PDA-owned vault ATA
+/// - release the vested portion of the allocation on claim
+/// - return the unclaimed remainder to the admin on cancellation
+///
+/// `Claim` reads the Clock sysvar, so a claim before the cliff is rejected and
+/// the vested entitlement grows linearly to `end_ts`. Token release uses
+/// `TransferChecked` signed by the vesting PDA, and `Cancel` refunds the
+/// remaining vault balance and closes the vault.
 #[derive(Debug, Parser)]
 #[command(name = "vesting-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

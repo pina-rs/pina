@@ -153,6 +153,15 @@ fn render_constant_docs(docs: &str) -> Vec<String> {
 	if docs.is_empty() {
 		Vec::new()
 	} else {
-		docs.lines().map(|line| format!("/// {line}")).collect()
+		let mut lines = docs
+			.lines()
+			.map(|line| format!("/// {line}"))
+			.collect::<Vec<_>>();
+		// Program docs are copied verbatim from the program source, so their
+		// intra-doc links resolve in the program crate but not in this one.
+		lines.push(
+			"#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]".to_string(),
+		);
+		lines
 	}
 }

@@ -11,6 +11,12 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `events` parity example ported to pina.
+///
+/// Anchor's event transport (`emit!`, `emit_cpi!`) is framework-specific. This
+/// parity port focuses on the event type definitions and deterministic
+/// serialization/discriminator behavior in pina.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const EVENTS_PROGRAM_ID: Address =
 	pina::address!("2dhGsWUzy5YKUsjZdLHLmkNpUDAXkNa9MYWsPc4Ziqzy");
 

@@ -18,7 +18,11 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for eventsProgram
+/// Anchor `events` parity example ported to pina.
+///
+/// Anchor's event transport (`emit!`, `emit_cpi!`) is framework-specific. This
+/// parity port focuses on the event type definitions and deterministic
+/// serialization/discriminator behavior in pina.
 #[derive(Debug, Parser)]
 #[command(name = "events-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

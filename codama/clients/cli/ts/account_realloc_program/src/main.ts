@@ -12,7 +12,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("account-realloc-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for accountReallocProgram");
+	.description(
+		'Anchor `realloc` parity example ported to pina.\n\nThe original Anchor fixture creates one global `sample` PDA. This secure\nadaptation deliberately derives one sample per authority instead. A resize\nrequest must therefore prove ownership through both the signer and the\ncanonical `[b"sample", authority]` PDA; it cannot resize an arbitrary\nprogram-owned account merely by presenting it as writable.',
+	);
 program.addCommand(initializeCommand);
 program.addCommand(reallocCommand);
 program.addCommand(realloc2Command);

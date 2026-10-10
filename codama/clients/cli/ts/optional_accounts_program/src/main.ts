@@ -13,7 +13,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("optional-accounts-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for optionalAccountsProgram");
+	.description(
+		"Optional accounts program — demonstrates `Option<&AccountView>` fields.\n\nEvery instruction keeps a **fixed** account layout: when a caller omits an\noptional account, the generated clients fill the slot with a readonly meta\npointing at this program's own address. On-chain, a slot holding the\nprogram ID parses as [`None`].\n\nCoverage matrix:\n\n| Instruction | Optional field                    | Behaviour when present            |\n|-------------|-----------------------------------|-----------------------------------|\n| `Init`      | —                                 | Creates the store PDA (baseline). |\n| `Touch`     | `store: Option<&mut AccountView>` | Increments the stored counter.    |\n| `Inspect`   | `store: Option<&AccountView>`     | Logs the observed count.          |\n| `Inspect`   | `witness: Option<&AccountView>`   | Must be a signer.                 |\n| `Note`      | `note: Option<&AccountView>`      | Logged as an opaque reference.    |",
+	);
 program.addCommand(initCommand);
 program.addCommand(touchCommand);
 program.addCommand(inspectCommand);

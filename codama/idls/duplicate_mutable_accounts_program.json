@@ -7,6 +7,12 @@
 		"name": "duplicateMutableAccountsProgram",
 		"publicKey": "4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH",
 		"version": "0.0.0",
+		"docs": [
+			"Anchor `duplicate-mutable-accounts` parity example ported to pina.",
+			"",
+			"Anchor enforces duplicate mutable account constraints in the account parser.",
+			"In pina this check should be explicit in program logic."
+		],
 		"instructions": [
 			{
 				"kind": "instructionNode",

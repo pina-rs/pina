@@ -2,7 +2,7 @@
 	"name": "system-accounts-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for systemAccountsProgram",
+	"description": "Anchor `system-accounts` parity example ported to pina",
 	"type": "module",
 	"bin": {
 		"system-accounts-program-cli": "./src/main.ts"
