@@ -119,7 +119,12 @@ pub(crate) fn run(cli: Cli) {
 		Commands::Idl { command, generate } => idl_command::run_idl_command(command, &generate),
 		Commands::Docs { topic } => run_docs(topic.as_deref()),
 		Commands::Skill { command } => run_skill_command(command),
-		Commands::Init { name, path, force } => run_init(name.as_str(), path.as_deref(), force),
+		Commands::Init {
+			name,
+			path,
+			force,
+			sbpf_linker,
+		} => run_init(name.as_str(), path.as_deref(), force, sbpf_linker),
 		Commands::Keys {
 			path,
 			keypair,
@@ -1924,10 +1929,11 @@ fn render_docs(content: &str) {
 	skin.print_text(content);
 }
 
-fn run_init(name: &str, path: Option<&Path>, force: bool) {
+fn run_init(name: &str, path: Option<&Path>, force: bool, sbpf_linker: bool) {
 	let project_path = path.map_or_else(|| PathBuf::from(name), PathBuf::from);
+	let options = pina_cli::InitOptions { force, sbpf_linker };
 
-	if let Err(err) = pina_cli::init_project(&project_path, name, force) {
+	if let Err(err) = pina_cli::init_project_with_options(&project_path, name, &options) {
 		eprintln!("{} {}", "Error".red().bold(), err);
 		std::process::exit(1);
 	}
@@ -1937,7 +1943,7 @@ fn run_init(name: &str, path: Option<&Path>, force: bool) {
 		"✔".green(),
 		project_path.display()
 	);
-	pina_cli::print_next_steps(&project_path, name);
+	pina_cli::print_next_steps_with_options(&project_path, name, &options);
 }
 
 fn run_profile(explicit_path: Option<&Path>, project: &Path, json: bool, output: Option<&Path>) {

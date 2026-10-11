@@ -112,6 +112,14 @@ pub enum BuildError {
 	#[error("`{command}` failed ({status})")]
 	CargoFailed { command: String, status: String },
 
+	#[error(
+		"`sbpf-linker` is required for the upstream build but could not be run: {source}. \
+	         Install it with `cargo binstall sbpf-linker` (or run `install:all` in this \
+	         repository), keep it on PATH, and read docs/sbpf-linker-evaluation.md for the \
+	         measured caveats of the experimental upstream toolchain"
+	)]
+	MissingSbpfLinker { source: std::io::Error },
+
 	#[error("IDL generation failed for `{package}`: {source}")]
 	GenerateIdl { package: String, source: IdlError },
 
@@ -227,6 +235,12 @@ fn build_with_measurements(
 ) -> Result<BuildOutput, BuildError> {
 	let project = Project::discover(&options.project_dir)?;
 	check_migrations_for_build(&project)?;
+	// `sbpf-linker = true` under `[project]` in pina.toml (written by `pina
+	// init --sbpf-linker`) routes every build to the upstream toolchain;
+	// removing the key reverts to the cargo-build-sbf driver.
+	if project.sbpf_linker {
+		return build_project_upstream(&project, options);
+	}
 	if options.size_profile.requests_lto() {
 		warn_lto_unavailable(&project);
 	}
@@ -281,7 +295,7 @@ fn build_with_measurements(
 	)?;
 
 	Ok(BuildOutput {
-		package_name: project.package_name,
+		package_name: project.package_name.clone(),
 		sbf_artifact,
 		idl: idl_path,
 	})
@@ -734,6 +748,305 @@ fn warn_lto_unavailable(project: &Project) {
 	);
 }
 
+/// Maximum number of libcall exports the upstream build adds across retries.
+const UPSTREAM_EXPORT_RETRY_LIMIT: usize = 8;
+
+/// The `sbpf-linker` binary name, resolved from PATH by rustc's `-C linker`.
+const SBPF_LINKER: &str = "sbpf-linker";
+
+/// Rustflags for the upstream `bpfel-unknown-none` build.
+///
+/// Mirrors the `[target.bpfel-unknown-none]` table in the repository's
+/// `.cargo/config.toml` and the `--sbpf-linker` variant of `pina init`
+/// scaffolding (the blueshift-gg solana-upstream-bpf-template flag set). The
+/// two `--cfg` flags are load-bearing: they switch pinocchio's syscall
+/// externs to static hash-encoded calls, which sbpf-linker links correctly;
+/// without them the relocation-based fallback produces programs that load
+/// but silently corrupt data. `extra_exports` appends the `--export=<symbol>`
+/// requests collected from the linker's missing-symbol diagnostics.
+fn upstream_rustflags(extra_exports: &[String]) -> String {
+	let mut flags = String::from(
+		"-C linker=sbpf-linker -C panic=abort -C relocation-model=static -C target-cpu=v4 \
+		 -C target-feature=+allows-misaligned-mem-access -C \
+		 link-arg=--llvm-args=--bpf-stack-size=4096 \
+		 -C link-arg=--llvm-args=--bpf-max-stores-per-memfunc=5 -C \
+		 link-arg=--llvm-args=--disable-gotox -C link-arg=--llvm-args=--disable-ldsx -C \
+		 link-arg=--llvm-args=--disable-movsx --cfg=target_os=\"solana\" \
+		 --cfg=target_feature=\"static-syscalls\" -A explicit_builtin_cfgs_in_flags",
+	);
+	for symbol in extra_exports {
+		flags.push_str(" -C link-arg=--export=");
+		flags.push_str(symbol);
+	}
+	flags
+}
+
+/// Arguments that drive an upstream sbpf-linker build with plain cargo.
+///
+/// Unlike the `cargo-build-sbf` driver, plain `cargo build` needs the
+/// `bpfel-unknown-none` target and the build-std sysroot on the command line;
+/// the linker and its tuning flags arrive through
+/// `CARGO_TARGET_BPFEL_UNKNOWN_NONE_RUSTFLAGS` (see the `upstream_rustflags`
+/// helper).
+fn upstream_bpf_args(
+	manifest_path: &Path,
+	features: &str,
+	options: &BuildOptions,
+) -> Vec<OsString> {
+	let mut args = vec![
+		OsString::from("build"),
+		OsString::from("--release"),
+		OsString::from("--manifest-path"),
+		manifest_path.as_os_str().to_owned(),
+		OsString::from("--target"),
+		OsString::from("bpfel-unknown-none"),
+		OsString::from("--features"),
+		OsString::from(features),
+		OsString::from("-Z"),
+		OsString::from("build-std=core,alloc"),
+	];
+
+	if options.no_default_features {
+		args.push(OsString::from("--no-default-features"));
+	}
+
+	args
+}
+
+/// The libcall symbol named by sbpf-linker's missing-export diagnostic.
+///
+/// sbpf-linker reports one missing symbol at a time, for example
+/// ``Symbol __udivti3 is missing. Export it with the `--export=__udivti3` flag.``
+/// The upstream build retries with the suggested export appended, so u128
+/// division programs link without manual flag bookkeeping.
+fn missing_export_symbol(output: &str) -> Option<String> {
+	let start = output.find("Symbol ")? + "Symbol ".len();
+	let rest = &output[start..];
+	let end = rest.find(" is missing")?;
+	if rest[..end].is_empty() {
+		return None;
+	}
+	Some(rest[..end].to_owned())
+}
+
+/// The `sbpf-linker` binary, overridable for pinned checkouts and tests.
+///
+/// `PINA_SBPF_LINKER` can name or point at the binary — for example the
+/// repository pin at `.bin/rust-nightly/sbpf-linker/<version>/bin/sbpf-linker`.
+/// The default is `sbpf-linker`, resolved from `PATH` by both this probe and
+/// rustc's `-C linker` flag.
+fn sbpf_linker_command() -> OsString {
+	std::env::var_os("PINA_SBPF_LINKER").unwrap_or_else(|| OsString::from(SBPF_LINKER))
+}
+
+/// Fail early when the sbpf-linker binary cannot be spawned.
+///
+/// Returns the directory to prepend to the cargo child's `PATH` when the
+/// override names a specific file, so rustc's `-C linker=sbpf-linker` and
+/// the probe resolve to the same binary.
+fn ensure_sbpf_linker_runnable(linker: &OsStr) -> Result<Option<PathBuf>, BuildError> {
+	if let Err(source) = Command::new(linker).arg("--version").output() {
+		return Err(BuildError::MissingSbpfLinker { source });
+	}
+	let path = PathBuf::from(linker);
+	Ok(if path.components().count() > 1 {
+		path.parent().map(Path::to_path_buf)
+	} else {
+		None
+	})
+}
+
+/// Apply release-profile overrides for the upstream sbpf-linker build.
+///
+/// LTO is always disabled: fat LTO under sbpf-linker inflates runtime
+/// compute units by 17-77% on pina examples and makes u128 division
+/// unresolvable at link time, so the override beats a manifest that declares
+/// `lto` (which `pina init` scaffolds). The remaining overrides mirror
+/// [`apply_size_profile`].
+fn apply_upstream_profile(
+	command: &mut Command,
+	options: &BuildOptions,
+	declared: DeclaredReleaseProfile,
+) {
+	command.env("CARGO_PROFILE_RELEASE_LTO", "false");
+	if !options.size_profile.applies_overrides() {
+		return;
+	}
+	let overflow_checks =
+		options.size_profile.keeps_overflow_checks() || declared.overflow_checks == Some(true);
+	if overflow_checks && !options.size_profile.keeps_overflow_checks() {
+		warn_manifest_overflow_checks();
+	}
+	command
+		.env("CARGO_PROFILE_RELEASE_CODEGEN_UNITS", "1")
+		.env("CARGO_PROFILE_RELEASE_OPT_LEVEL", "3")
+		.env(
+			"CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS",
+			if overflow_checks { "true" } else { "false" },
+		);
+}
+
+/// Build a project with upstream nightly Rust and the sbpf-linker binary.
+///
+/// Selected by `sbpf-linker = true` under `[project]` in pina.toml (`pina
+/// init --sbpf-linker` records it): every `pina build` compiles for the
+/// upstream `bpfel-unknown-none` target with `-Z build-std`, links with the
+/// `sbpf-linker` binary from PATH, and encodes syscalls statically
+/// (see the `upstream_rustflags` helper). Requires a nightly toolchain with `rust-src`,
+/// which `pina init` scaffolds. The build runs without LTO and retries with
+/// `--export=<symbol>` flags, up to `UPSTREAM_EXPORT_RETRY_LIMIT` times,
+/// when the linker reports missing libcall symbols. The cdylib lands in
+/// `target/bpfel-unknown-none/release` and is published like any build. An
+/// explicit `--verify` build is unaffected and keeps the solana-verify
+/// backend.
+///
+/// # Errors
+///
+/// Returns the same discovery, Cargo, extraction, and publication errors as
+/// [`build_project_with_options`], plus [`BuildError::MissingSbpfLinker`]
+/// when the linker binary cannot be spawned.
+pub fn build_project_upstream(
+	project: &Project,
+	options: &BuildOptions,
+) -> Result<BuildOutput, BuildError> {
+	let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
+	let linker = sbpf_linker_command();
+	build_project_upstream_with(project, options, &cargo, &linker)
+}
+
+/// Drive one upstream build, from cargo invocation through IDL publication.
+///
+/// Split from [`build_project_upstream`] so unit tests can supply the cargo
+/// and sbpf-linker paths directly — the wrapper reads them from environment
+/// variables, which parallel tests cannot safely set.
+fn build_project_upstream_with(
+	project: &Project,
+	options: &BuildOptions,
+	cargo: &OsStr,
+	linker: &OsStr,
+) -> Result<BuildOutput, BuildError> {
+	eprintln!("note: building with the upstream sbpf-linker (`sbpf-linker = true` in pina.toml)");
+	let manifest_path = project.program_dir.join("Cargo.toml");
+	let features = options
+		.features
+		.iter()
+		.map(String::as_str)
+		.chain(std::iter::once("bpf-entrypoint"))
+		.collect::<BTreeSet<_>>()
+		.into_iter()
+		.collect::<Vec<_>>()
+		.join(",");
+	let linker_dir = ensure_sbpf_linker_runnable(linker)?;
+
+	let mut exports: Vec<String> = Vec::new();
+	let output = loop {
+		let args = upstream_bpf_args(&manifest_path, &features, options);
+		let command_label = command_label(cargo, &args);
+		let mut command = Command::new(cargo);
+		command
+			.current_dir(&project.root)
+			.env("CARGO_TARGET_DIR", &project.target_dir)
+			.env(
+				"CARGO_TARGET_BPFEL_UNKNOWN_NONE_RUSTFLAGS",
+				upstream_rustflags(&exports),
+			)
+			.args(&args);
+		if let Some(dir) = &linker_dir {
+			let mut prefixed = dir.as_os_str().to_owned();
+			prefixed.push(":");
+			if let Some(path) = std::env::var_os("PATH") {
+				prefixed.push(path);
+			}
+			command.env("PATH", prefixed);
+		}
+		apply_upstream_profile(&mut command, options, declared_release_profile(project));
+
+		let output = command.output().map_err(|source| {
+			BuildError::RunCargo {
+				command: command_label.clone(),
+				source,
+			}
+		})?;
+
+		if output.status.success() {
+			break output;
+		}
+
+		let diagnostics = format!(
+			"{}{}",
+			String::from_utf8_lossy(&output.stderr),
+			String::from_utf8_lossy(&output.stdout),
+		);
+		if let Some(symbol) = missing_export_symbol(&diagnostics)
+			&& !exports.contains(&symbol)
+			&& exports.len() < UPSTREAM_EXPORT_RETRY_LIMIT
+		{
+			exports.push(symbol);
+			continue;
+		}
+
+		return Err(BuildError::CargoFailed {
+			command: command_label,
+			status: output.status.to_string(),
+		});
+	};
+	drop(output);
+
+	let compiler_artifact = project
+		.target_dir
+		.join("bpfel-unknown-none")
+		.join("release")
+		.join(format!("lib{}.so", project.library_name));
+
+	if !compiler_artifact.is_file() {
+		return Err(BuildError::MissingArtifact {
+			path: compiler_artifact,
+		});
+	}
+
+	let idl =
+		generate_idl(&project.program_dir, Some(&project.library_name)).map_err(|source| {
+			BuildError::GenerateIdl {
+				package: project.package_name.clone(),
+				source,
+			}
+		})?;
+	let json = serde_json::to_string_pretty(&idl)
+		.map_err(|source| serialize_idl_error(&project.package_name, source))?;
+
+	std::fs::create_dir_all(&project.idl_dir).map_err(|source| {
+		BuildError::CreateIdlDir {
+			path: project.idl_dir.clone(),
+			source,
+		}
+	})?;
+
+	let deploy_dir = project.target_dir.join("deploy");
+	std::fs::create_dir_all(&deploy_dir).map_err(|source| {
+		BuildError::CreateArtifactDir {
+			path: deploy_dir.clone(),
+			source,
+		}
+	})?;
+	let idl_path = project
+		.idl_dir
+		.join(format!("{}.json", project.library_name));
+	let sbf_artifact = deploy_dir.join(format!("{}.so", project.library_name));
+	publish_outputs(
+		&project.target_dir.join(".pina-build.lock"),
+		&idl_path,
+		json.as_bytes(),
+		&compiler_artifact,
+		&sbf_artifact,
+	)?;
+
+	Ok(BuildOutput {
+		package_name: project.package_name.clone(),
+		sbf_artifact,
+		idl: idl_path,
+	})
+}
+
 fn command_label(cargo: &OsStr, args: &[OsString]) -> String {
 	std::iter::once(cargo)
 		.chain(args.iter().map(OsString::as_os_str))
@@ -902,10 +1215,186 @@ fn restore_idl(path: &Path, previous: Option<&[u8]>) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
 	use std::fs;
+	#[cfg(unix)]
+	use std::os::unix::fs::PermissionsExt;
 
 	use tempfile::TempDir;
 
 	use super::*;
+
+	#[test]
+	fn upstream_args_target_the_upstream_bpf_target() {
+		let options = BuildOptions {
+			project_dir: PathBuf::new(),
+			features: Vec::new(),
+			no_default_features: false,
+			size_profile: SizeProfile::Production,
+		};
+		let args = upstream_bpf_args(
+			Path::new("/tmp/prog/Cargo.toml"),
+			"bpf-entrypoint,logs",
+			&options,
+		);
+		let args: Vec<String> = args
+			.iter()
+			.map(|argument| argument.to_string_lossy().into_owned())
+			.collect();
+		assert_eq!(
+			args,
+			vec![
+				"build",
+				"--release",
+				"--manifest-path",
+				"/tmp/prog/Cargo.toml",
+				"--target",
+				"bpfel-unknown-none",
+				"--features",
+				"bpf-entrypoint,logs",
+				"-Z",
+				"build-std=core,alloc",
+			]
+		);
+	}
+
+	#[test]
+	fn upstream_args_forward_no_default_features() {
+		let options = BuildOptions {
+			project_dir: PathBuf::new(),
+			features: Vec::new(),
+			no_default_features: true,
+			size_profile: SizeProfile::Production,
+		};
+		let args = upstream_bpf_args(Path::new("Cargo.toml"), "bpf-entrypoint", &options);
+		let args: Vec<String> = args
+			.iter()
+			.map(|argument| argument.to_string_lossy().into_owned())
+			.collect();
+		assert_eq!(
+			args.last().map(String::as_str),
+			Some("--no-default-features")
+		);
+	}
+
+	#[test]
+	fn upstream_rustflags_enable_static_syscalls() {
+		let flags = upstream_rustflags(&[]);
+		assert!(flags.contains("-C linker=sbpf-linker"));
+		assert!(flags.contains("--cfg=target_os=\"solana\""));
+		assert!(flags.contains("--cfg=target_feature=\"static-syscalls\""));
+	}
+
+	#[test]
+	fn upstream_rustflags_append_missing_export_requests() {
+		let flags = upstream_rustflags(&["__udivti3".to_owned()]);
+		assert!(flags.ends_with(" -C link-arg=--export=__udivti3"));
+	}
+
+	#[test]
+	fn missing_export_symbol_parses_the_linker_diagnostic() {
+		let output = "error: linking with `sbpf-linker` failed: exit status: 1\n  = note: \
+		 Error: Symbol __udivti3 is missing. Export it with the `--export=__udivti3` flag.";
+		assert_eq!(missing_export_symbol(output).as_deref(), Some("__udivti3"));
+	}
+
+	#[test]
+	fn missing_export_symbol_ignores_other_diagnostics() {
+		assert_eq!(
+			missing_export_symbol("ERROR llvm: stack limit exceeded"),
+			None
+		);
+		assert_eq!(missing_export_symbol("Symbol  is missing"), None);
+	}
+
+	#[test]
+	fn upstream_profile_forces_lto_off_even_for_none_profile() {
+		let mut command = Command::new("cargo");
+		apply_upstream_profile(
+			&mut command,
+			&BuildOptions {
+				project_dir: PathBuf::new(),
+				features: Vec::new(),
+				no_default_features: false,
+				size_profile: SizeProfile::None,
+			},
+			DeclaredReleaseProfile::default(),
+		);
+		assert_eq!(
+			command
+				.get_envs()
+				.find(|(key, _)| *key == "CARGO_PROFILE_RELEASE_LTO")
+				.and_then(|(_, value)| value),
+			Some(std::ffi::OsStr::new("false"))
+		);
+		assert!(
+			command
+				.get_envs()
+				.find(|(key, _)| *key == "CARGO_PROFILE_RELEASE_CODEGEN_UNITS")
+				.is_none(),
+			"SizeProfile::None should not set codegen-units"
+		);
+	}
+
+	#[test]
+	fn upstream_profile_sets_production_overrides() {
+		let mut command = Command::new("cargo");
+		apply_upstream_profile(
+			&mut command,
+			&BuildOptions {
+				project_dir: PathBuf::new(),
+				features: Vec::new(),
+				no_default_features: false,
+				size_profile: SizeProfile::Production,
+			},
+			DeclaredReleaseProfile {
+				overflow_checks: Some(true),
+				..DeclaredReleaseProfile::default()
+			},
+		);
+		let envs: Vec<_> = command.get_envs().collect();
+		let env = |name: &str| {
+			envs.iter()
+				.find(|(key, _)| *key == std::ffi::OsStr::new(name))
+				.and_then(|(_, value)| *value)
+		};
+		assert_eq!(
+			env("CARGO_PROFILE_RELEASE_LTO"),
+			Some(std::ffi::OsStr::new("false"))
+		);
+		assert_eq!(
+			env("CARGO_PROFILE_RELEASE_CODEGEN_UNITS"),
+			Some(std::ffi::OsStr::new("1"))
+		);
+		assert_eq!(
+			env("CARGO_PROFILE_RELEASE_OPT_LEVEL"),
+			Some(std::ffi::OsStr::new("3"))
+		);
+		assert_eq!(
+			env("CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS"),
+			Some(std::ffi::OsStr::new("true"))
+		);
+	}
+
+	#[test]
+	fn upstream_profile_respects_explicit_overflow_checks_request() {
+		let mut command = Command::new("cargo");
+		apply_upstream_profile(
+			&mut command,
+			&BuildOptions {
+				project_dir: PathBuf::new(),
+				features: Vec::new(),
+				no_default_features: false,
+				size_profile: SizeProfile::ProductionWithOverflowChecks,
+			},
+			DeclaredReleaseProfile::default(),
+		);
+		assert_eq!(
+			command
+				.get_envs()
+				.find(|(key, _)| *key == "CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS")
+				.and_then(|(_, value)| value),
+			Some(std::ffi::OsStr::new("true"))
+		);
+	}
 
 	#[test]
 	fn build_wrapper_forwards_discovery_errors() {
@@ -914,6 +1403,404 @@ mod tests {
 			.expect_err("missing project should fail discovery");
 
 		assert!(matches!(error, BuildError::Project(_)));
+	}
+
+	/// Write a dependency-free pina project fixture whose `pina.toml` carries
+	/// the upstream key and whose `cargo metadata` resolves offline.
+	#[cfg(unix)]
+	fn upstream_fixture(root: &Path) -> Project {
+		fs::create_dir_all(root.join("src"))
+			.unwrap_or_else(|error| panic!("create source: {error}"));
+		fs::write(
+			root.join("Cargo.toml"),
+			r#"[package]
+name = "upstream_test"
+version = "0.0.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+bpf-entrypoint = []
+"#,
+		)
+		.unwrap_or_else(|error| panic!("write manifest: {error}"));
+		fs::write(
+			root.join("pina.toml"),
+			r#"[project]
+program = "."
+sbpf-linker = true
+"#,
+		)
+		.unwrap_or_else(|error| panic!("write pina.toml: {error}"));
+		fs::write(
+			root.join("src/lib.rs"),
+			r#"use pina::*;
+
+declare_id!("11111111111111111111111111111111");
+
+#[discriminator]
+pub enum UpstreamInstruction {
+	Hello = 0,
+}
+
+#[instruction(discriminator = UpstreamInstruction::Hello)]
+pub struct HelloInstruction {}
+
+#[derive(Accounts)]
+pub struct HelloAccounts<'a> {
+	pub user: &'a AccountView,
+}
+
+impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let _ = HelloInstruction::try_from_bytes(data)?;
+		self.user.assert_signer()?;
+		Ok(())
+	}
+}
+
+pub fn process_instruction(
+	program_id: &Address,
+	accounts: &mut [AccountView],
+	data: &[u8],
+) -> ProgramResult {
+	let instruction: UpstreamInstruction = parse_instruction(program_id, &ID, data)?;
+	match instruction {
+		UpstreamInstruction::Hello => {
+			HelloAccounts::try_from((program_id, accounts))?.process(data)
+		}
+	}
+}
+"#,
+		)
+		.unwrap_or_else(|error| panic!("write lib.rs: {error}"));
+		Project::discover(root).unwrap_or_else(|error| panic!("discover fixture: {error}"))
+	}
+
+	/// Write a fake cargo that fabricates the upstream cdylib at the expected
+	/// path, and a fake sbpf-linker that answers `--version`.
+	#[cfg(unix)]
+	fn fake_upstream_binaries(dir: &Path) -> (PathBuf, PathBuf) {
+		let cargo = dir.join("fake-cargo.sh");
+		fs::write(
+			&cargo,
+			format!(
+				r#"#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${{1:-}}" == "metadata" ]]; then
+  exec "$REAL_CARGO" "$@"
+fi
+mkdir -p "$CARGO_TARGET_DIR/bpfel-unknown-none/release"
+printf 'upstream-elf' > "$CARGO_TARGET_DIR/bpfel-unknown-none/release/libupstream_test.so"
+"#
+			),
+		)
+		.unwrap_or_else(|error| panic!("write fake cargo: {error}"));
+		let mut perms = fs::metadata(&cargo)
+			.unwrap_or_else(|error| panic!("stat fake cargo: {error}"))
+			.permissions();
+		perms.set_mode(0o755);
+		fs::set_permissions(&cargo, perms)
+			.unwrap_or_else(|error| panic!("chmod fake cargo: {error}"));
+
+		let linker = dir.join("fake-sbpf-linker.sh");
+		fs::write(&linker, "#!/usr/bin/env bash\nexit 0\n")
+			.unwrap_or_else(|error| panic!("write fake linker: {error}"));
+		let mut perms = fs::metadata(&linker)
+			.unwrap_or_else(|error| panic!("stat fake linker: {error}"))
+			.permissions();
+		perms.set_mode(0o755);
+		fs::set_permissions(&linker, perms)
+			.unwrap_or_else(|error| panic!("chmod fake linker: {error}"));
+
+		(cargo, linker)
+	}
+
+	/// Drive `build_project_upstream_with` in-process with fake binaries so
+	/// the whole function body — preflight, cargo invocation, retry loop,
+	/// artifact discovery, and publication — runs under coverage
+	/// instrumentation.
+	#[test]
+	#[cfg(unix)]
+	fn upstream_build_publishes_the_cdylib_and_idl() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let fake_dir = temp.path().join("fake");
+		fs::create_dir_all(&fake_dir).unwrap_or_else(|error| panic!("fake dir: {error}"));
+		let (cargo, linker) = fake_upstream_binaries(&fake_dir);
+		let project_dir = temp.path().join("project");
+		let project = upstream_fixture(&project_dir);
+
+		// The fixture's Project::discover already ran with the real cargo; the
+		// build itself uses the fake, which fabricates the expected artifact
+		// at the discover-time target directory.
+		let target_dir = project.target_dir.clone();
+
+		let output = build_project_upstream_with(
+			&project,
+			&BuildOptions {
+				project_dir: project_dir.clone(),
+				features: Vec::new(),
+				no_default_features: false,
+				size_profile: SizeProfile::Production,
+			},
+			cargo.as_os_str(),
+			linker.as_os_str(),
+		)
+		.unwrap_or_else(|error| panic!("upstream build should succeed: {error}"));
+
+		assert!(
+			target_dir.join("deploy/upstream_test.so").is_file(),
+			"expected the upstream artifact to be published to target/deploy"
+		);
+		assert!(
+			target_dir.join("idl/upstream_test.json").is_file(),
+			"expected the IDL next to the deployed artifact"
+		);
+		assert!(output.sbf_artifact.ends_with("upstream_test.so"));
+	}
+
+	/// The upstream build reports a `MissingSbpfLinker` error when the
+	/// configured binary cannot be spawned.
+	#[test]
+	#[cfg(unix)]
+	fn upstream_build_fails_when_the_linker_is_missing() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let project_dir = temp.path().join("project");
+		let project = upstream_fixture(&project_dir);
+
+		let missing_linker = temp.path().join("nonexistent-sbpf-linker");
+		let error = build_project_upstream_with(
+			&project,
+			&BuildOptions {
+				project_dir,
+				features: Vec::new(),
+				no_default_features: false,
+				size_profile: SizeProfile::Production,
+			},
+			OsString::from("cargo").as_os_str(),
+			missing_linker.as_os_str(),
+		)
+		.expect_err("missing sbpf-linker should fail the preflight");
+
+		assert!(matches!(error, BuildError::MissingSbpfLinker { .. }));
+	}
+
+	/// The upstream build retries with `--export=<symbol>` when cargo reports
+	/// the linker's missing-libcall diagnostic, then succeeds.
+	#[test]
+	#[cfg(unix)]
+	fn upstream_build_retries_with_the_reported_export_symbol() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let fake_dir = temp.path().join("fake");
+		fs::create_dir_all(&fake_dir).unwrap_or_else(|error| panic!("fake dir: {error}"));
+		let (cargo, linker) = fake_upstream_binaries(&fake_dir);
+		// Wrap the fake cargo to fail on the first invocation with the
+		// sbpf-linker missing-export diagnostic, then delegate.
+		let retry_cargo = fake_dir.join("retry-cargo.sh");
+		fs::write(
+			&retry_cargo,
+			format!(
+				r#"#!/usr/bin/env bash
+if [[ ! -f "{sentinel}" ]]; then
+  touch "{sentinel}"
+  printf 'error: linking with `sbpf-linker` failed: exit status: 1\n' >&2
+  printf '  = note: Error: Symbol __udivti3 is missing. Export it with the `--export=__udivti3` flag.\n' >&2
+  exit 1
+fi
+exec "{cargo}" "$@"
+"#,
+				sentinel = fake_dir.join("first-attempt.sentinel").display(),
+				cargo = cargo.display(),
+			),
+		)
+		.unwrap_or_else(|error| panic!("write retry cargo: {error}"));
+		let mut perms = fs::metadata(&retry_cargo)
+			.unwrap_or_else(|error| panic!("stat retry cargo: {error}"))
+			.permissions();
+		perms.set_mode(0o755);
+		fs::set_permissions(&retry_cargo, perms)
+			.unwrap_or_else(|error| panic!("chmod retry cargo: {error}"));
+
+		let project_dir = temp.path().join("project");
+		let project = upstream_fixture(&project_dir);
+		let target_dir = project.target_dir.clone();
+
+		let output = build_project_upstream_with(
+			&project,
+			&BuildOptions {
+				project_dir,
+				features: Vec::new(),
+				no_default_features: false,
+				size_profile: SizeProfile::Production,
+			},
+			retry_cargo.as_os_str(),
+			linker.as_os_str(),
+		)
+		.unwrap_or_else(|error| panic!("upstream retry should succeed: {error}"));
+
+		assert!(
+			target_dir.join("deploy/upstream_test.so").is_file(),
+			"expected the artifact after the retry"
+		);
+	}
+
+	/// The upstream build surfaces a `MissingArtifact` error when cargo
+	/// succeeds but the cdylib is not at the expected path.
+	#[test]
+	#[cfg(unix)]
+	fn upstream_build_reports_a_missing_artifact() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let fake_dir = temp.path().join("fake");
+		fs::create_dir_all(&fake_dir).unwrap_or_else(|error| panic!("fake dir: {error}"));
+		// A no-op cargo that exits 0 without producing anything.
+		let no_op_cargo = fake_dir.join("no-op-cargo.sh");
+		fs::write(&no_op_cargo, "#!/usr/bin/env bash\nexit 0\n")
+			.unwrap_or_else(|error| panic!("write no-op cargo: {error}"));
+		let mut perms = fs::metadata(&no_op_cargo)
+			.unwrap_or_else(|error| panic!("stat no-op cargo: {error}"))
+			.permissions();
+		perms.set_mode(0o755);
+		fs::set_permissions(&no_op_cargo, perms)
+			.unwrap_or_else(|error| panic!("chmod no-op cargo: {error}"));
+
+		let linker = fake_dir.join("fake-sbpf-linker.sh");
+		fs::write(&linker, "#!/usr/bin/env bash\nexit 0\n")
+			.unwrap_or_else(|error| panic!("write fake linker: {error}"));
+		let mut perms = fs::metadata(&linker)
+			.unwrap_or_else(|error| panic!("stat fake linker: {error}"))
+			.permissions();
+		perms.set_mode(0o755);
+		fs::set_permissions(&linker, perms)
+			.unwrap_or_else(|error| panic!("chmod fake linker: {error}"));
+
+		let project_dir = temp.path().join("project");
+		let project = upstream_fixture(&project_dir);
+		let target_dir = project.target_dir.clone();
+
+		let error = build_project_upstream_with(
+			&project,
+			&BuildOptions {
+				project_dir,
+				features: Vec::new(),
+				no_default_features: false,
+				size_profile: SizeProfile::Production,
+			},
+			no_op_cargo.as_os_str(),
+			linker.as_os_str(),
+		)
+		.expect_err("no-op cargo should leave the artifact missing");
+
+		assert!(matches!(error, BuildError::MissingArtifact { .. }));
+	}
+
+	/// The routing from `build_with_measurements` through the env-reading
+	/// wrapper (`build_project_upstream` → `sbpf_linker_command`) into the
+	/// testable core. Uses `#[allow(unsafe_code)]` to set the `CARGO` and
+	/// `PINA_SBPF_LINKER` env vars the wrapper reads, which the workspace
+	/// otherwise denies for test code.
+	#[test]
+	#[cfg(unix)]
+	#[allow(unsafe_code)]
+	fn upstream_routing_fires_when_pina_toml_carries_the_key() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let fake_dir = temp.path().join("fake");
+		fs::create_dir_all(&fake_dir).unwrap_or_else(|error| panic!("fake dir: {error}"));
+		let (cargo, linker) = fake_upstream_binaries(&fake_dir);
+		let project_dir = temp.path().join("project");
+		let project = upstream_fixture(&project_dir);
+		let target_dir = project.target_dir.clone();
+		drop(project);
+
+		// SAFETY: This test is the only writer of these variables in the
+		// process; it restores the previous values before returning.
+		let previous_cargo = std::env::var_os("CARGO");
+		let previous_linker = std::env::var_os("PINA_SBPF_LINKER");
+		let real_cargo = env!("CARGO");
+		unsafe {
+			std::env::set_var("CARGO", &cargo);
+			std::env::set_var("PINA_SBPF_LINKER", &linker);
+			std::env::set_var("REAL_CARGO", real_cargo);
+		}
+
+		let result = build_project_with_options(&BuildOptions {
+			project_dir,
+			features: Vec::new(),
+			no_default_features: false,
+			size_profile: SizeProfile::Production,
+		});
+
+		// Restore env vars regardless of the outcome.
+		unsafe {
+			match previous_cargo {
+				Some(value) => std::env::set_var("CARGO", value),
+				None => std::env::remove_var("CARGO"),
+			}
+			match previous_linker {
+				Some(value) => std::env::set_var("PINA_SBPF_LINKER", value),
+				None => std::env::remove_var("PINA_SBPF_LINKER"),
+			}
+			std::env::remove_var("REAL_CARGO");
+		}
+
+		result
+			.unwrap_or_else(|error| panic!("routing through the wrapper should succeed: {error}"));
+		assert!(
+			target_dir.join("deploy/upstream_test.so").is_file(),
+			"expected the upstream artifact to be published via the routing test"
+		);
+	}
+
+	/// The upstream build surfaces a `CargoFailed` error when cargo exits
+	/// nonzero without a missing-export diagnostic to retry with.
+	#[test]
+	#[cfg(unix)]
+	fn upstream_build_fails_on_a_non_retryable_cargo_error() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let fake_dir = temp.path().join("fake");
+		fs::create_dir_all(&fake_dir).unwrap_or_else(|error| panic!("fake dir: {error}"));
+		let failing_cargo = fake_dir.join("failing-cargo.sh");
+		fs::write(
+			&failing_cargo,
+			"#!/usr/bin/env bash\nprintf 'error: unresolved dependency\\n' >&2\nexit 1\n",
+		)
+		.unwrap_or_else(|error| panic!("write failing cargo: {error}"));
+		let mut perms = fs::metadata(&failing_cargo)
+			.unwrap_or_else(|error| panic!("stat failing cargo: {error}"))
+			.permissions();
+		perms.set_mode(0o755);
+		fs::set_permissions(&failing_cargo, perms)
+			.unwrap_or_else(|error| panic!("chmod failing cargo: {error}"));
+
+		let linker = fake_dir.join("fake-sbpf-linker.sh");
+		fs::write(&linker, "#!/usr/bin/env bash\nexit 0\n")
+			.unwrap_or_else(|error| panic!("write fake linker: {error}"));
+		let mut perms = fs::metadata(&linker)
+			.unwrap_or_else(|error| panic!("stat fake linker: {error}"))
+			.permissions();
+		perms.set_mode(0o755);
+		fs::set_permissions(&linker, perms)
+			.unwrap_or_else(|error| panic!("chmod fake linker: {error}"));
+
+		let project_dir = temp.path().join("project");
+		let project = upstream_fixture(&project_dir);
+		let target_dir = project.target_dir.clone();
+
+		let error = build_project_upstream_with(
+			&project,
+			&BuildOptions {
+				project_dir,
+				features: Vec::new(),
+				no_default_features: false,
+				size_profile: SizeProfile::Production,
+			},
+			failing_cargo.as_os_str(),
+			linker.as_os_str(),
+		)
+		.expect_err("a non-retryable cargo error should surface");
+
+		assert!(matches!(error, BuildError::CargoFailed { .. }));
 	}
 
 	#[test]

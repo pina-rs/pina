@@ -27,6 +27,7 @@ The `examples/` workspace members demonstrate focused usage patterns. They are n
 - `heap_alloc_program`: opt-in heap allocation through `nostd_entrypoint_alloc!`, with the bump allocator, heap-frame sizing, and allocation-failure behavior.
 - `validation_program`: end-to-end declarative validation for instructions, instruction accounts, stored account state, and events.
 - `multisig_program`: production-shaped multisig consensus — bitmask voting, timelocked vault execution of compiled messages, governed config action streams, spending limits, legacy-account import, and the migration envelope.
+- `upstream_bpf_program`: upstream-toolchain showcase — the same program built with nightly Rust and the pinned `sbpf-linker` for `bpfel-unknown-none` with static syscalls; see the [sbpf-linker evaluation](../sbpf-linker-evaluation.md) for the measured caveats and the toolchain comparison matrix.
 
 Use examples as references for the specific framework behavior each one demonstrates. Do not infer unimplemented economic behavior from an instruction name. Read [Production Readiness](./production-readiness.md) before adapting an example for an asset-bearing program.
 

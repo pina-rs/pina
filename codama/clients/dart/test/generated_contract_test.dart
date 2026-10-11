@@ -731,6 +731,7 @@ const expectedPrograms = <String>[
   'sysvar_checks_program',
   'todo_program',
   'transfer_sol_program',
+  'upstream_bpf_program',
   'validation_program',
   'vesting_program',
 ];

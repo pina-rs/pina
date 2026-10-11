@@ -44,11 +44,40 @@ const SCAFFOLD_FILES: &[&str] = &[
 	"tests/surfpool/src/lib.rs",
 ];
 
+/// Options that vary how `pina init` scaffolds a project.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct InitOptions {
+	/// Overwrite scaffold files that already exist.
+	pub force: bool,
+	/// Scaffold for the experimental upstream sbpf-linker toolchain.
+	pub sbpf_linker: bool,
+}
+
 /// Initialize a new Pina program project in `project_dir`.
 ///
 /// When `force` is `false`, this function fails if any scaffold file already
 /// exists. When `true`, scaffold files are overwritten.
 pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Result<(), InitError> {
+	init_project_with_options(
+		project_dir,
+		package_name,
+		&InitOptions {
+			force,
+			sbpf_linker: false,
+		},
+	)
+}
+
+/// Initialize a new Pina program project with scaffold options.
+///
+/// # Errors
+///
+/// Returns the same name-validation and IO errors as [`init_project`].
+pub fn init_project_with_options(
+	project_dir: &Path,
+	package_name: &str,
+	options: &InitOptions,
+) -> Result<(), InitError> {
 	if !is_valid_package_name(package_name) {
 		return Err(InitError::InvalidPackageName {
 			name: package_name.to_owned(),
@@ -62,7 +91,7 @@ pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Resu
 		.collect();
 
 	// Check for existing files before writing anything.
-	if !force {
+	if !options.force {
 		for path in &paths {
 			if path.exists() {
 				return Err(InitError::DestinationExists { path: path.clone() });
@@ -84,10 +113,13 @@ pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Resu
 	let program_title = package_name.replace(['-', '_'], " ").to_upper_camel_case();
 
 	write_file(&paths[0], &cargo_toml_template(package_name))?;
-	write_file(&paths[1], &pina_toml_template())?;
-	write_file(&paths[2], &readme_template(package_name))?;
+	write_file(&paths[1], &pina_toml_template(options.sbpf_linker))?;
+	write_file(
+		&paths[2],
+		&readme_template(package_name, options.sbpf_linker),
+	)?;
 	write_file(&paths[3], &gitignore_template())?;
-	write_file(&paths[4], &cargo_config_template())?;
+	write_file(&paths[4], &cargo_config_template(options.sbpf_linker))?;
 	write_file(&paths[5], &build_script_template())?;
 	write_file(&paths[6], &lib_template(package_name, &program_title))?;
 	write_file(&paths[7], &entrypoint_template())?;
@@ -103,7 +135,23 @@ pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Resu
 }
 
 /// Print next-steps guidance to stdout.
-pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
+pub fn print_next_steps(project_dir: &Path, package_name: &str) {
+	print_next_steps_with_options(
+		project_dir,
+		package_name,
+		&InitOptions {
+			force: false,
+			sbpf_linker: false,
+		},
+	);
+}
+
+/// Print next-steps guidance for the options the project was initialized with.
+pub fn print_next_steps_with_options(
+	project_dir: &Path,
+	_package_name: &str,
+	options: &InitOptions,
+) {
 	println!();
 	println!("  Next steps:");
 	println!();
@@ -116,7 +164,14 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 	println!("    pina migrations create --auto true  # track every contract; record version 0");
 	println!();
 	println!("    pina lint                      # run Pina's security lints");
-	println!("    pina build                     # build SBF and generate the IDL");
+	if options.sbpf_linker {
+		println!(
+			"    pina build                     # build SBF with the upstream sbpf-linker (pina.toml: \
+			 sbpf-linker = true) and generate the IDL"
+		);
+	} else {
+		println!("    pina build                     # build SBF and generate the IDL");
+	}
 	println!("    pina test --unit               # fast native tests");
 	println!("    pina test                      # build SBF and test with Surfpool");
 	println!("    pina dev --yes                 # create and review the Surfpool runbook");
@@ -151,7 +206,24 @@ pub fn print_next_steps(project_dir: &Path, _package_name: &str) {
 /// placeholder `declare_id!` would bind the history to an address the user is
 /// about to replace. `pina migrations create --auto true` is the bootstrap
 /// step, and it runs once the real address is in place.
-fn pina_toml_template() -> String {
+fn pina_toml_template(sbpf_linker: bool) -> String {
+	if sbpf_linker {
+		return r#"[project]
+program = "."
+
+# Experimental: `pina build` links with the upstream sbpf-linker binary for
+# bpfel-unknown-none (static syscalls, no LTO). Remove this key to go back to
+# the cargo-build-sbf driver. See docs/sbpf-linker-evaluation.md.
+sbpf-linker = true
+
+[clients]
+output = "clients"
+languages = ["cpi", "rust", "typescript"]
+mode = "auto"
+scaffold = true
+"#
+		.to_owned();
+	}
 	r#"[project]
 program = "."
 
@@ -305,7 +377,20 @@ check-cfg = [
 	)
 }
 
-fn readme_template(package_name: &str) -> String {
+fn readme_template(package_name: &str, sbpf_linker: bool) -> String {
+	let toolchain_prerequisites = if sbpf_linker {
+		"SBF compilation uses the experimental upstream toolchain: pina.toml records \
+		 `sbpf-linker = true`, so every `pina build` compiles with the pinned nightly Rust \
+		 toolchain (with `rust-src` for build-std) and the `sbpf-linker` binary. Install \
+		 sbpf-linker with `cargo binstall sbpf-linker` and keep it on PATH; the build runs \
+		 without LTO by design. Remove the key from pina.toml to go back to the \
+		 cargo-build-sbf driver, and see the sbpf-linker evaluation for the measured \
+		 caveats."
+	} else {
+		"SBF compilation delegates to the Agave CLI's `cargo-build-sbf` driver. Install the \
+		 Agave CLI (Solana `agave` release) once and keep it on `PATH`."
+	};
+	let build_line = "- Build SBF and IDL: `pina build`";
 	format!(
 		r"# {package_name}
 
@@ -313,13 +398,13 @@ Generated by `pina init`.
 
 ## Prerequisites
 
-SBF compilation delegates to the Agave CLI's `cargo-build-sbf` driver. Install the Agave CLI (Solana `agave` release) once and keep it on `PATH`.
+{toolchain_prerequisites}
 
 TypeScript client generation requires Node.js with npm and `npx`.
 
 ## Development
 
-- Build SBF and IDL: `pina build`
+{build_line}
 - Build a deterministic deployable with Solana Verify: `pina build --verify`
 - Generate configured clients: `pina generate`
 - Run Pina's pinned security lint set: `pina lint`
@@ -361,7 +446,36 @@ fn gitignore_template() -> String {
 	"target/\n.DS_Store\n".to_owned()
 }
 
-fn cargo_config_template() -> String {
+fn cargo_config_template(sbpf_linker: bool) -> String {
+	if sbpf_linker {
+		return r#"[alias]
+# Experimental upstream sbpf-linker build. LTO is deliberately absent: fat LTO
+# under sbpf-linker inflates runtime compute units. See
+# docs/sbpf-linker-evaluation.md for the measured caveats.
+build-program = "build --release --target bpfel-unknown-none -Z build-std=core,alloc -F bpf-entrypoint"
+
+[target.bpfel-unknown-none]
+# Static syscalls are load-bearing: without the two --cfg flags the pinocchio
+# syscall externs fall back to relocation-based resolution that sbpf-linker
+# mishandles, producing programs that load but silently corrupt data.
+rustflags = [
+	"-C", "linker=sbpf-linker",
+	"-C", "panic=abort",
+	"-C", "relocation-model=static",
+	"-C", "target-cpu=v4",
+	"-C", "target-feature=+allows-misaligned-mem-access",
+	"-C", "link-arg=--llvm-args=--bpf-stack-size=4096",
+	"-C", "link-arg=--llvm-args=--bpf-max-stores-per-memfunc=5",
+	"-C", "link-arg=--llvm-args=--disable-gotox",
+	"-C", "link-arg=--llvm-args=--disable-ldsx",
+	"-C", "link-arg=--llvm-args=--disable-movsx",
+	"--cfg=target_os=\"solana\"",
+	"--cfg=target_feature=\"static-syscalls\"",
+	"-A", "explicit_builtin_cfgs_in_flags",
+]
+"#
+		.to_owned();
+	}
 	"[alias]\nbuild-program = \"build-sbf --sbf-out-dir target/deploy -F bpf-entrypoint\"\n"
 		.to_owned()
 }

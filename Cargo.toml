@@ -27,6 +27,7 @@ members = [
 	"codama/clients/cli/rust/sysvar_checks_program",
 	"codama/clients/cli/rust/todo_program",
 	"codama/clients/cli/rust/transfer_sol_program",
+	"codama/clients/cli/rust/upstream_bpf_program",
 	"codama/clients/cli/rust/validation_program",
 	"codama/clients/cli/rust/vesting_program",
 	"codama/clients/cpi/account_realloc_program",
@@ -54,6 +55,7 @@ members = [
 	"codama/clients/cpi/sysvar_checks_program",
 	"codama/clients/cpi/todo_program",
 	"codama/clients/cpi/transfer_sol_program",
+	"codama/clients/cpi/upstream_bpf_program",
 	"codama/clients/cpi/validation_program",
 	"codama/clients/cpi/vesting_program",
 	"codama/clients/rust/account_realloc_program",
@@ -81,6 +83,7 @@ members = [
 	"codama/clients/rust/sysvar_checks_program",
 	"codama/clients/rust/todo_program",
 	"codama/clients/rust/transfer_sol_program",
+	"codama/clients/rust/upstream_bpf_program",
 	"codama/clients/rust/validation_program",
 	"codama/clients/rust/vesting_program",
 	"crates/pina",
@@ -144,6 +147,8 @@ members = [
 	"examples/todo_program/tests/surfpool",
 	"examples/transfer_sol_program",
 	"examples/transfer_sol_program/tests/surfpool",
+	"examples/upstream_bpf_program",
+	"examples/upstream_bpf_program/tests/surfpool",
 	"examples/validation_program",
 	"examples/validation_program/tests/surfpool",
 	"examples/vesting_program",
@@ -348,6 +353,11 @@ pina_test = { path = "crates/pina_test", version = "0.23.0" }
 cargo-semver-checks = { version = "0.50.0" }
 cargo-workspaces = { version = "0.4.2" }
 hyperfine = { version = "1.20.0" }
+# Upstream SBF linker for the experimental `bpfel-unknown-none` build path
+# (see docs/sbpf-linker-evaluation.md). rustc resolves it by name from PATH:
+# `install:all` pins it under `.bin/rust-nightly/sbpf-linker/<version>/bin`
+# (add that directory to PATH), or `cargo binstall sbpf-linker` once.
+sbpf-linker = { version = "0.2.3" }
 
 [workspace.lints.rust]
 # Docstring coverage: every public item reachable from a crate root must be

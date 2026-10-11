@@ -1083,6 +1083,7 @@ mod tests {
 			client_generation: BTreeMap::new(),
 			migration_answers: Default::default(),
 			lint_levels: BTreeMap::new(),
+			sbpf_linker: false,
 		};
 		assert!(matches!(
 			require_surfpool_test(&project),

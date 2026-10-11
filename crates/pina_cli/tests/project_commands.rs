@@ -1408,6 +1408,80 @@ fn generate_real_typescript_and_dart_clients_preserves_scaffold_until_overwrite(
 }
 
 #[test]
+fn generate_refuses_to_remove_through_symbolic_links_in_committed_manifests() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"dart\"]\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	std::os::unix::fs::symlink(
+		workspace_root().join("node_modules"),
+		project.join("node_modules"),
+	)
+	.unwrap_or_else(|error| panic!("failed to expose workspace Node dependencies: {error}"));
+	let cargo = fake_cargo(temp.path());
+	let command = |arguments: &[&str]| {
+		let mut command = project_command(&project, &cargo, &target);
+		command.args(["generate", "--npx", "node"]).args(arguments);
+		command
+			.output()
+			.unwrap_or_else(|error| panic!("failed to run generation: {error}"))
+	};
+
+	let initial = command(&[]);
+	assert!(
+		initial.status.success(),
+		"initial generation failed: {}",
+		String::from_utf8_lossy(&initial.stderr)
+	);
+	let dart = project.join("clients/dart");
+	assert!(dart.join("lib/src/generated/custom_program").is_dir());
+
+	// The AUD2-H1 probe: a committed manifest entry whose path crosses a
+	// symbolic link planted inside the client tree, pointing outside the
+	// project at a victim file. `lstatSync` of the joined path follows the
+	// intermediate link, so the render script's tracked cleanup must never
+	// see such a tree: generation refuses it — on the Rust side before the
+	// renderer starts, and again in the script itself — and the victim
+	// survives either way.
+	let victim = temp.path().join("victim-home/.ssh");
+	fs::create_dir_all(&victim)
+		.unwrap_or_else(|error| panic!("failed to create victim directory: {error}"));
+	fs::write(victim.join("id_ed25519"), "secret key")
+		.unwrap_or_else(|error| panic!("failed to write victim key: {error}"));
+	std::os::unix::fs::symlink(&victim, dart.join("lib/src/generated/custom_program/link"))
+		.unwrap_or_else(|error| panic!("failed to plant link: {error}"));
+	fs::write(
+		dart.join(".pina-generated.json"),
+		r#"{"paths": ["lib/src/generated/custom_program/link/id_ed25519"]}"#,
+	)
+	.unwrap_or_else(|error| panic!("failed to plant manifest: {error}"));
+
+	let update = command(&[]);
+	assert!(
+		!update.status.success(),
+		"a tree containing a symbolic link must refuse to generate"
+	);
+	let stderr = String::from_utf8_lossy(&update.stderr);
+	assert!(
+		stderr.contains("symbolic link"),
+		"the failure must name the symbolic link: {stderr}"
+	);
+	assert!(
+		victim.join("id_ed25519").is_file(),
+		"the victim file outside the project must survive regeneration"
+	);
+	assert!(
+		fs::symlink_metadata(dart.join("lib/src/generated/custom_program/link")).is_ok(),
+		"the link itself must survive too; refusing costs nothing"
+	);
+}
+
+#[test]
 fn generate_typescript_uses_custom_library_identity() {
 	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 	let project = temp.path().join("project");

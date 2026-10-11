@@ -1199,7 +1199,7 @@
 					"canonical_name": "--output",
 					"hidden": false,
 					"global": false,
-					"summary": "Override the configured client output directory",
+					"summary": "Override the configured client output directory. Configured outputs stay inside the Git worktree; only this flag publishes outside it",
 					"value": {
 						"kind": "string",
 						"required": false,
@@ -1214,7 +1214,7 @@
 					"canonical_name": "--mode",
 					"hidden": false,
 					"global": false,
-					"summary": "Override how existing client destinations are handled",
+					"summary": "Override how existing client destinations are handled. Selecting `overwrite` is an operator decision: pina.toml cannot request it",
 					"value": {
 						"kind": "enum",
 						"required": false,
@@ -1254,7 +1254,7 @@
 					"canonical_name": "--npx",
 					"hidden": false,
 					"global": false,
-					"summary": "Executable used to invoke JavaScript or Dart renderers. Defaults to npx",
+					"summary": "Executable used to invoke JavaScript or Dart renderers. Defaults to npx, which resolves the pinned packages isolated from the project; pass a Node executable to resolve packages from the project on purpose",
 					"value": {
 						"kind": "string",
 						"required": false,
@@ -2432,6 +2432,26 @@
 					"hidden": false,
 					"global": false,
 					"summary": "Overwrite scaffold files that already exist",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
+						"--sbpf-linker"
+					],
+					"canonical_name": "--sbpf-linker",
+					"hidden": false,
+					"global": false,
+					"summary": "Experimental: scaffold for the upstream sbpf-linker toolchain",
+					"description": "Experimental: scaffold for the upstream sbpf-linker toolchain.\n\nRecords `sbpf-linker = true` under `[project]` in pina.toml, so every `pina build` compiles for bpfel-unknown-none with the pinned nightly Rust and the sbpf-linker binary instead of cargo-build-sbf; remove the key to revert. The scaffold also carries the static syscall rustflags and a build-program alias for bare cargo builds. The pinned toolchain ships rust-src for build-std; install sbpf-linker separately. The build runs without LTO by design; see docs/sbpf-linker-evaluation.md for the measured caveats.",
 					"value": {
 						"kind": "flag",
 						"required": false,

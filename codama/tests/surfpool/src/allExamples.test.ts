@@ -58,6 +58,7 @@ const EXAMPLE_PROGRAMS = [
 	"sysvar_checks_program",
 	"todo_program",
 	"transfer_sol_program",
+	"upstream_bpf_program",
 	"validation_program",
 	"vesting_program",
 ] as const;
@@ -551,6 +552,7 @@ const EXPECTED_ENTRYPOINT_CASES: Record<
 		accounts: "none",
 		programError: "NotEnoughAccountKeys",
 	},
+	upstream_bpf_program: { instruction: "hello", accounts: "payerSigner" },
 	validation_program: {
 		instruction: "initializePolicy",
 		accounts: "none",
@@ -583,6 +585,7 @@ const ACCESS_GUARD_PROGRAMS: Partial<
 	staking_rewards_program: "InvalidAccountData",
 	todo_program: "InvalidAccountData",
 	transfer_sol_program: "InvalidAccountData",
+	upstream_bpf_program: "MissingRequiredSignature",
 	vesting_program: "InvalidAccountData",
 };
 

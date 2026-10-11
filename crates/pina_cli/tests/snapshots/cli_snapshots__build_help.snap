@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 147
 info:
   program: pina
   args:

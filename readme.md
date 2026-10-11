@@ -943,13 +943,13 @@ When the `logs` feature is disabled, `log!` compiles to nothing.
 
 <!-- {=sbfBuildInstructions} -->
 
-Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
+Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker` (0.2.3 or newer, pinned in `[workspace.metadata.bin]`; run `install:all`):
 
 ```sh
 cargo build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
-The pinned nightly toolchain from `rust-toolchain.toml` runs the build; the `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
+The pinned nightly toolchain from `rust-toolchain.toml` runs the build; the `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests. The root `.cargo/config.toml` carries the static-syscall rustflags this path requires, and it builds without LTO by design — see the [sbpf-linker evaluation](https://github.com/pina-rs/pina/blob/main/docs/sbpf-linker-evaluation.md) for the measured comparison against `cargo build-sbf`.
 
 <!-- {/sbfBuildInstructions} -->
 
@@ -1057,6 +1057,7 @@ The `pina docs` subcommand renders built-in reference topics. Set the `PINA_TEMP
 | [`multisig_program`](examples/multisig_program)                                     | Production-shaped multisig: bitmask votes, timelocked vault execution, config action streams, spending limits, and legacy import |
 | [`staking_rewards_program`](examples/staking_rewards_program)                       | Staking pool and user-position accounting scaffold                                                                               |
 | [`pina_bpf_program`](examples/pina_bpf_program)                                     | Minimal pina-native BPF hello world (nightly + `build-std=core,alloc`)                                                           |
+| [`upstream_bpf_program`](examples/upstream_bpf_program)                             | Upstream-toolchain showcase: the same program built with the pinned `sbpf-linker` (nightly, static syscalls)                     |
 | [`declare_id_program`](examples/declare_id_program)                                 | Anchor `declare-id` test parity port for program-id mismatch                                                                     |
 | [`declare_program`](examples/declare_program)                                       | Anchor `declare-program` parity port for external-program ID checks                                                              |
 | [`duplicate_mutable_accounts_program`](examples/duplicate_mutable_accounts_program) | Anchor duplicate mutable account checks adapted to explicit pina validation                                                      |

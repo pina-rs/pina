@@ -136,6 +136,11 @@ pub struct Project {
 	pub migration_answers: MigrationsAnswersConfig,
 	#[serde(skip)]
 	pub lint_levels: BTreeMap<String, LintLevel>,
+	/// Experimental: build with the upstream sbpf-linker toolchain, recorded
+	/// as `sbpf-linker = true` under `[project]` in pina.toml (`pina init
+	/// --sbpf-linker` writes it). Removing the key reverts `pina build` to
+	/// the `cargo-build-sbf` driver.
+	pub sbpf_linker: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -229,6 +234,12 @@ pub struct MigrationsAnswersConfig {
 struct ProgramConfig {
 	program: String,
 	idl_dir: Option<String>,
+	/// Experimental: build with the upstream sbpf-linker binary for
+	/// `bpfel-unknown-none` instead of the `cargo-build-sbf` driver. `pina
+	/// init --sbpf-linker` records this; removing the key reverts every
+	/// `pina build` to cargo-build-sbf.
+	#[serde(default, alias = "sbpf-linker")]
+	sbpf_linker: bool,
 	/// Named path anchors declared as `[project.paths]`, usable as
 	/// `{{ name }}` in any configured path. Values may only reference the
 	/// built-in `{{root}}` repository anchor.
@@ -240,6 +251,7 @@ impl Default for ProgramConfig {
 		Self {
 			program: ".".to_owned(),
 			idl_dir: None,
+			sbpf_linker: false,
 			paths: BTreeMap::new(),
 		}
 	}
@@ -532,6 +544,7 @@ impl Project {
 			client_generation,
 			migration_answers: config.migrations.answers,
 			lint_levels,
+			sbpf_linker: config.project.sbpf_linker,
 			root,
 		})
 	}
@@ -599,6 +612,7 @@ impl Project {
 			client_generation,
 			migration_answers: MigrationsAnswersConfig::default(),
 			lint_levels: BTreeMap::new(),
+			sbpf_linker: false,
 			root,
 		})
 	}
