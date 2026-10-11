@@ -2165,6 +2165,9 @@ pub struct CompactState {
 #[allow(dead_code, non_snake_case, unused_imports)]
 mod __pinapod_compact_CompactState {
     use super::*;
+    use ::core::option::Option::{self, None, Some};
+    use ::core::result::Result::{self, Err, Ok};
+    use ::core::primitive::{bool, isize, str, u8, u16, u32, u64, usize};
     #[inline(always)]
     fn __pinapod_checked_add(
         left: usize,
