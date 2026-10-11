@@ -13,7 +13,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("compact-accounts-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for compactAccountsProgram");
+	.description(
+		"A focused compact-account lifecycle example.\n\n[`Journal`] stores a fixed header and only the active bytes of its title,\nentries, markers, and optional note. Mutations use one atomic patch that\nplans rent adjustment, reallocation, and validated encoding together.",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(resizeCommand);
 program.addCommand(writeCommand);

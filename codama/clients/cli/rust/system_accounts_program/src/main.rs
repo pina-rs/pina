@@ -18,7 +18,10 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for systemAccountsProgram
+/// Anchor `system-accounts` parity example ported to pina.
+///
+/// Verifies a signer authority plus a wallet account owned by the system
+/// program.
 #[derive(Debug, Parser)]
 #[command(name = "system-accounts-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

@@ -11,7 +11,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("validation-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for validationProgram");
+	.description(
+		"Complete declarative-validation example for Pina.\n\nThe program validates each boundary independently:\n\n- `#[instruction]` validates client-supplied values after decoding.\n- `#[derive(Accounts)]` validates the incoming account list after parsing.\n- `#[account]` validates stored state after initialization and loading.\n- `#[event]` validates an event before the program can emit or transport it.",
+	);
 program.addCommand(initializePolicyCommand);
 program.addCommand(checkPolicyCommand);
 program.addCommand(fetchCommand);

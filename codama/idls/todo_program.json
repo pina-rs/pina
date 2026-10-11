@@ -7,6 +7,15 @@
 		"name": "todoProgram",
 		"publicKey": "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd",
 		"version": "0.0.0",
+		"docs": [
+			"Todo program example built with pina.",
+			"",
+			"This example demonstrates a compact PDA-backed account with three",
+			"instruction paths:",
+			"- `Initialize`: creates a todo account for an authority.",
+			"- `ToggleCompleted`: flips the completion flag.",
+			"- `UpdateDigest`: updates a fixed-size digest payload."
+		],
 		"accounts": [
 			{
 				"kind": "accountNode",

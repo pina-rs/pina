@@ -2,7 +2,7 @@
 	"name": "privacy-pool-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for privacyPoolProgram",
+	"description": "A tiered-disclosure privacy pool built with pina",
 	"type": "module",
 	"bin": {
 		"privacy-pool-program-cli": "./src/main.ts"

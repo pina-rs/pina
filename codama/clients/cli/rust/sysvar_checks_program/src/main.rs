@@ -18,7 +18,10 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for sysvarChecksProgram
+/// Anchor `sysvars` parity example ported to pina.
+///
+/// Verifies that provided clock, rent, and stake-history accounts are the
+/// expected sysvar accounts.
 #[derive(Debug, Parser)]
 #[command(name = "sysvar-checks-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

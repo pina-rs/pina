@@ -2,7 +2,7 @@
 	"name": "compact-accounts-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for compactAccountsProgram",
+	"description": "A focused compact-account lifecycle example",
 	"type": "module",
 	"bin": {
 		"compact-accounts-program-cli": "./src/main.ts"

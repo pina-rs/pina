@@ -19,7 +19,22 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for optionalAccountsProgram
+/// Optional accounts program — demonstrates `Option<&AccountView>` fields.
+///
+/// Every instruction keeps a **fixed** account layout: when a caller omits an
+/// optional account, the generated clients fill the slot with a readonly meta
+/// pointing at this program's own address. On-chain, a slot holding the
+/// program ID parses as [`None`].
+///
+/// Coverage matrix:
+///
+/// | Instruction | Optional field                    | Behaviour when present            |
+/// |-------------|-----------------------------------|-----------------------------------|
+/// | `Init`      | —                                 | Creates the store PDA (baseline). |
+/// | `Touch`     | `store: Option<&mut AccountView>` | Increments the stored counter.    |
+/// | `Inspect`   | `store: Option<&AccountView>`     | Logs the observed count.          |
+/// | `Inspect`   | `witness: Option<&AccountView>`   | Must be a signer.                 |
+/// | `Note`      | `note: Option<&AccountView>`      | Logged as an opaque reference.    |
 #[derive(Debug, Parser)]
 #[command(name = "optional-accounts-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

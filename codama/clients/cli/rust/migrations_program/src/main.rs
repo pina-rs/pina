@@ -19,7 +19,14 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for migrationsProgram
+/// Instruction discriminator.
+///
+/// The reserved `Migrate` instruction's ladder is derived from the manifest:
+/// one optional slot per enveloped account contract, in identity-sorted
+/// order — `[payer, systemProgram, state, manualState, compactState]` — the
+/// same order generated clients compose. An explicit `migrations(State, ...)`
+/// list remains available when a program needs several same-contract slots in
+/// one sweep under a shared lamport budget.
 #[derive(Debug, Parser)]
 #[command(name = "migrations-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

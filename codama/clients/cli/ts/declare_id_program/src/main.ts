@@ -10,6 +10,8 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("declare-id-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for declareIdProgram");
+	.description(
+		"Anchor `declare-id` parity example ported to pina.\n\nAnchor's test validates that a program-id mismatch is rejected. In pina,\nthat check occurs in `parse_instruction`.",
+	);
 program.addCommand(initializeCommand);
 program.parseAsync(process.argv);

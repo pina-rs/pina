@@ -11,6 +11,15 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Complete declarative-validation example for Pina.
+///
+/// The program validates each boundary independently:
+///
+/// - `#[instruction]` validates client-supplied values after decoding.
+/// - `#[derive(Accounts)]` validates the incoming account list after parsing.
+/// - `#[account]` validates stored state after initialization and loading.
+/// - `#[event]` validates an event before the program can emit or transport it.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const VALIDATION_PROGRAM_ID: Address =
 	pina::address!("GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn");
 

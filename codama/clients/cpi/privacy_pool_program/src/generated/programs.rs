@@ -11,6 +11,69 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// A tiered-disclosure privacy pool built with pina.
+///
+/// This example is a shielded-pool payments program whose distinguishing
+/// feature is its disclosure protocol: transfers are private by default, and
+/// access to a note's history is a *governed, logged* act rather than a
+/// standing backdoor. It exists to show the scale of program pina can carry —
+/// Poseidon commitments through the runtime syscall, on-chain Groth16
+/// verification through the BN254 pairing syscall, a full nullifier-set
+/// discipline, and a multi-party disclosure state machine — inside one
+/// `no_std` crate with no `unsafe` code and heap use confined to the
+/// verifier's scratch buffers.
+///
+/// # The pool
+///
+/// [`PrivacyPoolInstruction::Deposit`] escrows a fixed denomination of SOL
+/// and inserts a client-computed Poseidon commitment into an on-chain
+/// incremental Merkle tree. [`PrivacyPoolInstruction::Withdraw`] and
+/// [`PrivacyPoolInstruction::Transfer`] spend a note by verifying a Groth16
+/// proof (public inputs: the tree root, the derived nullifier, and for
+/// transfers the successor commitment) and recording the nullifier. The
+/// pairing check runs entirely through the `sol_alt_bn128_group_op` syscall,
+/// so a spend fits in one transaction at a fraction of the compute budget
+/// instead of demanding the multi-transaction slicing a hand-written
+/// verifier used to need.
+///
+/// # The disclosure tiers
+///
+/// Every note carries an *audit envelope*: the note plaintext encrypted by
+/// the depositor's client, plus key shares escrowed to a committee of
+/// custodians. No single custodian can open an envelope; a threshold can,
+/// and the shares travel off-chain so no key material ever becomes public.
+/// Disclosure requests flow through three tiers:
+///
+/// - **Tier 0 — consent.** Anyone may request. The note's *view key* holder
+/// (a fresh keypair per note) must grant before custodians may execute.
+/// - **Tier 1 — verified.** Registered requesters. The subject is notified
+/// through an encrypted notice blob and holds a challenge window; once the
+/// window lapses without a challenge, the committee may execute.
+/// - **Tier 2 — compelled.** Registered requesters with standing legal
+/// process. No window; the committee may execute immediately.
+///
+/// The invariant the program enforces — the reason this is a protocol and
+/// not a policy document — is that reaching the custodian threshold *is* the
+/// log entry: [`PrivacyPoolInstruction::ApproveDisclosure`] flips a request
+/// to executed and appends to the append-only [`DisclosureLog`] in the same
+/// instruction. Disclosure without a permanent public record is impossible
+/// by construction.
+///
+/// # What this example deliberately is not
+///
+/// This is a teaching scaffold, not a production privacy system. The
+/// readme enumerates the honest limits: custodians can collude off-chain,
+/// fee-payer linkage is unaddressed (no relayer), deposits and withdrawals
+/// are correlation points, the nullifier scan is linear, the share
+/// encryption in tests is demo-grade, and the disclosure log names its
+/// target commitment rather than a salted scope root.
+///
+/// The `migrations(...)` list is the reserved `Migrate` instruction's slot
+/// order: `[payer, systemProgram, poolConfig, merkleTree, nullifierSet,
+/// custodianRegistry, requesterRegistry, disclosureLog, noteCommitment,
+/// disclosureRequest, verifyingKeyAccount]`. Generated clients derive the
+/// same order from the IDL.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const PRIVACY_POOL_PROGRAM_ID: Address =
 	pina::address!("DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D");
 

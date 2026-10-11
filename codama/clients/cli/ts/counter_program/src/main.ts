@@ -11,7 +11,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("counter-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for counterProgram");
+	.description(
+		"Counter program — demonstrates account state management with pina.\n\nThis example shows how to use pina's macro system to define on-chain state\nand mutate it across transactions. It covers:\n\n- **Account schemas** with `#[account]` — native Rust fields plus a\ngenerated, validated `PinaPod` view over account bytes.\n- **PDA-based accounts** — the counter is stored at a Program Derived\nAddress seeded by the authority's public key, so each user gets their own\ncounter.\n- **Instruction dispatch** — `#[discriminator]` + `#[instruction]` +\n`parse_instruction` for type-safe routing.\n- **Account validation chains** — `.assert_signer()?.assert_writable()?` for\nconcise, composable checks.\n- **`CreateProgramAccount`** — pina's CPI builder for PDA account creation.\n\n## Instructions\n\n| Variant     | Description                               |\n|-------------|-------------------------------------------|\n| `Initialize` | Create a new counter PDA for the signer. |\n| `Increment`  | Add 1 to the counter value.              |\n\nInstruction discriminator. Each variant maps to a unique `u8` tag that\nappears as the first byte of instruction data.\n\n`entrypoint` generates `CounterInstruction::process_instruction`, routing\neach variant to the accounts struct of the same name plus `Accounts`, and\nderives `CounterInstruction::MAX_INSTRUCTION_ACCOUNTS` from those structs'\ndeclared bounds.",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(incrementCommand);
 program.addCommand(fetchCommand);

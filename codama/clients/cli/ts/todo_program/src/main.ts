@@ -12,7 +12,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("todo-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for todoProgram");
+	.description(
+		"Todo program example built with pina.\n\nThis example demonstrates a compact PDA-backed account with three\ninstruction paths:\n- `Initialize`: creates a todo account for an authority.\n- `ToggleCompleted`: flips the completion flag.\n- `UpdateDigest`: updates a fixed-size digest payload.",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(toggleCompletedCommand);
 program.addCommand(updateDigestCommand);

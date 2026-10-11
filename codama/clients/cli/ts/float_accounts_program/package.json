@@ -2,7 +2,7 @@
 	"name": "float-accounts-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for floatAccountsProgram",
+	"description": "Anchor `floats` parity example ported to pina",
 	"type": "module",
 	"bin": {
 		"float-accounts-program-cli": "./src/main.ts"

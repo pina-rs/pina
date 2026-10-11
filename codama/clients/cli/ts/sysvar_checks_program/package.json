@@ -2,7 +2,7 @@
 	"name": "sysvar-checks-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for sysvarChecksProgram",
+	"description": "Anchor `sysvars` parity example ported to pina",
 	"type": "module",
 	"bin": {
 		"sysvar-checks-program-cli": "./src/main.ts"

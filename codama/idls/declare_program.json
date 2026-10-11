@@ -7,6 +7,13 @@
 		"name": "declareProgram",
 		"publicKey": "Dec1areProgram11111111111111111111111111111",
 		"version": "0.0.0",
+		"docs": [
+			"Anchor `declare-program` parity example ported to pina.",
+			"",
+			"This adaptation focuses on the core behavior that maps to pina directly:",
+			"validating that an \"external program\" account matches an expected program",
+			"ID before executing cross-program logic."
+		],
 		"instructions": [
 			{
 				"kind": "instructionNode",

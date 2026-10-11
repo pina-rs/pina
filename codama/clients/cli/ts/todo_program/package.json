@@ -2,7 +2,7 @@
 	"name": "todo-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for todoProgram",
+	"description": "Todo program example built with pina",
 	"type": "module",
 	"bin": {
 		"todo-program-cli": "./src/main.ts"

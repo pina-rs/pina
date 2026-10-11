@@ -11,6 +11,12 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `declare-program` parity example ported to pina.
+///
+/// This adaptation focuses on the core behavior that maps to pina directly:
+/// validating that an "external program" account matches an expected program
+/// ID before executing cross-program logic.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const DECLARE_PROGRAM_ID: Address =
 	pina::address!("Dec1areProgram11111111111111111111111111111");
 

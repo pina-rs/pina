@@ -89,4 +89,29 @@ describe("extractCliModel", () => {
 			})
 		).toThrow(/not supported/);
 	});
+
+	it("carries the program docs through to the model", () => {
+		const program = {
+			name: "docs_program",
+			publicKey: "11111111111111111111111111111111",
+			version: "0.0.0",
+			instructions: [],
+		};
+		const documented = extractCliModel({
+			program: {
+				...program,
+				docs: ["Docs program description.", "", "Second paragraph."],
+			},
+		});
+		expect(documented.docs).toEqual([
+			"Docs program description.",
+			"",
+			"Second paragraph.",
+		]);
+		expect(documented.about).toBe("Docs program description");
+
+		const undocumented = extractCliModel({ program });
+		expect(undocumented.docs).toEqual([]);
+		expect(undocumented.about).toBe("Command-line interface for docsProgram");
+	});
 });

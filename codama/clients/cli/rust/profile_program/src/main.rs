@@ -19,7 +19,27 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for profileProgram
+/// Profile program — demonstrates `PinaPod`'s bounded fields in fixed account
+/// state.
+///
+/// Pina validates the complete `PinaPod` representation before exposing a
+/// zero-copy view:
+///
+/// - **`String<32>` / `String<128>`** — UTF-8 text with a one-byte length
+/// prefix and fixed inline capacity.
+/// - **`Vec<u64, 8>`** — up to eight `u64` values with a two-byte count.
+/// - **`Option<T>`** — fixed-size optional data backed by `PodOption` in the
+/// generated zero-copy view. Used here for an optional favourite tag.
+/// - **`PodBool`** — a single-byte boolean for the `active` flag.
+///
+/// ## Instructions
+///
+/// | Variant         | Description                                  |
+/// |-----------------|----------------------------------------------|
+/// | `Initialize`    | Create a new profile PDA for the signer.     |
+/// | `UpdateProfile` | Replace the profile name and bio.            |
+/// | `AddTag`        | Append a tag to the profile's tag list.      |
+/// | `RemoveTag`     | Remove the tag at the given index.           |
 #[derive(Debug, Parser)]
 #[command(name = "profile-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'vesting-program-cli',
-      "Command-line interface for vestingProgram",
+      "Vesting schedule with cliff and linear unlock, built with pina.\n\nThis example demonstrates a complete vesting lifecycle:\n- initialize a vesting schedule and fund its PDA-owned vault ATA\n- release the vested portion of the allocation on claim\n- return the unclaimed remainder to the admin on cancellation\n\n`Claim` reads the Clock sysvar, so a claim before the cliff is rejected and\nthe vested entitlement grows linearly to `end_ts`. Token release uses\n`TransferChecked` signed by the vesting PDA, and `Cancel` refunds the\nremaining vault balance and closes the vault.",
     )
     ..argParser.addOption(
       'url',

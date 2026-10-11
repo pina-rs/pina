@@ -10,6 +10,8 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("sysvar-checks-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for sysvarChecksProgram");
+	.description(
+		"Anchor `sysvars` parity example ported to pina.\n\nVerifies that provided clock, rent, and stake-history accounts are the\nexpected sysvar accounts.",
+	);
 program.addCommand(sysvarsCommand);
 program.parseAsync(process.argv);

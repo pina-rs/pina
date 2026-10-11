@@ -2,7 +2,7 @@
 	"name": "duplicate-mutable-accounts-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for duplicateMutableAccountsProgram",
+	"description": "Anchor `duplicate-mutable-accounts` parity example ported to pina",
 	"type": "module",
 	"bin": {
 		"duplicate-mutable-accounts-program-cli": "./src/main.ts"

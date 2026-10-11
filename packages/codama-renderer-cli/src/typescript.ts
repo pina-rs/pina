@@ -648,7 +648,7 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("${bin}")
 	.version("0.1.0")
-	.description(${JSON.stringify(model.about)});
+	.description(${JSON.stringify(model.docs.join("\n") || model.about)});
 ${registrations}
 program.parseAsync(process.argv);
 `;

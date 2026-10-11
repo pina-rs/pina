@@ -2,7 +2,7 @@
 	"name": "staking-rewards-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for stakingRewardsProgram",
+	"description": "Staking account and rewards-bookkeeping scaffold built with pina",
 	"type": "module",
 	"bin": {
 		"staking-rewards-program-cli": "./src/main.ts"

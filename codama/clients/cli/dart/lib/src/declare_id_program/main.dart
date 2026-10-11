@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'declare-id-program-cli',
-      "Command-line interface for declareIdProgram",
+      "Anchor `declare-id` parity example ported to pina.\n\nAnchor's test validates that a program-id mismatch is rejected. In pina,\nthat check occurs in `parse_instruction`.",
     )
     ..argParser.addOption(
       'url',

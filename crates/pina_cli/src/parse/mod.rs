@@ -264,9 +264,12 @@ pub fn assemble_program_ir_multi_with_auto(
 
 	let public_key = public_key.ok_or(IdlError::NoProgramId)?;
 
+	let docs = program_docs(files, &all_disc_enums);
+
 	assemble_from_extracted(
 		program_name,
 		public_key,
+		&docs,
 		&all_disc_enums,
 		&all_account_structs,
 		&all_event_structs,
@@ -281,6 +284,47 @@ pub fn assemble_program_ir_multi_with_auto(
 	)
 }
 
+/// Program-level docs lowered from the crate's own documentation.
+///
+/// The crate root's module docs (`//!`) lead, so generated clients use them
+/// as the program's main description. They are followed by the doc comment
+/// on the entrypoint surface — the hand-written `process_instruction`
+/// function when it carries one, else the `#[discriminator(entrypoint)]`
+/// enum that generates it. A hand-written dispatch is authoritative, so its
+/// docs win over the enum's when both surfaces are annotated.
+fn program_docs(
+	files: &[&syn::File],
+	disc_enums: &[discriminator::DiscriminatorEnum],
+) -> Vec<String> {
+	let module_docs = files
+		.first()
+		.map(|file| doc_comments::extract_docs(&file.attrs))
+		.unwrap_or_default();
+	let fn_docs = files
+		.iter()
+		.find_map(|file| {
+			let docs = entrypoint::extract_process_instruction_docs(file);
+			(!docs.is_empty()).then_some(docs)
+		})
+		.unwrap_or_default();
+	let entrypoint_docs = if fn_docs.is_empty() {
+		disc_enums
+			.iter()
+			.find(|disc_enum| disc_enum.entrypoint)
+			.map(|disc_enum| disc_enum.docs.clone())
+			.unwrap_or_default()
+	} else {
+		fn_docs
+	};
+
+	let mut docs = module_docs;
+	if !docs.is_empty() && !entrypoint_docs.is_empty() {
+		docs.push(String::new());
+	}
+	docs.extend(entrypoint_docs);
+	docs
+}
+
 /// Assemble a `ProgramIr` from a single parsed syn `File`.
 pub fn assemble_program_ir(file: &syn::File, program_name: &str) -> Result<ProgramIr, IdlError> {
 	assemble_program_ir_multi(&[file], program_name)
@@ -291,6 +335,7 @@ pub fn assemble_program_ir(file: &syn::File, program_name: &str) -> Result<Progr
 fn assemble_from_extracted(
 	program_name: &str,
 	public_key: String,
+	program_docs: &[String],
 	disc_enums: &[discriminator::DiscriminatorEnum],
 	account_structs: &[account_state::AccountStruct],
 	event_structs: &[event_data::EventDeclaration],
@@ -392,6 +437,7 @@ fn assemble_from_extracted(
 	};
 
 	let ir = ProgramIr {
+		docs: program_docs.to_vec(),
 		name: program_name.to_owned(),
 		public_key,
 		pinapod_enums: pinapod_enums.to_vec(),
@@ -947,6 +993,132 @@ pub struct RunAccounts<'a> {
 		assert_eq!(ir.events[0].visible_docs(), Vec::<String>::new());
 		assert!(!ir.events[1].is_migratable());
 		assert!(ir.events[1].visible_docs().is_empty());
+	}
+
+	#[test]
+	fn assemble_program_ir_collects_module_and_entrypoint_docs() {
+		let source = r#"
+			//! Escrow program.
+			//!
+			//! Holds funds until both parties approve.
+
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			/// Routes each instruction to its accounts struct.
+			#[discriminator(entrypoint)]
+			pub enum EscrowInstruction {
+				Initialize = 0,
+			}
+
+			#[instruction(discriminator = EscrowInstruction, variant = Initialize)]
+			pub struct InitializeInstruction {}
+
+			#[derive(Accounts, Debug)]
+			pub struct InitializeAccounts<'a> {
+				pub authority: &'a AccountView,
+			}
+
+			impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
+				fn process(self, _data: &[u8]) -> ProgramResult {
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir = assemble_program_ir(&file, "escrow").unwrap_or_else(|e| panic!("assemble: {e}"));
+
+		assert_eq!(
+			ir.docs,
+			vec![
+				"Escrow program.".to_owned(),
+				String::new(),
+				"Holds funds until both parties approve.".to_owned(),
+				String::new(),
+				"Routes each instruction to its accounts struct.".to_owned(),
+			]
+		);
+	}
+
+	#[test]
+	fn assemble_program_ir_prefers_process_instruction_docs() {
+		let source = r#"
+			//! Escrow program.
+
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			/// Enum docs that must not win over the hand-written dispatch.
+			#[discriminator(entrypoint)]
+			pub enum EscrowInstruction {
+				Initialize = 0,
+			}
+
+			#[instruction(discriminator = EscrowInstruction, variant = Initialize)]
+			pub struct InitializeInstruction {}
+
+			#[derive(Accounts, Debug)]
+			pub struct InitializeAccounts<'a> {
+				pub authority: &'a AccountView,
+			}
+
+			impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
+				fn process(self, _data: &[u8]) -> ProgramResult {
+					Ok(())
+				}
+			}
+
+			/// The hand-written dispatch documents the program.
+			pub mod entrypoint {
+				/// The hand-written dispatch documents the program.
+				pub fn process_instruction(
+					program_id: &Address,
+					accounts: &mut [AccountView],
+					data: &[u8],
+				) -> ProgramResult {
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir = assemble_program_ir(&file, "escrow").unwrap_or_else(|e| panic!("assemble: {e}"));
+
+		assert_eq!(
+			ir.docs,
+			vec![
+				"Escrow program.".to_owned(),
+				String::new(),
+				"The hand-written dispatch documents the program.".to_owned(),
+			]
+		);
+	}
+
+	#[test]
+	fn assemble_program_ir_without_docs_stays_empty() {
+		let source = r#"
+			declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+
+			#[discriminator(entrypoint)]
+			pub enum PlainInstruction {
+				Initialize = 0,
+			}
+
+			#[instruction(discriminator = PlainInstruction, variant = Initialize)]
+			pub struct InitializeInstruction {}
+
+			#[derive(Accounts, Debug)]
+			pub struct InitializeAccounts<'a> {
+				pub authority: &'a AccountView,
+			}
+
+			impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
+				fn process(self, _data: &[u8]) -> ProgramResult {
+					Ok(())
+				}
+			}
+		"#;
+		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
+		let ir = assemble_program_ir(&file, "plain").unwrap_or_else(|e| panic!("assemble: {e}"));
+
+		assert!(ir.docs.is_empty());
 	}
 
 	#[test]
@@ -1511,6 +1683,7 @@ pub struct RunAccounts<'a> {
 			seeds: Vec::new(),
 		};
 		let ir = ProgramIr {
+			docs: Vec::new(),
 			name: "example".to_owned(),
 			public_key: "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS".to_owned(),
 			pinapod_enums: Vec::new(),
@@ -1539,6 +1712,7 @@ pub struct RunAccounts<'a> {
 			}],
 			repr_size: 1,
 			entrypoint: false,
+			docs: Vec::new(),
 		};
 		let account = account_state::AccountStruct {
 			name: "VaultState".to_owned(),
@@ -1553,6 +1727,7 @@ pub struct RunAccounts<'a> {
 		let error = assemble_from_extracted(
 			"example",
 			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS".to_owned(),
+			&[],
 			&[discriminator],
 			&[account],
 			&[],

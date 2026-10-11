@@ -19,7 +19,13 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for todoProgram
+/// Todo program example built with pina.
+///
+/// This example demonstrates a compact PDA-backed account with three
+/// instruction paths:
+/// - `Initialize`: creates a todo account for an authority.
+/// - `ToggleCompleted`: flips the completion flag.
+/// - `UpdateDigest`: updates a fixed-size digest payload.
 #[derive(Debug, Parser)]
 #[command(name = "todo-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

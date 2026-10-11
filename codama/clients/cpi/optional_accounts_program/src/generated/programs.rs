@@ -11,6 +11,23 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Optional accounts program — demonstrates `Option<&AccountView>` fields.
+///
+/// Every instruction keeps a **fixed** account layout: when a caller omits an
+/// optional account, the generated clients fill the slot with a readonly meta
+/// pointing at this program's own address. On-chain, a slot holding the
+/// program ID parses as [`None`].
+///
+/// Coverage matrix:
+///
+/// | Instruction | Optional field                    | Behaviour when present            |
+/// |-------------|-----------------------------------|-----------------------------------|
+/// | `Init`      | —                                 | Creates the store PDA (baseline). |
+/// | `Touch`     | `store: Option<&mut AccountView>` | Increments the stored counter.    |
+/// | `Inspect`   | `store: Option<&AccountView>`     | Logs the observed count.          |
+/// | `Inspect`   | `witness: Option<&AccountView>`   | Must be a signer.                 |
+/// | `Note`      | `note: Option<&AccountView>`      | Logged as an opaque reference.    |
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const OPTIONAL_ACCOUNTS_PROGRAM_ID: Address =
 	pina::address!("ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci");
 

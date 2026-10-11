@@ -1265,6 +1265,7 @@ mod tests {
 	#[test]
 	fn identifies_instructions_by_their_little_endian_discriminator() {
 		let program = ProgramIr {
+			docs: Vec::new(),
 			name: "wide".to_owned(),
 			public_key: "Wide1111111111111111111111111111111111111111".to_owned(),
 			pinapod_enums: Vec::new(),

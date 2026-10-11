@@ -2,7 +2,7 @@
 	"name": "transfer-sol-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for transferSolProgram",
+	"description": "Transfer SOL — demonstrates CPI and direct lamport transfers with pina",
 	"type": "module",
 	"bin": {
 		"transfer-sol-program-cli": "./src/main.ts"

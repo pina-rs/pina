@@ -2,7 +2,7 @@
 	"name": "migrations-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for migrationsProgram",
+	"description": "Instruction discriminator",
 	"type": "module",
 	"bin": {
 		"migrations-program-cli": "./src/main.ts"

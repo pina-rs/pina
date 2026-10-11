@@ -11,7 +11,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("migrations-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for migrationsProgram");
+	.description(
+		"Instruction discriminator.\n\nThe reserved `Migrate` instruction's ladder is derived from the manifest:\none optional slot per enveloped account contract, in identity-sorted\norder — `[payer, systemProgram, state, manualState, compactState]` — the\nsame order generated clients compose. An explicit `migrations(State, ...)`\nlist remains available when a program needs several same-contract slots in\none sweep under a shared lamport budget.",
+	);
 program.addCommand(updateCommand);
 program.addCommand(relayCommand);
 program.addCommand(fetchCommand);

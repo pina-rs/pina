@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'role-registry-program-cli',
-      "Command-line interface for roleRegistryProgram",
+      "Role-based registry and configuration scaffold built with pina.\n\nThis example shows a practical administrative flow:\n- initialize a registry config PDA\n- register per-role PDA entries\n- update role permissions\n- deactivate or rotate administrative control",
     )
     ..argParser.addOption(
       'url',

@@ -12,7 +12,9 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("events-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for eventsProgram");
+	.description(
+		"Anchor `events` parity example ported to pina.\n\nAnchor's event transport (`emit!`, `emit_cpi!`) is framework-specific. This\nparity port focuses on the event type definitions and deterministic\nserialization/discriminator behavior in pina.",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(testEventCommand);
 program.addCommand(testEventCpiCommand);

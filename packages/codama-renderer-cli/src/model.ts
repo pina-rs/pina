@@ -107,6 +107,8 @@ export interface CliModel {
 	programKebab: string;
 	programAddress: string;
 	programVersion: string;
+	/** Full program documentation from the IDL, one line per entry. */
+	docs: string[];
 	about: string;
 	instructions: InstructionModel[];
 	accounts: AccountModel[];
@@ -594,6 +596,7 @@ export function extractCliModel(root: {
 		programKebab: programSnake.replace(/_/g, "-"),
 		programAddress: program.publicKey,
 		programVersion: program.version,
+		docs: program.docs ?? [],
 		about: firstDoc?.replace(/\.$/, "") ??
 			`Command-line interface for ${programCamel}`,
 		instructions,

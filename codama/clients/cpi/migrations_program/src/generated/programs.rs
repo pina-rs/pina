@@ -11,6 +11,15 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Instruction discriminator.
+///
+/// The reserved `Migrate` instruction's ladder is derived from the manifest:
+/// one optional slot per enveloped account contract, in identity-sorted
+/// order — `[payer, systemProgram, state, manualState, compactState]` — the
+/// same order generated clients compose. An explicit `migrations(State, ...)`
+/// list remains available when a program needs several same-contract slots in
+/// one sweep under a shared lamport budget.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const MIGRATIONS_PROGRAM_ID: Address =
 	pina::address!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 

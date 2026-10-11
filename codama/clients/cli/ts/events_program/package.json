@@ -2,7 +2,7 @@
 	"name": "events-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for eventsProgram",
+	"description": "Anchor `events` parity example ported to pina",
 	"type": "module",
 	"bin": {
 		"events-program-cli": "./src/main.ts"

@@ -2,7 +2,7 @@
 	"name": "prop-amm-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for propAmmProgram",
+	"description": "Prop AMM oracle example ported from Anchor v2's `prop-amm` benchmark",
 	"type": "module",
 	"bin": {
 		"prop-amm-program-cli": "./src/main.ts"

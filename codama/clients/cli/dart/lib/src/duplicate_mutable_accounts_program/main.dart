@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'duplicate-mutable-accounts-program-cli',
-      "Command-line interface for duplicateMutableAccountsProgram",
+      "Anchor `duplicate-mutable-accounts` parity example ported to pina.\n\nAnchor enforces duplicate mutable account constraints in the account parser.\nIn pina this check should be explicit in program logic.",
     )
     ..argParser.addOption(
       'url',

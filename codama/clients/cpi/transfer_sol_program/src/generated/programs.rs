@@ -11,6 +11,31 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Transfer SOL — demonstrates CPI and direct lamport transfers with pina.
+///
+/// This example shows two ways to move SOL between accounts:
+///
+/// 1. **CPI Transfer** (`TransferInstruction::CpiTransfer`) — calls the system
+/// program's `Transfer` instruction via Cross-Program Invocation. This is
+/// the standard approach when the sender is an externally-owned account (a
+/// wallet). Requires the system program account in the transaction.
+///
+/// 2. **Direct Transfer** (`TransferInstruction::DirectTransfer`) — directly
+/// manipulates lamport balances using pina's `LamportTransfer` trait. This
+/// works **only when the sender is owned by this program**, since only the
+/// owning program may debit an account's lamports.
+///
+/// ## Key pina features demonstrated
+///
+/// - **Instruction data payloads** — the `#[instruction]` macro creates
+/// zero-copy structs with a discriminator and typed fields (`PodU64`).
+/// - **`system::instructions::Transfer`** — pina re-exports pinocchio-system's
+/// struct-based CPI helpers.
+/// - **`LamportTransfer` trait** — `account.send_owned(&ID, lamports, recipient)` for
+/// program-owned account transfers without CPI.
+/// - **Custom error types** — `#[error]` macro for program-specific errors with
+/// automatic `ProgramError::Custom` conversion.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const TRANSFER_SOL_PROGRAM_ID: Address =
 	pina::address!("BuXKn8EiVMKF8zYThuea3xhLq3jUHTTwDDLfCoehq7WG");
 

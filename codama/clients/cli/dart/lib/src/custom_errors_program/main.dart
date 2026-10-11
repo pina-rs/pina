@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'custom-errors-program-cli',
-      "Command-line interface for customErrorsProgram",
+      "Anchor `errors` parity example ported to pina.\n\nThis adaptation keeps the key behavior: deterministic custom error codes\nand explicit guard helpers that return those errors.",
     )
     ..argParser.addOption(
       'url',

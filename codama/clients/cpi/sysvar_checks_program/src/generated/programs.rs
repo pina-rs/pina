@@ -11,6 +11,11 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `sysvars` parity example ported to pina.
+///
+/// Verifies that provided clock, rent, and stake-history accounts are the
+/// expected sysvar accounts.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const SYSVAR_CHECKS_PROGRAM_ID: Address =
 	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 

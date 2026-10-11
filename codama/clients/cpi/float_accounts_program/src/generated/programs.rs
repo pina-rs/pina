@@ -11,6 +11,10 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `floats` parity example ported to pina.
+///
+/// Demonstrates float fields in account data plus an authority-gated update.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const FLOAT_ACCOUNTS_PROGRAM_ID: Address =
 	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 

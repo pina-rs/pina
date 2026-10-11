@@ -2,7 +2,7 @@
 	"name": "role-registry-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for roleRegistryProgram",
+	"description": "Role-based registry and configuration scaffold built with pina",
 	"type": "module",
 	"bin": {
 		"role-registry-program-cli": "./src/main.ts"

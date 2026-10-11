@@ -19,7 +19,17 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for escrowProgram
+/// Token escrow program built with pina.
+///
+/// Flow:
+/// 1. **Make** — the maker deposits token A into a PDA-owned vault and records
+/// the desired amount of token B in the escrow state.
+/// 2. **Take** — the taker sends token B to the maker's ATA, then the vault
+/// releases token A to the taker's ATA. The escrow is closed and rent is
+/// returned to the maker.
+/// 3. **Cancel** — the maker aborts the offer before a taker appears: the
+/// vault returns the full token A balance to the maker's ATA, then the
+/// vault and the escrow close and both rents return to the maker.
 #[derive(Debug, Parser)]
 #[command(name = "escrow-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

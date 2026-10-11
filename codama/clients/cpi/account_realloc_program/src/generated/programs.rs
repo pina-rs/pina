@@ -11,6 +11,14 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `realloc` parity example ported to pina.
+///
+/// The original Anchor fixture creates one global `sample` PDA. This secure
+/// adaptation deliberately derives one sample per authority instead. A resize
+/// request must therefore prove ownership through both the signer and the
+/// canonical `[b"sample", authority]` PDA; it cannot resize an arbitrary
+/// program-owned account merely by presenting it as writable.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const ACCOUNT_REALLOC_PROGRAM_ID: Address =
 	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 

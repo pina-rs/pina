@@ -7,6 +7,16 @@
 		"name": "validationProgram",
 		"publicKey": "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn",
 		"version": "0.0.0",
+		"docs": [
+			"Complete declarative-validation example for Pina.",
+			"",
+			"The program validates each boundary independently:",
+			"",
+			"- `#[instruction]` validates client-supplied values after decoding.",
+			"- `#[derive(Accounts)]` validates the incoming account list after parsing.",
+			"- `#[account]` validates stored state after initialization and loading.",
+			"- `#[event]` validates an event before the program can emit or transport it."
+		],
 		"accounts": [
 			{
 				"kind": "accountNode",

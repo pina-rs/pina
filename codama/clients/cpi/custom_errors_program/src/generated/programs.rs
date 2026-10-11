@@ -11,6 +11,11 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `errors` parity example ported to pina.
+///
+/// This adaptation keeps the key behavior: deterministic custom error codes
+/// and explicit guard helpers that return those errors.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const CUSTOM_ERRORS_PROGRAM_ID: Address =
 	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 

@@ -12,7 +12,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("vesting-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for vestingProgram");
+	.description(
+		"Vesting schedule with cliff and linear unlock, built with pina.\n\nThis example demonstrates a complete vesting lifecycle:\n- initialize a vesting schedule and fund its PDA-owned vault ATA\n- release the vested portion of the allocation on claim\n- return the unclaimed remainder to the admin on cancellation\n\n`Claim` reads the Clock sysvar, so a claim before the cliff is rejected and\nthe vested entitlement grows linearly to `end_ts`. Token release uses\n`TransferChecked` signed by the vesting PDA, and `Cancel` refunds the\nremaining vault balance and closes the vault.",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(claimCommand);
 program.addCommand(cancelCommand);

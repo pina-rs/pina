@@ -19,7 +19,23 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for stakingRewardsProgram
+/// Staking account and rewards-bookkeeping scaffold built with pina.
+///
+/// This example demonstrates the account and validation shape of a staking
+/// lifecycle:
+/// - initialize a rewards pool with a stake vault and a reward vault
+/// - open per-user positions
+/// - deposit stake tokens into the stake vault and withdraw them back out
+/// - update reward bookkeeping against a position account and release
+/// accrued rewards from the reward vault
+///
+/// This is not a staking product. Deposits and withdrawals do move real stake
+/// tokens to and from the pool's stake vault, and claims release real reward
+/// tokens from the reward vault, but the example still defines no reward
+/// emissions, funding, or solvency: the index only moves when the admin calls
+/// `SetRewardIndex`, and nothing refills the vaults. See the example README
+/// and the book's production-readiness guide before adapting it for
+/// production use.
 #[derive(Debug, Parser)]
 #[command(name = "staking-rewards-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

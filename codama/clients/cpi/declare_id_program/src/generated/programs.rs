@@ -11,6 +11,11 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `declare-id` parity example ported to pina.
+///
+/// Anchor's test validates that a program-id mismatch is rejected. In pina,
+/// that check occurs in `parse_instruction`.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const DECLARE_ID_PROGRAM_ID: Address =
 	pina::address!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 

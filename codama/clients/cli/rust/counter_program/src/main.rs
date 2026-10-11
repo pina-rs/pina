@@ -19,7 +19,36 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for counterProgram
+/// Counter program — demonstrates account state management with pina.
+///
+/// This example shows how to use pina's macro system to define on-chain state
+/// and mutate it across transactions. It covers:
+///
+/// - **Account schemas** with `#[account]` — native Rust fields plus a
+/// generated, validated `PinaPod` view over account bytes.
+/// - **PDA-based accounts** — the counter is stored at a Program Derived
+/// Address seeded by the authority's public key, so each user gets their own
+/// counter.
+/// - **Instruction dispatch** — `#[discriminator]` + `#[instruction]` +
+/// `parse_instruction` for type-safe routing.
+/// - **Account validation chains** — `.assert_signer()?.assert_writable()?` for
+/// concise, composable checks.
+/// - **`CreateProgramAccount`** — pina's CPI builder for PDA account creation.
+///
+/// ## Instructions
+///
+/// | Variant     | Description                               |
+/// |-------------|-------------------------------------------|
+/// | `Initialize` | Create a new counter PDA for the signer. |
+/// | `Increment`  | Add 1 to the counter value.              |
+///
+/// Instruction discriminator. Each variant maps to a unique `u8` tag that
+/// appears as the first byte of instruction data.
+///
+/// `entrypoint` generates `CounterInstruction::process_instruction`, routing
+/// each variant to the accounts struct of the same name plus `Accounts`, and
+/// derives `CounterInstruction::MAX_INSTRUCTION_ACCOUNTS` from those structs'
+/// declared bounds.
 #[derive(Debug, Parser)]
 #[command(name = "counter-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

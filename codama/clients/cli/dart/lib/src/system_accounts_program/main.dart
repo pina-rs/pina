@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'system-accounts-program-cli',
-      "Command-line interface for systemAccountsProgram",
+      "Anchor `system-accounts` parity example ported to pina.\n\nVerifies a signer authority plus a wallet account owned by the system\nprogram.",
     )
     ..argParser.addOption(
       'url',

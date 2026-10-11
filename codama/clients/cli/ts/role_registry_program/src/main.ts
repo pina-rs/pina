@@ -14,7 +14,9 @@ import { fetchCommand } from "./fetch.ts";
 const program = registerGlobals(new Command())
 	.name("role-registry-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for roleRegistryProgram");
+	.description(
+		"Role-based registry and configuration scaffold built with pina.\n\nThis example shows a practical administrative flow:\n- initialize a registry config PDA\n- register per-role PDA entries\n- update role permissions\n- deactivate or rotate administrative control",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(addRoleCommand);
 program.addCommand(updateRoleCommand);

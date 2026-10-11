@@ -18,7 +18,27 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for helloSolanaProgram
+/// Hello Solana — minimal pina program example.
+///
+/// This is the simplest possible Solana program built with pina. It
+/// demonstrates the basic structure every pina program follows:
+///
+/// 1. Declare a program ID with [`declare_id!`].
+/// 2. Define an instruction discriminator enum with [`#[discriminator]`].
+/// 3. Define instruction data structs with [`#[instruction]`].
+/// 4. Define an accounts struct with [`#[derive(Accounts)]`].
+/// 5. Implement [`ProcessAccountInfos`] to hold the instruction logic.
+/// 6. Wire up the entrypoint with [`nostd_entrypoint!`] and
+/// [`parse_instruction`].
+///
+/// When invoked, this program simply logs "Hello, Solana!".
+///
+/// The top-level instruction router.
+///
+/// 1. `parse_instruction` reads the discriminator byte from `data` and
+/// converts it into `HelloInstruction`, verifying the program ID.
+/// 2. The `match` dispatches to the appropriate accounts struct which
+/// handles validation and execution.
 #[derive(Debug, Parser)]
 #[command(name = "hello-solana-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

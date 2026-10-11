@@ -18,7 +18,11 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for declareProgram
+/// Anchor `declare-program` parity example ported to pina.
+///
+/// This adaptation focuses on the core behavior that maps to pina directly:
+/// validating that an "external program" account matches an expected program
+/// ID before executing cross-program logic.
 #[derive(Debug, Parser)]
 #[command(name = "declare-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

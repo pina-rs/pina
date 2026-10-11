@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'escrow-program-cli',
-      "Command-line interface for escrowProgram",
+      "Token escrow program built with pina.\n\nFlow:\n1. **Make** — the maker deposits token A into a PDA-owned vault and records\nthe desired amount of token B in the escrow state.\n2. **Take** — the taker sends token B to the maker's ATA, then the vault\nreleases token A to the taker's ATA. The escrow is closed and rent is\nreturned to the maker.\n3. **Cancel** — the maker aborts the offer before a taker appears: the\nvault returns the full token A balance to the maker's ATA, then the\nvault and the escrow close and both rents return to the maker.",
     )
     ..argParser.addOption(
       'url',

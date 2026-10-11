@@ -10,6 +10,8 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("system-accounts-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for systemAccountsProgram");
+	.description(
+		"Anchor `system-accounts` parity example ported to pina.\n\nVerifies a signer authority plus a wallet account owned by the system\nprogram.",
+	);
 program.addCommand(initializeCommand);
 program.parseAsync(process.argv);

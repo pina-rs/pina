@@ -329,6 +329,7 @@ mod tests {
 
 	fn program() -> ProgramIr {
 		ProgramIr {
+			docs: Vec::new(),
 			name: "map<&>program".to_owned(),
 			public_key: "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS".to_owned(),
 			pinapod_enums: Vec::new(),

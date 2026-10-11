@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'todo-program-cli',
-      "Command-line interface for todoProgram",
+      "Todo program example built with pina.\n\nThis example demonstrates a compact PDA-backed account with three\ninstruction paths:\n- `Initialize`: creates a todo account for an authority.\n- `ToggleCompleted`: flips the completion flag.\n- `UpdateDigest`: updates a fixed-size digest payload.",
     )
     ..argParser.addOption(
       'url',

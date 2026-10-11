@@ -10,6 +10,8 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("hello-solana-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for helloSolanaProgram");
+	.description(
+		'Hello Solana — minimal pina program example.\n\nThis is the simplest possible Solana program built with pina. It\ndemonstrates the basic structure every pina program follows:\n\n1. Declare a program ID with [`declare_id!`].\n2. Define an instruction discriminator enum with [`#[discriminator]`].\n3. Define instruction data structs with [`#[instruction]`].\n4. Define an accounts struct with [`#[derive(Accounts)]`].\n5. Implement [`ProcessAccountInfos`] to hold the instruction logic.\n6. Wire up the entrypoint with [`nostd_entrypoint!`] and\n[`parse_instruction`].\n\nWhen invoked, this program simply logs "Hello, Solana!".\n\nThe top-level instruction router.\n\n1. `parse_instruction` reads the discriminator byte from `data` and\nconverts it into `HelloInstruction`, verifying the program ID.\n2. The `match` dispatches to the appropriate accounts struct which\nhandles validation and execution.',
+	);
 program.addCommand(helloCommand);
 program.parseAsync(process.argv);

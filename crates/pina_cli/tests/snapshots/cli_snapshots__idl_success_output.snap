@@ -1,5 +1,6 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
+assertion_line: 632
 info:
   program: pina
   args:
@@ -19,6 +20,12 @@ exit_code: 0
     "name": "declareIdProgram",
     "publicKey": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
     "version": "0.0.0",
+    "docs": [
+      "Anchor `declare-id` parity example ported to pina.",
+      "",
+      "Anchor's test validates that a program-id mismatch is rejected. In pina,",
+      "that check occurs in `parse_instruction`."
+    ],
     "instructions": [
       {
         "kind": "instructionNode",

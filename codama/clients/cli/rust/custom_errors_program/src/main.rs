@@ -18,7 +18,10 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// Command-line interface for customErrorsProgram
+/// Anchor `errors` parity example ported to pina.
+///
+/// This adaptation keeps the key behavior: deterministic custom error codes
+/// and explicit guard helpers that return those errors.
 #[derive(Debug, Parser)]
 #[command(name = "custom-errors-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {

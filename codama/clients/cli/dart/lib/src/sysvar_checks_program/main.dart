@@ -9,7 +9,7 @@ import 'commands/commands.dart';
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
       'sysvar-checks-program-cli',
-      "Command-line interface for sysvarChecksProgram",
+      "Anchor `sysvars` parity example ported to pina.\n\nVerifies that provided clock, rent, and stake-history accounts are the\nexpected sysvar accounts.",
     )
     ..argParser.addOption(
       'url',

@@ -1027,7 +1027,19 @@ fn renders_program_id_constants() {
 	assert!(programs_rs.contains("pub const REGISTRY_ID: Address ="));
 	assert!(programs_rs.contains("Bp6AJD3QQ64kZVfc1YnhP7GN5UBYEHsDXpGUc1xzg4op"));
 	assert!(programs_rs.contains("/// Primary registry"));
+	// Program docs arrive verbatim, so their intra-doc links cannot resolve
+	// here; the constant carries the allow that keeps rustdoc quiet.
+	assert!(programs_rs.contains("#[allow(rustdoc::broken_intra_doc_links"));
 	assert!(programs_rs.contains("pub const HELPER_ID: Address ="));
+	// An undocumented program emits neither the docs nor the allow.
+	let helper = programs_rs
+		.split("pub const HELPER_ID")
+		.nth(1)
+		.unwrap_or_else(|| panic!("HELPER_ID renders"));
+	assert!(
+		!helper.contains("rustdoc::broken_intra_doc_links"),
+		"the allow belongs to documented constants only"
+	);
 }
 
 #[test]

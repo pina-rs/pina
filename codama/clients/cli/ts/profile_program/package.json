@@ -2,7 +2,7 @@
 	"name": "profile-program-cli",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Command-line interface for profileProgram",
+	"description": "Profile program — demonstrates `PinaPod`'s bounded fields in fixed account",
 	"type": "module",
 	"bin": {
 		"profile-program-cli": "./src/main.ts"

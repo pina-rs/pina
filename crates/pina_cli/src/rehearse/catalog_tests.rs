@@ -27,6 +27,7 @@ fn account(name: &str, value: u64, docs: &[&str], fields: Vec<FieldIr>) -> Accou
 
 fn program(accounts: Vec<AccountIr>) -> ProgramIr {
 	ProgramIr {
+		docs: Vec::new(),
 		name: "fixture".to_owned(),
 		public_key: "GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS".to_owned(),
 		pinapod_enums: Vec::new(),

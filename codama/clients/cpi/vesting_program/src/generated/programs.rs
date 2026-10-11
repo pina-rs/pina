@@ -11,6 +11,18 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Vesting schedule with cliff and linear unlock, built with pina.
+///
+/// This example demonstrates a complete vesting lifecycle:
+/// - initialize a vesting schedule and fund its PDA-owned vault ATA
+/// - release the vested portion of the allocation on claim
+/// - return the unclaimed remainder to the admin on cancellation
+///
+/// `Claim` reads the Clock sysvar, so a claim before the cliff is rejected and
+/// the vested entitlement grows linearly to `end_ts`. Token release uses
+/// `TransferChecked` signed by the vesting PDA, and `Cancel` refunds the
+/// remaining vault balance and closes the vault.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const VESTING_PROGRAM_ID: Address =
 	pina::address!("FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh");
 

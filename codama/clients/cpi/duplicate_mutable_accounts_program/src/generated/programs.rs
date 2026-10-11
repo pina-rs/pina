@@ -11,6 +11,11 @@ use pina::Address;
 use pina::CpiProgramId;
 use pina::Program;
 
+/// Anchor `duplicate-mutable-accounts` parity example ported to pina.
+///
+/// Anchor enforces duplicate mutable account constraints in the account parser.
+/// In pina this check should be explicit in program logic.
+#[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_ID: Address =
 	pina::address!("4D6rvpR7TSPwmFottLGa5gpzMcJ76kN8bimQHV9rogjH");
 

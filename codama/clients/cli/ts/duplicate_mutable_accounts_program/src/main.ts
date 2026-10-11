@@ -12,7 +12,9 @@ import { registerGlobals } from "./context.ts";
 const program = registerGlobals(new Command())
 	.name("duplicate-mutable-accounts-program-cli")
 	.version("0.1.0")
-	.description("Command-line interface for duplicateMutableAccountsProgram");
+	.description(
+		"Anchor `duplicate-mutable-accounts` parity example ported to pina.\n\nAnchor enforces duplicate mutable account constraints in the account parser.\nIn pina this check should be explicit in program logic.",
+	);
 program.addCommand(failsDuplicateMutableCommand);
 program.addCommand(allowsDuplicateMutableCommand);
 program.addCommand(allowsDuplicateReadonlyCommand);
