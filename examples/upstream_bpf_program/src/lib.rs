@@ -62,7 +62,7 @@ const CLOCK_SYSVAR_ID: Address = address!("SysvarC1ock11111111111111111111111111
 pub enum UpstreamInstruction {
 	/// Log a greeting to show the program executed.
 	Hello = 0,
-	/// Read and log the current clock slot through the runtime syscall.
+	/// Validate and read the clock sysvar account, then log a static marker.
 	Ping = 1,
 }
 

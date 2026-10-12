@@ -952,6 +952,10 @@ fn build_project_upstream_with(
 			)
 			.args(&args);
 		if let Some(dir) = &linker_dir {
+			// The `:` separator is unix-only, matching sbpf-linker itself,
+			// which does not ship Windows binaries. `join_paths` was tried
+			// but re-joining the devenv shell's very long PATH breaks the
+			// child's ability to find bash through `#!/usr/bin/env`.
 			let mut prefixed = dir.as_os_str().to_owned();
 			prefixed.push(":");
 			if let Some(path) = std::env::var_os("PATH") {
@@ -985,6 +989,9 @@ fn build_project_upstream_with(
 			continue;
 		}
 
+		// `command.output()` captures both streams; surface the compiler
+		// diagnostics so upstream-build failures are diagnosable.
+		eprint!("{diagnostics}");
 		return Err(BuildError::CargoFailed {
 			command: command_label,
 			status: output.status.to_string(),
@@ -1695,62 +1702,13 @@ exec "{cargo}" "$@"
 		assert!(matches!(error, BuildError::MissingArtifact { .. }));
 	}
 
-	/// The routing from `build_with_measurements` through the env-reading
-	/// wrapper (`build_project_upstream` → `sbpf_linker_command`) into the
-	/// testable core. Uses `#[allow(unsafe_code)]` to set the `CARGO` and
-	/// `PINA_SBPF_LINKER` env vars the wrapper reads, which the workspace
-	/// otherwise denies for test code.
-	#[test]
-	#[cfg(unix)]
-	#[allow(unsafe_code)]
-	fn upstream_routing_fires_when_pina_toml_carries_the_key() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		let fake_dir = temp.path().join("fake");
-		fs::create_dir_all(&fake_dir).unwrap_or_else(|error| panic!("fake dir: {error}"));
-		let (cargo, linker) = fake_upstream_binaries(&fake_dir);
-		let project_dir = temp.path().join("project");
-		let project = upstream_fixture(&project_dir);
-		let target_dir = project.target_dir.clone();
-		drop(project);
-
-		// SAFETY: This test is the only writer of these variables in the
-		// process; it restores the previous values before returning.
-		let previous_cargo = std::env::var_os("CARGO");
-		let previous_linker = std::env::var_os("PINA_SBPF_LINKER");
-		let real_cargo = env!("CARGO");
-		unsafe {
-			std::env::set_var("CARGO", &cargo);
-			std::env::set_var("PINA_SBPF_LINKER", &linker);
-			std::env::set_var("REAL_CARGO", real_cargo);
-		}
-
-		let result = build_project_with_options(&BuildOptions {
-			project_dir,
-			features: Vec::new(),
-			no_default_features: false,
-			size_profile: SizeProfile::Production,
-		});
-
-		// Restore env vars regardless of the outcome.
-		unsafe {
-			match previous_cargo {
-				Some(value) => std::env::set_var("CARGO", value),
-				None => std::env::remove_var("CARGO"),
-			}
-			match previous_linker {
-				Some(value) => std::env::set_var("PINA_SBPF_LINKER", value),
-				None => std::env::remove_var("PINA_SBPF_LINKER"),
-			}
-			std::env::remove_var("REAL_CARGO");
-		}
-
-		result
-			.unwrap_or_else(|error| panic!("routing through the wrapper should succeed: {error}"));
-		assert!(
-			target_dir.join("deploy/upstream_test.so").is_file(),
-			"expected the upstream artifact to be published via the routing test"
-		);
-	}
+	// The routing from `build_with_measurements` through the env-reading
+	// wrapper (`build_project_upstream` → `sbpf_linker_command`) is exercised
+	// end-to-end by `upstream_build_drives_the_upstream_recipe` in
+	// `tests/upstream_build_command.rs`, which spawns the CLI binary with the
+	// CARGO and PINA_SBPF_LINKER environment variables set on the child — the
+	// only safe way to cover env-var readers, since Rust marks `set_var`
+	// unsafe for multithreaded processes.
 
 	/// The upstream build surfaces a `CargoFailed` error when cargo exits
 	/// nonzero without a missing-export diagnostic to retry with.
