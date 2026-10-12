@@ -123,6 +123,12 @@ ignore = [
 	# surfpool/litesvm, not in any shipped crate graph). The workspace's own
 	# rand is 0.9.5 and its own ed25519-dalek is 3.0.0.
 	"RUSTSEC-2026-0097",
+	# RUSTSEC-2024-0449: unsafe-libyaml is unmaintained (archived upstream,
+	# no safe upgrade). Reached via pina_test → surfpool-sdk → surfpool-core →
+	# serde_yaml (deprecated) → unsafe-libyaml 0.2.11. Host/test stack only
+	# (via surfpool, not in any shipped crate graph). Removable once surfpool
+	# drops serde_yaml — tracked in #619.
+	"RUSTSEC-2024-0449",
 ]
 
 [licenses]
