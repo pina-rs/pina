@@ -1,0 +1,22 @@
+[project]
+program = "."
+idl_dir = "{{root}}/codama/idls"
+# Experimental: routes `pina build` to the upstream sbpf-linker toolchain.
+# Remove this key to go back to the cargo-build-sbf driver.
+sbpf-linker = true
+
+[clients]
+output = "{{root}}/codama/clients"
+languages = ["cpi", "rust", "typescript", "dart", "cli-rust", "cli-ts", "cli-dart"]
+
+[clients.typescript]
+output = "js"
+
+[clients.cli-rust]
+output = "cli/rust"
+
+[clients.cli-ts]
+output = "cli/ts"
+
+[clients.cli-dart]
+output = "cli/dart"

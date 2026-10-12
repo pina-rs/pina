@@ -19,6 +19,7 @@ use object::Architecture;
 use object::BinaryFormat;
 use object::Object;
 use object::ObjectSection;
+use object::ObjectSegment;
 use object::ObjectSymbol;
 use object::SymbolKind;
 
@@ -103,21 +104,28 @@ pub fn parse_elf(data: &[u8], path: &Path) -> Result<ElfInfo, ProfileError> {
 		}
 	}
 
-	// Find the .text section.
-	let text_section = obj.section_by_name(".text").ok_or_else(|| {
-		ProfileError::NoTextSection {
+	// Find the `.text` section. sbpf-linker emits static-syscall programs as
+	// program-header-only ELFs with no section table at all, so fall back to
+	// the executable `PT_LOAD` segment when there are no sections to consult.
+	let (text_vaddr, text_bytes) = if let Some(text_section) = obj.section_by_name(".text") {
+		let vaddr = text_section.address();
+		let bytes = text_section
+			.data()
+			.map_err(|e| {
+				ProfileError::Elf {
+					path: path.to_path_buf(),
+					message: format!("Failed to read .text section data: {e}"),
+				}
+			})?
+			.to_vec();
+		(vaddr, bytes)
+	} else if obj.sections().next().is_none() {
+		executable_text_segment(&obj, path)?
+	} else {
+		return Err(ProfileError::NoTextSection {
 			path: path.to_path_buf(),
-		}
-	})?;
-
-	// Extract section metadata
-	let text_vaddr = text_section.address();
-	let text_bytes = text_section.data().map_err(|e| {
-		ProfileError::Elf {
-			path: path.to_path_buf(),
-			message: format!("Failed to read .text section data: {e}"),
-		}
-	})?;
+		});
+	};
 	let text_size = text_bytes.len() as u64;
 	let text_range = text_vaddr..text_vaddr.saturating_add(text_size);
 
@@ -142,7 +150,7 @@ pub fn parse_elf(data: &[u8], path: &Path) -> Result<ElfInfo, ProfileError> {
 
 	Ok(ElfInfo {
 		program_name,
-		text_bytes: text_bytes.to_vec(),
+		text_bytes,
 		text_vaddr,
 		text_size,
 		symbols,
@@ -216,6 +224,44 @@ pub fn unstripped_symbols(path: &Path, stripped: &ElfInfo) -> Option<Vec<Symbol>
 	})
 }
 
+/// Locate the instruction stream of a section-less ELF.
+///
+/// These are the sbpf-linker static-syscall artifacts: the whole program
+/// lives in its program headers, and the executable `PT_LOAD` segment
+/// carries the SBF instructions, so profiling reads the segment instead of
+/// a `.text` section.
+///
+/// # Errors
+///
+/// Returns [`ProfileError::Elf`] when the executable segment cannot be read,
+/// and [`ProfileError::NoTextSection`] when the ELF has no executable
+/// segment.
+fn executable_text_segment<'data>(
+	obj: &object::File<'data, &'data [u8]>,
+	path: &Path,
+) -> Result<(u64, Vec<u8>), ProfileError> {
+	for segment in obj.segments() {
+		let executable = match segment.flags() {
+			object::SegmentFlags::Elf { p_flags, .. } => p_flags.contains(object::elf::PF_X),
+			_ => false,
+		};
+		if !executable {
+			continue;
+		}
+		let bytes = segment.data().map_err(|e| {
+			ProfileError::Elf {
+				path: path.to_path_buf(),
+				message: format!("Failed to read executable segment data: {e}"),
+			}
+		})?;
+		return Ok((segment.address(), bytes.to_vec()));
+	}
+
+	Err(ProfileError::NoTextSection {
+		path: path.to_path_buf(),
+	})
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -231,6 +277,152 @@ mod tests {
 		let garbage = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02, 0x03];
 		let result = parse_elf(&garbage, Path::new("garbage.so"));
 		assert!(result.is_err());
+	}
+
+	#[test]
+	fn parse_elf_rejects_a_non_elf_binary() {
+		use object::write::Object;
+
+		let mut writer = Object::new(
+			object::BinaryFormat::MachO,
+			object::Architecture::X86_64,
+			object::Endianness::Little,
+		);
+		let section = writer.add_section(Vec::new(), b".text".to_vec(), object::SectionKind::Text);
+		writer.set_section_data(section, vec![0u8; 8], 8);
+		let bytes = writer.write().expect("write Mach-O binary");
+		let result = parse_elf(&bytes, Path::new("macho.so"));
+		let error = result.expect_err("a Mach-O binary should fail the format check");
+		assert!(
+			error.to_string().contains("expected ELF format"),
+			"unexpected error: {error}"
+		);
+	}
+
+	#[test]
+	fn parse_elf_rejects_an_elf_with_the_wrong_architecture() {
+		use object::write::Object;
+
+		let mut writer = Object::new(
+			object::BinaryFormat::Elf,
+			object::Architecture::X86_64,
+			object::Endianness::Little,
+		);
+		let section = writer.add_section(Vec::new(), b".text".to_vec(), object::SectionKind::Text);
+		writer.set_section_data(section, vec![0u8; 8], 8);
+		let bytes = writer.write().expect("write x86-64 ELF");
+		let result = parse_elf(&bytes, Path::new("x86_64.so"));
+		let error = result.expect_err("an x86-64 ELF should fail the architecture check");
+		assert!(
+			error.to_string().contains("expected SBF/BPF architecture"),
+			"unexpected error: {error}"
+		);
+	}
+
+	#[test]
+	fn text_symbols_skips_empty_and_out_of_range_names() {
+		use object::read::ObjectSymbol;
+		use object::write::Object;
+
+		let mut writer = Object::new(
+			object::BinaryFormat::Elf,
+			object::Architecture::Sbf,
+			object::Endianness::Little,
+		);
+		let section = writer.add_section(Vec::new(), b".text".to_vec(), object::SectionKind::Text);
+		writer.set_section_data(section, vec![0u8; 64], 8);
+		for &(name, offset, size) in &[
+			("", 0u64, 8u64),
+			("in_range", 8, 8),
+			("far_away", 0x100_0000, 8),
+		] {
+			writer.add_symbol(object::write::Symbol {
+				name: name.as_bytes().to_vec(),
+				value: offset,
+				size,
+				kind: object::SymbolKind::Text,
+				scope: object::SymbolScope::Dynamic,
+				weak: false,
+				section: object::write::SymbolSection::Section(section),
+				flags: object::SymbolFlags::None,
+			});
+		}
+		let bytes = writer.write().expect("write ELF with edge-case symbols");
+		let obj = object::File::parse(bytes.as_slice()).expect("parse ELF");
+		let symbols = text_symbols(obj.symbols(), &(0..64));
+		assert_eq!(
+			symbols.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+			vec!["in_range"],
+			"empty names and out-of-range addresses should be filtered"
+		);
+	}
+
+	/// Build a minimal section-less little-endian SBPF ELF whose single
+	/// `PT_LOAD` covers `text`, mirroring the sbpf-linker static-syscall
+	/// artifact layout: program headers only, no section table.
+	fn phdr_only_elf(p_flags: u32, text: &[u8]) -> Vec<u8> {
+		let mut elf = Vec::new();
+		// ELF64 header: ident, ET_EXEC, EM_BPF, EV_CURRENT.
+		elf.extend_from_slice(&[0x7f, b'E', b'L', b'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+		elf.extend_from_slice(&2u16.to_le_bytes());
+		elf.extend_from_slice(&247u16.to_le_bytes());
+		elf.extend_from_slice(&1u32.to_le_bytes());
+		let entry = 0x1000u64;
+		elf.extend_from_slice(&entry.to_le_bytes());
+		elf.extend_from_slice(&64u64.to_le_bytes()); // e_phoff
+		elf.extend_from_slice(&0u64.to_le_bytes()); // e_shoff
+		elf.extend_from_slice(&0u32.to_le_bytes()); // e_flags
+		elf.extend_from_slice(&64u16.to_le_bytes()); // e_ehsize
+		elf.extend_from_slice(&56u16.to_le_bytes()); // e_phentsize
+		elf.extend_from_slice(&1u16.to_le_bytes()); // e_phnum
+		elf.extend_from_slice(&64u16.to_le_bytes()); // e_shentsize
+		elf.extend_from_slice(&0u16.to_le_bytes()); // e_shnum
+		elf.extend_from_slice(&0u16.to_le_bytes()); // e_shstrndx
+		assert_eq!(elf.len(), 64);
+		// Program header: one PT_LOAD for the text bytes.
+		elf.extend_from_slice(&1u32.to_le_bytes()); // PT_LOAD
+		elf.extend_from_slice(&p_flags.to_le_bytes());
+		elf.extend_from_slice(&(64u64 + 56).to_le_bytes()); // p_offset
+		elf.extend_from_slice(&entry.to_le_bytes()); // p_vaddr
+		elf.extend_from_slice(&entry.to_le_bytes()); // p_paddr
+		elf.extend_from_slice(&(text.len() as u64).to_le_bytes());
+		elf.extend_from_slice(&(text.len() as u64).to_le_bytes());
+		elf.extend_from_slice(&8u64.to_le_bytes());
+		elf.extend_from_slice(text);
+		elf
+	}
+
+	#[test]
+	fn parse_elf_reads_phdr_only_static_syscall_artifacts() {
+		let text = [0xBFu8, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+		let elf = phdr_only_elf(1, &text); // PF_X
+		let info = parse_elf(&elf, Path::new("static.so")).expect("parse PHDR-only ELF");
+		assert_eq!(info.text_vaddr, 0x1000);
+		assert_eq!(info.text_size, text.len() as u64);
+		assert_eq!(info.text_bytes, text);
+		assert!(info.symbols.is_empty());
+	}
+
+	#[test]
+	fn parse_elf_rejects_phdr_only_without_executable_segment() {
+		let elf = phdr_only_elf(4, &[0u8; 8]); // PF_R only
+		let result = parse_elf(&elf, Path::new("readonly.so"));
+		assert!(matches!(result, Err(ProfileError::NoTextSection { .. })));
+	}
+
+	#[test]
+	fn parse_elf_still_rejects_sectioned_elves_without_text() {
+		use object::Endianness;
+		use object::SectionKind;
+		use object::write::Object;
+
+		let mut writer = Object::new(BinaryFormat::Elf, Architecture::Bpf, Endianness::Little);
+		let section =
+			writer.add_section(Vec::new(), b".rodata".to_vec(), SectionKind::ReadOnlyData);
+		writer.set_section_data(section, vec![0u8; 8], 8);
+		let bytes = writer.write().expect("write sectioned ELF");
+		let result = parse_elf(&bytes, Path::new("rodata-only.so"));
+		assert!(matches!(result, Err(ProfileError::NoTextSection { .. })));
 	}
 
 	#[test]

@@ -1,0 +1,55 @@
+{
+	"abiVersion": "0.21",
+	"programId": "2oYypU3qZSK14274jeqP8XXGmXWn6Zhf4RRpLSDGURmk",
+	"versionType": "u8",
+	"auto": [
+		"accounts",
+		"instructions",
+		"events"
+	],
+	"contracts": {
+		"instruction:1:00": {
+			"rustName": "HelloInstructionData",
+			"envelope": false,
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": []
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "user",
+								"signer": true
+							}
+						]
+					}
+				}
+			]
+		},
+		"instruction:1:01": {
+			"rustName": "PingInstructionData",
+			"envelope": false,
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": []
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "user",
+								"signer": true
+							},
+							{
+								"name": "clock"
+							}
+						]
+					}
+				}
+			]
+		}
+	}
+}

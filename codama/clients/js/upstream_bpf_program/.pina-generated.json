@@ -1,0 +1,12 @@
+{
+	"paths": [
+		"package.json",
+		"src/generated/index.ts",
+		"src/generated/instructions/hello.ts",
+		"src/generated/instructions/index.ts",
+		"src/generated/instructions/ping.ts",
+		"src/generated/pinaPodCodecs.ts",
+		"src/generated/programs/index.ts",
+		"src/generated/programs/upstreamBpfProgram.ts"
+	]
+}

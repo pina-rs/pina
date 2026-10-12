@@ -1,0 +1,21 @@
+{
+	"name": "upstream-bpf-program-cli",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Upstream BPF — the sbpf-linker showcase program",
+	"type": "module",
+	"bin": {
+		"upstream-bpf-program-cli": "./src/main.ts"
+	},
+	"scripts": {
+		"start": "tsx src/main.ts"
+	},
+	"dependencies": {
+		"@solana/kit": "^8.0.0",
+		"commander": "^15.0.0"
+	},
+	"devDependencies": {
+		"tsx": "^4.20.0",
+		"typescript": "^5.9.0"
+	}
+}

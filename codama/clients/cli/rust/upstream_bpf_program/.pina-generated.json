@@ -1,0 +1,10 @@
+{
+	"paths": [
+		".pina-generated",
+		"src/commands/hello.rs",
+		"src/commands/mod.rs",
+		"src/commands/ping.rs",
+		"src/context.rs",
+		"src/main.rs"
+	]
+}

@@ -156,13 +156,13 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <!-- {=sbfBuildInstructions} -->
 
-Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker`:
+Programs are compiled to the `bpfel-unknown-none` target using `sbpf-linker` (0.2.3 or newer, pinned in `[workspace.metadata.bin]`; run `install:all`):
 
 ```sh
 cargo build --release --target bpfel-unknown-none -p my_program -Z build-std=core,alloc -F bpf-entrypoint
 ```
 
-The pinned nightly toolchain from `rust-toolchain.toml` runs the build; the `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests.
+The pinned nightly toolchain from `rust-toolchain.toml` runs the build; the `bpf-entrypoint` feature gate separates the on-chain entrypoint from the library code used in tests. The root `.cargo/config.toml` carries the static-syscall rustflags this path requires, and it builds without LTO by design — see the [sbpf-linker evaluation](https://github.com/pina-rs/pina/blob/main/docs/sbpf-linker-evaluation.md) for the measured comparison against `cargo build-sbf`.
 
 <!-- {/sbfBuildInstructions} -->
 

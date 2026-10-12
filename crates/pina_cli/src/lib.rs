@@ -62,8 +62,11 @@ pub use crate::cpi::generate_cpi_crate;
 pub use crate::cpi::generate_cpi_crate_from_reader;
 pub use crate::cpi::generate_cpi_crate_from_reader_with_config;
 use crate::error::IdlError;
+pub use crate::init::InitOptions;
 pub use crate::init::init_project;
+pub use crate::init::init_project_with_options;
 pub use crate::init::print_next_steps;
+pub use crate::init::print_next_steps_with_options;
 use crate::parse::parse_program_with_auto;
 pub use crate::project::GenerationMode;
 

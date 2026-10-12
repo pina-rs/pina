@@ -535,6 +535,19 @@ pub(crate) enum Commands {
 		/// Overwrite scaffold files that already exist.
 		#[arg(long)]
 		force: bool,
+
+		/// Experimental: scaffold for the upstream sbpf-linker toolchain.
+		///
+		/// Records `sbpf-linker = true` under `[project]` in pina.toml, so
+		/// every `pina build` compiles for bpfel-unknown-none with the pinned
+		/// nightly Rust and the sbpf-linker binary instead of cargo-build-sbf;
+		/// remove the key to revert. The scaffold also carries the static
+		/// syscall rustflags and a build-program alias for bare cargo builds.
+		/// The pinned toolchain ships rust-src for build-std; install
+		/// sbpf-linker separately. The build runs without LTO by design; see
+		/// docs/sbpf-linker-evaluation.md for the measured caveats.
+		#[arg(long)]
+		sbpf_linker: bool,
 	},
 
 	/// Inspect or synchronize the current program's identity.

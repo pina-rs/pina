@@ -1,0 +1,13 @@
+{
+	"paths": [
+		"README.md",
+		"package.json",
+		"src/client.ts",
+		"src/commands/hello.ts",
+		"src/commands/ping.ts",
+		"src/context.ts",
+		"src/endpoint.ts",
+		"src/main.ts",
+		"tsconfig.json"
+	]
+}
