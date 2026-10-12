@@ -119,13 +119,14 @@ Each Pod integer type provides `ZERO`, `MIN`, and `MAX` constants.
 
 <!-- {@pinaFeatureHighlights} -->
 
+- **Smallest binaries, lowest framework overhead**: built on `pinocchio` instead of `solana-program`, so the framework's dispatch and validation cost a few bytes and a few compute units, not thousands of CU per instruction.
+- **`no_std` and allocation-free**: every on-chain crate compiles to the `bpfel-unknown-none` SBF target with no heap and no allocator.
+- **Framework-managed ABI migrations**: version envelopes, generated transitions, and a publication ledger evolve account and instruction schemas without breaking deployed programs — the only Solana framework that ships this.
 - **Validated zero-copy deserialization**: PinaPod validates account data before Pina returns an in-place view, with no heap allocation.
-- **`no_std` compatible**: all crates compile to the `bpfel-unknown-none` SBF target for on-chain deployment.
-- **Low compute units**: built on `pinocchio` instead of `solana-program`, saving thousands of CU per instruction.
-- **Discriminator system**: every account, instruction, and event type carries a typed discriminator as its first field.
-- **Validation chaining**: chain assertions on `AccountView` references.
+- **Discriminator-first layouts**: every account, instruction, and event type carries a typed discriminator as its first field, one byte by default.
+- **Declarative validation**: chain assertions on `AccountView` references, or compile `#[pina(validate(...))]` rules into allocation-free checks.
 - **Proc-macro sugar**: `#[account]`, `#[instruction]`, `#[event]`, `#[error]`, `#[discriminator]`, and `#[derive(Accounts)]` eliminate boilerplate.
-- **CPI helpers**: PDA account creation, lamport transfers, and token operations.
+- **CPI helpers**: PDA account creation, lamport transfers, and token operations as documented instruction structs.
 
 <!-- {/pinaFeatureHighlights} -->
 

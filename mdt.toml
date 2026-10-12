@@ -12,3 +12,15 @@ ignore = ["**/*.t.md"]
 [padding]
 before = 0
 after = false
+
+# Data context for inline interpolation. `cargo.workspace.package.version` is
+# the single version every published `pina` crate inherits, so the readme can
+# name the current release without a hand-maintained string. The key is `cargo`
+# rather than `workspace` because a data key named `workspace` shadows the
+# `[workspace]` table and resolves `package.version` against the root package
+# instead (`pina_root` is versioned separately and never published). The
+# monochange release flow runs `fix:format` (which ends in `docs:sync` ->
+# `mdt update`) after bumping versions, which refreshes every reference on each
+# release.
+[data]
+cargo = "Cargo.toml"
