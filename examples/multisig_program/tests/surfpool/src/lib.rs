@@ -2708,8 +2708,8 @@ fn audit_sec_11_unauthorized_first_initializer_cannot_capture_the_program_config
 /// before its execution window can open (expiry starts at creation, the delay
 /// at approval). Creating a multisig in that configuration must be rejected.
 ///
-/// Fixed behavior: creation fails with `InvalidConfiguration`, which the test
-/// asserts below.
+/// Fixed behavior: creation fails with a program error and leaves no multisig
+/// behind, which the test asserts below.
 #[test]
 #[ignore = "run with pina test"]
 fn audit_sec_21_creation_rejects_a_ttl_that_expires_before_the_timelock_elapses() {
@@ -2767,6 +2767,11 @@ fn audit_sec_21_creation_rejects_a_ttl_that_expires_before_the_timelock_elapses(
 			.expect_err("a TTL at or below the timelock must be rejected at creation");
 
 		assert!(
+			error.message().contains("custom program error"),
+			"expected the configuration rejection, got: {}",
+			error.message()
+		);
+		assert!(
 			program.account(&multisig_key).is_err(),
 			"the rejected configuration must not create the multisig"
 		);
@@ -2784,8 +2789,8 @@ fn audit_sec_21_creation_rejects_a_ttl_that_expires_before_the_timelock_elapses(
 /// permissionlessly closable with the refund going to the configured rent
 /// collector.
 ///
-/// Fixed behavior: an expired or stale-indexed proposal is permissionlessly
-/// closable, which the test asserts below.
+/// Fixed behavior: the configured rent collector can close an expired
+/// proposal, which the test asserts below.
 #[test]
 #[ignore = "run with pina test"]
 fn audit_sec_22_an_expired_proposal_can_be_closed_by_anyone() {
