@@ -233,8 +233,8 @@ mod tests {
 		let owned = TempDir::new().unwrap_or_else(|error| panic!("{error}"));
 		let mut command = Command::new("printer");
 
-		isolate_package_child_in(&mut command, project.path(), owned.path())
-			.unwrap_or_else(|e| panic!("{e}"));
+		let isolated = isolate_package_child_in(&mut command, project.path(), owned.path());
+		let isolated = isolated.unwrap_or_else(|e| panic!("{e}"));
 
 		assert_eq!(
 			command.get_current_dir(),
@@ -252,12 +252,13 @@ mod tests {
 			.get_envs()
 			.find_map(|(key, value)| (key == "PATH").then_some(value))
 			.expect("a caller with a PATH keeps a scrubbed one");
+		let current = std::env::current_dir().unwrap_or_else(|e| panic!("cwd: {e}"));
 		let expected = scrubbed_path(
 			&std::env::var_os("PATH").unwrap_or_default(),
 			project.path(),
-			&std::env::current_dir().unwrap_or_else(|e| panic!("{e}")),
-		)
-		.unwrap_or_else(|e| panic!("{e}"));
+			&current,
+		);
+		let expected = expected.unwrap_or_else(|e| panic!("{e}"));
 		assert_eq!(configured_path.unwrap(), expected);
 	}
 

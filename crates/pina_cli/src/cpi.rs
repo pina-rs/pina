@@ -651,10 +651,8 @@ mod tests {
 		const CHILD_MARKER: &str = "PINA_TEST_CPI_NPX_ISOLATION";
 
 		if std::env::var_os(CHILD_MARKER).is_some() {
-			let project = PathBuf::from(
-				std::env::var_os("PINA_TEST_CPI_PROJECT")
-					.unwrap_or_else(|| panic!("child carries the project")),
-			);
+			let project = std::env::var_os("PINA_TEST_CPI_PROJECT").expect("child project path");
+			let project = PathBuf::from(project);
 			let isolated = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
 
 			// The fake `npx` bakes in the project root and the physical
@@ -663,10 +661,8 @@ mod tests {
 			// outside the scratch directory refuses the run.
 			let sh_quote =
 				|path: &Path| format!("'{}'", path.display().to_string().replace('\'', r"'\''"));
-			let isolated_path = isolated
-				.path()
-				.canonicalize()
-				.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+			let canonical = isolated.path().canonicalize();
+			let isolated_path = canonical.unwrap_or_else(|error| panic!("canonicalize: {error}"));
 			let npx = project.join("fake-npx");
 			executable(
 				&npx,
@@ -682,12 +678,12 @@ mod tests {
 				),
 			);
 
-			let output = run_npx_converter_with_temp_dir(
+			let converted = run_npx_converter_with_temp_dir(
 				npx.to_str().unwrap_or("fake-npx"),
 				&project.join("anchor.json"),
 				Ok(isolated),
-			)
-			.unwrap_or_else(|error| panic!("converter failed: {error}"));
+			);
+			let output = converted.unwrap_or_else(|error| panic!("converter: {error}"));
 
 			assert!(
 				output.status.success(),
@@ -704,14 +700,12 @@ mod tests {
 		// Resolve the symlinked macOS temporary spelling once, so the PATH
 		// entry, the child's working directory, and the scrub root all share
 		// one absolute spelling.
-		let project = project
-			.canonicalize()
-			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let canonical = project.canonicalize();
+		let project = canonical.unwrap_or_else(|error| panic!("canonicalize: {error}"));
 		let shadow_bin = project.join("node_modules/.bin");
-		std::fs::create_dir_all(&shadow_bin)
-			.unwrap_or_else(|error| panic!("mkdir failed: {error}"));
-		std::fs::write(project.join("anchor.json"), b"{}")
-			.unwrap_or_else(|error| panic!("write failed: {error}"));
+		std::fs::create_dir_all(&shadow_bin).unwrap_or_else(|error| panic!("mkdir: {error}"));
+		let anchor = project.join("anchor.json");
+		std::fs::write(&anchor, b"{}").unwrap_or_else(|error| panic!("write failed: {error}"));
 
 		// A shadow `node` fails the run if anything resolves it from the
 		// workspace instead of the system toolchain.
@@ -721,25 +715,26 @@ mod tests {
 		);
 
 		let inherited_path = std::env::var_os("PATH").unwrap_or_default();
-		let shadowed_path = std::env::join_paths(
+		let joined = std::env::join_paths(
 			std::iter::once(shadow_bin.clone()).chain(std::env::split_paths(&inherited_path)),
-		)
-		.unwrap_or_else(|error| panic!("join failed: {error}"));
+		);
+		let shadowed_path = joined.unwrap_or_else(|error| panic!("join paths: {error}"));
 
-		let output = Command::new(
-			std::env::current_exe().unwrap_or_else(|error| panic!("locate test binary: {error}")),
-		)
-		.args([
-			"cpi::tests::npx_converter_child_is_isolated_from_workspace_path_entries",
-			"--exact",
-			"--nocapture",
-		])
-		.env(CHILD_MARKER, "1")
-		.env("PINA_TEST_CPI_PROJECT", &project)
-		.env("PATH", shadowed_path)
-		.current_dir(&project)
-		.output()
-		.unwrap_or_else(|error| panic!("run isolated converter test: {error}"));
+		let test_binary = std::env::current_exe();
+		let test_binary = test_binary.unwrap_or_else(|error| panic!("locate test binary: {error}"));
+		let mut child = Command::new(test_binary);
+		child
+			.args([
+				"cpi::tests::npx_converter_child_is_isolated_from_workspace_path_entries",
+				"--exact",
+				"--nocapture",
+			])
+			.env(CHILD_MARKER, "1")
+			.env("PINA_TEST_CPI_PROJECT", &project)
+			.env("PATH", shadowed_path)
+			.current_dir(&project);
+		let spawned = child.output();
+		let output = spawned.unwrap_or_else(|error| panic!("run isolated test: {error}"));
 
 		assert!(
 			output.status.success(),
