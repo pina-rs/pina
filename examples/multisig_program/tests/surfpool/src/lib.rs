@@ -2708,8 +2708,8 @@ fn audit_sec_11_unauthorized_first_initializer_cannot_capture_the_program_config
 /// before its execution window can open (expiry starts at creation, the delay
 /// at approval). Creating a multisig in that configuration must be rejected.
 ///
-/// Current behavior: the combination is accepted, so the `expect_err` below
-/// fails and the test proves proposals can be born impossible to execute.
+/// Fixed behavior: creation fails with `InvalidConfiguration`, which the test
+/// asserts below.
 #[test]
 #[ignore = "run with pina test"]
 fn audit_sec_21_creation_rejects_a_ttl_that_expires_before_the_timelock_elapses() {
@@ -2784,8 +2784,8 @@ fn audit_sec_21_creation_rejects_a_ttl_that_expires_before_the_timelock_elapses(
 /// permissionlessly closable with the refund going to the configured rent
 /// collector.
 ///
-/// Current behavior: the close is refused with `InvalidProposalStatus`, so
-/// the `expect` below fails and the test proves the stranded rent.
+/// Fixed behavior: an expired or stale-indexed proposal is permissionlessly
+/// closable, which the test asserts below.
 #[test]
 #[ignore = "run with pina test"]
 fn audit_sec_22_an_expired_proposal_can_be_closed_by_anyone() {
