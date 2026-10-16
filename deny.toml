@@ -26,7 +26,7 @@ git-fetch-with-cli = true
 # claims above were verified against `cargo tree -i <spec> --workspace
 # --all-features --target all`, which does include dev edges.
 #
-# Review date: 2026-09-18. Re-check on each dependency-train bump; each
+# Review date: 2026-10-16. Re-check on each dependency-train bump; each
 # suppression below should become an upstream upgrade rather than accumulate.
 # Each entry also needs a tracking issue filed on the repository (see the
 # accompanying changeset); this file cannot open one itself.
@@ -129,6 +129,16 @@ ignore = [
 	# (via surfpool, not in any shipped crate graph). Removable once surfpool
 	# drops serde_yaml — tracked in #619.
 	"RUSTSEC-2024-0449",
+	# RUSTSEC-2026-0346, RUSTSEC-2026-0349: rustls session-value `Debug`
+	# output can expose TLS secrets, and the pre-authentication key-exchange
+	# record allows a downgrade to classical-only key exchange. Both fire on
+	# rustls 0.21.12, reached through the same txtx-addon-kit → reqwest 0.11 →
+	# rustls 0.21 chain as RUSTSEC-2026-0098/0099/0104 above. Host/test stack
+	# only (via surfpool, not in any shipped crate graph); the advisories are
+	# patched only on the 0.23 line, which the workspace carries at 0.23.46.
+	# Removable once the Surfpool train drops reqwest 0.11 — tracked in #621.
+	"RUSTSEC-2026-0346",
+	"RUSTSEC-2026-0349",
 ]
 
 [licenses]
