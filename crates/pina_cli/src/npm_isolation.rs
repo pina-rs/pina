@@ -43,6 +43,21 @@ pub(crate) fn isolate_package_child(
 	isolate_with_path(command, workspace_root, std::env::var_os("PATH"))
 }
 
+/// [`isolate_package_child`] for a caller that owns the directory the child
+/// runs from, such as the Anchor converter's scratch directory.
+///
+/// # Errors
+///
+/// Returns an error when the current directory cannot be determined or the
+/// scrubbed `PATH` cannot be reassembled.
+pub(crate) fn isolate_package_child_in(
+	command: &mut Command,
+	workspace_root: &Path,
+	dir: &Path,
+) -> std::io::Result<()> {
+	isolate_command(command, workspace_root, dir, std::env::var_os("PATH"))
+}
+
 /// [`isolate_package_child`] for an explicit `PATH`, which a caller may lack.
 fn isolate_with_path(
 	command: &mut Command,
@@ -51,6 +66,18 @@ fn isolate_with_path(
 ) -> std::io::Result<TempDir> {
 	let isolated = TempDir::new()?;
 
+	isolate_command(command, workspace_root, isolated.path(), path)?;
+
+	Ok(isolated)
+}
+
+/// Scrub `PATH`, drop `NODE_PATH`, and run `command` from `dir`.
+fn isolate_command(
+	command: &mut Command,
+	workspace_root: &Path,
+	dir: &Path,
+	path: Option<OsString>,
+) -> std::io::Result<()> {
 	if let Some(path) = path {
 		let current = std::env::current_dir()?;
 		command.env("PATH", scrubbed_path(&path, workspace_root, &current)?);
@@ -58,9 +85,9 @@ fn isolate_with_path(
 
 	// A pure package-resolution channel nothing in the pinned flows needs.
 	command.env_remove("NODE_PATH");
-	command.current_dir(isolated.path());
+	command.current_dir(dir);
 
-	Ok(isolated)
+	Ok(())
 }
 
 /// Return `path` without the entries that sit inside `workspace_root`.
@@ -198,6 +225,40 @@ mod tests {
 			command.get_envs().all(|(key, _)| key != "PATH"),
 			"no PATH may be invented for a caller that has none"
 		);
+	}
+
+	#[test]
+	fn isolate_package_child_in_runs_from_the_callers_directory_with_scrubbed_path() {
+		let project = TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let owned = TempDir::new().unwrap_or_else(|error| panic!("{error}"));
+		let mut command = Command::new("printer");
+
+		isolate_package_child_in(&mut command, project.path(), owned.path())
+			.unwrap_or_else(|e| panic!("{e}"));
+
+		assert_eq!(
+			command.get_current_dir(),
+			Some(owned.path()),
+			"the child must run from the caller-owned directory, not a new one"
+		);
+		assert!(
+			command
+				.get_envs()
+				.any(|(key, value)| { key == "NODE_PATH" && value.is_none() }),
+			"NODE_PATH must be removed from the child environment"
+		);
+
+		let configured_path = command
+			.get_envs()
+			.find_map(|(key, value)| (key == "PATH").then_some(value))
+			.expect("a caller with a PATH keeps a scrubbed one");
+		let expected = scrubbed_path(
+			&std::env::var_os("PATH").unwrap_or_default(),
+			project.path(),
+			&std::env::current_dir().unwrap_or_else(|e| panic!("{e}")),
+		)
+		.unwrap_or_else(|e| panic!("{e}"));
+		assert_eq!(configured_path.unwrap(), expected);
 	}
 
 	#[test]

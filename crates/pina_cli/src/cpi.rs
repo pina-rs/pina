@@ -295,6 +295,17 @@ fn run_npx_converter(npx: &str, path: &Path) -> Result<std::process::Output, Cpi
 	run_npx_converter_with_temp_dir(npx, path, tempfile::tempdir())
 }
 
+/// Maps a converter-runner failure (scratch directory, isolation, spawn) onto
+/// the shared `RunConverter` error.
+fn run_converter_error(cmd: &str) -> impl FnOnce(std::io::Error) -> CpiGenerateError + '_ {
+	move |source| {
+		CpiGenerateError::RunConverter {
+			cmd: cmd.to_string(),
+			source,
+		}
+	}
+}
+
 fn run_npx_converter_with_temp_dir(
 	npx: &str,
 	path: &Path,
@@ -306,16 +317,22 @@ fn run_npx_converter_with_temp_dir(
 			source,
 		}
 	})?;
-	let isolated_dir = isolated_dir.map_err(|source| {
-		CpiGenerateError::RunConverter {
-			cmd: npx.to_string(),
-			source,
-		}
-	})?;
+	let isolated_dir = isolated_dir.map_err(run_converter_error(npx))?;
+
+	// `npx -p <package> node` resolves `node` through the inherited `PATH`, so
+	// a workspace-local `node_modules/.bin` could shadow it; scrub those
+	// entries, keeping the npx cache the converter script resolves from.
+	let workspace_root = crate::project::generation_containment_root(
+		&std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+	);
 	let mut command = Command::new(npx);
-	command
-		.current_dir(isolated_dir.path())
-		.args(["-y", "-p", NODES_FROM_ANCHOR_PACKAGE, "node"]);
+	crate::npm_isolation::isolate_package_child_in(
+		&mut command,
+		&workspace_root,
+		isolated_dir.path(),
+	)
+	.map_err(run_converter_error(npx))?;
+	command.args(["-y", "-p", NODES_FROM_ANCHOR_PACKAGE, "node"]);
 
 	run_node_converter(command, &absolute_path, npx, ConverterResolution::Npx)
 }
@@ -330,12 +347,7 @@ fn run_node_converter(
 		.args(["--input-type=module", "--eval", ANCHOR_CONVERT_SCRIPT])
 		.arg(resolution.as_str())
 		.arg(path);
-	command.output().map_err(|source| {
-		CpiGenerateError::RunConverter {
-			cmd: name.to_string(),
-			source,
-		}
-	})
+	command.output().map_err(run_converter_error(name))
 }
 
 fn converter_failure(output: &std::process::Output, cmd: &str) -> CpiGenerateError {
@@ -622,6 +634,119 @@ mod tests {
 		assert!(output.status.success(), "{}", diagnostic);
 		serde_json::from_slice::<RootNode>(&output.stdout)
 			.unwrap_or_else(|error| panic!("safe converter output was invalid: {error}"));
+	}
+
+	/// The converter's `npx` child resolves `node` through its inherited
+	/// `PATH`, so the runner must scrub workspace-local entries: a `PATH` that
+	/// leads with the project's `node_modules/.bin` must not reach the child.
+	///
+	/// The outer invocation re-execs the test binary with that shadowed `PATH`
+	/// and the project as its working directory; the child invocation runs the
+	/// real converter runner against a fake `npx` that refuses when a
+	/// workspace entry or `NODE_PATH` survives, or when its working directory
+	/// is not the isolated scratch directory.
+	#[cfg(unix)]
+	#[test]
+	fn npx_converter_child_is_isolated_from_workspace_path_entries() {
+		const CHILD_MARKER: &str = "PINA_TEST_CPI_NPX_ISOLATION";
+
+		if std::env::var_os(CHILD_MARKER).is_some() {
+			let project = PathBuf::from(
+				std::env::var_os("PINA_TEST_CPI_PROJECT")
+					.unwrap_or_else(|| panic!("child carries the project")),
+			);
+			let isolated = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+
+			// The fake `npx` bakes in the project root and the physical
+			// spelling of the isolated directory: any surviving `PATH` entry
+			// under the root, a stray `NODE_PATH`, or a working directory
+			// outside the scratch directory refuses the run.
+			let sh_quote =
+				|path: &Path| format!("'{}'", path.display().to_string().replace('\'', r"'\''"));
+			let isolated_path = isolated
+				.path()
+				.canonicalize()
+				.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+			let npx = project.join("fake-npx");
+			executable(
+				&npx,
+				&format!(
+					"#!/bin/sh\n\
+					 if [ \"$(pwd -P)\" != {isolated} ]; then echo 'wrong working directory' >&2; \
+					 exit 5; fi\n\
+					 if [ -n \"$NODE_PATH\" ]; then echo 'NODE_PATH survived' >&2; exit 3; fi\n\
+					 if printf '%s' \"$PATH\" | grep -F -q -- {root}; then \
+					 echo 'workspace PATH entry survived' >&2; exit 4; fi\n",
+					isolated = sh_quote(&isolated_path),
+					root = sh_quote(&project),
+				),
+			);
+
+			let output = run_npx_converter_with_temp_dir(
+				npx.to_str().unwrap_or("fake-npx"),
+				&project.join("anchor.json"),
+				Ok(isolated),
+			)
+			.unwrap_or_else(|error| panic!("converter failed: {error}"));
+
+			assert!(
+				output.status.success(),
+				"isolated converter child refused: {}",
+				diagnostic_text(&output.stderr)
+			);
+			return;
+		}
+
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
+		let project = temp.path().join("project");
+		std::fs::create_dir_all(&project).unwrap_or_else(|error| panic!("mkdir failed: {error}"));
+
+		// Resolve the symlinked macOS temporary spelling once, so the PATH
+		// entry, the child's working directory, and the scrub root all share
+		// one absolute spelling.
+		let project = project
+			.canonicalize()
+			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let shadow_bin = project.join("node_modules/.bin");
+		std::fs::create_dir_all(&shadow_bin)
+			.unwrap_or_else(|error| panic!("mkdir failed: {error}"));
+		std::fs::write(project.join("anchor.json"), b"{}")
+			.unwrap_or_else(|error| panic!("write failed: {error}"));
+
+		// A shadow `node` fails the run if anything resolves it from the
+		// workspace instead of the system toolchain.
+		executable(
+			&shadow_bin.join("node"),
+			"#!/bin/sh\necho 'shadow node executed' >&2\nexit 9\n",
+		);
+
+		let inherited_path = std::env::var_os("PATH").unwrap_or_default();
+		let shadowed_path = std::env::join_paths(
+			std::iter::once(shadow_bin.clone()).chain(std::env::split_paths(&inherited_path)),
+		)
+		.unwrap_or_else(|error| panic!("join failed: {error}"));
+
+		let output = Command::new(
+			std::env::current_exe().unwrap_or_else(|error| panic!("locate test binary: {error}")),
+		)
+		.args([
+			"cpi::tests::npx_converter_child_is_isolated_from_workspace_path_entries",
+			"--exact",
+			"--nocapture",
+		])
+		.env(CHILD_MARKER, "1")
+		.env("PINA_TEST_CPI_PROJECT", &project)
+		.env("PATH", shadowed_path)
+		.current_dir(&project)
+		.output()
+		.unwrap_or_else(|error| panic!("run isolated converter test: {error}"));
+
+		assert!(
+			output.status.success(),
+			"isolated child failed:\n{}\n{}",
+			String::from_utf8_lossy(&output.stdout),
+			String::from_utf8_lossy(&output.stderr)
+		);
 	}
 
 	#[cfg(unix)]
