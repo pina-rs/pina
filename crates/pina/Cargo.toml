@@ -40,7 +40,6 @@ floats = ["derive", "pinapod/floats"]
 validation = ["derive", "pina_macros/validation"]
 
 [dependencies]
-pastey = { workspace = true, default-features = true }
 pina_macros = { workspace = true, optional = true }
 pinapod = { workspace = true, default-features = true }
 pinocchio = { workspace = true, default-features = false, features = ["copy", "sha2"] }

@@ -6,8 +6,8 @@ publish = false
 
 # Contract regression for SEC-33 of the 2026-09-22 deep audit: a downstream
 # consumer needs only `pina` — never a direct `pinapod` or `fixed`
-# dependency — to derive fixed-point schemas. `pina` re-exports the
-# exact-pinned `pinapod = "=0.4.3"` and the matching `fixed = "=1.30.0"`,
+# dependency — to derive fixed-point schemas. `pina` re-exports
+# `pinapod = "0.4.7"`, which itself exact-pins the matching `fixed = "=1.30.0"`,
 # so schema fields derive against the only `fixed` build pinapod's
 # `ZcField` implementations recognize.
 #

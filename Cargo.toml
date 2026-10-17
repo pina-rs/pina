@@ -274,7 +274,6 @@ num-traits = { version = "^0.2", default-features = false }
 object = { default-features = false, version = "^0.40.0" }
 owo-colors = { default-features = false, version = "^4.0" }
 paste = { default-features = false, version = "^1" }
-pastey = { default-features = false, version = "^0.2" }
 # Pinapod defines the account wire format and its derive, and 0.4.7 is the
 # first release binding the generated modules' prelude names to `core`, so a
 # schema module cannot rebind the constructors the generated code spells, and
