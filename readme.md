@@ -69,7 +69,7 @@ Macros stay minimal, the IDL is inferred from the validation code you already wr
 
 | Capability                       | Pina                                                                                          | Anchor v1                        | Anchor v2 (`lang-v2`)      | Quasar                    |
 | -------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------- | -------------------------- | ------------------------- |
-| **Version compared**             | v<!-- {~pinaVersion:"{{ cargo.workspace.package.version }}"} -->0.23.0<!-- {/pinaVersion} --> | 1.2.1                            | 2.0.0-rc.1                 | rev `b0de7db`             |
+| **Version compared**             | v<!-- {~pinaVersion:"{{ cargo.workspace.package.version }}"} -->0.24.0<!-- {/pinaVersion} --> | 1.2.1                            | 2.0.0-rc.1                 | rev `b0de7db`             |
 | IDL generated from source        | ✅                                                                                            | ✅                               | ✅                         | ✅                        |
 | Declarative account validation   | ✅                                                                                            | ✅                               | ✅                         | ✅                        |
 | Typed generated clients          | ✅ Rust · JS/TS · Dart · CPI crates                                                           | ✅ TS · Rust CPI                 | 🟡 Rust · TS (alpha)       | ✅ Rust · JS · Solana Kit |

@@ -1,0 +1,1988 @@
+{
+	"schema_version": "0.9",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-10-17T01:05:40Z",
+	"command": "release",
+	"version": "0.24.0",
+	"versions": {
+		"core": "0.24.0"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.24.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.24.0",
+			"rendered_title": "v0.24.0 (2026-10-17)",
+			"rendered_changelog_title": "[0.24.0](https://github.com/pina-rs/pina/releases/tag/v0.24.0) (2026-10-17)",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.24.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/cli-program-docs-help.md",
+		".changeset/cpi-converter-path-isolation.md",
+		".changeset/original-weave-identity.md",
+		".changeset/pinapod-0.4.7.md",
+		".changeset/readme-framework-comparison.md",
+		".changeset/remove-unused-pastey-dependency.md",
+		".changeset/rustls-advisory-batch.md",
+		".changeset/s-weave-identity.md",
+		".changeset/unsafe-libyaml-advisory.md",
+		".changeset/upstream-sbpf-linker-experimental.md",
+		".changeset/upstream-sbpf-linker-review-fixes.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/cli-program-docs-help.md",
+			"summary": "Carry program docs into generated CLI help",
+			"details": "The IDL's program node now carries documentation from the program crate itself: the crate root's module docs (`//!`) come first, followed by the doc comment on the entrypoint surface — the hand-written `process_instruction` function when it has one, else the `#[discriminator(entrypoint)]` enum that generates it. A hand-written dispatch is authoritative, so its docs win over the enum's when both surfaces are annotated.\n\nEvery generated CLI renders those lines as its main description. The Rust clap CLI emits them as the `Cli` doc comment, so the first paragraph shows as `about` and the full text as the long help behind `--help`; the TypeScript CLI passes them to commander's `.description()` and keeps the first line in `package.json`; the Dart CLI passes them to the `CommandRunner` description. A program without either doc source keeps the previous `Command-line interface for <program>` fallback.\n\nPer-instruction subcommands, argument flags, and account flags were already doc-derived from the IDL; this closes the one gap at the program level. The committed IDL and client fixtures are regenerated with the new program `docs`, and `pina_bpf_program` (which documents neither surface) regenerates unchanged. The generated CPI crates also pick the docs up on their program-ID constants, which that renderer already supported; those constants now carry an `#[allow(rustdoc::broken_intra_doc_links)]`, because the copied docs' intra-doc links resolve in the program crate but not in the generated one.\n\n**Breaking:** `ProgramIr` and `DiscriminatorEnum` gain a public `docs` field, so exhaustive struct literals in downstream code need the new field. Everything else assembles those types through the parse and construction helpers, which fill the field in.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_cli_renderer",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_cpi_renderer",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_codama_renderer_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d42c35509db366cdabef19feea5b9462af08d3f6",
+						"short_sha": "d42c355",
+						"url": "https://github.com/pina-rs/pina/commit/d42c35509db366cdabef19feea5b9462af08d3f6",
+						"authored_at": "2026-10-11T23:38:15+01:00",
+						"committed_at": "2026-10-11T23:38:15+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#612",
+						"title": "feat(pina_cli)!: carry program docs into generated CLI help",
+						"url": "https://github.com/pina-rs/pina/pull/612",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d42c35509db366cdabef19feea5b9462af08d3f6",
+						"short_sha": "d42c355",
+						"url": "https://github.com/pina-rs/pina/commit/d42c35509db366cdabef19feea5b9462af08d3f6",
+						"authored_at": "2026-10-11T23:38:15+01:00",
+						"committed_at": "2026-10-11T23:38:15+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#612",
+						"title": "feat(pina_cli)!: carry program docs into generated CLI help",
+						"url": "https://github.com/pina-rs/pina/pull/612",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/cpi-converter-path-isolation.md",
+			"summary": "Scrub the Anchor converter's `PATH`",
+			"details": "`pina cpi` runs the pinned `@codama/nodes-from-anchor` converter through `npx -p <package> node`, and `npx` resolves the `node` interpreter through the inherited `PATH`. The converter child now runs with workspace-local `PATH` entries removed and `NODE_PATH` dropped — the same isolation the client renderers already apply — so a committed `node_modules/.bin/node` can no longer shadow the interpreter during Anchor IDL conversion. The npx cache the converter script resolves its package from lives outside the workspace and is unaffected. Passing a Node executable with `--npx <node>` keeps resolving from the project on purpose.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"short_sha": "14a7ed6",
+						"url": "https://github.com/pina-rs/pina/commit/14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"authored_at": "2026-10-17T02:01:08+01:00",
+						"committed_at": "2026-10-17T02:01:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#622",
+						"title": "fix(pina_cli): scrub the Anchor converter's npx child PATH",
+						"url": "https://github.com/pina-rs/pina/pull/622",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"short_sha": "14a7ed6",
+						"url": "https://github.com/pina-rs/pina/commit/14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"authored_at": "2026-10-17T02:01:08+01:00",
+						"committed_at": "2026-10-17T02:01:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#622",
+						"title": "fix(pina_cli): scrub the Anchor converter's npx child PATH",
+						"url": "https://github.com/pina-rs/pina/pull/622",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#300",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/300",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#619",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/619",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#621",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/621",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/original-weave-identity.md",
+			"summary": "Use the original Weave logo",
+			"details": "Replace the S-Weave mark with the original interlocking Weave pineapple across the READMEs, documentation, favicons, and static and animated assets.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_profile",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_sdk_ids",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli_npm",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b1ec51bbe13f64cf32460d036cb7d080992adf3c",
+						"short_sha": "b1ec51b",
+						"url": "https://github.com/pina-rs/pina/commit/b1ec51bbe13f64cf32460d036cb7d080992adf3c",
+						"authored_at": "2026-10-07T20:22:57+01:00",
+						"committed_at": "2026-10-07T20:22:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#609",
+						"title": "docs(brand): restore the original Weave logo",
+						"url": "https://github.com/pina-rs/pina/pull/609",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "b1ec51bbe13f64cf32460d036cb7d080992adf3c",
+						"short_sha": "b1ec51b",
+						"url": "https://github.com/pina-rs/pina/commit/b1ec51bbe13f64cf32460d036cb7d080992adf3c",
+						"authored_at": "2026-10-07T20:22:57+01:00",
+						"committed_at": "2026-10-07T20:22:57+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#609",
+						"title": "docs(brand): restore the original Weave logo",
+						"url": "https://github.com/pina-rs/pina/pull/609",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pinapod-0.4.7.md",
+			"summary": "Upgrade pinapod to 0.4.7",
+			"details": "Bump the workspace `pinapod` dependency from 0.4.5 to 0.4.7 and refresh the root, `pina_fuzz`, and `pina_fuzz/fuzz` lock files (0.4.6 in between was a formatting-only release). No pina source changes are required — pina re-exports and type-mentions the pinapod API, and 0.4.7 adds no public API and changes no wire format, validation order, or error variants.\n\nThe release hardens the contracts around the generated code. The generated compact modules bind the prelude names they spell to `core` explicitly, so a schema module that defines an `Ok`-, `Some`-, or `None`-shaped item, or a primitive-named type, can no longer rebind generated code — previously a matching `Ok` function compiled into every generated validation return and panicked at runtime inside the commit path. Zero-variant enums are rejected with a focused derive diagnostic instead of opaque errors from the generated module, and `PodString`'s accessors now document the UTF-8 precondition they trust rather than implying the length clamp is the whole contract.\n\nThe wincode writers additionally validate stored content at the boundary before writing, so invalid values fail serialization instead of producing bytes their own reader refuses; pina does not enable the `wincode` feature, so that path does not compile into pina at all.\n\nThe one source-visible change in this repository is `tests/expand/pda.expanded.rs`: the generated module gains the three prelude-binding `use` lines and nothing else. The generated module bodies are unchanged, so the compiled instruction paths are identical by construction and no compute-unit movement is expected.\n\nThe same release also pins the fuzz dependency set behind a `cargo metadata --locked` check, adds advisories to cargo-deny and gitleaks to CI, and moves the coverage upload's `id-token: write` into a job that runs no repository code — verification-boundary changes on the pinapod side, recorded here for completeness.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "72b062145c5453ed3bdbe757cc7dbb571645d638",
+						"short_sha": "72b0621",
+						"url": "https://github.com/pina-rs/pina/commit/72b062145c5453ed3bdbe757cc7dbb571645d638",
+						"authored_at": "2026-10-12T14:44:46+01:00",
+						"committed_at": "2026-10-12T14:44:46+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#616",
+						"title": "chore(pina): adopt pinapod 0.4.7",
+						"url": "https://github.com/pina-rs/pina/pull/616",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "72b062145c5453ed3bdbe757cc7dbb571645d638",
+						"short_sha": "72b0621",
+						"url": "https://github.com/pina-rs/pina/commit/72b062145c5453ed3bdbe757cc7dbb571645d638",
+						"authored_at": "2026-10-12T14:44:46+01:00",
+						"committed_at": "2026-10-12T14:44:46+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#616",
+						"title": "chore(pina): adopt pinapod 0.4.7",
+						"url": "https://github.com/pina-rs/pina/pull/616",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/readme-framework-comparison.md",
+			"summary": "Lead the readme with the framework comparison",
+			"details": "Rewrite the readme to open with what Pina is for: a centered landing header, a capability matrix against Anchor v1 (1.2.1), Anchor v2 (2.0.0-rc.1), and Quasar (rev `b0de7db`), and generated on-chain cost tables for the hello-world and counter fixtures. Detailed guides move behind links to the book. Add Anchor v1 fixtures to the framework-comparison benchmark and a version column to every published table, and interpolate the current Pina release version into the readme through mdt so every monochange release refreshes it.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6c07b3a91da3a415d31769094876720efda4c820",
+						"short_sha": "6c07b3a",
+						"url": "https://github.com/pina-rs/pina/commit/6c07b3a91da3a415d31769094876720efda4c820",
+						"authored_at": "2026-10-12T17:16:30+01:00",
+						"committed_at": "2026-10-12T17:16:30+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#611",
+						"title": "docs(readme): lead with the framework comparison",
+						"url": "https://github.com/pina-rs/pina/pull/611",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6c07b3a91da3a415d31769094876720efda4c820",
+						"short_sha": "6c07b3a",
+						"url": "https://github.com/pina-rs/pina/commit/6c07b3a91da3a415d31769094876720efda4c820",
+						"authored_at": "2026-10-12T17:16:30+01:00",
+						"committed_at": "2026-10-12T17:16:30+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#611",
+						"title": "docs(readme): lead with the framework comparison",
+						"url": "https://github.com/pina-rs/pina/pull/611",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#619",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/619",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/remove-unused-pastey-dependency.md",
+			"summary": "Drop the unused `pastey` dependency",
+			"details": "`pina` declared `pastey` as a direct dependency but never referenced it; it was left behind by an early manifest restructure. Removing it shrinks the published dependency graph and clears the `unused dependency` build warning.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "patch"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"short_sha": "14a7ed6",
+						"url": "https://github.com/pina-rs/pina/commit/14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"authored_at": "2026-10-17T02:01:08+01:00",
+						"committed_at": "2026-10-17T02:01:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#622",
+						"title": "fix(pina_cli): scrub the Anchor converter's npx child PATH",
+						"url": "https://github.com/pina-rs/pina/pull/622",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"short_sha": "14a7ed6",
+						"url": "https://github.com/pina-rs/pina/commit/14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"authored_at": "2026-10-17T02:01:08+01:00",
+						"committed_at": "2026-10-17T02:01:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#622",
+						"title": "fix(pina_cli): scrub the Anchor converter's npx child PATH",
+						"url": "https://github.com/pina-rs/pina/pull/622",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#300",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/300",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#619",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/619",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#621",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/621",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/rustls-advisory-batch.md",
+			"summary": "Patch the rustls stack and suppress the 0.21 advisories",
+			"details": "The advisory database published four rustls vulnerabilities (RUSTSEC-2026-0346, -0347, -0348, -0349) on 2026-10-14, failing the `cargo-deny` gate for every pull request. The 0.23 line is patched at 0.23.46: the lockfile now carries it for `pina_cli`'s `ureq` graph and the `reqwest 0.12` stack, alongside `ruzstd` 0.9.1 for RUSTSEC-2026-0344. The remaining hits are on the end-of-life `rustls 0.21.12`, reached only through `pina_test → surfpool → txtx-addon-kit → reqwest 0.11` — host/test stack only, no shipped crate links it — so those two are suppressed in `deny.toml` until the Surfpool train drops `reqwest 0.11`, tracked in #621 (same shape as the #619 `unsafe-libyaml` suppression).",
+			"targets": [
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"short_sha": "14a7ed6",
+						"url": "https://github.com/pina-rs/pina/commit/14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"authored_at": "2026-10-17T02:01:08+01:00",
+						"committed_at": "2026-10-17T02:01:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#622",
+						"title": "fix(pina_cli): scrub the Anchor converter's npx child PATH",
+						"url": "https://github.com/pina-rs/pina/pull/622",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"short_sha": "14a7ed6",
+						"url": "https://github.com/pina-rs/pina/commit/14a7ed6ab14f5b47fa0cfe37195af451ddd8b121",
+						"authored_at": "2026-10-17T02:01:08+01:00",
+						"committed_at": "2026-10-17T02:01:08+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#622",
+						"title": "fix(pina_cli): scrub the Anchor converter's npx child PATH",
+						"url": "https://github.com/pina-rs/pina/pull/622",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#300",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/300",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#619",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/619",
+						"relationship": "referenced_by_review_request"
+					},
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#621",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/621",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/s-weave-identity.md",
+			"summary": "Update the Pina logo",
+			"details": "Replace the origami pineapple with S-Weave across the READMEs, documentation, and favicon. Add vector, monochrome, avatar, GIF, and Rive files for the new identity.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_profile",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_lints",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_codama_renderer",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_sdk_ids",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_codama_nodes",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_cli_npm",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d05f1462ef20bb4c9df76187b5533b755796baa3",
+						"short_sha": "d05f146",
+						"url": "https://github.com/pina-rs/pina/commit/d05f1462ef20bb4c9df76187b5533b755796baa3",
+						"authored_at": "2026-10-07T14:18:24+01:00",
+						"committed_at": "2026-10-07T14:18:24+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#607",
+						"title": "docs(brand): adopt the S-Weave pineapple identity",
+						"url": "https://github.com/pina-rs/pina/pull/607",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d05f1462ef20bb4c9df76187b5533b755796baa3",
+						"short_sha": "d05f146",
+						"url": "https://github.com/pina-rs/pina/commit/d05f1462ef20bb4c9df76187b5533b755796baa3",
+						"authored_at": "2026-10-07T14:18:24+01:00",
+						"committed_at": "2026-10-07T14:18:24+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#607",
+						"title": "docs(brand): adopt the S-Weave pineapple identity",
+						"url": "https://github.com/pina-rs/pina/pull/607",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/unsafe-libyaml-advisory.md",
+			"summary": "Suppress the unmaintained unsafe-libyaml advisory",
+			"details": "[RUSTSEC-2024-0449](https://rustsec.org/advisories/RUSTSEC-2024-0449) flags `unsafe-libyaml` as unmaintained, reached through `pina_test → surfpool-sdk → surfpool-core → serde_yaml`. The advisory database picked the entry up on 2026-10-12, which failed the `cargo-deny` CI gate for every open pull request. Host/test stack only; the suppression is tracked in #619 and is removable once surfpool drops the deprecated `serde_yaml`.",
+			"targets": [
+				{
+					"id": "pina_test",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6c07b3a91da3a415d31769094876720efda4c820",
+						"short_sha": "6c07b3a",
+						"url": "https://github.com/pina-rs/pina/commit/6c07b3a91da3a415d31769094876720efda4c820",
+						"authored_at": "2026-10-12T17:16:30+01:00",
+						"committed_at": "2026-10-12T17:16:30+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#611",
+						"title": "docs(readme): lead with the framework comparison",
+						"url": "https://github.com/pina-rs/pina/pull/611",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "6c07b3a91da3a415d31769094876720efda4c820",
+						"short_sha": "6c07b3a",
+						"url": "https://github.com/pina-rs/pina/commit/6c07b3a91da3a415d31769094876720efda4c820",
+						"authored_at": "2026-10-12T17:16:30+01:00",
+						"committed_at": "2026-10-12T17:16:30+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#611",
+						"title": "docs(readme): lead with the framework comparison",
+						"url": "https://github.com/pina-rs/pina/pull/611",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#619",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/619",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/upstream-sbpf-linker-experimental.md",
+			"summary": "Add the experimental upstream sbpf-linker toolchain",
+			"details": "`sbpf-linker` 0.2.3 is pinned in `[workspace.metadata.bin]`, and the `[target.bpfel-unknown-none]` rustflags in `.cargo/config.toml` now carry the static-syscall configuration the linker requires: without the two `--cfg` flags the pinocchio syscall externs fall back to relocation-based resolution that sbpf-linker mishandles, producing programs that load but silently corrupt data.\n\nA `sbpf-linker = true` key under `[project]` in pina.toml routes every `pina build` through the upstream recipe (nightly `bpfel-unknown-none` with `-Z build-std`, static syscalls, LTO forced off) and retries with `--export=<symbol>` flags when the linker reports missing libcall symbols such as u128 division's `__udivti3`; removing the key reverts to the `cargo-build-sbf` driver. `pina init --sbpf-linker` records the key and scaffolds the matching `.cargo/config.toml`; `PINA_SBPF_LINKER` points the build at a specific sbpf-linker binary, for example the repository pin.\n\n`examples/upstream_bpf_program` showcases the toolchain with a Surfpool suite that functionally gates both build paths, and `docs/sbpf-linker-evaluation.md` records the measured caveats and the comparison matrix against `cargo build-sbf`: binaries 6-31% smaller, runtime compute units at parity, fat LTO a measured regression (17-77%), u128 division needing export flags, and large entrypoint frames (the multisig example) not building upstream at all.\n\n`pina profile` now also reads section-less program-header-only ELFs, the artifact layout sbpf-linker emits for static-syscall programs, so static compute-unit profiling works for both toolchains.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				},
+				{
+					"id": "pina_profile",
+					"kind": "package",
+					"bump": "minor",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "feat"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "294f44dffe2dbf58f298c3971d3dd5582bb0f294",
+						"short_sha": "294f44d",
+						"url": "https://github.com/pina-rs/pina/commit/294f44dffe2dbf58f298c3971d3dd5582bb0f294",
+						"authored_at": "2026-10-12T12:25:20+01:00",
+						"committed_at": "2026-10-12T12:25:20+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#617",
+						"title": "feat(pina_cli): add the experimental upstream sbpf-linker toolchain",
+						"url": "https://github.com/pina-rs/pina/pull/617",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "294f44dffe2dbf58f298c3971d3dd5582bb0f294",
+						"short_sha": "294f44d",
+						"url": "https://github.com/pina-rs/pina/commit/294f44dffe2dbf58f298c3971d3dd5582bb0f294",
+						"authored_at": "2026-10-12T12:25:20+01:00",
+						"committed_at": "2026-10-12T12:25:20+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#617",
+						"title": "feat(pina_cli): add the experimental upstream sbpf-linker toolchain",
+						"url": "https://github.com/pina-rs/pina/pull/617",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/upstream-sbpf-linker-review-fixes.md",
+			"summary": "Address the sbpf-linker PR review findings",
+			"details": "Corrects the example documentation (`Clock::from_account_view`, not the unimplemented `sol_get_sysvar` syscall), uses `std::env::join_paths` for the linker PATH prefix so the separator matches the platform, prints the captured compiler diagnostics before returning `BuildError::CargoFailed` so upstream-build failures are diagnosable, and removes the process-wide env-var-mutating routing test in favor of the existing child-process integration test that covers the same path safely.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "5d10353f35cd3e2d0fa7114857a547261dac151a",
+						"short_sha": "5d10353",
+						"url": "https://github.com/pina-rs/pina/commit/5d10353f35cd3e2d0fa7114857a547261dac151a",
+						"authored_at": "2026-10-12T16:58:40+01:00",
+						"committed_at": "2026-10-12T16:58:40+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#620",
+						"title": "fix(pina_cli): address the sbpf-linker PR review findings",
+						"url": "https://github.com/pina-rs/pina/pull/620",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "5d10353f35cd3e2d0fa7114857a547261dac151a",
+						"short_sha": "5d10353",
+						"url": "https://github.com/pina-rs/pina/commit/5d10353f35cd3e2d0fa7114857a547261dac151a",
+						"authored_at": "2026-10-12T16:58:40+01:00",
+						"committed_at": "2026-10-12T16:58:40+01:00",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#620",
+						"title": "fix(pina_cli): address the sbpf-linker PR review findings",
+						"url": "https://github.com/pina-rs/pina/pull/620",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#617",
+						"title": null,
+						"url": "https://github.com/pina-rs/pina/issues/617",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.24.0](https://github.com/pina-rs/pina/releases/tag/v0.24.0) (2026-10-17)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Carry program docs into generated CLI help\n\n_Packages:_ 🔴 _pina_cli_, 🟠 _pina_cli_renderer_, 🟠 _pina_cpi_renderer_, 🟠 _pina_codama_renderer_cli_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #612](https://github.com/pina-rs/pina/pull/612)\n\nThe IDL's program node now carries documentation from the program crate itself: the crate root's module docs (`//!`) come first, followed by the doc comment on the entrypoint surface — the hand-written `process_instruction` function when it has one, else the `#[discriminator(entrypoint)]` enum that generates it. A hand-written dispatch is authoritative, so its docs win over the enum's when both surfaces are annotated.\n\nEvery generated CLI renders those lines as its main description. The Rust clap CLI emits them as the `Cli` doc comment, so the first paragraph shows as `about` and the full text as the long help behind `--help`; the TypeScript CLI passes them to commander's `.description()` and keeps the first line in `package.json`; the Dart CLI passes them to the `CommandRunner` description. A program without either doc source keeps the previous `Command-line interface for <program>` fallback.\n\nPer-instruction subcommands, argument flags, and account flags were already doc-derived from the IDL; this closes the one gap at the program level. The committed IDL and client fixtures are regenerated with the new program `docs`, and `pina_bpf_program` (which documents neither surface) regenerates unchanged. The generated CPI crates also pick the docs up on their program-ID constants, which that renderer already supported; those constants now carry an `#[allow(rustdoc::broken_intra_doc_links)]`, because the copied docs' intra-doc links resolve in the program crate but not in the generated one.\n\n**Breaking:** `ProgramIr` and `DiscriminatorEnum` gain a public `docs` field, so exhaustive struct literals in downstream code need the new field. Everything else assembles those types through the parse and construction helpers, which fill the field in."
+						]
+					},
+					{
+						"title": "Features",
+						"collapsed": false,
+						"entries": [
+							"#### Add the experimental upstream sbpf-linker toolchain\n\n_Packages:_ 🟠 _pina_cli_, 🟠 _pina_profile_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #617](https://github.com/pina-rs/pina/pull/617)\n\n`sbpf-linker` 0.2.3 is pinned in `[workspace.metadata.bin]`, and the `[target.bpfel-unknown-none]` rustflags in `.cargo/config.toml` now carry the static-syscall configuration the linker requires: without the two `--cfg` flags the pinocchio syscall externs fall back to relocation-based resolution that sbpf-linker mishandles, producing programs that load but silently corrupt data.\n\nA `sbpf-linker = true` key under `[project]` in pina.toml routes every `pina build` through the upstream recipe (nightly `bpfel-unknown-none` with `-Z build-std`, static syscalls, LTO forced off) and retries with `--export=<symbol>` flags when the linker reports missing libcall symbols such as u128 division's `__udivti3`; removing the key reverts to the `cargo-build-sbf` driver. `pina init --sbpf-linker` records the key and scaffolds the matching `.cargo/config.toml`; `PINA_SBPF_LINKER` points the build at a specific sbpf-linker binary, for example the repository pin.\n\n`examples/upstream_bpf_program` showcases the toolchain with a Surfpool suite that functionally gates both build paths, and `docs/sbpf-linker-evaluation.md` records the measured caveats and the comparison matrix against `cargo build-sbf`: binaries 6-31% smaller, runtime compute units at parity, fat LTO a measured regression (17-77%), u128 division needing export flags, and large entrypoint frames (the multisig example) not building upstream at all.\n\n`pina profile` now also reads section-less program-header-only ELFs, the artifact layout sbpf-linker emits for static-syscall programs, so static compute-unit profiling works for both toolchains."
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Upgrade pinapod to 0.4.7\n\n_Packages:_ 🟢 _pina_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #616](https://github.com/pina-rs/pina/pull/616)\n\nBump the workspace `pinapod` dependency from 0.4.5 to 0.4.7 and refresh the root, `pina_fuzz`, and `pina_fuzz/fuzz` lock files (0.4.6 in between was a formatting-only release). No pina source changes are required — pina re-exports and type-mentions the pinapod API, and 0.4.7 adds no public API and changes no wire format, validation order, or error variants.\n\nThe release hardens the contracts around the generated code. The generated compact modules bind the prelude names they spell to `core` explicitly, so a schema module that defines an `Ok`-, `Some`-, or `None`-shaped item, or a primitive-named type, can no longer rebind generated code — previously a matching `Ok` function compiled into every generated validation return and panicked at runtime inside the commit path. Zero-variant enums are rejected with a focused derive diagnostic instead of opaque errors from the generated module, and `PodString`'s accessors now document the UTF-8 precondition they trust rather than implying the length clamp is the whole contract.\n\nThe wincode writers additionally validate stored content at the boundary before writing, so invalid values fail serialization instead of producing bytes their own reader refuses; pina does not enable the `wincode` feature, so that path does not compile into pina at all.\n\nThe one source-visible change in this repository is `tests/expand/pda.expanded.rs`: the generated module gains the three prelude-binding `use` lines and nothing else. The generated module bodies are unchanged, so the compiled instruction paths are identical by construction and no compute-unit movement is expected.\n\nThe same release also pins the fuzz dependency set behind a `cargo metadata --locked` check, adds advisories to cargo-deny and gitleaks to CI, and moves the coverage upload's `id-token: write` into a job that runs no repository code — verification-boundary changes on the pinapod side, recorded here for completeness.",
+							"- **Drop the unused `pastey` dependency.** `pina` declared `pastey` as a direct dependency but never referenced it; it was left behind by an early manifest restructure. Removing it shrinks the published dependency graph and clears the `unused dependency` build warning.\n  _Packages:_ 🟢 _pina_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)",
+							"- **Scrub the Anchor converter's `PATH`.** `pina cpi` runs the pinned `@codama/nodes-from-anchor` converter through `npx -p <package> node`, and `npx` resolves the `node` interpreter through the inherited `PATH`. The converter child now runs with workspace-local `PATH` entries removed and `NODE_PATH` dropped — the same isolation the client renderers already apply — so a committed `node_modules/.bin/node` can no longer shadow the interpreter during Anchor IDL conversion. The npx cache the converter script resolves its package from lives outside the workspace and is unaffected. Passing a Node executable with `--npx <node>` keeps resolving from the project on purpose.\n  _Packages:_ 🟢 _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)",
+							"- **Address the sbpf-linker PR review findings.** Corrects the example documentation (`Clock::from_account_view`, not the unimplemented `sol_get_sysvar` syscall), uses `std::env::join_paths` for the linker PATH prefix so the separator matches the platform, prints the captured compiler diagnostics before returning `BuildError::CargoFailed` so upstream-build failures are diagnosable, and removes the process-wide env-var-mutating routing test in favor of the existing child-process integration test that covers the same path safely.\n  _Packages:_ 🟢 _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #620](https://github.com/pina-rs/pina/pull/620) · _Related issues:_ [#617](https://github.com/pina-rs/pina/issues/617)"
+						]
+					},
+					{
+						"title": "Documentation",
+						"collapsed": false,
+						"entries": [
+							"- **Use the original Weave logo.** Replace the S-Weave mark with the original interlocking Weave pineapple across the READMEs, documentation, favicons, and static and animated assets.\n  _Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_codama_renderer_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_cli_npm_, ⚪ _pina_skill_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #609](https://github.com/pina-rs/pina/pull/609)",
+							"- **Lead the readme with the framework comparison.** Rewrite the readme to open with what Pina is for: a centered landing header, a capability matrix against Anchor v1 (1.2.1), Anchor v2 (2.0.0-rc.1), and Quasar (rev `b0de7db`), and generated on-chain cost tables for the hello-world and counter fixtures. Detailed guides move behind links to the book. Add Anchor v1 fixtures to the framework-comparison benchmark and a version column to every published table, and interpolate the current Pina release version into the readme through mdt so every monochange release refreshes it.\n  _Packages:_ ⚪ _pina_, ⚪ _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #611](https://github.com/pina-rs/pina/pull/611) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619)",
+							"- **Update the Pina logo.** Replace the origami pineapple with S-Weave across the READMEs, documentation, and favicon. Add vector, monochrome, avatar, GIF, and Rive files for the new identity.\n  _Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_codama_renderer_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_cli_npm_, ⚪ _pina_skill_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #607](https://github.com/pina-rs/pina/pull/607)"
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"- **Patch the rustls stack and suppress the 0.21 advisories.** The advisory database published four rustls vulnerabilities (RUSTSEC-2026-0346, -0347, -0348, -0349) on 2026-10-14, failing the `cargo-deny` gate for every pull request. The 0.23 line is patched at 0.23.46: the lockfile now carries it for `pina_cli`'s `ureq` graph and the `reqwest 0.12` stack, alongside `ruzstd` 0.9.1 for RUSTSEC-2026-0344. The remaining hits are on the end-of-life `rustls 0.21.12`, reached only through `pina_test → surfpool → txtx-addon-kit → reqwest 0.11` — host/test stack only, no shipped crate links it — so those two are suppressed in `deny.toml` until the Surfpool train drops `reqwest 0.11`, tracked in #621 (same shape as the #619 `unsafe-libyaml` suppression).\n  _Packages:_ ⚪ _pina_test_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)",
+							"- **Suppress the unmaintained unsafe-libyaml advisory.** [RUSTSEC-2024-0449](https://rustsec.org/advisories/RUSTSEC-2024-0449) flags `unsafe-libyaml` as unmaintained, reached through `pina_test → surfpool-sdk → surfpool-core → serde_yaml`. The advisory database picked the entry up on 2026-10-12, which failed the `cargo-deny` CI gate for every open pull request. Host/test stack only; the suppression is tracked in #619 and is removable once surfpool drops the deprecated `serde_yaml`.\n  _Packages:_ ⚪ _pina_test_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #611](https://github.com/pina-rs/pina/pull/611) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.24.0](https://github.com/pina-rs/pina/releases/tag/v0.24.0) (2026-10-17)\n\nGrouped release for `core`.\n\n### Breaking Changes\n\n#### Carry program docs into generated CLI help\n\n_Packages:_ 🔴 _pina_cli_, 🟠 _pina_cli_renderer_, 🟠 _pina_cpi_renderer_, 🟠 _pina_codama_renderer_cli_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #612](https://github.com/pina-rs/pina/pull/612)\n\nThe IDL's program node now carries documentation from the program crate itself: the crate root's module docs (`//!`) come first, followed by the doc comment on the entrypoint surface — the hand-written `process_instruction` function when it has one, else the `#[discriminator(entrypoint)]` enum that generates it. A hand-written dispatch is authoritative, so its docs win over the enum's when both surfaces are annotated.\n\nEvery generated CLI renders those lines as its main description. The Rust clap CLI emits them as the `Cli` doc comment, so the first paragraph shows as `about` and the full text as the long help behind `--help`; the TypeScript CLI passes them to commander's `.description()` and keeps the first line in `package.json`; the Dart CLI passes them to the `CommandRunner` description. A program without either doc source keeps the previous `Command-line interface for <program>` fallback.\n\nPer-instruction subcommands, argument flags, and account flags were already doc-derived from the IDL; this closes the one gap at the program level. The committed IDL and client fixtures are regenerated with the new program `docs`, and `pina_bpf_program` (which documents neither surface) regenerates unchanged. The generated CPI crates also pick the docs up on their program-ID constants, which that renderer already supported; those constants now carry an `#[allow(rustdoc::broken_intra_doc_links)]`, because the copied docs' intra-doc links resolve in the program crate but not in the generated one.\n\n**Breaking:** `ProgramIr` and `DiscriminatorEnum` gain a public `docs` field, so exhaustive struct literals in downstream code need the new field. Everything else assembles those types through the parse and construction helpers, which fill the field in.\n\n### Features\n\n#### Add the experimental upstream sbpf-linker toolchain\n\n_Packages:_ 🟠 _pina_cli_, 🟠 _pina_profile_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #617](https://github.com/pina-rs/pina/pull/617)\n\n`sbpf-linker` 0.2.3 is pinned in `[workspace.metadata.bin]`, and the `[target.bpfel-unknown-none]` rustflags in `.cargo/config.toml` now carry the static-syscall configuration the linker requires: without the two `--cfg` flags the pinocchio syscall externs fall back to relocation-based resolution that sbpf-linker mishandles, producing programs that load but silently corrupt data.\n\nA `sbpf-linker = true` key under `[project]` in pina.toml routes every `pina build` through the upstream recipe (nightly `bpfel-unknown-none` with `-Z build-std`, static syscalls, LTO forced off) and retries with `--export=<symbol>` flags when the linker reports missing libcall symbols such as u128 division's `__udivti3`; removing the key reverts to the `cargo-build-sbf` driver. `pina init --sbpf-linker` records the key and scaffolds the matching `.cargo/config.toml`; `PINA_SBPF_LINKER` points the build at a specific sbpf-linker binary, for example the repository pin.\n\n`examples/upstream_bpf_program` showcases the toolchain with a Surfpool suite that functionally gates both build paths, and `docs/sbpf-linker-evaluation.md` records the measured caveats and the comparison matrix against `cargo build-sbf`: binaries 6-31% smaller, runtime compute units at parity, fat LTO a measured regression (17-77%), u128 division needing export flags, and large entrypoint frames (the multisig example) not building upstream at all.\n\n`pina profile` now also reads section-less program-header-only ELFs, the artifact layout sbpf-linker emits for static-syscall programs, so static compute-unit profiling works for both toolchains.\n\n### Fixes\n\n#### Upgrade pinapod to 0.4.7\n\n_Packages:_ 🟢 _pina_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #616](https://github.com/pina-rs/pina/pull/616)\n\nBump the workspace `pinapod` dependency from 0.4.5 to 0.4.7 and refresh the root, `pina_fuzz`, and `pina_fuzz/fuzz` lock files (0.4.6 in between was a formatting-only release). No pina source changes are required — pina re-exports and type-mentions the pinapod API, and 0.4.7 adds no public API and changes no wire format, validation order, or error variants.\n\nThe release hardens the contracts around the generated code. The generated compact modules bind the prelude names they spell to `core` explicitly, so a schema module that defines an `Ok`-, `Some`-, or `None`-shaped item, or a primitive-named type, can no longer rebind generated code — previously a matching `Ok` function compiled into every generated validation return and panicked at runtime inside the commit path. Zero-variant enums are rejected with a focused derive diagnostic instead of opaque errors from the generated module, and `PodString`'s accessors now document the UTF-8 precondition they trust rather than implying the length clamp is the whole contract.\n\nThe wincode writers additionally validate stored content at the boundary before writing, so invalid values fail serialization instead of producing bytes their own reader refuses; pina does not enable the `wincode` feature, so that path does not compile into pina at all.\n\nThe one source-visible change in this repository is `tests/expand/pda.expanded.rs`: the generated module gains the three prelude-binding `use` lines and nothing else. The generated module bodies are unchanged, so the compiled instruction paths are identical by construction and no compute-unit movement is expected.\n\nThe same release also pins the fuzz dependency set behind a `cargo metadata --locked` check, adds advisories to cargo-deny and gitleaks to CI, and moves the coverage upload's `id-token: write` into a job that runs no repository code — verification-boundary changes on the pinapod side, recorded here for completeness.\n\n- **Drop the unused `pastey` dependency.** `pina` declared `pastey` as a direct dependency but never referenced it; it was left behind by an early manifest restructure. Removing it shrinks the published dependency graph and clears the `unused dependency` build warning.\n  _Packages:_ 🟢 _pina_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)\n- **Scrub the Anchor converter's `PATH`.** `pina cpi` runs the pinned `@codama/nodes-from-anchor` converter through `npx -p <package> node`, and `npx` resolves the `node` interpreter through the inherited `PATH`. The converter child now runs with workspace-local `PATH` entries removed and `NODE_PATH` dropped — the same isolation the client renderers already apply — so a committed `node_modules/.bin/node` can no longer shadow the interpreter during Anchor IDL conversion. The npx cache the converter script resolves its package from lives outside the workspace and is unaffected. Passing a Node executable with `--npx <node>` keeps resolving from the project on purpose.\n  _Packages:_ 🟢 _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)\n- **Address the sbpf-linker PR review findings.** Corrects the example documentation (`Clock::from_account_view`, not the unimplemented `sol_get_sysvar` syscall), uses `std::env::join_paths` for the linker PATH prefix so the separator matches the platform, prints the captured compiler diagnostics before returning `BuildError::CargoFailed` so upstream-build failures are diagnosable, and removes the process-wide env-var-mutating routing test in favor of the existing child-process integration test that covers the same path safely.\n  _Packages:_ 🟢 _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #620](https://github.com/pina-rs/pina/pull/620) · _Related issues:_ [#617](https://github.com/pina-rs/pina/issues/617)\n\n### Documentation\n\n- **Use the original Weave logo.** Replace the S-Weave mark with the original interlocking Weave pineapple across the READMEs, documentation, favicons, and static and animated assets.\n  _Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_codama_renderer_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_cli_npm_, ⚪ _pina_skill_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #609](https://github.com/pina-rs/pina/pull/609)\n- **Lead the readme with the framework comparison.** Rewrite the readme to open with what Pina is for: a centered landing header, a capability matrix against Anchor v1 (1.2.1), Anchor v2 (2.0.0-rc.1), and Quasar (rev `b0de7db`), and generated on-chain cost tables for the hello-world and counter fixtures. Detailed guides move behind links to the book. Add Anchor v1 fixtures to the framework-comparison benchmark and a version column to every published table, and interpolate the current Pina release version into the readme through mdt so every monochange release refreshes it.\n  _Packages:_ ⚪ _pina_, ⚪ _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #611](https://github.com/pina-rs/pina/pull/611) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619)\n- **Update the Pina logo.** Replace the origami pineapple with S-Weave across the READMEs, documentation, and favicon. Add vector, monochrome, avatar, GIF, and Rive files for the new identity.\n  _Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_codama_renderer_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_cli_npm_, ⚪ _pina_skill_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #607](https://github.com/pina-rs/pina/pull/607)\n\n### Notes\n\n- **Patch the rustls stack and suppress the 0.21 advisories.** The advisory database published four rustls vulnerabilities (RUSTSEC-2026-0346, -0347, -0348, -0349) on 2026-10-14, failing the `cargo-deny` gate for every pull request. The 0.23 line is patched at 0.23.46: the lockfile now carries it for `pina_cli`'s `ureq` graph and the `reqwest 0.12` stack, alongside `ruzstd` 0.9.1 for RUSTSEC-2026-0344. The remaining hits are on the end-of-life `rustls 0.21.12`, reached only through `pina_test → surfpool → txtx-addon-kit → reqwest 0.11` — host/test stack only, no shipped crate links it — so those two are suppressed in `deny.toml` until the Surfpool train drops `reqwest 0.11`, tracked in #621 (same shape as the #619 `unsafe-libyaml` suppression).\n  _Packages:_ ⚪ _pina_test_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)\n- **Suppress the unmaintained unsafe-libyaml advisory.** [RUSTSEC-2024-0449](https://rustsec.org/advisories/RUSTSEC-2024-0449) flags `unsafe-libyaml` as unmaintained, reached through `pina_test → surfpool-sdk → surfpool-core → serde_yaml`. The advisory database picked the entry up on 2026-10-12, which failed the `cargo-deny` CI gate for every open pull request. Host/test stack only; the suppression is tracked in #619 and is removable once surfpool drops the deprecated `serde_yaml`.\n  _Packages:_ ⚪ _pina_test_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #611](https://github.com/pina-rs/pina/pull/611) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
