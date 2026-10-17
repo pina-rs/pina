@@ -4,6 +4,75 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.24.0](https://github.com/pina-rs/pina/releases/tag/v0.24.0) (2026-10-17)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Carry program docs into generated CLI help
+
+_Packages:_ 🔴 _pina_cli_, 🟠 _pina_cli_renderer_, 🟠 _pina_cpi_renderer_, 🟠 _pina_codama_renderer_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #612](https://github.com/pina-rs/pina/pull/612)
+
+The IDL's program node now carries documentation from the program crate itself: the crate root's module docs (`//!`) come first, followed by the doc comment on the entrypoint surface — the hand-written `process_instruction` function when it has one, else the `#[discriminator(entrypoint)]` enum that generates it. A hand-written dispatch is authoritative, so its docs win over the enum's when both surfaces are annotated.
+
+Every generated CLI renders those lines as its main description. The Rust clap CLI emits them as the `Cli` doc comment, so the first paragraph shows as `about` and the full text as the long help behind `--help`; the TypeScript CLI passes them to commander's `.description()` and keeps the first line in `package.json`; the Dart CLI passes them to the `CommandRunner` description. A program without either doc source keeps the previous `Command-line interface for <program>` fallback.
+
+Per-instruction subcommands, argument flags, and account flags were already doc-derived from the IDL; this closes the one gap at the program level. The committed IDL and client fixtures are regenerated with the new program `docs`, and `pina_bpf_program` (which documents neither surface) regenerates unchanged. The generated CPI crates also pick the docs up on their program-ID constants, which that renderer already supported; those constants now carry an `#[allow(rustdoc::broken_intra_doc_links)]`, because the copied docs' intra-doc links resolve in the program crate but not in the generated one.
+
+**Breaking:** `ProgramIr` and `DiscriminatorEnum` gain a public `docs` field, so exhaustive struct literals in downstream code need the new field. Everything else assembles those types through the parse and construction helpers, which fill the field in.
+
+### Features
+
+#### Add the experimental upstream sbpf-linker toolchain
+
+_Packages:_ 🟠 _pina_cli_, 🟠 _pina_profile_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #617](https://github.com/pina-rs/pina/pull/617)
+
+`sbpf-linker` 0.2.3 is pinned in `[workspace.metadata.bin]`, and the `[target.bpfel-unknown-none]` rustflags in `.cargo/config.toml` now carry the static-syscall configuration the linker requires: without the two `--cfg` flags the pinocchio syscall externs fall back to relocation-based resolution that sbpf-linker mishandles, producing programs that load but silently corrupt data.
+
+A `sbpf-linker = true` key under `[project]` in pina.toml routes every `pina build` through the upstream recipe (nightly `bpfel-unknown-none` with `-Z build-std`, static syscalls, LTO forced off) and retries with `--export=<symbol>` flags when the linker reports missing libcall symbols such as u128 division's `__udivti3`; removing the key reverts to the `cargo-build-sbf` driver. `pina init --sbpf-linker` records the key and scaffolds the matching `.cargo/config.toml`; `PINA_SBPF_LINKER` points the build at a specific sbpf-linker binary, for example the repository pin.
+
+`examples/upstream_bpf_program` showcases the toolchain with a Surfpool suite that functionally gates both build paths, and `docs/sbpf-linker-evaluation.md` records the measured caveats and the comparison matrix against `cargo build-sbf`: binaries 6-31% smaller, runtime compute units at parity, fat LTO a measured regression (17-77%), u128 division needing export flags, and large entrypoint frames (the multisig example) not building upstream at all.
+
+`pina profile` now also reads section-less program-header-only ELFs, the artifact layout sbpf-linker emits for static-syscall programs, so static compute-unit profiling works for both toolchains.
+
+### Fixes
+
+#### Upgrade pinapod to 0.4.7
+
+_Packages:_ 🟢 _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #616](https://github.com/pina-rs/pina/pull/616)
+
+Bump the workspace `pinapod` dependency from 0.4.5 to 0.4.7 and refresh the root, `pina_fuzz`, and `pina_fuzz/fuzz` lock files (0.4.6 in between was a formatting-only release). No pina source changes are required — pina re-exports and type-mentions the pinapod API, and 0.4.7 adds no public API and changes no wire format, validation order, or error variants.
+
+The release hardens the contracts around the generated code. The generated compact modules bind the prelude names they spell to `core` explicitly, so a schema module that defines an `Ok`-, `Some`-, or `None`-shaped item, or a primitive-named type, can no longer rebind generated code — previously a matching `Ok` function compiled into every generated validation return and panicked at runtime inside the commit path. Zero-variant enums are rejected with a focused derive diagnostic instead of opaque errors from the generated module, and `PodString`'s accessors now document the UTF-8 precondition they trust rather than implying the length clamp is the whole contract.
+
+The wincode writers additionally validate stored content at the boundary before writing, so invalid values fail serialization instead of producing bytes their own reader refuses; pina does not enable the `wincode` feature, so that path does not compile into pina at all.
+
+The one source-visible change in this repository is `tests/expand/pda.expanded.rs`: the generated module gains the three prelude-binding `use` lines and nothing else. The generated module bodies are unchanged, so the compiled instruction paths are identical by construction and no compute-unit movement is expected.
+
+The same release also pins the fuzz dependency set behind a `cargo metadata --locked` check, adds advisories to cargo-deny and gitleaks to CI, and moves the coverage upload's `id-token: write` into a job that runs no repository code — verification-boundary changes on the pinapod side, recorded here for completeness.
+
+- **Drop the unused `pastey` dependency.** `pina` declared `pastey` as a direct dependency but never referenced it; it was left behind by an early manifest restructure. Removing it shrinks the published dependency graph and clears the `unused dependency` build warning. _Packages:_ 🟢 _pina_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)
+- **Scrub the Anchor converter's `PATH`.** `pina cpi` runs the pinned `@codama/nodes-from-anchor` converter through `npx -p <package> node`, and `npx` resolves the `node` interpreter through the inherited `PATH`. The converter child now runs with workspace-local `PATH` entries removed and `NODE_PATH` dropped — the same isolation the client renderers already apply — so a committed `node_modules/.bin/node` can no longer shadow the interpreter during Anchor IDL conversion. The npx cache the converter script resolves its package from lives outside the workspace and is unaffected. Passing a Node executable with `--npx <node>` keeps resolving from the project on purpose. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)
+- **Address the sbpf-linker PR review findings.** Corrects the example documentation (`Clock::from_account_view`, not the unimplemented `sol_get_sysvar` syscall), uses `std::env::join_paths` for the linker PATH prefix so the separator matches the platform, prints the captured compiler diagnostics before returning `BuildError::CargoFailed` so upstream-build failures are diagnosable, and removes the process-wide env-var-mutating routing test in favor of the existing child-process integration test that covers the same path safely. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #620](https://github.com/pina-rs/pina/pull/620) · _Related issues:_ [#617](https://github.com/pina-rs/pina/issues/617)
+
+### Documentation
+
+- **Use the original Weave logo.** Replace the S-Weave mark with the original interlocking Weave pineapple across the READMEs, documentation, favicons, and static and animated assets. _Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_codama_renderer_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_cli_npm_, ⚪ _pina_skill_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #609](https://github.com/pina-rs/pina/pull/609)
+- **Lead the readme with the framework comparison.** Rewrite the readme to open with what Pina is for: a centered landing header, a capability matrix against Anchor v1 (1.2.1), Anchor v2 (2.0.0-rc.1), and Quasar (rev `b0de7db`), and generated on-chain cost tables for the hello-world and counter fixtures. Detailed guides move behind links to the book. Add Anchor v1 fixtures to the framework-comparison benchmark and a version column to every published table, and interpolate the current Pina release version into the readme through mdt so every monochange release refreshes it. _Packages:_ ⚪ _pina_, ⚪ _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #611](https://github.com/pina-rs/pina/pull/611) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619)
+- **Update the Pina logo.** Replace the origami pineapple with S-Weave across the READMEs, documentation, and favicon. Add vector, monochrome, avatar, GIF, and Rive files for the new identity. _Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_codama_renderer_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_cli_npm_, ⚪ _pina_skill_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #607](https://github.com/pina-rs/pina/pull/607)
+
+### Notes
+
+- **Patch the rustls stack and suppress the 0.21 advisories.** The advisory database published four rustls vulnerabilities (RUSTSEC-2026-0346, -0347, -0348, -0349) on 2026-10-14, failing the `cargo-deny` gate for every pull request. The 0.23 line is patched at 0.23.46: the lockfile now carries it for `pina_cli`'s `ureq` graph and the `reqwest 0.12` stack, alongside `ruzstd` 0.9.1 for RUSTSEC-2026-0344. The remaining hits are on the end-of-life `rustls 0.21.12`, reached only through `pina_test → surfpool → txtx-addon-kit → reqwest 0.11` — host/test stack only, no shipped crate links it — so those two are suppressed in `deny.toml` until the Surfpool train drops `reqwest 0.11`, tracked in #621 (same shape as the #619 `unsafe-libyaml` suppression). _Packages:_ ⚪ _pina_test_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#300](https://github.com/pina-rs/pina/issues/300), [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)
+- **Suppress the unmaintained unsafe-libyaml advisory.** [RUSTSEC-2024-0449](https://rustsec.org/advisories/RUSTSEC-2024-0449) flags `unsafe-libyaml` as unmaintained, reached through `pina_test → surfpool-sdk → surfpool-core → serde_yaml`. The advisory database picked the entry up on 2026-10-12, which failed the `cargo-deny` CI gate for every open pull request. Host/test stack only; the suppression is tracked in #619 and is removable once surfpool drops the deprecated `serde_yaml`. _Packages:_ ⚪ _pina_test_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #611](https://github.com/pina-rs/pina/pull/611) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619)
+
 ## [0.23.0](https://github.com/pina-rs/pina/releases/tag/v0.23.0) (2026-10-05)
 
 Grouped release for `core`.
