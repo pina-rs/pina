@@ -1237,15 +1237,101 @@ in
       description = "Run experimental Solana VM coverage via mucho when available (non-blocking).";
       binary = "bash";
     };
+    "mutants:run" = {
+      exec = ''
+        set -euo pipefail
+        # Features, `--locked`, exclusions, and the timeout floor come from
+        # `.cargo/mutants.toml`, which cargo-mutants loads by default.
+        # Tests expect a home directory, which a clean CI shell may not set;
+        # `test:all` uses the same fallback.
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
+
+        # cargo-mutants exits 0 when its filters leave nothing to mutate, which
+        # reads as a passing run. List first and refuse an empty selection,
+        # except where nothing to mutate is a real answer: an `--in-diff` run
+        # whose diff touches no mutable code, or packages that are all outside
+        # the nightly inventory, such as `pina_sdk_ids`, which holds only
+        # constants.
+        mutant_count=$(cargo mutants --list "$@" | wc -l)
+        if [ "$mutant_count" -eq 0 ]; then
+          empty_allowed=0
+          case " $* " in
+            *" --in-diff "* | *" --in-diff="*) empty_allowed=1 ;;
+          esac
+          if [ "$empty_allowed" -eq 0 ]; then
+            inventory=$(mutants:packages)
+            previous=""
+            for arg in "$@"; do
+              case "$previous" in
+                -p | --package)
+                  if grep -qxF -- "$arg" <<<"$inventory"; then
+                    empty_allowed=0
+                    break
+                  fi
+                  empty_allowed=1
+                  ;;
+              esac
+              previous="$arg"
+            done
+          fi
+          if [ "$empty_allowed" -eq 1 ]; then
+            echo "The selection contains no mutants; nothing to test."
+            exit 0
+          fi
+          echo "cargo-mutants found no mutants for: $*" >&2
+          echo "A run that tests nothing is not a pass; check .cargo/mutants.toml and the package selection." >&2
+          exit 1
+        fi
+        echo "Testing $mutant_count mutants."
+        mkdir -p "$DEVENV_ROOT/target/mutants"
+        status=0
+        cargo mutants --output "$DEVENV_ROOT/target/mutants" "$@" || status=$?
+        exit "$status"
+      '';
+      description = "Run cargo-mutants with the given arguments, failing when they select no mutants.";
+      binary = "bash";
+    };
+    "mutants:prepare" = {
+      exec = ''
+        set -euo pipefail
+        # `pina_cli`'s tests need what `test:all` sets up first: the pinned
+        # Anchor converter in `node_modules` and the CLI renderer bundle.
+        # cargo-mutants does not copy either into a scratch tree, so pair this
+        # with `--in-place`.
+        if [ -z "''${HOME:-}" ]; then
+          export HOME="$DEVENV_ROOT/.cache/home"
+        fi
+        mkdir -p "$HOME"
+        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
+      '';
+      description = "Install the npm packages and renderer bundle that pina_cli's tests need under mutation testing.";
+      binary = "bash";
+    };
+    "mutants:packages" = {
+      exec = ''
+        # The core crates the nightly mutation run covers, each of which must
+        # yield mutants. `.cargo/mutants.toml` has no package selector, so the
+        # inventory lives here. `pina_sdk_ids` is left out: it holds only
+        # constants, so it yields no mutants.
+        printf '%s\n' pina pina_cli pina_codama_renderer pina_macros pina_profile
+      '';
+      description = "Print the crates covered by nightly mutation testing, one per line.";
+      binary = "bash";
+    };
     "mutants:all" = {
       exec = ''
         set -euo pipefail
-        mkdir -p "$DEVENV_ROOT/target/mutants"
-        status=0
-        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" || status=$?
-        exit "$status"
+        pkg_args=()
+        while read -r package; do
+          pkg_args+=("-p" "$package")
+        done < <(mutants:packages)
+        mutants:run "''${pkg_args[@]}" "$@"
       '';
-      description = "Run mutation testing across all core workspace crates (nightly).";
+      description = "Run mutation testing across all core workspace crates.";
       binary = "bash";
     };
     "mutants:diff" = {
@@ -1286,16 +1372,13 @@ in
         fi
 
         echo "Changed packages: ''${changed_packages[*]}"
-        mkdir -p "$DEVENV_ROOT/target/mutants"
 
         pkg_args=()
         for pkg in "''${changed_packages[@]}"; do
           pkg_args+=("-p" "$pkg")
         done
 
-        status=0
-        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" "''${pkg_args[@]}" || status=$?
-        exit "$status"
+        mutants:run "''${pkg_args[@]}"
       '';
       description = "Run mutation testing only on crates changed relative to a base branch (PR).";
       binary = "bash";
@@ -1304,7 +1387,7 @@ in
       exec = ''
         set -euo pipefail
         if [ $# -eq 0 ]; then
-          echo "Usage: mutants:crate <package-name>" >&2
+          echo "Usage: mutants:crate <package-name> [cargo-mutants args...]" >&2
           exit 1
         fi
         if ! cargo metadata --no-deps --format-version 1 |
@@ -1313,12 +1396,11 @@ in
           echo "Package '$1' does not belong to the root workspace." >&2
           exit 1
         fi
-        mkdir -p "$DEVENV_ROOT/target/mutants"
-        status=0
-        cargo mutants --all-features --cargo-arg --locked --output "$DEVENV_ROOT/target/mutants" -p "$1" || status=$?
-        exit "$status"
+        package="$1"
+        shift
+        mutants:run -p "$package" "$@"
       '';
-      description = "Run mutation testing on a single workspace crate.";
+      description = "Run mutation testing on a single workspace crate; extra arguments go to cargo-mutants.";
       binary = "bash";
     };
     "fix:all" = {

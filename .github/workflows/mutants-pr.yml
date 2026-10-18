@@ -9,7 +9,7 @@ on:
       - main
     paths:
       - "crates/**"
-      - "mutants.toml"
+      - ".cargo/mutants.toml"
       - ".github/workflows/mutants-pr.yml"
 
 concurrency:
@@ -93,12 +93,31 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Mutate only the lines this pull request changes. A whole crate does not
+      # fit the job: `pina_cli` alone yields thousands of mutants, which the
+      # nightly run covers in rotating shards instead.
+      - name: write the pull request diff
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$BASE_REF" --depth=1 || true
+          mkdir -p target
+          git diff "origin/${BASE_REF}...HEAD" > target/mutants-pr.diff
+
+      - name: prepare the mutation baseline
+        run: mutants:prepare
+        shell: devenv shell -c -- bash -e {0}
+
+      # `--in-place` mutates this disposable checkout instead of a copy, which
+      # keeps what `mutants:prepare` installed and the git worktree that
+      # `pina.toml`'s `{{root}}` anchor resolves through.
       - name: run mutation tests for ${{ matrix.package }}
         id: mutation_tests
         continue-on-error: true
         env:
           PACKAGE: ${{ matrix.package }}
-        run: mutants:crate "$PACKAGE"
+        run: mutants:crate "$PACKAGE" --in-diff target/mutants-pr.diff --in-place
         shell: devenv shell -c PACKAGE -- bash -e {0}
 
       # Historical misses are advisory on pull requests, but the failed step and

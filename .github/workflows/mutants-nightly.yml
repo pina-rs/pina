@@ -1,23 +1,39 @@
 name: "mutants-nightly"
 permissions:
   contents: read
-  issues: write
 
-# Nightly mutation testing across all core workspace crates.
+# Nightly mutation testing across the core workspace crates listed by the
+# `mutants:packages` devenv task. The inventory is about 7,500 mutants at
+# roughly 35 seconds each, far more than one job allows, so it is split into
+# `MUTANTS_SHARDS` shards of about 190 mutants. Each night the matrix jobs test
+# the next shards in turn, so every mutant is tested once every
+# `MUTANTS_SHARDS / <matrix size>` nights.
 on:
   schedule:
     # Run every day at 02:00 UTC.
     - cron: "0 2 * * *"
   workflow_dispatch:
+    inputs:
+      first_shard:
+        description: "First shard to test, from 0 to MUTANTS_SHARDS - 1; each matrix job takes the next one. Defaults to tonight's shards."
+        required: false
+        type: string
 
 concurrency:
   group: mutants-nightly-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  MUTANTS_SHARDS: "40"
+
 jobs:
   mutants:
     timeout-minutes: 180
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [0, 1, 2, 3]
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,32 +46,101 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: run mutation tests
-        run: mutants:all
+      - name: choose the shard
+        id: shard
+        env:
+          REQUESTED_FIRST_SHARD: ${{ inputs.first_shard }}
+          LANE: ${{ matrix.lane }}
+          LANES: ${{ strategy.job-total }}
+        run: |
+          set -euo pipefail
+          day=$(( $(date -u +%s) / 86400 ))
+          first="${REQUESTED_FIRST_SHARD:-$(( day * LANES % MUTANTS_SHARDS ))}"
+          if ! [[ "$first" =~ ^(0|[1-9][0-9]*)$ ]] || [ "$first" -ge "$MUTANTS_SHARDS" ]; then
+            echo "::error::The first shard must be a whole number from 0 to $((MUTANTS_SHARDS - 1)); got '$first'."
+            exit 1
+          fi
+          shard=$(( (first + LANE) % MUTANTS_SHARDS ))
+          echo "shard=$shard/$MUTANTS_SHARDS" >> "$GITHUB_OUTPUT"
+          echo "Testing mutants shard $shard of $MUTANTS_SHARDS (0-based)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: prepare the mutation baseline
+        run: mutants:prepare
         shell: devenv shell -c -- bash -e {0}
+
+      # `--in-place` mutates this disposable checkout instead of a copy, which
+      # keeps what `mutants:prepare` installed and the git worktree that
+      # `pina.toml`'s `{{root}}` anchor resolves through. The exit status is
+      # kept in a file because the clean devenv shell does not see
+      # `GITHUB_OUTPUT`. cargo-mutants exits 2 for missed mutants and 3 for
+      # timeouts; anything else is a setup or baseline failure.
+      - name: run mutation tests
+        env:
+          MUTANTS_SHARD: ${{ steps.shard.outputs.shard }}
+        run: |
+          status=0
+          mutants:all --shard "$MUTANTS_SHARD" --in-place || status=$?
+          mkdir -p target/mutants
+          echo "$status" > target/mutants/exit-status
+          echo "$MUTANTS_SHARD" > target/mutants/shard
+          exit "$status"
+        shell: devenv shell -c MUTANTS_SHARD -- bash -e {0}
 
       - name: upload mutants report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mutants-report
+          name: mutants-report-${{ matrix.lane }}
           path: target/mutants
 
+  # Surviving mutants and timeouts are findings and open one issue for the
+  # night; a shard that could not test anything fails its job without
+  # claiming mutants escaped.
+  report:
+    needs: mutants
+    if: always() && needs.mutants.result == 'failure'
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: download mutants reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mutants-report-*
+          path: target/mutants-reports
+
       - name: open issue on mutant escapes
-        if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # Extract the summary line from the mutants output if present.
-          summary="$(grep -m1 'mutants' target/mutants/outcomes.json 2>/dev/null || echo 'See uploaded artifact.')"
-          body="Nightly mutation testing failed — some mutants were not caught by the test suite.\n\n$summary\n\n[Artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          set -euo pipefail
+          findings=""
+          for dir in target/mutants-reports/*/; do
+            status="$(cat "$dir/exit-status" 2>/dev/null || echo missing)"
+            case "$status" in
+              2 | 3) ;;
+              *) continue ;;
+            esac
+            shard="$(cat "$dir/shard" 2>/dev/null || basename "$dir")"
+            summary="$(jq -r '"\(.total_mutants) mutants tested: \(.missed) missed, \(.timeout) timed out, \(.caught) caught, \(.unviable) unviable."' "$dir/mutants.out/outcomes.json" 2>/dev/null || echo 'See the uploaded report.')"
+            findings+="- Shard ${shard}: ${summary}"$'\n'
+          done
+
+          if [ -z "$findings" ]; then
+            echo "No shard reported surviving mutants or timeouts; check the failed jobs for a setup or baseline failure."
+            exit 0
+          fi
+
+          body="$(printf 'Nightly mutation testing found mutants the test suite did not catch.\n\n%s\n[Artifacts](%s)\n' "$findings" "$RUN_URL")"
 
           # Only open a new issue if one is not already open.
-          existing=$(gh issue list --repo "${{ github.repository }}" \
-            --label "mutants" --state open --json number --jq '.[0].number')
-
+          existing=$(gh issue list --label "mutants" --state open --json number --jq '.[0].number')
           if [ -z "$existing" ]; then
-            gh issue create --repo "${{ github.repository }}" \
+            gh issue create \
               --title "Nightly mutation testing failed" \
               --body "$body" \
               --label "mutants"
