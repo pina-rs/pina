@@ -34,7 +34,7 @@ Separate PR workflows also verify:
 
 - `surfpool` builds each example SBF program and exercises its runtime guards through the Surfpool SDK
 - `performance` for instruction compute units, every example program's build size and static CU estimate, CLI timings, and core host timings against the PR base
-- `mutants-pr` mutates the lines a pull request changes in each changed crate (`mutants:crate <crate> --in-diff <diff>`); surviving mutants are advisory and show as a failed step with a summary rather than a failed job
+- `mutants-pr` mutates the lines a pull request changes in each changed crate (`mutants:crate <crate> --in-diff <diff>`); surviving mutants and timeouts are advisory and show as a failed step with a summary rather than a failed job, while a baseline or setup failure fails the job
 
 The `mutants-nightly` workflow splits the core crates' mutants into `MUTANTS_SHARDS` shards and tests the next few each night in parallel jobs (`mutants:all --shard <k>/<n>`), so every mutant in the `mutants:packages` inventory is tested once every ten nights with 40 shards and four jobs; surviving mutants or timeouts open one `mutants` issue for the night. Both workflows read `.cargo/mutants.toml`, and `mutants:run` fails a run that selects no mutants, so a configuration that excludes every source cannot pass as a clean run.
 
