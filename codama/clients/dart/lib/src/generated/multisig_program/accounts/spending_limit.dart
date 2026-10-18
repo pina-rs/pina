@@ -25,6 +25,7 @@ class SpendingLimit {
     required this.remainingAmount,
     required this.lastReset,
     required this.period,
+    required this.memberGeneration,
     required this.members,
     required this.destinations,
   }) : discriminator = 4,
@@ -42,6 +43,7 @@ class SpendingLimit {
   final BigInt remainingAmount;
   final BigInt lastReset;
   final int period;
+  final int memberGeneration;
   final List<int> members;
   final List<int> destinations;
 
@@ -62,6 +64,7 @@ class SpendingLimit {
           remainingAmount == other.remainingAmount &&
           lastReset == other.lastReset &&
           period == other.period &&
+          memberGeneration == other.memberGeneration &&
           members == other.members &&
           destinations == other.destinations;
 
@@ -79,13 +82,14 @@ class SpendingLimit {
     remainingAmount,
     lastReset,
     period,
+    memberGeneration,
     members,
     destinations,
   );
 
   @override
   String toString() =>
-      'SpendingLimit(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, multisig: $multisig, createKey: $createKey, vaultIndex: $vaultIndex, vaultBump: $vaultBump, mint: $mint, amount: $amount, remainingAmount: $remainingAmount, lastReset: $lastReset, period: $period, members: $members, destinations: $destinations)';
+      'SpendingLimit(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, multisig: $multisig, createKey: $createKey, vaultIndex: $vaultIndex, vaultBump: $vaultBump, mint: $mint, amount: $amount, remainingAmount: $remainingAmount, lastReset: $lastReset, period: $period, memberGeneration: $memberGeneration, members: $members, destinations: $destinations)';
 }
 
 Encoder<SpendingLimit> getSpendingLimitEncoder() {
@@ -102,6 +106,7 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
     ('remainingAmount', getU64Encoder()),
     ('lastReset', getI64Encoder()),
     ('period', getU8Encoder()),
+    ('memberGeneration', getU32Encoder()),
     (
       'members',
       offsetEncoder(
@@ -112,7 +117,7 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
               offsetEncoder(
                 offsetEncoder(
                   getU16Encoder(),
-                  OffsetConfig(preOffset: (scope) => 126),
+                  OffsetConfig(preOffset: (scope) => 130),
                 ),
                 OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
               ),
@@ -132,7 +137,7 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
             offsetEncoder(
               offsetEncoder(
                 getU16Encoder(),
-                OffsetConfig(preOffset: (scope) => 128),
+                OffsetConfig(preOffset: (scope) => 132),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -158,6 +163,7 @@ Encoder<SpendingLimit> getSpendingLimitEncoder() {
       'remainingAmount': value.remainingAmount,
       'lastReset': value.lastReset,
       'period': value.period,
+      'memberGeneration': value.memberGeneration,
       'members': value.members,
       'destinations': value.destinations,
     },
@@ -178,6 +184,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
     ('remainingAmount', getU64Decoder()),
     ('lastReset', getI64Decoder()),
     ('period', getU8Decoder()),
+    ('memberGeneration', getU32Decoder()),
     (
       'members',
       offsetDecoder(
@@ -188,7 +195,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
               offsetDecoder(
                 offsetDecoder(
                   getU16Decoder(),
-                  OffsetConfig(preOffset: (scope) => 126),
+                  OffsetConfig(preOffset: (scope) => 130),
                 ),
                 OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
               ),
@@ -198,7 +205,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
             offsetDecoder(
               offsetDecoder(
                 getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 126),
+                OffsetConfig(preOffset: (scope) => 130),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -218,7 +225,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
             offsetDecoder(
               offsetDecoder(
                 getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 128),
+                OffsetConfig(preOffset: (scope) => 132),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -228,7 +235,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
           offsetDecoder(
             offsetDecoder(
               getU16Decoder(),
-              OffsetConfig(preOffset: (scope) => 128),
+              OffsetConfig(preOffset: (scope) => 132),
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
@@ -271,6 +278,7 @@ Decoder<SpendingLimit> getSpendingLimitDecoder() {
         remainingAmount: map['remainingAmount']! as BigInt,
         lastReset: map['lastReset']! as BigInt,
         period: map['period']! as int,
+        memberGeneration: map['memberGeneration']! as int,
         members: map['members']! as List<int>,
         destinations: map['destinations']! as List<int>,
       ),

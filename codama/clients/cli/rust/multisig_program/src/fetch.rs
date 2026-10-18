@@ -25,10 +25,10 @@ pub enum Command {
 	ProgramConfig(ProgramConfigArgs),
 	/// A multisig: consensus parameters plus the sorted member roster.
 	///
-	/// Members live in two parallel compact tails (`member_keys` sorted ascending,
-	/// `member_permissions` aligned by index) so the account only pays rent for
-	/// active members. A member's bit index in a proposal's vote masks is its
-	/// position in `member_keys`.
+	/// Members live in three parallel compact tails (`member_roster` sorted
+	/// ascending, `member_permissions` and `member_generations` aligned by index)
+	/// so the account only pays rent for active members. A member's bit index in a
+	/// proposal's vote masks is its position in the roster.
 	Multisig(MultisigArgs),
 	/// A proposal: vote state and payload in one account.
 	///
@@ -251,8 +251,10 @@ fn multisig_json(account: &multisig_program_client::accounts::MultisigRef<'_>) -
 		"ttl": account.ttl.get(),
 		"transaction_index": account.transaction_index.get(),
 		"stale_transaction_index": account.stale_transaction_index.get(),
+		"member_generation": account.member_generation.get(),
 		"member_roster": account.member_roster().to_vec(),
 		"member_permissions": account.member_permissions().to_vec(),
+		"member_generations": account.member_generations().iter().map(|value| value.get()).collect::<Vec<_>>(),
 	})
 }
 
@@ -288,6 +290,7 @@ fn spending_limit_json(account: &multisig_program_client::accounts::SpendingLimi
 		"remaining_amount": account.remaining_amount.get(),
 		"last_reset": account.last_reset.get(),
 		"period": account.period,
+		"member_generation": account.member_generation.get(),
 		"members": account.members().to_vec(),
 		"destinations": account.destinations().to_vec(),
 	})

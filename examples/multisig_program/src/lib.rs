@@ -97,6 +97,10 @@ const SEED_LEGACY_MULTISIG: &[u8] = b"multisig";
 /// which caps it well below the mask width.
 pub const MAX_MEMBERS: usize = 16;
 
+/// Join generations for a founding or imported roster: every member joins at
+/// generation zero.
+const FOUNDING_GENERATIONS: [PodU32; MAX_MEMBERS] = [PodU32::ZERO; MAX_MEMBERS];
+
 /// Upper bound on the timelock so a fat-fingered config cannot brick the
 /// multisig, matching the classic bound: three months.
 pub const MAX_TIME_LOCK: u32 = 3 * 30 * 24 * 60 * 60;
@@ -305,10 +309,10 @@ pub struct ProgramConfig {
 
 /// A multisig: consensus parameters plus the sorted member roster.
 ///
-/// Members live in two parallel compact tails (`member_keys` sorted ascending,
-/// `member_permissions` aligned by index) so the account only pays rent for
-/// active members. A member's bit index in a proposal's vote masks is its
-/// position in `member_keys`.
+/// Members live in three parallel compact tails (`member_roster` sorted
+/// ascending, `member_permissions` and `member_generations` aligned by index)
+/// so the account only pays rent for active members. A member's bit index in a
+/// proposal's vote masks is its position in the roster.
 #[account(discriminator = MultisigAccountType, compact)]
 #[pda(seeds = [SEED_MULTISIG, create_key: Address], bump = bump)]
 pub struct Multisig {
@@ -332,12 +336,19 @@ pub struct Multisig {
 	pub transaction_index: u64,
 	/// Proposals at or below this index predate the latest consensus change.
 	pub stale_transaction_index: u64,
+	/// Membership generation, bumped each time a member joins. A spending
+	/// limit records it when granted, so the grant covers only members who
+	/// joined at or before that point.
+	pub member_generation: u32,
 	/// Sorted member roster as concatenated 32-byte addresses, parallel to
 	/// `member_permissions`. Raw bytes keep the generated CLI clients
 	/// renderable while the compact tail still charges rent per member.
 	pub member_roster: PodVec<u8, 512, 2>,
 	/// Permission masks, parallel to the roster.
 	pub member_permissions: PodVec<u8, 16, 1>,
+	/// The membership generation each member joined at, parallel to the
+	/// roster. Founding and imported members joined at generation zero.
+	pub member_generations: PodVec<PodU32, 16, 1>,
 }
 
 /// A proposal: vote state and payload in one account.
@@ -401,6 +412,10 @@ pub struct SpendingLimit {
 	pub last_reset: i64,
 	/// Reset period; see the `PERIOD_*` constants.
 	pub period: u8,
+	/// The multisig's membership generation when this limit was granted. A
+	/// drawer who joined later, including a removed member who rejoined, is
+	/// refused until a new grant names them.
+	pub member_generation: u32,
 	/// Members allowed to draw on this limit, as concatenated addresses.
 	pub members: PodVec<u8, 512, 2>,
 	/// Allowed destinations as concatenated addresses; empty means
@@ -708,9 +723,11 @@ pub struct MultisigSnapshot {
 	pub ttl: u32,
 	pub transaction_index: u64,
 	pub stale_transaction_index: u64,
+	pub member_generation: u32,
 	pub bump: u8,
 	pub member_keys: [Address; 16],
 	pub member_permissions: [u8; 16],
+	pub member_generations: [PodU32; 16],
 	pub member_count: usize,
 }
 
@@ -729,9 +746,11 @@ impl MultisigSnapshot {
 			ttl: 0,
 			transaction_index: 0,
 			stale_transaction_index: 0,
+			member_generation: 0,
 			bump: 0,
 			member_keys: [Address::default(); MAX_MEMBERS],
 			member_permissions: [0; MAX_MEMBERS],
+			member_generations: [PodU32::ZERO; MAX_MEMBERS],
 			member_count: 0,
 		};
 
@@ -744,11 +763,19 @@ impl MultisigSnapshot {
 			snapshot.ttl = state.ttl.get();
 			snapshot.transaction_index = state.transaction_index.get();
 			snapshot.stale_transaction_index = state.stale_transaction_index.get();
+			snapshot.member_generation = state.member_generation.get();
 			snapshot.bump = state.bump;
 			snapshot.member_count =
 				decode_roster(state.member_roster(), &mut snapshot.member_keys)?;
 			snapshot.member_permissions[..snapshot.member_count]
 				.copy_from_slice(state.member_permissions());
+			// Every member must carry a join generation: a short tail would
+			// leave a member looking like a founder to every grant.
+			let generations = state.member_generations();
+			if generations.len() != snapshot.member_count {
+				return Err(MultisigError::InvalidConfiguration.into());
+			}
+			snapshot.member_generations[..snapshot.member_count].copy_from_slice(generations);
 			Ok(())
 		})?;
 
@@ -771,6 +798,11 @@ impl MultisigSnapshot {
 	/// Index of `key` in the member roster, if present.
 	pub fn member_index_of(&self, key: &Address) -> Option<usize> {
 		member_index(self.member_keys(), key)
+	}
+
+	/// The generation the member at `index` joined at.
+	pub fn joined_generation(&self, index: usize) -> u32 {
+		self.member_generations[index].get()
 	}
 
 	/// The member's permission mask, or zero for non-members.
@@ -1709,6 +1741,16 @@ fn apply_config_actions(
 					.member_permissions
 					.copy_within(position..working.member_count, position + 1);
 				working.member_permissions[position] = permissions;
+				// Every join takes a fresh generation, so a returning member
+				// never matches a grant made before they left.
+				working.member_generation = working
+					.member_generation
+					.checked_add(1)
+					.ok_or(ProgramError::ArithmeticOverflow)?;
+				working
+					.member_generations
+					.copy_within(position..working.member_count, position + 1);
+				working.member_generations[position] = PodU32::from(working.member_generation);
 				working.member_count += 1;
 				working.changed = true;
 			}
@@ -1725,6 +1767,9 @@ fn apply_config_actions(
 					.copy_within(position + 1..working.member_count, position);
 				working
 					.member_permissions
+					.copy_within(position + 1..working.member_count, position);
+				working
+					.member_generations
 					.copy_within(position + 1..working.member_count, position);
 				working.member_count -= 1;
 				working.changed = true;
@@ -1815,6 +1860,7 @@ fn apply_config_actions(
 						.remaining_amount(amount)
 						.last_reset(now)
 						.period(period)
+						.member_generation(working.member_generation)
 						.replace_members(
 							&flatten_roster::<512>(&sorted_members[..members_len])
 								[..members_len * 32],
@@ -1864,8 +1910,10 @@ fn find_mut_by_address<'a>(
 ///
 /// Limits the caller did not pass stay untouched, but they cannot lend
 /// authority either: [`SpendingLimitUseAccounts`] independently requires the
-/// drawer to be a current member of the multisig, so revocation never depends
-/// on which limit accounts a removal execution happened to receive.
+/// drawer to be a current member of the multisig who joined no later than the
+/// limit's grant, so revocation never depends on which limit accounts a
+/// removal execution happened to receive, and re-adding the member does not
+/// revive it.
 fn prune_spending_limit_roster(
 	multisig_key: &Address,
 	removed: &Address,
@@ -1920,7 +1968,9 @@ fn prune_spending_limit_roster(
 struct MultisigWorkingState {
 	member_keys: [Address; MAX_MEMBERS],
 	member_permissions: [u8; MAX_MEMBERS],
+	member_generations: [PodU32; MAX_MEMBERS],
 	member_count: usize,
+	member_generation: u32,
 	threshold: u16,
 	timelock: u32,
 	ttl: u32,
@@ -1935,7 +1985,9 @@ impl MultisigWorkingState {
 		MultisigWorkingState {
 			member_keys: snapshot.member_keys,
 			member_permissions: snapshot.member_permissions,
+			member_generations: snapshot.member_generations,
 			member_count: snapshot.member_count,
+			member_generation: snapshot.member_generation,
 			threshold: snapshot.threshold,
 			timelock: snapshot.timelock,
 			ttl: snapshot.ttl,
@@ -2087,7 +2139,7 @@ impl<'a> ProcessAccountInfos<'a> for MultisigCreateAccounts<'a> {
 		pay_creation_fee(self.program_config, self.treasury, self.rent_payer)?;
 
 		let create_key = *self.create_key.address();
-		let space = Multisig::projected_bytes(member_count * 32, member_count)?;
+		let space = Multisig::projected_bytes(member_count * 32, member_count, member_count)?;
 		let seeds = Multisig::seeds(&create_key);
 
 		CreateCompactProgramAccountWithBump {
@@ -2106,10 +2158,12 @@ impl<'a> ProcessAccountInfos<'a> for MultisigCreateAccounts<'a> {
 				.ttl(ttl)
 				.transaction_index(0)
 				.stale_transaction_index(0)
+				.member_generation(0)
 				.replace_member_roster(
 					&flatten_roster::<512>(&member_keys[..member_count])[..member_count * 32],
 				)
-				.replace_member_permissions(member_permissions),
+				.replace_member_permissions(member_permissions)
+				.replace_member_generations(&FOUNDING_GENERATIONS[..member_count]),
 			space,
 		}
 		.invoke::<Multisig>()?;
@@ -2152,7 +2206,7 @@ impl<'a> ProcessAccountInfos<'a> for MultisigImportAccounts<'a> {
 
 		let create_key = *self.create_key.address();
 		let member_count = legacy.member_count;
-		let space = Multisig::projected_bytes(member_count * 32, member_count)?;
+		let space = Multisig::projected_bytes(member_count * 32, member_count, member_count)?;
 		let seeds = Multisig::seeds(&create_key);
 
 		CreateCompactProgramAccountWithBump {
@@ -2179,10 +2233,12 @@ impl<'a> ProcessAccountInfos<'a> for MultisigImportAccounts<'a> {
 				.ttl(0)
 				.transaction_index(0)
 				.stale_transaction_index(0)
+				.member_generation(0)
 				.replace_member_roster(
 					&flatten_roster::<512>(legacy.members())[..legacy.member_count * 32],
 				)
-				.replace_member_permissions(&legacy.member_permissions[..member_count]),
+				.replace_member_permissions(&legacy.member_permissions[..member_count])
+				.replace_member_generations(&FOUNDING_GENERATIONS[..member_count]),
 			space,
 		}
 		.invoke::<Multisig>()?;
@@ -2944,11 +3000,13 @@ fn commit_multisig(
 			.rent_collector(working.rent_collector)
 			.config_authority(working.config_authority)
 			.stale_transaction_index(stale_transaction_index)
+			.member_generation(working.member_generation)
 			.replace_member_roster(
 				&flatten_roster::<512>(&working.member_keys[..working.member_count])
 					[..working.member_count * 32],
 			)
-			.replace_member_permissions(&working.member_permissions[..working.member_count]),
+			.replace_member_permissions(&working.member_permissions[..working.member_count])
+			.replace_member_generations(&working.member_generations[..working.member_count]),
 	}
 	.invoke::<Multisig>()?;
 
@@ -3161,9 +3219,10 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 		// removed from the multisig is refused even when a limit roster still
 		// names them, so revocation never depends on which limit accounts the
 		// removal execution received.
-		if !multisig.is_member(&member_key) {
+		let Some(member_position) = multisig.member_index_of(&member_key) else {
 			return Err(MultisigError::Unauthorized.into());
-		}
+		};
+		let joined_generation = multisig.joined_generation(member_position);
 
 		let mut limit_create_key = Address::default();
 		let mut mint = Address::default();
@@ -3183,6 +3242,13 @@ impl<'a> ProcessAccountInfos<'a> for SpendingLimitUseAccounts<'a> {
 				let mut members = [Address::default(); MAX_SPENDING_LIMIT_MEMBERS];
 				let members_count = decode_roster(limit.members(), &mut members)?;
 				if !members[..members_count].contains(&member_key) {
+					return Err(MultisigError::Unauthorized.into());
+				}
+				// Membership alone does not revive a grant: a drawer who
+				// joined after the limit was granted, including a removed
+				// member who rejoined while an unpruned roster still named
+				// them, needs a new grant.
+				if joined_generation > limit.member_generation.get() {
 					return Err(MultisigError::Unauthorized.into());
 				}
 				limit_create_key = limit.create_key;
@@ -3902,12 +3968,18 @@ mod tests {
 
 	#[test]
 	fn compact_size_projections_scale_with_active_tails() {
-		assert_eq!(Multisig::projected_bytes(0, 0), Ok(Multisig::HEADER_SIZE));
-		let three = Multisig::projected_bytes(3 * 32, 3)
+		assert_eq!(
+			Multisig::projected_bytes(0, 0, 0),
+			Ok(Multisig::HEADER_SIZE)
+		);
+		let three = Multisig::projected_bytes(3 * 32, 3, 3)
 			.unwrap_or_else(|error| panic!("three members: {error:?}"));
-		assert_eq!(three, Multisig::HEADER_SIZE + 3 * 32 + 3);
-		// Seventeen members exceed the sixteen-slot roster capacity.
-		assert!(Multisig::projected_bytes(17 * 32, 17).is_err());
+		// Each member costs its address, its permission byte, and its
+		// four-byte join generation.
+		assert_eq!(three, Multisig::HEADER_SIZE + 3 * 32 + 3 + 3 * 4);
+		// Seventeen members exceed the sixteen-slot capacity of every tail.
+		assert!(Multisig::projected_bytes(17 * 32, 17, 17).is_err());
+		assert!(Multisig::projected_bytes(16 * 32, 16, 17).is_err());
 
 		let vault = Proposal::projected_bytes(2, 100, 0)
 			.unwrap_or_else(|error| panic!("vault proposal: {error:?}"));

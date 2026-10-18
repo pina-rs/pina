@@ -66,10 +66,10 @@ export function getMultisigDiscriminator2Bytes(): ReadonlyUint8Array {
 /**
  * A multisig: consensus parameters plus the sorted member roster.
  *
- * Members live in two parallel compact tails (`member_keys` sorted ascending,
- * `member_permissions` aligned by index) so the account only pays rent for
- * active members. A member's bit index in a proposal's vote masks is its
- * position in `member_keys`.
+ * Members live in three parallel compact tails (`member_roster` sorted
+ * ascending, `member_permissions` and `member_generations` aligned by index)
+ * so the account only pays rent for active members. A member's bit index in a
+ * proposal's vote masks is its position in the roster.
  */
 export type Multisig = {
 	discriminator: number;
@@ -99,6 +99,12 @@ export type Multisig = {
 	/** Proposals at or below this index predate the latest consensus change. */
 	staleTransactionIndex: bigint;
 	/**
+	 * Membership generation, bumped each time a member joins. A spending
+	 * limit records it when granted, so the grant covers only members who
+	 * joined at or before that point.
+	 */
+	memberGeneration: number;
+	/**
 	 * Sorted member roster as concatenated 32-byte addresses, parallel to
 	 * `member_permissions`. Raw bytes keep the generated CLI clients
 	 * renderable while the compact tail still charges rent per member.
@@ -106,6 +112,11 @@ export type Multisig = {
 	memberRoster: Array<number>;
 	/** Permission masks, parallel to the roster. */
 	memberPermissions: Array<number>;
+	/**
+	 * The membership generation each member joined at, parallel to the
+	 * roster. Founding and imported members joined at generation zero.
+	 */
+	memberGenerations: Array<number>;
 };
 
 export type MultisigArgs = {
@@ -134,6 +145,12 @@ export type MultisigArgs = {
 	/** Proposals at or below this index predate the latest consensus change. */
 	staleTransactionIndex: number | bigint;
 	/**
+	 * Membership generation, bumped each time a member joins. A spending
+	 * limit records it when granted, so the grant covers only members who
+	 * joined at or before that point.
+	 */
+	memberGeneration: number;
+	/**
 	 * Sorted member roster as concatenated 32-byte addresses, parallel to
 	 * `member_permissions`. Raw bytes keep the generated CLI clients
 	 * renderable while the compact tail still charges rent per member.
@@ -141,6 +158,11 @@ export type MultisigArgs = {
 	memberRoster: Array<number>;
 	/** Permission masks, parallel to the roster. */
 	memberPermissions: Array<number>;
+	/**
+	 * The membership generation each member joined at, parallel to the
+	 * roster. Founding and imported members joined at generation zero.
+	 */
+	memberGenerations: Array<number>;
 };
 
 /** Gets the encoder for {@link MultisigArgs} account data. */
@@ -158,19 +180,20 @@ export function getMultisigEncoder(): Encoder<MultisigArgs> {
 			["ttl", getU32Encoder()],
 			["transactionIndex", getU64Encoder()],
 			["staleTransactionIndex", getU64Encoder()],
+			["memberGeneration", getU32Encoder()],
 			[
 				"memberRoster",
 				offsetEncoder(
 					getPinaPodBoundedArrayEncoder(
 						getArrayEncoder(getU8Encoder(), {
 							size: offsetEncoder(
-								offsetEncoder(getU16Encoder(), { preOffset: () => 125 }),
+								offsetEncoder(getU16Encoder(), { preOffset: () => 129 }),
 								{ postOffset: ({ preOffset }) => preOffset + 0 },
 							),
 						}),
 						512,
 					),
-					{ preOffset: ({ preOffset }) => preOffset + 3 },
+					{ preOffset: ({ preOffset }) => preOffset + 4 },
 				),
 			],
 			[
@@ -178,7 +201,19 @@ export function getMultisigEncoder(): Encoder<MultisigArgs> {
 				getPinaPodBoundedArrayEncoder(
 					getArrayEncoder(getU8Encoder(), {
 						size: offsetEncoder(
-							offsetEncoder(getU8Encoder(), { preOffset: () => 127 }),
+							offsetEncoder(getU8Encoder(), { preOffset: () => 131 }),
+							{ postOffset: ({ preOffset }) => preOffset + 0 },
+						),
+					}),
+					16,
+				),
+			],
+			[
+				"memberGenerations",
+				getPinaPodBoundedArrayEncoder(
+					getArrayEncoder(getU32Encoder(), {
+						size: offsetEncoder(
+							offsetEncoder(getU8Encoder(), { preOffset: () => 132 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
@@ -207,26 +242,27 @@ export function getMultisigDecoder(): Decoder<Multisig> {
 		["ttl", getU32Decoder()],
 		["transactionIndex", getU64Decoder()],
 		["staleTransactionIndex", getU64Decoder()],
+		["memberGeneration", getU32Decoder()],
 		[
 			"memberRoster",
 			offsetDecoder(
 				getPinaPodBoundedArrayDecoder(
 					getArrayDecoder(getU8Decoder(), {
 						size: offsetDecoder(
-							offsetDecoder(getU16Decoder(), { preOffset: () => 125 }),
+							offsetDecoder(getU16Decoder(), { preOffset: () => 129 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
 					getPinaPodBoundedCountDecoder(
 						offsetDecoder(
-							offsetDecoder(getU16Decoder(), { preOffset: () => 125 }),
+							offsetDecoder(getU16Decoder(), { preOffset: () => 129 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 						512,
 					),
 					512,
 				),
-				{ preOffset: ({ preOffset }) => preOffset + 3 },
+				{ preOffset: ({ preOffset }) => preOffset + 4 },
 			),
 		],
 		[
@@ -234,13 +270,32 @@ export function getMultisigDecoder(): Decoder<Multisig> {
 			getPinaPodBoundedArrayDecoder(
 				getArrayDecoder(getU8Decoder(), {
 					size: offsetDecoder(
-						offsetDecoder(getU8Decoder(), { preOffset: () => 127 }),
+						offsetDecoder(getU8Decoder(), { preOffset: () => 131 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
 				getPinaPodBoundedCountDecoder(
 					offsetDecoder(
-						offsetDecoder(getU8Decoder(), { preOffset: () => 127 }),
+						offsetDecoder(getU8Decoder(), { preOffset: () => 131 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+					16,
+				),
+				16,
+			),
+		],
+		[
+			"memberGenerations",
+			getPinaPodBoundedArrayDecoder(
+				getArrayDecoder(getU32Decoder(), {
+					size: offsetDecoder(
+						offsetDecoder(getU8Decoder(), { preOffset: () => 132 }),
+						{ postOffset: ({ preOffset }) => preOffset + 0 },
+					),
+				}),
+				getPinaPodBoundedCountDecoder(
+					offsetDecoder(
+						offsetDecoder(getU8Decoder(), { preOffset: () => 132 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 					16,

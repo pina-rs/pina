@@ -31,6 +31,8 @@ import {
 	getStructEncoder,
 	getU16Decoder,
 	getU16Encoder,
+	getU32Decoder,
+	getU32Encoder,
 	getU64Decoder,
 	getU64Encoder,
 	getU8Decoder,
@@ -88,6 +90,12 @@ export type SpendingLimit = {
 	lastReset: bigint;
 	/** Reset period; see the `PERIOD_*` constants. */
 	period: number;
+	/**
+	 * The multisig's membership generation when this limit was granted. A
+	 * drawer who joined later, including a removed member who rejoined, is
+	 * refused until a new grant names them.
+	 */
+	memberGeneration: number;
 	/** Members allowed to draw on this limit, as concatenated addresses. */
 	members: Array<number>;
 	/**
@@ -119,6 +127,12 @@ export type SpendingLimitArgs = {
 	lastReset: number | bigint;
 	/** Reset period; see the `PERIOD_*` constants. */
 	period: number;
+	/**
+	 * The multisig's membership generation when this limit was granted. A
+	 * drawer who joined later, including a removed member who rejoined, is
+	 * refused until a new grant names them.
+	 */
+	memberGeneration: number;
 	/** Members allowed to draw on this limit, as concatenated addresses. */
 	members: Array<number>;
 	/**
@@ -144,13 +158,14 @@ export function getSpendingLimitEncoder(): Encoder<SpendingLimitArgs> {
 			["remainingAmount", getU64Encoder()],
 			["lastReset", getI64Encoder()],
 			["period", getU8Encoder()],
+			["memberGeneration", getU32Encoder()],
 			[
 				"members",
 				offsetEncoder(
 					getPinaPodBoundedArrayEncoder(
 						getArrayEncoder(getU8Encoder(), {
 							size: offsetEncoder(
-								offsetEncoder(getU16Encoder(), { preOffset: () => 126 }),
+								offsetEncoder(getU16Encoder(), { preOffset: () => 130 }),
 								{ postOffset: ({ preOffset }) => preOffset + 0 },
 							),
 						}),
@@ -164,7 +179,7 @@ export function getSpendingLimitEncoder(): Encoder<SpendingLimitArgs> {
 				getPinaPodBoundedArrayEncoder(
 					getArrayEncoder(getU8Encoder(), {
 						size: offsetEncoder(
-							offsetEncoder(getU16Encoder(), { preOffset: () => 128 }),
+							offsetEncoder(getU16Encoder(), { preOffset: () => 132 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
@@ -197,19 +212,20 @@ export function getSpendingLimitDecoder(): Decoder<SpendingLimit> {
 		["remainingAmount", getU64Decoder()],
 		["lastReset", getI64Decoder()],
 		["period", getU8Decoder()],
+		["memberGeneration", getU32Decoder()],
 		[
 			"members",
 			offsetDecoder(
 				getPinaPodBoundedArrayDecoder(
 					getArrayDecoder(getU8Decoder(), {
 						size: offsetDecoder(
-							offsetDecoder(getU16Decoder(), { preOffset: () => 126 }),
+							offsetDecoder(getU16Decoder(), { preOffset: () => 130 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 					}),
 					getPinaPodBoundedCountDecoder(
 						offsetDecoder(
-							offsetDecoder(getU16Decoder(), { preOffset: () => 126 }),
+							offsetDecoder(getU16Decoder(), { preOffset: () => 130 }),
 							{ postOffset: ({ preOffset }) => preOffset + 0 },
 						),
 						512,
@@ -224,13 +240,13 @@ export function getSpendingLimitDecoder(): Decoder<SpendingLimit> {
 			getPinaPodBoundedArrayDecoder(
 				getArrayDecoder(getU8Decoder(), {
 					size: offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 128 }),
+						offsetDecoder(getU16Decoder(), { preOffset: () => 132 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 				}),
 				getPinaPodBoundedCountDecoder(
 					offsetDecoder(
-						offsetDecoder(getU16Decoder(), { preOffset: () => 128 }),
+						offsetDecoder(getU16Decoder(), { preOffset: () => 132 }),
 						{ postOffset: ({ preOffset }) => preOffset + 0 },
 					),
 					256,

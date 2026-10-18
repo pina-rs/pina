@@ -26,6 +26,7 @@ pub struct SpendingLimit<'data> {
 	pub remaining_amount: u64,
 	pub last_reset: i64,
 	pub period: u8,
+	pub member_generation: u32,
 	pub members: &'data [u8],
 	pub destinations: &'data [u8],
 }
@@ -35,7 +36,7 @@ pub const SPENDING_LIMIT_DISCRIMINATOR: [u8; 2] = [4, 0];
 
 impl<'data> SpendingLimit<'data> {
 	/// Largest encoded size of this account's data.
-	pub const MAX_LEN: usize = 131200;
+	pub const MAX_LEN: usize = 131204;
 	/// Why this account has no generated parser.
 	pub const PARSER_UNSUPPORTED: &'static str = "unsupported type `accountNode` at `account `SpendingLimit` field `members``: this field's width is not fixed, so a read-only parser cannot locate the field that follows it";
 

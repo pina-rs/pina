@@ -42,33 +42,33 @@ export const CONFIG_UPDATE_COMPUTE_UNIT_LIMIT = 2400;
  * Compute units `multisigCreate` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const MULTISIG_CREATE_MEASURED_COMPUTE_UNITS = 4057;
+export const MULTISIG_CREATE_MEASURED_COMPUTE_UNITS = 4212;
 
 /**
  * Compute unit limit to request for a transaction carrying `multisigCreate`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const MULTISIG_CREATE_COMPUTE_UNIT_LIMIT = 5200;
+export const MULTISIG_CREATE_COMPUTE_UNIT_LIMIT = 5400;
 
 /**
  * Compute units `proposalCreate` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const PROPOSAL_CREATE_MEASURED_COMPUTE_UNITS = 15435;
+export const PROPOSAL_CREATE_MEASURED_COMPUTE_UNITS = 15586;
 
 /**
  * Compute unit limit to request for a transaction carrying `proposalCreate`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const PROPOSAL_CREATE_COMPUTE_UNIT_LIMIT = 18900;
+export const PROPOSAL_CREATE_COMPUTE_UNIT_LIMIT = 19100;
 
 /**
  * Compute units `proposalActivate` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const PROPOSAL_ACTIVATE_MEASURED_COMPUTE_UNITS = 4422;
+export const PROPOSAL_ACTIVATE_MEASURED_COMPUTE_UNITS = 4427;
 
 /**
  * Compute unit limit to request for a transaction carrying `proposalActivate`: the
@@ -81,7 +81,7 @@ export const PROPOSAL_ACTIVATE_COMPUTE_UNIT_LIMIT = 5700;
  * Compute units `proposalApprove` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const PROPOSAL_APPROVE_MEASURED_COMPUTE_UNITS = 4485;
+export const PROPOSAL_APPROVE_MEASURED_COMPUTE_UNITS = 4490;
 
 /**
  * Compute unit limit to request for a transaction carrying `proposalApprove`: the
@@ -94,7 +94,7 @@ export const PROPOSAL_APPROVE_COMPUTE_UNIT_LIMIT = 5700;
  * Compute units `proposalReject` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const PROPOSAL_REJECT_MEASURED_COMPUTE_UNITS = 4471;
+export const PROPOSAL_REJECT_MEASURED_COMPUTE_UNITS = 4476;
 
 /**
  * Compute unit limit to request for a transaction carrying `proposalReject`: the
@@ -107,7 +107,7 @@ export const PROPOSAL_REJECT_COMPUTE_UNIT_LIMIT = 5700;
  * Compute units `proposalRevoke` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const PROPOSAL_REVOKE_MEASURED_COMPUTE_UNITS = 4463;
+export const PROPOSAL_REVOKE_MEASURED_COMPUTE_UNITS = 4468;
 
 /**
  * Compute unit limit to request for a transaction carrying `proposalRevoke`: the
@@ -120,20 +120,20 @@ export const PROPOSAL_REVOKE_COMPUTE_UNIT_LIMIT = 5700;
  * Compute units `proposalCancel` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const PROPOSAL_CANCEL_MEASURED_COMPUTE_UNITS = 4412;
+export const PROPOSAL_CANCEL_MEASURED_COMPUTE_UNITS = 4417;
 
 /**
  * Compute unit limit to request for a transaction carrying `proposalCancel`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const PROPOSAL_CANCEL_COMPUTE_UNIT_LIMIT = 5600;
+export const PROPOSAL_CANCEL_COMPUTE_UNIT_LIMIT = 5700;
 
 /**
  * Compute units `vaultExecute` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const VAULT_EXECUTE_MEASURED_COMPUTE_UNITS = 8321;
+export const VAULT_EXECUTE_MEASURED_COMPUTE_UNITS = 8326;
 
 /**
  * Compute unit limit to request for a transaction carrying `vaultExecute`: the
@@ -146,33 +146,33 @@ export const VAULT_EXECUTE_COMPUTE_UNIT_LIMIT = 10300;
  * Compute units `configExecute` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const CONFIG_EXECUTE_MEASURED_COMPUTE_UNITS = 13025;
+export const CONFIG_EXECUTE_MEASURED_COMPUTE_UNITS = 13367;
 
 /**
  * Compute unit limit to request for a transaction carrying `configExecute`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const CONFIG_EXECUTE_COMPUTE_UNIT_LIMIT = 16000;
+export const CONFIG_EXECUTE_COMPUTE_UNIT_LIMIT = 16400;
 
 /**
  * Compute units `configAuthorityExecute` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const CONFIG_AUTHORITY_EXECUTE_MEASURED_COMPUTE_UNITS = 3386;
+export const CONFIG_AUTHORITY_EXECUTE_MEASURED_COMPUTE_UNITS = 3707;
 
 /**
  * Compute unit limit to request for a transaction carrying `configAuthorityExecute`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const CONFIG_AUTHORITY_EXECUTE_COMPUTE_UNIT_LIMIT = 4400;
+export const CONFIG_AUTHORITY_EXECUTE_COMPUTE_UNIT_LIMIT = 4800;
 
 /**
  * Compute units `spendingLimitUse` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const SPENDING_LIMIT_USE_MEASURED_COMPUTE_UNITS = 7517;
+export const SPENDING_LIMIT_USE_MEASURED_COMPUTE_UNITS = 7574;
 
 /**
  * Compute unit limit to request for a transaction carrying `spendingLimitUse`: the
@@ -185,14 +185,14 @@ export const SPENDING_LIMIT_USE_COMPUTE_UNIT_LIMIT = 9400;
  * Compute units `proposalClose` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const PROPOSAL_CLOSE_MEASURED_COMPUTE_UNITS = 3799;
+export const PROPOSAL_CLOSE_MEASURED_COMPUTE_UNITS = 3835;
 
 /**
  * Compute unit limit to request for a transaction carrying `proposalClose`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const PROPOSAL_CLOSE_COMPUTE_UNIT_LIMIT = 4900;
+export const PROPOSAL_CLOSE_COMPUTE_UNIT_LIMIT = 5000;
 
 /** The most compute units a transaction may request. */
 const MAX_COMPUTE_UNIT_LIMIT = 1400000;

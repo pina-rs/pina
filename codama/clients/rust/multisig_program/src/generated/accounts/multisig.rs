@@ -15,10 +15,10 @@
 pub struct Multisig {
 	/// A multisig: consensus parameters plus the sorted member roster.
 	///
-	/// Members live in two parallel compact tails (`member_keys` sorted ascending,
-	/// `member_permissions` aligned by index) so the account only pays rent for
-	/// active members. A member's bit index in a proposal's vote masks is its
-	/// position in `member_keys`.
+	/// Members live in three parallel compact tails (`member_roster` sorted
+	/// ascending, `member_permissions` and `member_generations` aligned by index)
+	/// so the account only pays rent for active members. A member's bit index in a
+	/// proposal's vote masks is its position in the roster.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
@@ -41,12 +41,19 @@ pub struct Multisig {
 	pub transaction_index: u64,
 	/// Proposals at or below this index predate the latest consensus change.
 	pub stale_transaction_index: u64,
+	/// Membership generation, bumped each time a member joins. A spending
+	/// limit records it when granted, so the grant covers only members who
+	/// joined at or before that point.
+	pub member_generation: u32,
 	/// Sorted member roster as concatenated 32-byte addresses, parallel to
 	/// `member_permissions`. Raw bytes keep the generated CLI clients
 	/// renderable while the compact tail still charges rent per member.
 	pub member_roster: pina::Vec<u8, 512>,
 	/// Permission masks, parallel to the roster.
 	pub member_permissions: pina::PodVec<u8, 16, 1>,
+	/// The membership generation each member joined at, parallel to the
+	/// roster. Founding and imported members joined at generation zero.
+	pub member_generations: pina::PodVec<u32, 16, 1>,
 }
 
 pub const MULTISIG_DISCRIMINATOR: u8 = 2u8;

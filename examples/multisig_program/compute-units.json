@@ -1,15 +1,15 @@
 {
 	"schemaVersion": 1,
 	"measurement": "surfpool-simulation-max",
-	"artifactSha256": "32bac0707e9a00523009074c136a38f80c9eb7968090cfb4fef976c5feece20e",
+	"artifactSha256": "f9e9d2af0959ca46afde51ba2c06ae782de78ac5a57779b09342ad3a5b07b3cf",
 	"instructions": {
 		"configAuthorityExecute": {
-			"computeUnits": 3386,
+			"computeUnits": 3707,
 			"samples": 2
 		},
 		"configExecute": {
-			"computeUnits": 13025,
-			"samples": 8
+			"computeUnits": 13367,
+			"samples": 9
 		},
 		"configInitialize": {
 			"computeUnits": 4543,
@@ -20,43 +20,43 @@
 			"samples": 1
 		},
 		"multisigCreate": {
-			"computeUnits": 4057,
+			"computeUnits": 4212,
 			"samples": 13
 		},
 		"proposalActivate": {
-			"computeUnits": 4422,
-			"samples": 15
+			"computeUnits": 4427,
+			"samples": 16
 		},
 		"proposalApprove": {
-			"computeUnits": 4485,
-			"samples": 27
+			"computeUnits": 4490,
+			"samples": 29
 		},
 		"proposalCancel": {
-			"computeUnits": 4412,
+			"computeUnits": 4417,
 			"samples": 1
 		},
 		"proposalClose": {
-			"computeUnits": 3799,
+			"computeUnits": 3835,
 			"samples": 2
 		},
 		"proposalCreate": {
-			"computeUnits": 15435,
-			"samples": 18
+			"computeUnits": 15586,
+			"samples": 19
 		},
 		"proposalReject": {
-			"computeUnits": 4471,
+			"computeUnits": 4476,
 			"samples": 2
 		},
 		"proposalRevoke": {
-			"computeUnits": 4463,
+			"computeUnits": 4468,
 			"samples": 1
 		},
 		"spendingLimitUse": {
-			"computeUnits": 7517,
-			"samples": 3
+			"computeUnits": 7574,
+			"samples": 4
 		},
 		"vaultExecute": {
-			"computeUnits": 8321,
+			"computeUnits": 8326,
 			"samples": 2
 		}
 	}

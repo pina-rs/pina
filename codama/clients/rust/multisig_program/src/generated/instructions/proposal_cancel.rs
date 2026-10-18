@@ -11,12 +11,12 @@
 pub const PROPOSAL_CANCEL_DISCRIMINATOR: u8 = 9u8;
 /// Compute units `ProposalCancel` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const PROPOSAL_CANCEL_MEASURED_COMPUTE_UNITS: u32 = 4412;
+pub const PROPOSAL_CANCEL_MEASURED_COMPUTE_UNITS: u32 = 4417;
 /// Compute unit limit to request for a transaction carrying `ProposalCancel`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const PROPOSAL_CANCEL_COMPUTE_UNIT_LIMIT: u32 = 5600;
+pub const PROPOSAL_CANCEL_COMPUTE_UNIT_LIMIT: u32 = 5700;
 
 /// Accounts.
 #[derive(Clone, Debug)]

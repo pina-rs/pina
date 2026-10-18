@@ -165,6 +165,7 @@
 		"lib/src/generated/multisig_program/types/pina_pod_v1_compact_capacity_a13_spending_limit_f12_destinations.dart",
 		"lib/src/generated/multisig_program/types/pina_pod_v1_compact_capacity_a13_spending_limit_f7_members.dart",
 		"lib/src/generated/multisig_program/types/pina_pod_v1_compact_capacity_a8_multisig_f12_member_roster.dart",
+		"lib/src/generated/multisig_program/types/pina_pod_v1_compact_capacity_a8_multisig_f17_member_generations.dart",
 		"lib/src/generated/multisig_program/types/pina_pod_v1_compact_capacity_a8_multisig_f17_member_permissions.dart",
 		"lib/src/generated/multisig_program/types/pina_pod_v1_compact_capacity_a8_proposal_f14_ephemeral_bumps.dart",
 		"lib/src/generated/multisig_program/types/pina_pod_v1_compact_capacity_a8_proposal_f7_actions.dart",

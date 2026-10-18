@@ -23,6 +23,7 @@ use mollusk_svm::result::InstructionResult;
 #[path = "../src/lib.rs"]
 mod program;
 use pina::Address;
+use pina::PodU32;
 use program::ConfigInitializeIx;
 use program::KIND_CONFIG;
 use program::KIND_VAULT;
@@ -243,7 +244,8 @@ fn multisig_data(
 		permissions[position] = PERMISSIONS_ALL;
 	}
 	let space =
-		Multisig::projected_bytes(member_keys.len() * 32, member_keys.len()).expect("member space");
+		Multisig::projected_bytes(member_keys.len() * 32, member_keys.len(), member_keys.len())
+			.expect("member space");
 	let mut data = vec![0_u8; space];
 	Multisig::initialize(
 		&mut data,
@@ -257,10 +259,12 @@ fn multisig_data(
 			.ttl(ttl)
 			.transaction_index(transaction_index)
 			.stale_transaction_index(0)
+			.member_generation(0)
 			.replace_member_roster(
 				&flatten_fixture_roster(&keys[..member_keys.len()])[..member_keys.len() * 32],
 			)
-			.replace_member_permissions(&permissions[..member_keys.len()]),
+			.replace_member_permissions(&permissions[..member_keys.len()])
+			.replace_member_generations(&[PodU32::ZERO; 16][..member_keys.len()]),
 	)
 	.unwrap_or_else(|error| panic!("encode multisig fixture: {error:?}"));
 	data
@@ -484,6 +488,15 @@ fn multisig_create_initializes_the_compact_roster() {
 	assert_eq!(roster.1, 3);
 	assert_eq!(roster.0[0], pina_address(&members[0]));
 	assert_eq!(state.transaction_index.get(), 0);
+	// Founding members all join at generation zero.
+	assert_eq!(state.member_generation.get(), 0);
+	assert_eq!(state.member_generations().len(), 3);
+	assert!(
+		state
+			.member_generations()
+			.iter()
+			.all(|generation| generation.get() == 0)
+	);
 }
 
 #[test]
@@ -1191,6 +1204,15 @@ fn config_execute_adds_a_member_and_invalidates_prior_proposals() {
 	let roster = decode_fixture_roster(state.member_roster());
 	assert_eq!(roster.1, 4);
 	assert!(roster.0[..4].contains(&pina_address(&new_member)));
+	// The join took the next generation; the founders keep theirs, aligned
+	// with the roster after the sorted insert.
+	assert_eq!(state.member_generation.get(), 1);
+	let generations = state.member_generations();
+	assert_eq!(generations.len(), 4);
+	for (position, member) in roster.0[..4].iter().enumerate() {
+		let expected = u32::from(*member == pina_address(&new_member));
+		assert_eq!(generations[position].get(), expected);
+	}
 	// The consensus moved, so every prior proposal is stale.
 	assert_eq!(state.stale_transaction_index.get(), 1);
 
@@ -1292,6 +1314,110 @@ fn spending_limit_use_resets_the_period_and_moves_sol() {
 	// The two-day-old anchor rolled two whole days and reset before the draw.
 	assert_eq!(state.remaining_amount.get(), 60);
 	assert_eq!(state.last_reset.get(), now - 2 * day + 2 * day);
+}
+
+#[test]
+#[ignore = "build the SBF artifact first"]
+fn spending_limit_use_refuses_a_member_who_joined_after_the_grant() {
+	let now = 1_700_000_000;
+	let mut mollusk = create_mollusk();
+	mollusk.sysvars.clock.unix_timestamp = now;
+
+	let create_key = key(21);
+	let members = sorted_member_keys();
+	let (multisig_key, multisig_bump) = multisig_pda(&create_key);
+	let (vault_key, _) = vault_pda(&multisig_key, 0);
+	let limit_create_key = key(50);
+	let (limit_key, limit_bump) = spending_limit_pda(&multisig_key, &limit_create_key);
+	let destination = key(60);
+
+	// The second member left and rejoined at generation 2, after the limit
+	// was granted at generation 1; the other two are founders.
+	let mut multisig = multisig_data(&create_key, 2, 0, 0, &members, multisig_bump, 0);
+	let generations = [PodU32::from(0), PodU32::from(2), PodU32::from(0)];
+	Multisig::update(
+		&mut multisig,
+		&MultisigPatch::new()
+			.member_generation(2)
+			.replace_member_generations(&generations),
+	)
+	.expect("record the rejoin");
+
+	let mut member_addresses = [Address::default(); 16];
+	for (position, member) in members.iter().enumerate() {
+		member_addresses[position] = pina_address(member);
+	}
+	let space = SpendingLimit::projected_bytes(3 * 32, 0).unwrap();
+	let mut limit_account = vec![0_u8; space];
+	SpendingLimit::initialize(
+		&mut limit_account,
+		&SpendingLimitPatch::new()
+			.bump(limit_bump)
+			.multisig(pina_address(&multisig_key))
+			.create_key(pina_address(&limit_create_key))
+			.vault_index(0)
+			.vault_bump(vault_pda(&multisig_key, 0).1)
+			.mint(Address::default())
+			.amount(100)
+			.remaining_amount(100)
+			.last_reset(now)
+			.period(PERIOD_DAY)
+			.member_generation(1)
+			.replace_members(&flatten_fixture_roster(&member_addresses[..3])[..3 * 32]),
+	)
+	.unwrap();
+
+	let mut world = World::new();
+	world.add(multisig_key, stored_account(multisig, RENT_LAMPORTS));
+	world.add(limit_key, stored_account(limit_account, RENT_LAMPORTS));
+	world.add(vault_key, system_account(VAULT_LAMPORTS));
+	world.add(destination, system_account(0));
+	for member in &members {
+		world.add(*member, system_account(RENT_LAMPORTS));
+	}
+	let (clock_key, clock_account) = mollusk.sysvars.keyed_account_for_clock_sysvar();
+	world.add(clock_key, clock_account);
+	let (system_key, system_account) = keyed_account_for_system_program();
+	world.add(system_key, system_account);
+
+	let mut data = vec![0_u8; SpendingLimitUseIx::SIZE];
+	SpendingLimitUseIx::initialize(&mut data, |ix| {
+		ix.amount.set(40);
+		ix.decimals = 9;
+		Ok(())
+	})
+	.unwrap();
+	let filler = program_id();
+	let draw = |drawer: Pubkey| {
+		Instruction::new_with_bytes(
+			program_id(),
+			&data,
+			vec![
+				AccountMeta::new_readonly(multisig_key, false),
+				AccountMeta::new(limit_key, false),
+				AccountMeta::new_readonly(drawer, true),
+				AccountMeta::new(vault_key, false),
+				AccountMeta::new(destination, false),
+				clock_meta(),
+				AccountMeta::new_readonly(filler, false), // no vault token account
+				AccountMeta::new_readonly(filler, false), // no mint
+				AccountMeta::new_readonly(filler, false), // no token program
+				AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+			],
+		)
+	};
+
+	// The rejoined member is a current member named on the roster, but the
+	// grant predates their return.
+	world.run(
+		&mollusk,
+		&draw(members[1]),
+		&[Check::err(MultisigError::Unauthorized.into())],
+	);
+
+	// A founder's grant is untouched by the other member's departure.
+	let result = world.run(&mollusk, &draw(members[0]), &[Check::success()]);
+	assert_eq!(account(&result, &destination).lamports, 40);
 }
 
 #[test]

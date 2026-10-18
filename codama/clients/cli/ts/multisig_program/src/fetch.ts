@@ -51,7 +51,7 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 	.addCommand(
 		registerGlobals(new Command("multisig"))
 			.description(
-				"A multisig: consensus parameters plus the sorted member roster.\n\nMembers live in two parallel compact tails (`member_keys` sorted ascending,\n`member_permissions` aligned by index) so the account only pays rent for\nactive members. A member's bit index in a proposal's vote masks is its\nposition in `member_keys`.",
+				"A multisig: consensus parameters plus the sorted member roster.\n\nMembers live in three parallel compact tails (`member_roster` sorted\nascending, `member_permissions` and `member_generations` aligned by index)\nso the account only pays rent for active members. A member's bit index in a\nproposal's vote masks is its position in the roster.",
 			)
 			.option(
 				"--address <address>",

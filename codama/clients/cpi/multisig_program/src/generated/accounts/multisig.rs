@@ -15,10 +15,10 @@ use crate::generated_types::*;
 
 /// A multisig: consensus parameters plus the sorted member roster.
 ///
-/// Members live in two parallel compact tails (`member_keys` sorted ascending,
-/// `member_permissions` aligned by index) so the account only pays rent for
-/// active members. A member's bit index in a proposal's vote masks is its
-/// position in `member_keys`.
+/// Members live in three parallel compact tails (`member_roster` sorted
+/// ascending, `member_permissions` and `member_generations` aligned by index)
+/// so the account only pays rent for active members. A member's bit index in a
+/// proposal's vote masks is its position in the roster.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Multisig<'data> {
 	pub bump: u8,
@@ -30,8 +30,10 @@ pub struct Multisig<'data> {
 	pub ttl: u32,
 	pub transaction_index: u64,
 	pub stale_transaction_index: u64,
+	pub member_generation: u32,
 	pub member_roster: &'data [u8],
 	pub member_permissions: &'data [u8],
+	pub member_generations: &'data [u32],
 }
 
 /// Account discriminator declared by the program's IDL.
@@ -39,7 +41,7 @@ pub const MULTISIG_DISCRIMINATOR: [u8; 2] = [2, 0];
 
 impl<'data> Multisig<'data> {
 	/// Largest encoded size of this account's data.
-	pub const MAX_LEN: usize = 65918;
+	pub const MAX_LEN: usize = 66943;
 	/// Why this account has no generated parser.
 	pub const PARSER_UNSUPPORTED: &'static str = "unsupported type `accountNode` at `account `Multisig` field `member_roster``: this field's width is not fixed, so a read-only parser cannot locate the field that follows it";
 

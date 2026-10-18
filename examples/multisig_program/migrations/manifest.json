@@ -80,12 +80,20 @@
 								"rustType": "u64"
 							},
 							{
+								"name": "member_generation",
+								"rustType": "u32"
+							},
+							{
 								"name": "member_roster",
 								"rustType": "PodVec<u8, 512, 2>"
 							},
 							{
 								"name": "member_permissions",
 								"rustType": "PodVec<u8, 16, 1>"
+							},
+							{
+								"name": "member_generations",
+								"rustType": "PodVec<PodU32, 16, 1>"
 							}
 						]
 					}
@@ -210,6 +218,10 @@
 							{
 								"name": "period",
 								"rustType": "u8"
+							},
+							{
+								"name": "member_generation",
+								"rustType": "u32"
 							},
 							{
 								"name": "members",
