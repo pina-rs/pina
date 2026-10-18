@@ -9,7 +9,7 @@ on:
       - main
     paths:
       - "crates/**"
-      - "mutants.toml"
+      - ".cargo/mutants.toml"
       - ".github/workflows/mutants-pr.yml"
 
 concurrency:
@@ -93,24 +93,63 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Mutate only the lines this pull request changes. A whole crate does not
+      # fit the job: `pina_cli` alone yields thousands of mutants, which the
+      # nightly run covers in rotating shards instead.
+      - name: write the pull request diff
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$BASE_REF" --depth=1 || true
+          mkdir -p target
+          git diff "origin/${BASE_REF}...HEAD" > target/mutants-pr.diff
+
+      - name: prepare the mutation baseline
+        run: mutants:prepare
+        shell: devenv shell -c -- bash -e {0}
+
+      # `--in-place` mutates this disposable checkout instead of a copy, which
+      # keeps what `mutants:prepare` installed and the git worktree that
+      # `pina.toml`'s `{{root}}` anchor resolves through. The exit status is
+      # kept in a file because the clean devenv shell does not see
+      # `GITHUB_OUTPUT`.
       - name: run mutation tests for ${{ matrix.package }}
         id: mutation_tests
         continue-on-error: true
         env:
           PACKAGE: ${{ matrix.package }}
-        run: mutants:crate "$PACKAGE"
+        run: |
+          status=0
+          mutants:crate "$PACKAGE" --in-diff target/mutants-pr.diff --in-place || status=$?
+          mkdir -p target/mutants
+          echo "$status" > target/mutants/exit-status
+          exit "$status"
         shell: devenv shell -c PACKAGE -- bash -e {0}
 
-      # Historical misses are advisory on pull requests, but the failed step and
-      # summary must remain visible instead of presenting a false-green run.
+      # Missed mutants and timeouts (cargo-mutants exits 2 and 3) are advisory
+      # on pull requests, but the failed step and summary must remain visible
+      # instead of presenting a false-green run. Any other failure means no
+      # mutant was tested, such as a failing baseline, so it fails the job.
       - name: report mutation test outcome
         if: always() && steps.mutation_tests.outcome == 'failure'
         env:
           PACKAGE: ${{ matrix.package }}
         run: |
-          echo "::warning::Mutation testing found surviving mutants or could not complete for ${PACKAGE}. Review the uploaded report."
-          echo "### Mutation testing needs attention: \`${PACKAGE}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "The mutation step failed. Review the uploaded report for surviving mutants or infrastructure errors." >> "$GITHUB_STEP_SUMMARY"
+          status="$(cat target/mutants/exit-status 2>/dev/null || echo missing)"
+          case "$status" in
+            2 | 3)
+              echo "::warning::Mutation testing found surviving mutants or timeouts for ${PACKAGE}. Review the uploaded report."
+              echo "### Mutation testing needs attention: \`${PACKAGE}\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "cargo-mutants exited ${status}: some mutants survived or timed out. Review the uploaded report." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "::error::Mutation testing could not run for ${PACKAGE} (exit status ${status}). Check the mutation step's log."
+              echo "### Mutation testing failed: \`${PACKAGE}\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "cargo-mutants exited ${status}, so no mutants were tested." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+          esac
 
       - name: upload mutants report
         if: always()
