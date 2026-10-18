@@ -1,0 +1,59 @@
+# cargo-mutants configuration for the pina workspace.
+#
+# cargo-mutants reads this file from its default location, so every run picks
+# it up without a `--config` flag. Keys follow the schema of the pinned tool:
+# `cargo mutants --emit-schema config` prints it, and an unknown key or a
+# mistyped value fails the run instead of being ignored.
+# See: https://mutants.rs/config-file.html
+#
+# The crate inventory lives in the `mutants:packages` devenv task, because
+# the config file has no package selector; `mutants:crate` and `mutants:diff`
+# choose their packages from the command line.
+
+test_tool = "cargo"
+
+# Build in the default dev profile, the one `cargo test` uses. A release build
+# re-optimizes the mutated crate for every mutant: measured on `pina_cli`, each
+# mutant took about 130 seconds in release against 28 in dev, which would put
+# the nightly inventory out of reach. Dev builds also keep overflow checks on.
+
+# Features and dependency resolution for every build and test run.
+all_features = true
+additional_cargo_args = ["--locked"]
+
+# Copy `.git` into each scratch tree. `pina.toml` resolves its `{{root}}`
+# anchor through the git worktree, so without it `pina_cli`'s project, explain,
+# and rehearse tests fail the unmutated baseline and no mutant is tested.
+#
+# `pina_cli`'s Anchor conversion test also needs the gitignored `node_modules`
+# and the built Codama renderer, neither of which a scratch copy carries. CI
+# therefore runs `mutants:prepare` and passes `--in-place` to mutate its
+# disposable checkout; do the same to test `pina_cli` locally, on a clean tree.
+copy_vcs = true
+
+# Floor for the per-mutant test timeout. cargo-mutants scales the timeout from
+# the baseline test time, so a slow crate is not cut off mid-run while a hung
+# mutant still cannot stall the nightly job.
+minimum_test_timeout = 120
+
+# Exclude integration tests, generated code, and example programs, which are
+# integration-heavy and yield diminishing returns.
+#
+# `crates/pina/src/verification*` holds the Kani proof harnesses. They compile
+# only under `cfg(kani)`, so `cargo test` never builds them and every mutant in
+# them would be reported as missed. The Kani tier verifies them instead.
+exclude_globs = [
+	"codama/**",
+	"examples/**",
+	"security/**",
+	"lints/**",
+	"**/tests/**",
+	"**/*_test.rs",
+	"**/*tests.rs",
+	"target/**",
+	"crates/pina/src/verification.rs",
+	"crates/pina/src/verification/**",
+]
+
+# Emit the JSON report for CI post-processing.
+output = "target/mutants"

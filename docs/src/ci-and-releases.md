@@ -34,6 +34,9 @@ Separate PR workflows also verify:
 
 - `surfpool` builds each example SBF program and exercises its runtime guards through the Surfpool SDK
 - `performance` for instruction compute units, every example program's build size and static CU estimate, CLI timings, and core host timings against the PR base
+- `mutants-pr` mutates the lines a pull request changes in each changed crate (`mutants:crate <crate> --in-diff <diff>`); surviving mutants and timeouts are advisory and show as a failed step with a summary rather than a failed job, while a baseline or setup failure fails the job
+
+The `mutants-nightly` workflow splits the core crates' mutants into `MUTANTS_SHARDS` shards and tests the next few each night in parallel jobs (`mutants:all --shard <k>/<n>`), so every mutant in the `mutants:packages` inventory is tested once every ten nights with 40 shards and four jobs; surviving mutants or timeouts open one `mutants` issue for the night. Both workflows read `.cargo/mutants.toml`, and `mutants:run` fails a run that selects no mutants, so a configuration that excludes every source cannot pass as a clean run.
 
 The main CI workflow also runs `release-publish` on every pull request. When a PR contains releaseable changesets, the job creates the same release commit as the production release workflow and keeps that commit local to the runner. Registry readiness and a publish dry-run both select every package from its embedded release record, and CI requires their package sets to match so a newly added package cannot be omitted by a maintained allowlist. Cargo cannot completely verify dependent crates until their same-release dependencies exist in crates.io; Monochange plans those packages and publishes them in dependency order during the real release. Prepared release PRs are checked directly. Pull requests without a publishable release keep the job visible but skip the preflight explicitly.
 
