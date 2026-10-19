@@ -37,6 +37,7 @@
 		"src/generated/types/pinaPodV1CompactCapacityA13SpendingLimitF12Destinations.ts",
 		"src/generated/types/pinaPodV1CompactCapacityA13SpendingLimitF7Members.ts",
 		"src/generated/types/pinaPodV1CompactCapacityA8MultisigF12MemberRoster.ts",
+		"src/generated/types/pinaPodV1CompactCapacityA8MultisigF17MemberGenerations.ts",
 		"src/generated/types/pinaPodV1CompactCapacityA8MultisigF17MemberPermissions.ts",
 		"src/generated/types/pinaPodV1CompactCapacityA8ProposalF14EphemeralBumps.ts",
 		"src/generated/types/pinaPodV1CompactCapacityA8ProposalF7Actions.ts",

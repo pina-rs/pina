@@ -6,7 +6,7 @@
 //! check` fails when this file no longer matches the manifest. A layout
 //! change that forgets an offset fails `cargo test` in the same change.
 
-// manifest-sha256: c23be921cc892220a57aaebfc8e5f2e3b78898227ad7c4ae5356884f0d661b1c
+// manifest-sha256: 3fba0e6739f94414dd2e0a3cdbed9114abd9c9cf4b95fe8b6338d73f5480570b
 // program-id: 5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc
 // version_type: u8
 
@@ -58,7 +58,7 @@ pub mod account_1_02 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "a25ddec5b9e3cec728084bf6c192bdbfd6352f6f250a9d0f5bcb9deacc327573";
+	pub const SCHEMA_SHA256: &str = "631609436d2ecdfbcbb85442ccfca2f4e6564260e538e309c4eed2e2f0e5b74e";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -68,9 +68,9 @@ pub mod account_1_02 {
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
 	/// Compact header size in bytes, excluding the envelope header.
-	pub const HEADER_SIZE: usize = 126;
+	pub const HEADER_SIZE: usize = 131;
 	/// Largest valid encoded size, including the envelope header.
-	pub const MAX_SIZE: usize = MIGRATION_HEADER_SIZE + 654;
+	pub const MAX_SIZE: usize = MIGRATION_HEADER_SIZE + 723;
 	/// Byte granularity of valid allocations.
 	pub const TAIL_ALIGNMENT: usize = 1;
 	/// Smallest valid encoded size, including the envelope header.
@@ -114,7 +114,7 @@ pub mod account_1_04 {
 	/// Current schema version.
 	pub const VERSION: u32 = 0;
 	/// Schema hash recorded for this version.
-	pub const SCHEMA_SHA256: &str = "0a66860f28db96fc9efa230fc270a231075ab02f2b36534bbe8e0d06005c881f";
+	pub const SCHEMA_SHA256: &str = "9509005c01847690cc561feb06f649bcaab85318e4ce7d6614155620c73f0f70";
 	/// Width of the discriminator in bytes.
 	pub const DISCRIMINATOR_BYTES: usize = 1;
 	/// Byte offset of the migration version field.
@@ -124,9 +124,9 @@ pub mod account_1_04 {
 	/// Bytes occupied by the discriminator and version envelope together.
 	pub const MIGRATION_HEADER_SIZE: usize = 2;
 	/// Compact header size in bytes, excluding the envelope header.
-	pub const HEADER_SIZE: usize = 128;
+	pub const HEADER_SIZE: usize = 132;
 	/// Largest valid encoded size, including the envelope header.
-	pub const MAX_SIZE: usize = MIGRATION_HEADER_SIZE + 896;
+	pub const MAX_SIZE: usize = MIGRATION_HEADER_SIZE + 900;
 	/// Byte granularity of valid allocations.
 	pub const TAIL_ALIGNMENT: usize = 1;
 	/// Smallest valid encoded size, including the envelope header.

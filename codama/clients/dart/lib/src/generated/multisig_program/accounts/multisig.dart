@@ -24,8 +24,10 @@ class Multisig {
     required this.ttl,
     required this.transactionIndex,
     required this.staleTransactionIndex,
+    required this.memberGeneration,
     required this.memberRoster,
     required this.memberPermissions,
+    required this.memberGenerations,
   }) : discriminator = 2,
        migrationVersion = 0;
 
@@ -40,8 +42,10 @@ class Multisig {
   final int ttl;
   final BigInt transactionIndex;
   final BigInt staleTransactionIndex;
+  final int memberGeneration;
   final List<int> memberRoster;
   final List<int> memberPermissions;
+  final List<int> memberGenerations;
 
   @override
   bool operator ==(Object other) =>
@@ -59,8 +63,10 @@ class Multisig {
           ttl == other.ttl &&
           transactionIndex == other.transactionIndex &&
           staleTransactionIndex == other.staleTransactionIndex &&
+          memberGeneration == other.memberGeneration &&
           memberRoster == other.memberRoster &&
-          memberPermissions == other.memberPermissions;
+          memberPermissions == other.memberPermissions &&
+          memberGenerations == other.memberGenerations;
 
   @override
   int get hashCode => Object.hash(
@@ -75,13 +81,15 @@ class Multisig {
     ttl,
     transactionIndex,
     staleTransactionIndex,
+    memberGeneration,
     memberRoster,
     memberPermissions,
+    memberGenerations,
   );
 
   @override
   String toString() =>
-      'Multisig(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, createKey: $createKey, configAuthority: $configAuthority, rentCollector: $rentCollector, threshold: $threshold, timelock: $timelock, ttl: $ttl, transactionIndex: $transactionIndex, staleTransactionIndex: $staleTransactionIndex, memberRoster: $memberRoster, memberPermissions: $memberPermissions)';
+      'Multisig(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, createKey: $createKey, configAuthority: $configAuthority, rentCollector: $rentCollector, threshold: $threshold, timelock: $timelock, ttl: $ttl, transactionIndex: $transactionIndex, staleTransactionIndex: $staleTransactionIndex, memberGeneration: $memberGeneration, memberRoster: $memberRoster, memberPermissions: $memberPermissions, memberGenerations: $memberGenerations)';
 }
 
 Encoder<Multisig> getMultisigEncoder() {
@@ -97,6 +105,7 @@ Encoder<Multisig> getMultisigEncoder() {
     ('ttl', getU32Encoder()),
     ('transactionIndex', getU64Encoder()),
     ('staleTransactionIndex', getU64Encoder()),
+    ('memberGeneration', getU32Encoder()),
     (
       'memberRoster',
       offsetEncoder(
@@ -107,7 +116,7 @@ Encoder<Multisig> getMultisigEncoder() {
               offsetEncoder(
                 offsetEncoder(
                   getU16Encoder(),
-                  OffsetConfig(preOffset: (scope) => 125),
+                  OffsetConfig(preOffset: (scope) => 129),
                 ),
                 OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
               ),
@@ -115,7 +124,7 @@ Encoder<Multisig> getMultisigEncoder() {
           ),
           512,
         ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 3),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 4),
       ),
     ),
     (
@@ -127,7 +136,25 @@ Encoder<Multisig> getMultisigEncoder() {
             offsetEncoder(
               offsetEncoder(
                 getU8Encoder(),
-                OffsetConfig(preOffset: (scope) => 127),
+                OffsetConfig(preOffset: (scope) => 131),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+          ),
+        ),
+        16,
+      ),
+    ),
+    (
+      'memberGenerations',
+      getPinaPodBoundedArrayEncoder(
+        getArrayEncoder(
+          transformEncoder(getU32Encoder(), (int value) => value),
+          size: PrefixedArraySize(
+            offsetEncoder(
+              offsetEncoder(
+                getU8Encoder(),
+                OffsetConfig(preOffset: (scope) => 132),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -152,8 +179,10 @@ Encoder<Multisig> getMultisigEncoder() {
       'ttl': value.ttl,
       'transactionIndex': value.transactionIndex,
       'staleTransactionIndex': value.staleTransactionIndex,
+      'memberGeneration': value.memberGeneration,
       'memberRoster': value.memberRoster,
       'memberPermissions': value.memberPermissions,
+      'memberGenerations': value.memberGenerations,
     },
   );
 }
@@ -171,6 +200,7 @@ Decoder<Multisig> getMultisigDecoder() {
     ('ttl', getU32Decoder()),
     ('transactionIndex', getU64Decoder()),
     ('staleTransactionIndex', getU64Decoder()),
+    ('memberGeneration', getU32Decoder()),
     (
       'memberRoster',
       offsetDecoder(
@@ -181,7 +211,7 @@ Decoder<Multisig> getMultisigDecoder() {
               offsetDecoder(
                 offsetDecoder(
                   getU16Decoder(),
-                  OffsetConfig(preOffset: (scope) => 125),
+                  OffsetConfig(preOffset: (scope) => 129),
                 ),
                 OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
               ),
@@ -191,7 +221,7 @@ Decoder<Multisig> getMultisigDecoder() {
             offsetDecoder(
               offsetDecoder(
                 getU16Decoder(),
-                OffsetConfig(preOffset: (scope) => 125),
+                OffsetConfig(preOffset: (scope) => 129),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -199,7 +229,7 @@ Decoder<Multisig> getMultisigDecoder() {
           ),
           512,
         ),
-        OffsetConfig(preOffset: (scope) => scope.preOffset + 3),
+        OffsetConfig(preOffset: (scope) => scope.preOffset + 4),
       ),
     ),
     (
@@ -211,7 +241,7 @@ Decoder<Multisig> getMultisigDecoder() {
             offsetDecoder(
               offsetDecoder(
                 getU8Decoder(),
-                OffsetConfig(preOffset: (scope) => 127),
+                OffsetConfig(preOffset: (scope) => 131),
               ),
               OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
             ),
@@ -221,7 +251,35 @@ Decoder<Multisig> getMultisigDecoder() {
           offsetDecoder(
             offsetDecoder(
               getU8Decoder(),
-              OffsetConfig(preOffset: (scope) => 127),
+              OffsetConfig(preOffset: (scope) => 131),
+            ),
+            OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+          ),
+          16,
+        ),
+        16,
+      ),
+    ),
+    (
+      'memberGenerations',
+      getPinaPodBoundedArrayDecoder(
+        getArrayDecoder(
+          getU32Decoder(),
+          size: PrefixedArraySize(
+            offsetDecoder(
+              offsetDecoder(
+                getU8Decoder(),
+                OffsetConfig(preOffset: (scope) => 132),
+              ),
+              OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
+            ),
+          ),
+        ),
+        getPinaPodBoundedCountDecoder(
+          offsetDecoder(
+            offsetDecoder(
+              getU8Decoder(),
+              OffsetConfig(preOffset: (scope) => 132),
             ),
             OffsetConfig(postOffset: (scope) => scope.preOffset + 0),
           ),
@@ -263,8 +321,10 @@ Decoder<Multisig> getMultisigDecoder() {
         ttl: map['ttl']! as int,
         transactionIndex: map['transactionIndex']! as BigInt,
         staleTransactionIndex: map['staleTransactionIndex']! as BigInt,
+        memberGeneration: map['memberGeneration']! as int,
         memberRoster: map['memberRoster']! as List<int>,
         memberPermissions: map['memberPermissions']! as List<int>,
+        memberGenerations: map['memberGenerations']! as List<int>,
       ),
       newOffset,
     );

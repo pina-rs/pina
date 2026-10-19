@@ -35,6 +35,10 @@ pub struct SpendingLimit {
 	pub last_reset: i64,
 	/// Reset period; see the `PERIOD_*` constants.
 	pub period: u8,
+	/// The multisig's membership generation when this limit was granted. A
+	/// drawer who joined later, including a removed member who rejoined, is
+	/// refused until a new grant names them.
+	pub member_generation: u32,
 	/// Members allowed to draw on this limit, as concatenated addresses.
 	pub members: pina::Vec<u8, 512>,
 	/// Allowed destinations as concatenated addresses; empty means

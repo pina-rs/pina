@@ -11,7 +11,7 @@
 pub const PROPOSAL_ACTIVATE_DISCRIMINATOR: u8 = 5u8;
 /// Compute units `ProposalActivate` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const PROPOSAL_ACTIVATE_MEASURED_COMPUTE_UNITS: u32 = 4422;
+pub const PROPOSAL_ACTIVATE_MEASURED_COMPUTE_UNITS: u32 = 4427;
 /// Compute unit limit to request for a transaction carrying `ProposalActivate`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to

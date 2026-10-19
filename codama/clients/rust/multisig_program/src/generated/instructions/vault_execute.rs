@@ -11,7 +11,7 @@
 pub const VAULT_EXECUTE_DISCRIMINATOR: u8 = 10u8;
 /// Compute units `VaultExecute` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const VAULT_EXECUTE_MEASURED_COMPUTE_UNITS: u32 = 8321;
+pub const VAULT_EXECUTE_MEASURED_COMPUTE_UNITS: u32 = 8326;
 /// Compute unit limit to request for a transaction carrying `VaultExecute`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to

@@ -2368,16 +2368,13 @@ fn removing_a_member_revokes_spending_limit_access() {
 ///
 /// Removal only prunes the limit accounts its execution receives, so a limit
 /// omitted from that execution keeps the removed address on its roster. The
-/// durable defence is the membership check in `SpendingLimitUse`: a drawer who
-/// is not a current member is refused no matter what a stale roster says, and
-/// re-adding the address does not restore the old delegation — it must be
-/// re-granted explicitly.
+/// durable defence is the membership generation: `SpendingLimitUse` refuses a
+/// drawer who is not a current member, and a drawer who joined after the
+/// limit was granted, so re-adding the address does not restore the old
+/// delegation. The other members' grants stay valid, and an explicit re-grant
+/// restores the returning member's allowance.
 #[test]
-#[ignore = "KNOWN RESIDUAL (2026-09-20 sweep follow-up): a stale spending-limit roster entry \
-            revives when the removed member is re-added, because the limit stores no membership \
-            generation to compare against. Closing it needs a generation counter in \
-            `SpendingLimit` (a layout change with a migration and IDL regeneration), not a guard \
-            in this handler. Run with `--ignored` to observe the gap."]
+#[ignore = "run with pina test"]
 fn a_readded_member_cannot_reuse_the_old_limit_grant() {
 	pina_test::run(async {
 		let pid = program_id();
@@ -2455,6 +2452,9 @@ fn a_readded_member_cannot_reuse_the_old_limit_grant() {
 				.remaining_amount(1000)
 				.last_reset(0)
 				.period(PERIOD_DAY)
+				// Granted while all three founders, who join at generation
+				// zero, were members.
+				.member_generation(0)
 				.replace_members(&flatten_roster(&member_addresses[..3])[..3 * 32])
 				.replace_destinations(&flatten_roster(&[pina_address(&payee)])[..32]),
 		)
@@ -2556,13 +2556,9 @@ fn a_readded_member_cannot_reuse_the_old_limit_grant() {
 		}
 		execute_config_proposal(&program, &multisig_key, &readd_key, Vec::new());
 
-		// The retained roster entry must NOT resurrect the old delegation
-		// silently: B is a member again, but the grant was revoked.
-		// KNOWN RESIDUAL: this currently SUCCEEDS — the retained roster entry
-		// revives the revoked grant the moment the address is a member again.
-		// The assertion below records the required behaviour once a membership
-		// generation exists; until then this test documents the gap.
-		let draw = draw_from_limit(
+		// The retained roster entry must NOT resurrect the old delegation: B is
+		// a member again, but joined after the grant.
+		let error = draw_from_limit(
 			&program,
 			&multisig_key,
 			&limit_key,
@@ -2570,20 +2566,108 @@ fn a_readded_member_cannot_reuse_the_old_limit_grant() {
 			&payee,
 			&member_b(),
 			400,
-		);
-		if draw.is_ok() {
-			eprintln!(
-				"RESIDUAL CONFIRMED: a stale spending-limit roster entry restored the revoked \
-				 grant after AddMember. See the sweep report's E3 residual."
-			);
+		)
+		.expect_err("a re-added member must not reuse the old grant");
+		pina_test::assert_custom_error(&error, MultisigError::Unauthorized as u32);
+		assert_eq!(
 			program
-				.stop()
-				.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
-			return;
+				.balance(&payee)
+				.unwrap_or_else(|error| panic!("payee balance: {error:?}")),
+			FUND
+		);
+
+		// C never left, so the same limit still serves C.
+		draw_from_limit(
+			&program,
+			&multisig_key,
+			&limit_key,
+			&vault_key,
+			&payee,
+			&member_c(),
+			400,
+		)
+		.unwrap_or_else(|error| panic!("an unrelated member's grant must survive: {error:?}"));
+		assert_eq!(
+			program
+				.balance(&payee)
+				.unwrap_or_else(|error| panic!("payee balance: {error:?}")),
+			FUND + 400
+		);
+
+		// An explicit re-grant restores B's allowance.
+		let regrant_create_key = Pubkey::new_from_array([0x62; 32]);
+		let (regrant_key, _) = spending_limit_pda(&multisig_key, &regrant_create_key);
+		let mut regrant = vec![1_u8, ACTION_ADD_SPENDING_LIMIT];
+		regrant.extend_from_slice(regrant_create_key.as_ref());
+		regrant.push(0_u8); // vault index
+		regrant.extend_from_slice(Address::default().as_ref()); // SOL
+		regrant.extend_from_slice(&1_000_u64.to_le_bytes());
+		regrant.push(PERIOD_DAY);
+		regrant.push(1_u8); // members
+		regrant.extend_from_slice(member_b().pubkey().as_ref());
+		// Unrestricted destinations keep the stream within the action cap.
+		regrant.push(0_u8);
+		let (regrant_proposal_key, regrant_proposal_bump) = proposal_pda(&multisig_key, 3);
+		program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&proposal_create_ix(
+						&multisig_key,
+						regrant_proposal_bump,
+						KIND_CONFIG,
+						&[],
+						&regrant,
+					),
+					vec![
+						AccountMeta::new(multisig_key, false),
+						AccountMeta::new(regrant_proposal_key, false),
+						AccountMeta::new_readonly(member_a().pubkey(), true),
+						AccountMeta::new(member_a().pubkey(), true),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&member_a()],
+			)
+			.unwrap_or_else(|error| panic!("create the re-grant proposal: {error:?}"));
+		advance_proposal(
+			&program,
+			MultisigInstruction::ProposalActivate as u8,
+			&multisig_key,
+			&regrant_proposal_key,
+			&member_a(),
+		);
+		for signer in [&member_a(), &member_c()] {
+			advance_proposal(
+				&program,
+				MultisigInstruction::ProposalApprove as u8,
+				&multisig_key,
+				&regrant_proposal_key,
+				signer,
+			);
 		}
-		pina_test::assert_custom_error(
-			&draw.expect_err("checked above"),
-			MultisigError::Unauthorized as u32,
+		execute_config_proposal(
+			&program,
+			&multisig_key,
+			&regrant_proposal_key,
+			vec![AccountMeta::new(regrant_key, false)],
+		);
+		draw_from_limit(
+			&program,
+			&multisig_key,
+			&regrant_key,
+			&vault_key,
+			&payee,
+			&member_b(),
+			400,
+		)
+		.unwrap_or_else(|error| panic!("a re-granted member must draw: {error:?}"));
+		assert_eq!(
+			program
+				.balance(&payee)
+				.unwrap_or_else(|error| panic!("payee balance: {error:?}")),
+			FUND + 800
 		);
 
 		program

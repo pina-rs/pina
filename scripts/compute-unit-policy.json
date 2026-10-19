@@ -39,6 +39,86 @@
 		"token_loader_cu_program/token_2022_mint_wrong_owner": false
 	},
 	"staticCuApprovals": {},
-	"runtimeCuApprovals": {},
-	"binarySizeApprovals": {}
+	"runtimeCuApprovals": {
+		"multisig_program/configAuthorityExecute": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 3386,
+			"head": 3707,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/configExecute": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 13025,
+			"head": 13367,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/multisigCreate": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 4057,
+			"head": 4212,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/proposalActivate": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 4422,
+			"head": 4427,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/proposalApprove": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 4485,
+			"head": 4490,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/proposalCancel": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 4412,
+			"head": 4417,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/proposalClose": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 3799,
+			"head": 3835,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/proposalCreate": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 15435,
+			"head": 15586,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/proposalReject": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 4471,
+			"head": 4476,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/proposalRevoke": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 4463,
+			"head": 4468,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/spendingLimitUse": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 7517,
+			"head": 7574,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"multisig_program/vaultExecute": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 8321,
+			"head": 8326,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		}
+	},
+	"binarySizeApprovals": {
+		"multisig_program": {
+			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
+			"base": 158992,
+			"head": 162608,
+			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		}
+	}
 }

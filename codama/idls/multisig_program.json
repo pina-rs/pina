@@ -183,10 +183,10 @@
 				"docs": [
 					"A multisig: consensus parameters plus the sorted member roster.",
 					"",
-					"Members live in two parallel compact tails (`member_keys` sorted ascending,",
-					"`member_permissions` aligned by index) so the account only pays rent for",
-					"active members. A member's bit index in a proposal's vote masks is its",
-					"position in `member_keys`."
+					"Members live in three parallel compact tails (`member_roster` sorted",
+					"ascending, `member_permissions` and `member_generations` aligned by index)",
+					"so the account only pays rent for active members. A member's bit index in a",
+					"proposal's vote masks is its position in the roster."
 				],
 				"data": {
 					"kind": "structTypeNode",
@@ -323,6 +323,20 @@
 						},
 						{
 							"kind": "structFieldTypeNode",
+							"name": "memberGeneration",
+							"docs": [
+								"Membership generation, bumped each time a member joins. A spending",
+								"limit records it when granted, so the grant covers only members who",
+								"joined at or before that point."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "memberRoster",
 							"docs": [
 								"Sorted member roster as concatenated 32-byte addresses, parallel to",
@@ -331,7 +345,7 @@
 							],
 							"type": {
 								"kind": "preOffsetTypeNode",
-								"offset": 3,
+								"offset": 4,
 								"strategy": "relative",
 								"type": {
 									"kind": "arrayTypeNode",
@@ -348,7 +362,7 @@
 											"strategy": "preOffset",
 											"type": {
 												"kind": "preOffsetTypeNode",
-												"offset": 125,
+												"offset": 129,
 												"strategy": "absolute",
 												"type": {
 													"kind": "numberTypeNode",
@@ -382,7 +396,41 @@
 										"strategy": "preOffset",
 										"type": {
 											"kind": "preOffsetTypeNode",
-											"offset": 127,
+											"offset": 131,
+											"strategy": "absolute",
+											"type": {
+												"kind": "numberTypeNode",
+												"format": "u8",
+												"endian": "le"
+											}
+										}
+									}
+								}
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
+							"name": "memberGenerations",
+							"docs": [
+								"The membership generation each member joined at, parallel to the",
+								"roster. Founding and imported members joined at generation zero."
+							],
+							"type": {
+								"kind": "arrayTypeNode",
+								"item": {
+									"kind": "numberTypeNode",
+									"format": "u32",
+									"endian": "le"
+								},
+								"count": {
+									"kind": "prefixedCountNode",
+									"prefix": {
+										"kind": "postOffsetTypeNode",
+										"offset": 0,
+										"strategy": "preOffset",
+										"type": {
+											"kind": "preOffsetTypeNode",
+											"offset": 132,
 											"strategy": "absolute",
 											"type": {
 												"kind": "numberTypeNode",
@@ -899,6 +947,20 @@
 						},
 						{
 							"kind": "structFieldTypeNode",
+							"name": "memberGeneration",
+							"docs": [
+								"The multisig's membership generation when this limit was granted. A",
+								"drawer who joined later, including a removed member who rejoined, is",
+								"refused until a new grant names them."
+							],
+							"type": {
+								"kind": "numberTypeNode",
+								"format": "u32",
+								"endian": "le"
+							}
+						},
+						{
+							"kind": "structFieldTypeNode",
 							"name": "members",
 							"docs": [
 								"Members allowed to draw on this limit, as concatenated addresses."
@@ -922,7 +984,7 @@
 											"strategy": "preOffset",
 											"type": {
 												"kind": "preOffsetTypeNode",
-												"offset": 126,
+												"offset": 130,
 												"strategy": "absolute",
 												"type": {
 													"kind": "numberTypeNode",
@@ -957,7 +1019,7 @@
 										"strategy": "preOffset",
 										"type": {
 											"kind": "preOffsetTypeNode",
-											"offset": 128,
+											"offset": 132,
 											"strategy": "absolute",
 											"type": {
 												"kind": "numberTypeNode",
@@ -1439,8 +1501,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 5200,
-							"measured": 4057
+							"limit": 5400,
+							"measured": 4212
 						}
 					}
 				]
@@ -1862,8 +1924,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 18900,
-							"measured": 15435
+							"limit": 19100,
+							"measured": 15586
 						}
 					}
 				]
@@ -1941,7 +2003,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 5700,
-							"measured": 4422
+							"measured": 4427
 						}
 					}
 				]
@@ -2019,7 +2081,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 5700,
-							"measured": 4485
+							"measured": 4490
 						}
 					}
 				]
@@ -2097,7 +2159,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 5700,
-							"measured": 4471
+							"measured": 4476
 						}
 					}
 				]
@@ -2175,7 +2237,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 5700,
-							"measured": 4463
+							"measured": 4468
 						}
 					}
 				]
@@ -2252,8 +2314,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 5600,
-							"measured": 4412
+							"limit": 5700,
+							"measured": 4417
 						}
 					}
 				]
@@ -2342,7 +2404,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 10300,
-							"measured": 8321
+							"measured": 8326
 						}
 					}
 				]
@@ -2461,8 +2523,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 16000,
-							"measured": 13025
+							"limit": 16400,
+							"measured": 13367
 						}
 					}
 				]
@@ -2594,8 +2656,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 4400,
-							"measured": 3386
+							"limit": 4800,
+							"measured": 3707
 						}
 					}
 				]
@@ -2752,7 +2814,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 9400,
-							"measured": 7517
+							"measured": 7574
 						}
 					}
 				]
@@ -2834,8 +2896,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 4900,
-							"measured": 3799
+							"limit": 5000,
+							"measured": 3835
 						}
 					}
 				]
@@ -2856,6 +2918,17 @@
 			{
 				"kind": "definedTypeNode",
 				"name": "pinaPodV1CompactCapacityA8MultisigF17MemberPermissions",
+				"type": {
+					"kind": "fixedSizeTypeNode",
+					"size": 16,
+					"type": {
+						"kind": "bytesTypeNode"
+					}
+				}
+			},
+			{
+				"kind": "definedTypeNode",
+				"name": "pinaPodV1CompactCapacityA8MultisigF17MemberGenerations",
 				"type": {
 					"kind": "fixedSizeTypeNode",
 					"size": 16,

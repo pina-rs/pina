@@ -107,8 +107,10 @@ final class FetchMultisigCommand extends Command<void> {
       'ttl': account.data.ttl,
       'transaction_index': account.data.transactionIndex,
       'stale_transaction_index': account.data.staleTransactionIndex,
+      'member_generation': account.data.memberGeneration,
       'member_roster': account.data.memberRoster,
       'member_permissions': account.data.memberPermissions,
+      'member_generations': account.data.memberGenerations,
     });
   }
 }
@@ -228,6 +230,7 @@ final class FetchSpendingLimitCommand extends Command<void> {
       'remaining_amount': account.data.remainingAmount,
       'last_reset': account.data.lastReset,
       'period': account.data.period,
+      'member_generation': account.data.memberGeneration,
       'members': account.data.members,
       'destinations': account.data.destinations,
     });

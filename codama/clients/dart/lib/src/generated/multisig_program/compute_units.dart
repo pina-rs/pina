@@ -29,25 +29,25 @@ const int configUpdateComputeUnitLimit = 2400;
 
 /// Compute units `multisigCreate` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int multisigCreateMeasuredComputeUnits = 4057;
+const int multisigCreateMeasuredComputeUnits = 4212;
 
 /// Compute unit limit to request for a transaction carrying `multisigCreate`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int multisigCreateComputeUnitLimit = 5200;
+const int multisigCreateComputeUnitLimit = 5400;
 
 /// Compute units `proposalCreate` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int proposalCreateMeasuredComputeUnits = 15435;
+const int proposalCreateMeasuredComputeUnits = 15586;
 
 /// Compute unit limit to request for a transaction carrying `proposalCreate`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int proposalCreateComputeUnitLimit = 18900;
+const int proposalCreateComputeUnitLimit = 19100;
 
 /// Compute units `proposalActivate` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int proposalActivateMeasuredComputeUnits = 4422;
+const int proposalActivateMeasuredComputeUnits = 4427;
 
 /// Compute unit limit to request for a transaction carrying `proposalActivate`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -56,7 +56,7 @@ const int proposalActivateComputeUnitLimit = 5700;
 
 /// Compute units `proposalApprove` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int proposalApproveMeasuredComputeUnits = 4485;
+const int proposalApproveMeasuredComputeUnits = 4490;
 
 /// Compute unit limit to request for a transaction carrying `proposalApprove`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -65,7 +65,7 @@ const int proposalApproveComputeUnitLimit = 5700;
 
 /// Compute units `proposalReject` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int proposalRejectMeasuredComputeUnits = 4471;
+const int proposalRejectMeasuredComputeUnits = 4476;
 
 /// Compute unit limit to request for a transaction carrying `proposalReject`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -74,7 +74,7 @@ const int proposalRejectComputeUnitLimit = 5700;
 
 /// Compute units `proposalRevoke` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int proposalRevokeMeasuredComputeUnits = 4463;
+const int proposalRevokeMeasuredComputeUnits = 4468;
 
 /// Compute unit limit to request for a transaction carrying `proposalRevoke`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -83,16 +83,16 @@ const int proposalRevokeComputeUnitLimit = 5700;
 
 /// Compute units `proposalCancel` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int proposalCancelMeasuredComputeUnits = 4412;
+const int proposalCancelMeasuredComputeUnits = 4417;
 
 /// Compute unit limit to request for a transaction carrying `proposalCancel`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int proposalCancelComputeUnitLimit = 5600;
+const int proposalCancelComputeUnitLimit = 5700;
 
 /// Compute units `vaultExecute` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int vaultExecuteMeasuredComputeUnits = 8321;
+const int vaultExecuteMeasuredComputeUnits = 8326;
 
 /// Compute unit limit to request for a transaction carrying `vaultExecute`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -101,25 +101,25 @@ const int vaultExecuteComputeUnitLimit = 10300;
 
 /// Compute units `configExecute` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int configExecuteMeasuredComputeUnits = 13025;
+const int configExecuteMeasuredComputeUnits = 13367;
 
 /// Compute unit limit to request for a transaction carrying `configExecute`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int configExecuteComputeUnitLimit = 16000;
+const int configExecuteComputeUnitLimit = 16400;
 
 /// Compute units `configAuthorityExecute` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int configAuthorityExecuteMeasuredComputeUnits = 3386;
+const int configAuthorityExecuteMeasuredComputeUnits = 3707;
 
 /// Compute unit limit to request for a transaction carrying `configAuthorityExecute`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int configAuthorityExecuteComputeUnitLimit = 4400;
+const int configAuthorityExecuteComputeUnitLimit = 4800;
 
 /// Compute units `spendingLimitUse` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int spendingLimitUseMeasuredComputeUnits = 7517;
+const int spendingLimitUseMeasuredComputeUnits = 7574;
 
 /// Compute unit limit to request for a transaction carrying `spendingLimitUse`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -128,12 +128,12 @@ const int spendingLimitUseComputeUnitLimit = 9400;
 
 /// Compute units `proposalClose` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int proposalCloseMeasuredComputeUnits = 3799;
+const int proposalCloseMeasuredComputeUnits = 3835;
 
 /// Compute unit limit to request for a transaction carrying `proposalClose`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int proposalCloseComputeUnitLimit = 4900;
+const int proposalCloseComputeUnitLimit = 5000;
 
 /// The most compute units a transaction may request.
 const int _maxComputeUnitLimit = 1400000;
