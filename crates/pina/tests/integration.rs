@@ -1992,6 +1992,107 @@ fn token_account_extension_policy_requires_an_explicit_allow_list() {
 	assert_eq!(token_account.amount(), 88);
 }
 
+/// Builds a token account whose base fields all hold distinct nonzero values,
+/// so a helper that reads the wrong offset cannot return the expected value.
+/// A non-native account still carries nonzero reserve bytes, which
+/// `native_amount` must ignore.
+#[cfg(feature = "token")]
+fn build_token_account_state_bytes(
+	state: token::state::AccountState,
+	native_reserve: Option<u64>,
+) -> Vec<u8> {
+	let mut data = vec![0u8; token::state::TokenAccount::LEN];
+	data[0..32].fill(0x11);
+	data[32..64].fill(0x22);
+	data[64..72].copy_from_slice(&0x3333_u64.to_le_bytes());
+	data[72] = 1;
+	data[76..108].fill(0x44);
+	data[108] = state as u8;
+	data[109] = u8::from(native_reserve.is_some());
+	data[113..121].copy_from_slice(&native_reserve.unwrap_or(0x7777).to_le_bytes());
+	data[121..129].copy_from_slice(&0x5555_u64.to_le_bytes());
+	data[129] = 1;
+	data[133..165].fill(0x66);
+	data
+}
+
+#[cfg(feature = "token")]
+#[test]
+fn token_account_ref_reads_state_and_native_reserve_for_both_programs() {
+	use token::state::AccountState;
+
+	let cases = [
+		(AccountState::Initialized, Some(2_039_280_u64)),
+		(AccountState::Frozen, None),
+		(AccountState::Uninitialized, None),
+	];
+
+	for program in [token::ID, token_2022::ID] {
+		for (state, native_reserve) in cases {
+			let mut data = build_token_account_state_bytes(state, native_reserve);
+			if program == token_2022::ID {
+				add_token_2022_account_type(&mut data, token_2022::state::AccountType::Account);
+			}
+			let accounts = [AccountBuilder::new()
+				.address(address!("6QWeT6FpJrm8AF1btu6WH2k2Xhq6t5vbheKVfQavmeoZ"))
+				.owner(program)
+				.lamports(1_000_000)
+				.data(&data)];
+			let mut input = unsafe { create_test_input(&accounts, &[0u8]) };
+			let mut accts = [UNINIT; 10];
+			let (_, account_views, ..) =
+				unsafe { deserialize_test_input::<10>(&mut input, &mut accts) };
+
+			let account = account_views[0]
+				.as_token_account_for_program(&program)
+				.unwrap_or_else(|error| panic!("token account load failed: {error:?}"));
+			let label = format!("{state:?} account owned by {program:?}");
+
+			assert_eq!(account.program_id(), &program, "{label}");
+			assert_eq!(account.legacy().is_some(), program == token::ID, "{label}");
+			assert_eq!(
+				account.token_2022().is_some(),
+				program == token_2022::ID,
+				"{label}"
+			);
+			assert_eq!(
+				account.mint(),
+				&Address::new_from_array([0x11; 32]),
+				"{label}"
+			);
+			assert_eq!(
+				account.owner(),
+				&Address::new_from_array([0x22; 32]),
+				"{label}"
+			);
+			assert_eq!(account.amount(), 0x3333, "{label}");
+			assert_eq!(
+				account.delegate(),
+				Some(&Address::new_from_array([0x44; 32])),
+				"{label}"
+			);
+			assert_eq!(account.delegated_amount(), 0x5555, "{label}");
+			assert_eq!(
+				account.close_authority(),
+				Some(&Address::new_from_array([0x66; 32])),
+				"{label}"
+			);
+			assert_eq!(
+				account.is_initialized(),
+				state != AccountState::Uninitialized,
+				"{label}"
+			);
+			assert_eq!(
+				account.is_frozen(),
+				state == AccountState::Frozen,
+				"{label}"
+			);
+			assert_eq!(account.is_native(), native_reserve.is_some(), "{label}");
+			assert_eq!(account.native_amount(), native_reserve, "{label}");
+		}
+	}
+}
+
 #[cfg(feature = "token")]
 #[test]
 fn as_associated_token_account_accepts_token_2022_owner() {
