@@ -93,9 +93,9 @@ jobs:
           name: mutants-report-${{ matrix.lane }}
           path: target/mutants
 
-  # Surviving mutants and timeouts are findings and open one issue for the
-  # night; a shard that could not test anything fails its job without
-  # claiming mutants escaped.
+  # Surviving mutants and timeouts are findings: they open the tracking issue,
+  # or add the night's shards to it when it is already open. A shard that
+  # could not test anything fails its job without claiming mutants escaped.
   report:
     needs: mutants
     if: always() && needs.mutants.result == 'failure'
@@ -137,7 +137,15 @@ jobs:
 
           body="$(printf 'Nightly mutation testing found mutants the test suite did not catch.\n\n%s\n[Artifacts](%s)\n' "$findings" "$RUN_URL")"
 
-          # Only open a new issue if one is not already open.
+          # `gh issue create --label` fails when the label is missing, so make
+          # sure it exists first; `--force` leaves an existing label in place.
+          gh label create "mutants" \
+            --color "d93f0b" \
+            --description "Surviving mutants found by nightly mutation testing" \
+            --force
+
+          # Keep one issue open. Each night tests different shards, so a night
+          # that finds more survivors adds them to the open issue as a comment.
           existing=$(gh issue list --label "mutants" --state open --json number --jq '.[0].number')
           if [ -z "$existing" ]; then
             gh issue create \
@@ -145,5 +153,5 @@ jobs:
               --body "$body" \
               --label "mutants"
           else
-            echo "Issue #$existing already open."
+            gh issue comment "$existing" --body "$body"
           fi

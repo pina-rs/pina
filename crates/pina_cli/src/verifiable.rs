@@ -1434,12 +1434,32 @@ mod tests {
 		];
 		assert!(valid_features(&valid));
 
+		// The empty selector sorts before every other, so check it directly.
+		assert!(!is_cargo_feature_selector(""));
+
+		// Every limit is inclusive: the total may reach exactly the byte limit.
+		let mut at_limit = vec!["bpf-entrypoint".to_owned()];
+		at_limit.extend((0..32).map(|index| format!("feature-{index:02}-{}", "x".repeat(116))));
+		let used = at_limit.iter().map(String::len).sum::<usize>();
+		at_limit.push(format!("zz-{}", "x".repeat(MAX_FEATURE_BYTES - used - 3)));
+		assert_eq!(
+			at_limit.iter().map(String::len).sum::<usize>(),
+			MAX_FEATURE_BYTES
+		);
+		assert!(valid_features(&at_limit));
+		let mut over_limit = at_limit.clone();
+		over_limit[at_limit.len() - 1].push('x');
+
+		// Each malformed selector sorts after `bpf-entrypoint`, so the order
+		// check cannot reject it before the selector check does.
 		for invalid in [
 			Vec::new(),
 			vec!["bpf-entrypoint".to_owned(), String::new()],
-			vec!["bpf-entrypoint".to_owned(), "bad,feature".to_owned()],
-			vec!["bpf-entrypoint".to_owned(), "bad\nfeature".to_owned()],
-			vec!["bpf-entrypoint".to_owned(), "bad feature".to_owned()],
+			vec!["bpf-entrypoint".to_owned(), "zz,feature".to_owned()],
+			vec!["bpf-entrypoint".to_owned(), "zz\nfeature".to_owned()],
+			vec!["bpf-entrypoint".to_owned(), "zz feature".to_owned()],
+			vec!["bpf-entrypoint".to_owned(), "zz\u{1b}feature".to_owned()],
+			over_limit,
 			vec!["logging".to_owned(), "bpf-entrypoint".to_owned()],
 			vec!["bpf-entrypoint".to_owned(), "bpf-entrypoint".to_owned()],
 			vec![
@@ -1526,8 +1546,11 @@ mod tests {
 				.collect::<String>()
 		);
 
+		// The first read ends in a run of zeroes that must be kept, because a
+		// nonzero byte follows it in a later read.
 		let mut large = vec![0_u8; 2 * 1024 * 1024];
 		large[0] = 1;
+		large[100] = 3;
 		large[64 * 1024 + 7] = 2;
 		fs::write(&path, &large)
 			.unwrap_or_else(|error| panic!("large fixture write failed: {error}"));
@@ -1619,6 +1642,9 @@ mod tests {
 			"https://[::ffff:10.0.0.1]/repo",
 			"https://[::1/repo",
 			"https://[2606:4700::6810:85e5]suffix/repo",
+			"https://[2606:4700::6810:85e5]:/repo",
+			"https://[2606:4700::6810:85e5]:abc/repo",
+			"https://[2606:4700::6810:85e5]:70000/repo",
 		] {
 			assert!(!is_public_https_url(url), "unexpected public URL: {url}");
 		}
@@ -1635,6 +1661,18 @@ mod tests {
 		assert!(is_public_https_url(
 			"https://[2606:4700::6810:85e5]:443/repo"
 		));
+		// Only 2001:db8::/32 is reserved for documentation, not all of 2001::/16.
+		assert!(is_public_https_url("https://[2001:4860:4860::8888]/repo"));
+
+		// A DNS name may reach 253 bytes, and each label 63.
+		let label = "a".repeat(63);
+		let longest_host = format!("{label}.{label}.{label}.{}", "b".repeat(61));
+		assert_eq!(longest_host.len(), 253);
+		assert!(is_public_https_url(&format!("https://{longest_host}/repo")));
+		assert!(!is_public_https_url(&format!(
+			"https://{label}.{label}.{label}.{}/repo",
+			"b".repeat(62)
+		)));
 		assert_eq!(portable_path(Path::new("")), ".");
 		assert_eq!(
 			portable_path(Path::new("programs/counter")),
@@ -1673,54 +1711,74 @@ mod tests {
 			Err(VerifyBuildError::UnsupportedRecordToolVersion { .. })
 		));
 
+		const HASH: &str = "executableHash must be 64 hexadecimal characters";
+		const LIBRARY: &str = "library names are inconsistent or invalid";
+		const PATHS: &str = "build paths must be relative and must not traverse parents";
+
 		let mut cases = Vec::new();
 		for bad_hash in ["0".repeat(63), format!("{}z", "0".repeat(63))] {
 			let mut invalid = manifest.clone();
 			invalid.executable_hash = bad_hash;
-			cases.push(invalid);
+			cases.push((invalid, HASH));
 		}
 		let mut invalid = manifest.clone();
 		invalid.build.library_name = "different".to_owned();
-		cases.push(invalid);
+		cases.push((invalid, LIBRARY));
 		for library in ["", "bad-name"] {
 			let mut invalid = manifest.clone();
 			invalid.library_name = library.to_owned();
 			invalid.build.library_name = library.to_owned();
-			cases.push(invalid);
+			cases.push((invalid, LIBRARY));
 		}
 		for bad_path in ["", "../workspace", "/workspace", "C:\\workspace", "a\\b"] {
 			let mut invalid = manifest.clone();
 			invalid.build.workspace_path = bad_path.to_owned();
-			cases.push(invalid);
+			cases.push((invalid, PATHS));
 		}
 		let mut invalid = manifest.clone();
 		invalid.source.dirty = Some(true);
-		cases.push(invalid);
+		cases.push((invalid, "source dirty state must be false"));
 		for revision in [None, Some("bad".to_owned())] {
 			let mut invalid = manifest.clone();
 			invalid.source.revision = revision;
-			cases.push(invalid);
+			cases.push((
+				invalid,
+				"source revision must be a 40-character hexadecimal Git revision",
+			));
 		}
 		let mut invalid = manifest.clone();
 		invalid.source.repository = Some("https://127.0.0.1/repo".to_owned());
-		cases.push(invalid);
+		cases.push((invalid, "source repository must be a public HTTPS URL"));
 		let mut invalid = manifest.clone();
-		invalid.build.features.push("bad,feature".to_owned());
-		cases.push(invalid);
+		invalid.build.features.push("zz,feature".to_owned());
+		cases.push((
+			invalid,
+			"build features must be bounded, sorted, unique Cargo feature selectors",
+		));
 		let mut invalid = manifest.clone();
 		invalid.diagnostics.push("bad diagnostic".to_owned());
-		cases.push(invalid);
+		cases.push((
+			invalid,
+			"diagnostics must be bounded, unique diagnostic identifiers",
+		));
 		for lock_hash in ["0".repeat(63), format!("{}z", "0".repeat(63))] {
 			let mut invalid = manifest.clone();
 			invalid.build.cargo_lock_sha256 = lock_hash;
-			cases.push(invalid);
+			cases.push((invalid, "cargoLockSha256 must be 64 hexadecimal characters"));
 		}
 
-		for invalid in cases {
-			assert!(matches!(
-				validate_manifest(&path, &invalid),
-				Err(VerifyBuildError::InvalidRecord { .. })
+		// Name each record for its own library and hash, so the filename check
+		// cannot reject it before the check under test does.
+		for (invalid, expected) in cases {
+			let path = PathBuf::from(format!(
+				"{}-{}.json",
+				invalid.library_name, invalid.executable_hash
 			));
+			let result = validate_manifest(&path, &invalid);
+			assert!(
+				matches!(result, Err(VerifyBuildError::InvalidRecord { reason }) if reason == expected),
+				"expected `{expected}`, got {result:?}"
+			);
 		}
 		assert!(matches!(
 			validate_manifest(Path::new("wrong.json"), &manifest),
@@ -1786,6 +1844,19 @@ mod tests {
 		assert!(matches!(
 			read_bounded_record(FailingReader, Path::new("record.json")),
 			Err(VerifyBuildError::ReadRecord { .. })
+		));
+	}
+
+	#[test]
+	fn bounded_record_reader_accepts_exactly_one_mebibyte() {
+		let at_limit = vec![b' '; 1024 * 1024];
+		let result = read_bounded_record(at_limit.as_slice(), Path::new("record.json"));
+		assert_eq!(result.map(|bytes| bytes.len()).ok(), Some(at_limit.len()));
+
+		let over_limit = [at_limit.as_slice(), b" "].concat();
+		assert!(matches!(
+			read_bounded_record(over_limit.as_slice(), Path::new("record.json")),
+			Err(VerifyBuildError::RecordTooLarge { .. })
 		));
 	}
 
@@ -2095,6 +2166,25 @@ mod tests {
 		fs::set_permissions(&locked, fs::Permissions::from_mode(0o700))
 			.unwrap_or_else(|error| panic!("unlocking fixture failed: {error}"));
 		assert!(matches!(result, Err(VerifyBuildError::CopySource { .. })));
+	}
+
+	#[test]
+	fn record_paths_must_have_the_expected_file_type() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let file = temp.path().join("record.json");
+		fs::write(&file, b"{}").unwrap_or_else(|error| panic!("write failed: {error}"));
+
+		assert!(ensure_record_path(&file, false).is_ok());
+		assert!(ensure_record_path(temp.path(), true).is_ok());
+		assert!(ensure_record_path(&temp.path().join("missing"), true).is_ok());
+		assert!(matches!(
+			ensure_record_path(&file, true),
+			Err(VerifyBuildError::RecordAlias { .. })
+		));
+		assert!(matches!(
+			ensure_record_path(temp.path(), false),
+			Err(VerifyBuildError::RecordAlias { .. })
+		));
 	}
 
 	#[test]
