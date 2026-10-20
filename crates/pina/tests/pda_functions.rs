@@ -113,3 +113,83 @@ fn try_find_program_address_multiple_seeds() {
 
 	assert!(result.is_some(), "multi-seed PDA should derive");
 }
+
+/// A program and seeds whose canonical bump is 250, so the search has to step
+/// past five bumps that hash onto the curve. The address and bump were derived
+/// independently with `getProgramDerivedAddress` from `@solana/kit`.
+const VAULT_PROGRAM: pina::Address = pina::address!("BHvLHF6mJpWxywWY5S2tsHdDtHirHyeRxoS6uF6T5FoY");
+const VAULT_SEEDS: [&[u8]; 2] = [b"vault", b"pina-pda-4"];
+const VAULT_ADDRESS: pina::Address = pina::address!("FvDWmqvqDnoT8hvD4uVMPnnLNCpbbX5MLPjpTCQVgnAp");
+const VAULT_BUMP: u8 = 250;
+
+#[test]
+fn try_find_program_address_matches_an_independent_derivation() {
+	assert_eq!(
+		try_find_program_address(&VAULT_SEEDS, &VAULT_PROGRAM),
+		Some((VAULT_ADDRESS, VAULT_BUMP))
+	);
+
+	// The canonical bump is the highest one that derives a valid address.
+	for bump in VAULT_BUMP + 1..=u8::MAX {
+		assert_eq!(
+			create_program_address(&[VAULT_SEEDS[0], VAULT_SEEDS[1], &[bump]], &VAULT_PROGRAM),
+			Err(ProgramError::InvalidSeeds),
+			"bump {bump} unexpectedly derived a valid address"
+		);
+	}
+}
+
+#[test]
+#[allow(deprecated)]
+fn find_program_address_returns_the_canonical_address_and_bump() {
+	assert_eq!(
+		pina::find_program_address(&VAULT_SEEDS, &VAULT_PROGRAM),
+		(VAULT_ADDRESS, VAULT_BUMP)
+	);
+}
+
+#[test]
+fn try_find_program_address_rejects_invalid_seeds() {
+	let too_long = [7_u8; pina::MAX_SEED_LEN + 1];
+	assert_eq!(try_find_program_address(&[&too_long], &VAULT_PROGRAM), None);
+
+	// The search appends the bump as one more seed, so 16 caller seeds leave
+	// no room for it.
+	let too_many: [&[u8]; 16] = [b"seed"; 16];
+	assert_eq!(try_find_program_address(&too_many, &VAULT_PROGRAM), None);
+}
+
+#[test]
+#[allow(deprecated)]
+#[should_panic(expected = "could not find program address from seeds")]
+fn find_program_address_panics_for_invalid_seeds() {
+	let too_long = [7_u8; pina::MAX_SEED_LEN + 1];
+	let _ = pina::find_program_address(&[&too_long], &VAULT_PROGRAM);
+}
+
+/// The associated token addresses of one wallet and mint under each token
+/// program, derived independently with `getProgramDerivedAddress` from
+/// `@solana/kit` over the seeds wallet, token program, mint.
+#[cfg(feature = "token")]
+#[test]
+fn associated_token_addresses_match_independent_derivations() {
+	let wallet = pina::address!("4Nd1mL5g7dUvNbKQjnYQgQki71RJKVQ1BM8DT6vKrrf5");
+	let mint = pina::address!("CktRuQ2mttxyPjdvVSxGJySLjeRGna43E77gzHu6HotE");
+	let legacy = pina::address!("6tXvgeoHarRaepCJVhKSHJWjawYJ7Htto7mswUTNqdDD");
+	let token_2022 = pina::address!("Pvsbbj8RbipfnRsAdrWw6BhaiJbVAney3kvgPAjCTqu");
+
+	assert_eq!(
+		pina::try_get_associated_token_address(&wallet, &mint, &pina::token::ID),
+		Some((legacy, 255))
+	);
+	assert_eq!(
+		pina::try_get_associated_token_address(&wallet, &mint, &pina::token_2022::ID),
+		Some((token_2022, 253))
+	);
+
+	// The wallet comes first in the seeds, so swapping it with the mint names
+	// a different account.
+	let swapped = pina::try_get_associated_token_address(&mint, &wallet, &pina::token::ID)
+		.unwrap_or_else(|| panic!("swapped seeds should still derive an address"));
+	assert_ne!(swapped.0, legacy);
+}
