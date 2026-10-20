@@ -15,8 +15,13 @@ on:
 permissions:
   contents: read
 
+# An edit that leaves the base branch alone, such as a title or description
+# change, gives the policy nothing new to validate. It runs in a concurrency
+# group of its own, so it cannot cancel a validation run in progress. Every
+# other event, retargeting included, shares the pull request's group, and a
+# newer run there still cancels an older one.
 concurrency:
-  group: changeset-policy-${{ github.event.pull_request.number || github.ref }}
+  group: changeset-policy-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'edited' && !github.event.changes.base && format('-edit-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 # The policy check must run on every pull request (its whole purpose is
@@ -25,7 +30,13 @@ concurrency:
 # pays for the nix/devenv setup once instead of twice.
 jobs:
   check:
-    if: ${{ github.event.action != 'edited' || github.event.changes.base }}
+    # `check` is a required status, and a skipped job satisfies one, so an edit
+    # must not leave a skipped `check` behind. The job runs on every event, and
+    # for an edit that keeps the base it reports as `check (edit ignored)` and
+    # skips its steps. A job-level `if` would skip the whole job, and GitHub
+    # does not evaluate the name of a skipped job, so it would show this
+    # expression instead.
+    name: ${{ github.event.action == 'edited' && !github.event.changes.base && 'check (edit ignored)' || 'check' }}
     timeout-minutes: 25
     runs-on: ubuntu-24.04
     permissions:
@@ -35,19 +46,28 @@ jobs:
       # only `issues: write` the comment API returns 403 "Resource not
       # accessible by integration", and the action degrades to a warning.
       pull-requests: write
+    env:
+      VALIDATE: ${{ github.event.action != 'edited' || github.event.changes.base != null }}
     steps:
+      - name: skip an edit that keeps the base branch
+        if: ${{ env.VALIDATE != 'true' }}
+        run: echo "This edit leaves the base branch unchanged, so the changeset policy has nothing new to validate."
+
       - name: checkout repository
+        if: ${{ env.VALIDATE == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: setup devenv
+        if: ${{ env.VALIDATE == 'true' }}
         uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: add devenv monochange to PATH
+        if: ${{ env.VALIDATE == 'true' }}
         run: |
           set -euo pipefail
           profile="$(devenv shell -- bash -c 'printf %s "${DEVENV_PROFILE:-}"')"
@@ -60,9 +80,11 @@ jobs:
         shell: bash
 
       - name: collect changed files
+        if: ${{ env.VALIDATE == 'true' }}
         id: changed
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
       - name: run changeset policy
+        if: ${{ env.VALIDATE == 'true' }}
         uses: monochange/actions/changeset-policy@6866cbbd35932bdfb496f5b144578c9274d36ca0 # v0.10.0
         with:
           # Coverage-based verification: every changed package must be covered
@@ -78,7 +100,7 @@ jobs:
       - name: classify changes
         # Classify even when the policy step fails, so the comment always
         # describes the latest push instead of an earlier commit.
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.VALIDATE == 'true' }}
         # v0.9.4 moved to the `schema_version` contract monochange 0.14 emits
         # ("0.2"), so this pin and the CLI must move together: 0.9.2 parses the
         # integer `schemaVersion` that 0.13 emitted, and 0.9.4 rejects it with
