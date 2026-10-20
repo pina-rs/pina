@@ -256,6 +256,7 @@ pub(crate) fn run(cli: Cli) {
 			program,
 			build,
 			program_keypair,
+			upgrade_only,
 			upgrade_authority,
 			payer,
 			cluster,
@@ -269,11 +270,17 @@ pub(crate) fn run(cli: Cli) {
 			rehearse_limit,
 			allow_rehearsal_changes,
 		} => {
+			// clap rejects --upgrade-only together with --program-keypair.
+			let program_address = match program_keypair {
+				_ if upgrade_only => pina_cli::deploy::ProgramAddress::DeclaredId,
+				Some(path) => pina_cli::deploy::ProgramAddress::Keypair(path),
+				None => pina_cli::deploy::ProgramAddress::ConventionalKeypair,
+			};
 			run_deploy(
 				project,
 				program,
 				build,
-				program_keypair,
+				program_address,
 				upgrade_authority,
 				payer,
 				&cluster,
@@ -1456,7 +1463,7 @@ fn run_deploy(
 	project: PathBuf,
 	program: Option<PathBuf>,
 	build: bool,
-	program_keypair: Option<PathBuf>,
+	program_address: pina_cli::deploy::ProgramAddress,
 	upgrade_authority: PathBuf,
 	payer: PathBuf,
 	cluster: &str,
@@ -1473,7 +1480,7 @@ fn run_deploy(
 		project,
 		remote_command,
 		program,
-		program_keypair,
+		program_address,
 		upgrade_authority,
 		payer,
 		target,

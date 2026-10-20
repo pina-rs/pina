@@ -107,6 +107,22 @@ impl Cluster {
 	}
 }
 
+/// Where a deployment takes the program address from.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProgramAddress {
+	/// The conventional `target/deploy/<library>-keypair.json` program keypair.
+	ConventionalKeypair,
+	/// An explicit program keypair.
+	Keypair(PathBuf),
+	/// The source's declared program ID, without reading any program keypair.
+	///
+	/// Only an upgrade can use it: the program must already be deployed, because
+	/// a first deployment has to be signed by the program keypair and the Solana
+	/// CLI rejects one without it. Automation that upgrades a program never has
+	/// to hold the key that controls its address on other clusters.
+	DeclaredId,
+}
+
 /// Inputs used to resolve a deployment plan.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeploymentRequest {
@@ -114,8 +130,8 @@ pub struct DeploymentRequest {
 	pub project: PathBuf,
 	/// Explicit existing SBF artifact, if conventional discovery is not desired.
 	pub program: Option<PathBuf>,
-	/// Explicit program keypair, if the conventional keypair is not desired.
-	pub program_keypair: Option<PathBuf>,
+	/// Source of the program address.
+	pub program_address: ProgramAddress,
 	/// Required upgrade-authority keypair.
 	pub upgrade_authority: PathBuf,
 	/// Required deployment fee-payer keypair.
@@ -144,7 +160,7 @@ pub struct DeploymentPlan {
 	program_dir: String,
 	library_name: String,
 	program: String,
-	program_keypair: String,
+	program_keypair: Option<String>,
 	upgrade_authority: String,
 	payer: String,
 	program_id: String,
@@ -157,7 +173,7 @@ pub struct DeploymentPlan {
 #[derive(Clone, Eq, PartialEq)]
 struct InputFingerprint {
 	program: [u8; 32],
-	program_keypair: [u8; 32],
+	program_keypair: Option<[u8; 32]>,
 	upgrade_authority: [u8; 32],
 	payer: [u8; 32],
 }
@@ -165,7 +181,7 @@ struct InputFingerprint {
 struct DeploymentInputSnapshot {
 	_directory: tempfile::TempDir,
 	program: String,
-	program_keypair: String,
+	program_keypair: Option<String>,
 	upgrade_authority: String,
 	payer: String,
 }
@@ -197,11 +213,17 @@ impl DeploymentInputSnapshot {
 			&directory.path().join("program.so"),
 			"program",
 		)?;
-		let program_keypair_path = snapshot_input(
-			Path::new(plan.program_keypair()),
-			&directory.path().join("program-keypair.json"),
-			"program keypair",
-		)?;
+		let program_keypair_path = match plan.program_keypair() {
+			Some(path) => {
+				let snapshot = snapshot_input(
+					Path::new(path),
+					&directory.path().join("program-keypair.json"),
+					"program keypair",
+				)?;
+				Some(snapshot)
+			}
+			None => None,
+		};
 		let upgrade_authority_path = snapshot_input(
 			Path::new(plan.upgrade_authority()),
 			&directory.path().join("upgrade-authority.json"),
@@ -212,26 +234,35 @@ impl DeploymentInputSnapshot {
 			&directory.path().join("payer.json"),
 			"fee payer",
 		)?;
-		protect_snapshot_keypair(&program_keypair_path, "program keypair")?;
+		if let Some(path) = &program_keypair_path {
+			protect_snapshot_keypair(path, "program keypair")?;
+		}
 		protect_snapshot_keypair(&upgrade_authority_path, "upgrade authority")?;
 		protect_snapshot_keypair(&payer_path, "fee payer")?;
 
-		let program_keypair_bytes = read_keypair(&program_keypair_path, "program keypair")?;
+		let program_keypair = ProgramKeypairFile::read_optional(program_keypair_path.as_deref())?;
 		validate_keypair(&upgrade_authority_path, "upgrade authority")?;
 		validate_keypair(&payer_path, "fee payer")?;
-		let keypair_program_id = bs58::encode(&program_keypair_bytes[32..]).into_string();
 		let fingerprint = InputFingerprint {
 			program: file_digest(&program_path, "program")?,
-			program_keypair: file_digest(&program_keypair_path, "program keypair")?,
+			program_keypair: program_keypair.as_ref().map(|keypair| keypair.digest),
 			upgrade_authority: file_digest(&upgrade_authority_path, "upgrade authority")?,
 			payer: file_digest(&payer_path, "fee payer")?,
 		};
+		let keypair_program_id = program_keypair
+			.as_ref()
+			.map(|keypair| keypair.program_id.as_str());
 
-		validate_snapshot_matches_plan(plan, &keypair_program_id, &fingerprint)?;
+		validate_snapshot_matches_plan(plan, keypair_program_id, &fingerprint)?;
+
+		let program_keypair_snapshot = match &program_keypair_path {
+			Some(path) => Some(path_string(path, "program keypair snapshot")?),
+			None => None,
+		};
 
 		Ok(Self {
 			program: path_string(&program_path, "program snapshot")?,
-			program_keypair: path_string(&program_keypair_path, "program keypair snapshot")?,
+			program_keypair: program_keypair_snapshot,
 			upgrade_authority: path_string(&upgrade_authority_path, "upgrade authority snapshot")?,
 			payer: path_string(&payer_path, "fee payer snapshot")?,
 			_directory: directory,
@@ -244,7 +275,7 @@ impl DeploymentInputSnapshot {
 				let facts = DeploymentFacts {
 					program: &self.program,
 					program_id: plan.program_id(),
-					program_keypair: &self.program_keypair,
+					program_keypair: self.program_keypair.as_deref(),
 					upgrade_authority: &self.upgrade_authority,
 					payer: &self.payer,
 					rpc_url: plan.rpc_url(),
@@ -255,7 +286,7 @@ impl DeploymentInputSnapshot {
 			None => {
 				deploy_command(
 					&self.program,
-					&self.program_keypair,
+					self.program_keypair.as_deref().unwrap_or(plan.program_id()),
 					&self.upgrade_authority,
 					&self.payer,
 					plan.rpc_url(),
@@ -265,12 +296,15 @@ impl DeploymentInputSnapshot {
 	}
 }
 
+/// Compare a snapshot with its plan. `keypair_program_id` is the snapshot
+/// program keypair's address, or `None` when the plan upgrades by declared ID.
 fn validate_snapshot_matches_plan(
 	plan: &DeploymentPlan,
-	keypair_program_id: &str,
+	keypair_program_id: Option<&str>,
 	fingerprint: &InputFingerprint,
 ) -> Result<(), DeployError> {
-	if keypair_program_id != plan.program_id || fingerprint != &plan.input_fingerprint {
+	let keypair_matches = keypair_program_id.is_none_or(|program_id| program_id == plan.program_id);
+	if !keypair_matches || fingerprint != &plan.input_fingerprint {
 		return Err(DeployError::InputsChanged);
 	}
 
@@ -281,7 +315,7 @@ fn validate_snapshot_matches_plan(
 struct SerializableDeploymentPlan<'a> {
 	project_root: &'a str,
 	program: &'a str,
-	program_keypair: &'a str,
+	program_keypair: Option<&'a str>,
 	upgrade_authority: &'a str,
 	payer: &'a str,
 	program_id: &'a str,
@@ -344,10 +378,11 @@ impl DeploymentPlan {
 		self.input_fingerprint.program
 	}
 
-	/// Keypair defining the program address.
+	/// Keypair defining the program address, or `None` when the plan upgrades
+	/// the program deployed at its declared ID without one.
 	#[must_use]
-	pub fn program_keypair(&self) -> &str {
-		&self.program_keypair
+	pub fn program_keypair(&self) -> Option<&str> {
+		self.program_keypair.as_deref()
 	}
 
 	/// Keypair authorized to upgrade the program.
@@ -362,7 +397,8 @@ impl DeploymentPlan {
 		&self.payer
 	}
 
-	/// Program address declared by the source and verified against the program keypair.
+	/// Program address declared by the source and, when the plan has one,
+	/// verified against the program keypair.
 	#[must_use]
 	pub fn program_id(&self) -> &str {
 		&self.program_id
@@ -426,7 +462,7 @@ impl DeploymentPlan {
 			None => {
 				deploy_command(
 					self.program(),
-					self.program_keypair(),
+					self.program_keypair().unwrap_or(self.program_id()),
 					self.upgrade_authority(),
 					self.payer(),
 					self.rpc_url(),
@@ -462,11 +498,13 @@ impl DeploymentPlan {
 
 	fn revalidate(&self) -> Result<(), DeployError> {
 		let program = Path::new(self.program());
-		let program_keypair = Path::new(self.program_keypair());
+		let program_keypair = self.program_keypair().map(Path::new);
 		let upgrade_authority = Path::new(self.upgrade_authority());
 		let payer = Path::new(self.payer());
 		canonical_file(program, "program", None)?;
-		canonical_file(program_keypair, "program keypair", Some("program keypair"))?;
+		if let Some(program_keypair) = program_keypair {
+			canonical_file(program_keypair, "program keypair", Some("program keypair"))?;
+		}
 		canonical_file(
 			upgrade_authority,
 			"upgrade authority",
@@ -483,17 +521,16 @@ impl DeploymentPlan {
 				})?
 				.program
 				.public_key;
-		let program_keypair_bytes = read_keypair(program_keypair, "program keypair")?;
-		let keypair_program_id = bs58::encode(&program_keypair_bytes[32..]).into_string();
+		let program_keypair = ProgramKeypairFile::read_optional(program_keypair)?;
 		let fingerprint = InputFingerprint {
 			program: file_digest(program, "program")?,
-			program_keypair: file_digest(program_keypair, "program keypair")?,
+			program_keypair: program_keypair.as_ref().map(|keypair| keypair.digest),
 			upgrade_authority: file_digest(upgrade_authority, "upgrade authority")?,
 			payer: file_digest(payer, "fee payer")?,
 		};
 
 		if current_program_id != self.program_id
-			|| keypair_program_id != self.program_id
+			|| program_keypair.is_some_and(|keypair| keypair.program_id != self.program_id)
 			|| fingerprint != self.input_fingerprint
 		{
 			return Err(DeployError::InputsChanged);
@@ -517,11 +554,16 @@ impl DeploymentPlan {
 			"  Program:           {}",
 			diagnostic_quote(self.program())
 		);
-		let _ = writeln!(
-			output,
-			"  Program keypair:   {}",
-			diagnostic_quote(self.program_keypair())
-		);
+		match self.program_keypair() {
+			Some(program_keypair) => {
+				let _ = writeln!(
+					output,
+					"  Program keypair:   {}",
+					diagnostic_quote(program_keypair)
+				);
+			}
+			None => output.push_str("  Program keypair:   none (upgrade by declared program ID)\n"),
+		}
 		let _ = writeln!(
 			output,
 			"  Upgrade authority: {}",
@@ -888,16 +930,23 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 		},
 		|path| canonical_file(path, "program", None),
 	)?;
-	let program_keypair_path = request.program_keypair.as_deref().map_or_else(
-		|| {
-			canonical_file(
+	let program_keypair_path = match &request.program_address {
+		ProgramAddress::ConventionalKeypair => {
+			Some(canonical_file(
 				&deploy_dir.join(format!("{}-keypair.json", project.library_name)),
 				"program keypair",
 				Some("program keypair"),
-			)
-		},
-		|path| canonical_file(path, "program keypair", Some("program keypair")),
-	)?;
+			)?)
+		}
+		ProgramAddress::Keypair(path) => {
+			Some(canonical_file(
+				path,
+				"program keypair",
+				Some("program keypair"),
+			)?)
+		}
+		ProgramAddress::DeclaredId => None,
+	};
 	let upgrade_authority_path = canonical_file(
 		&request.upgrade_authority,
 		"upgrade authority",
@@ -914,33 +963,36 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 			})?
 			.program
 			.public_key;
-	let program_keypair_bytes = read_keypair(&program_keypair_path, "program keypair")?;
-	let keypair_program_id = bs58::encode(&program_keypair_bytes[32..]).into_string();
-
-	if declared_program_id != keypair_program_id {
+	let program_keypair_file = ProgramKeypairFile::read_optional(program_keypair_path.as_deref())?;
+	if let Some(keypair) = &program_keypair_file
+		&& keypair.program_id != declared_program_id
+	{
 		return Err(DeployError::ProgramIdMismatch {
 			declared: declared_program_id,
-			keypair: keypair_program_id,
+			keypair: keypair.program_id.clone(),
 		});
 	}
 
 	let target = ResolvedTarget::resolve(&request.target)?;
 	let program = path_string(&program_path, "program")?;
-	let program_keypair = path_string(&program_keypair_path, "program keypair")?;
+	let program_keypair = match &program_keypair_path {
+		Some(path) => Some(path_string(path, "program keypair")?),
+		None => None,
+	};
 	let upgrade_authority = path_string(&upgrade_authority_path, "upgrade authority")?;
 	let payer = path_string(&payer_path, "fee payer")?;
 	let project_root = path_string(&project.root, "project root")?;
 	let program_dir = path_string(&project.program_dir, "program directory")?;
 	let input_fingerprint = InputFingerprint {
 		program: file_digest(&program_path, "program")?,
-		program_keypair: file_digest(&program_keypair_path, "program keypair")?,
+		program_keypair: program_keypair_file.map(|keypair| keypair.digest),
 		upgrade_authority: file_digest(&upgrade_authority_path, "upgrade authority")?,
 		payer: file_digest(&payer_path, "fee payer")?,
 	};
 	let warnings = deployment_warnings(
 		&program_path,
 		&read_keypair(&upgrade_authority_path, "upgrade authority")?,
-		&keypair_program_id,
+		&declared_program_id,
 	);
 
 	Ok(DeploymentPlan {
@@ -1000,9 +1052,12 @@ fn build_deployment_program_with(
 	build(project).map(|_| ()).map_err(DeployError::Build)
 }
 
+/// The `solana program deploy` command. `program_id` is the program keypair
+/// path, or the bare address when upgrading by declared ID: the Solana CLI
+/// accepts either, and an address alone can only upgrade.
 fn deploy_command(
 	program: &str,
-	program_keypair: &str,
+	program_id: &str,
 	upgrade_authority: &str,
 	payer: &str,
 	rpc_url: &str,
@@ -1014,7 +1069,7 @@ fn deploy_command(
 			"deploy".to_owned(),
 			program.to_owned(),
 			"--program-id".to_owned(),
-			program_keypair.to_owned(),
+			program_id.to_owned(),
 			"--upgrade-authority".to_owned(),
 			upgrade_authority.to_owned(),
 			"--fee-payer".to_owned(),
@@ -1034,7 +1089,7 @@ fn deploy_command(
 struct DeploymentFacts<'a> {
 	program: &'a str,
 	program_id: &'a str,
-	program_keypair: &'a str,
+	program_keypair: Option<&'a str>,
 	upgrade_authority: &'a str,
 	payer: &'a str,
 	rpc_url: &'a str,
@@ -1055,24 +1110,30 @@ fn override_command(facts: &DeploymentFacts<'_>, command: &str) -> CommandPlan {
 	let (shell, flag) = ("sh", "-c");
 	#[cfg(not(unix))]
 	let (shell, flag) = ("cmd", "/C");
+	let mut env = vec![
+		("PINA_DEPLOY_PROGRAM".to_owned(), program.to_owned()),
+		("PINA_DEPLOY_PROGRAM_ID".to_owned(), program_id.to_owned()),
+	];
+	// An upgrade by declared ID has no program keypair to export.
+	if let Some(program_keypair) = program_keypair {
+		env.push((
+			"PINA_DEPLOY_PROGRAM_KEYPAIR".to_owned(),
+			program_keypair.to_owned(),
+		));
+	}
+	env.extend([
+		(
+			"PINA_DEPLOY_UPGRADE_AUTHORITY".to_owned(),
+			upgrade_authority.to_owned(),
+		),
+		("PINA_DEPLOY_PAYER".to_owned(), payer.to_owned()),
+		("PINA_DEPLOY_RPC_URL".to_owned(), rpc_url.to_owned()),
+		("PINA_DEPLOY_CLUSTER".to_owned(), cluster.to_owned()),
+	]);
 	CommandPlan {
 		program: shell.to_owned(),
 		args: vec![flag.to_owned(), command.to_owned()],
-		env: vec![
-			("PINA_DEPLOY_PROGRAM".to_owned(), program.to_owned()),
-			("PINA_DEPLOY_PROGRAM_ID".to_owned(), program_id.to_owned()),
-			(
-				"PINA_DEPLOY_PROGRAM_KEYPAIR".to_owned(),
-				program_keypair.to_owned(),
-			),
-			(
-				"PINA_DEPLOY_UPGRADE_AUTHORITY".to_owned(),
-				upgrade_authority.to_owned(),
-			),
-			("PINA_DEPLOY_PAYER".to_owned(), payer.to_owned()),
-			("PINA_DEPLOY_RPC_URL".to_owned(), rpc_url.to_owned()),
-			("PINA_DEPLOY_CLUSTER".to_owned(), cluster.to_owned()),
-		],
+		env,
 	}
 }
 
@@ -1344,6 +1405,29 @@ fn canonical_file(
 	}
 
 	Ok(canonical)
+}
+
+/// The address and digest a program keypair file had when it was read.
+struct ProgramKeypairFile {
+	program_id: String,
+	digest: [u8; 32],
+}
+
+impl ProgramKeypairFile {
+	/// Read the program keypair at `path`, or nothing when the deployment
+	/// upgrades by declared ID and has no program keypair.
+	fn read_optional(path: Option<&Path>) -> Result<Option<Self>, DeployError> {
+		let Some(path) = path else {
+			return Ok(None);
+		};
+		let keypair = read_keypair(path, "program keypair")?;
+		let digest = file_digest(path, "program keypair")?;
+
+		Ok(Some(Self {
+			program_id: bs58::encode(&keypair[32..]).into_string(),
+			digest,
+		}))
+	}
 }
 
 fn validate_keypair(path: &Path, kind: &'static str) -> Result<(), DeployError> {
@@ -1657,7 +1741,7 @@ mod tests {
 				remote_command: None,
 				project: self.root.clone(),
 				program: None,
-				program_keypair: None,
+				program_address: ProgramAddress::ConventionalKeypair,
 				upgrade_authority: self.authority.clone(),
 				payer: self.payer.clone(),
 				target,
@@ -1828,7 +1912,10 @@ mod tests {
 			.unwrap_or_else(|error| panic!("prepare deployment: {error}"));
 
 		assert_eq!(plan.program(), canonical(&fixture.program));
-		assert_eq!(plan.program_keypair(), canonical(&fixture.program_keypair));
+		assert_eq!(
+			plan.program_keypair(),
+			Some(canonical(&fixture.program_keypair).as_str())
+		);
 		assert_eq!(plan.upgrade_authority(), canonical(&fixture.authority));
 		assert_eq!(plan.payer(), canonical(&fixture.payer));
 		assert_eq!(plan.cluster(), "devnet");
@@ -1856,6 +1943,106 @@ mod tests {
 				env: Vec::new(),
 			}
 		);
+	}
+
+	#[test]
+	fn upgrade_by_declared_id_never_reads_a_program_keypair() {
+		let fixture = Fixture::new();
+		// The conventional keypair is gone, so a plan that touched it would fail.
+		fs::remove_file(&fixture.program_keypair)
+			.unwrap_or_else(|error| panic!("remove program keypair: {error}"));
+		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Devnet));
+		request.program_address = ProgramAddress::DeclaredId;
+		let plan =
+			prepare_deployment(&request).unwrap_or_else(|error| panic!("prepare upgrade: {error}"));
+		let json = serde_json::to_value(&plan)
+			.unwrap_or_else(|error| panic!("serialize upgrade plan: {error}"));
+
+		assert_eq!(plan.program_keypair(), None);
+		assert_eq!(json["program_keypair"], serde_json::Value::Null);
+		assert!(
+			plan.render_text()
+				.contains("Program keypair:   none (upgrade by declared program ID)")
+		);
+		assert_eq!(
+			plan.commands()[0].args,
+			vec![
+				"program".to_owned(),
+				"deploy".to_owned(),
+				canonical(&fixture.program),
+				"--program-id".to_owned(),
+				plan.program_id().to_owned(),
+				"--upgrade-authority".to_owned(),
+				canonical(&fixture.authority),
+				"--fee-payer".to_owned(),
+				canonical(&fixture.payer),
+				"--url".to_owned(),
+				DEVNET_URL.to_owned(),
+			]
+		);
+
+		let mut runner = FakeRunner::default();
+		execute_deployment(&plan, true, false, &mut runner, &mut rejecting_confirmer())
+			.unwrap_or_else(|error| panic!("execute upgrade: {error}"));
+		assert_eq!(runner.calls.len(), 1);
+		assert_eq!(runner.calls[0].1[4], plan.program_id());
+		plan.verify_inputs_unchanged()
+			.unwrap_or_else(|error| panic!("revalidate upgrade: {error}"));
+	}
+
+	#[test]
+	fn upgrade_by_declared_id_exports_no_program_keypair_to_a_remote_command() {
+		let fixture = Fixture::new();
+		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
+		request.program_address = ProgramAddress::DeclaredId;
+		request.remote_command = Some("deploy-wrapper".to_owned());
+		let plan = prepare_deployment(&request)
+			.unwrap_or_else(|error| panic!("prepare remote upgrade: {error}"));
+		let keys = |command: &CommandPlan| {
+			command
+				.env
+				.iter()
+				.map(|(key, _)| key.clone())
+				.collect::<Vec<_>>()
+		};
+		let expected = [
+			"PINA_DEPLOY_PROGRAM",
+			"PINA_DEPLOY_PROGRAM_ID",
+			"PINA_DEPLOY_UPGRADE_AUTHORITY",
+			"PINA_DEPLOY_PAYER",
+			"PINA_DEPLOY_RPC_URL",
+			"PINA_DEPLOY_CLUSTER",
+		];
+
+		assert_eq!(keys(&plan.commands()[0]), expected);
+
+		let snapshot = DeploymentInputSnapshot::capture(&plan)
+			.unwrap_or_else(|error| panic!("capture upgrade snapshot: {error}"));
+		assert_eq!(snapshot.program_keypair, None);
+		assert_eq!(keys(&snapshot.command(&plan)), expected);
+	}
+
+	#[test]
+	fn upgrade_by_declared_id_still_rejects_drifted_inputs() {
+		let fixture = Fixture::new();
+		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
+		request.program_address = ProgramAddress::DeclaredId;
+		let plan =
+			prepare_deployment(&request).unwrap_or_else(|error| panic!("prepare upgrade: {error}"));
+
+		validate_snapshot_matches_plan(&plan, None, &plan.input_fingerprint)
+			.unwrap_or_else(|error| panic!("an unchanged upgrade snapshot matches: {error}"));
+		assert!(matches!(
+			validate_snapshot_matches_plan(&plan, Some("another-program"), &plan.input_fingerprint),
+			Err(DeployError::InputsChanged)
+		));
+
+		fs::write(&fixture.program, b"changed SBF")
+			.unwrap_or_else(|error| panic!("change program: {error}"));
+		assert!(matches!(
+			plan.verify_inputs_unchanged(),
+			Err(DeployError::InputsChanged)
+		));
 	}
 
 	#[test]
@@ -1889,7 +2076,10 @@ mod tests {
 			.unwrap_or_else(|error| panic!("canonicalize program: {error}"));
 
 		assert_eq!(plan.program(), path(&expected_program));
-		assert_eq!(plan.program_keypair(), canonical(&lib_keypair));
+		assert_eq!(
+			plan.program_keypair(),
+			Some(canonical(&lib_keypair).as_str())
+		);
 		assert_eq!(plan.commands().len(), 1);
 		assert_eq!(built_from.as_deref(), Some(fixture.root.as_path()));
 		assert_eq!(plan.commands()[0].program, "solana");
@@ -1918,12 +2108,15 @@ mod tests {
 		write_keypair(&explicit_keypair);
 		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Testnet));
 		request.program = Some(explicit_program.clone());
-		request.program_keypair = Some(explicit_keypair.clone());
+		request.program_address = ProgramAddress::Keypair(explicit_keypair.clone());
 		let plan = prepare_deployment(&request)
 			.unwrap_or_else(|error| panic!("prepare deployment: {error}"));
 
 		assert_eq!(plan.program(), canonical(&explicit_program));
-		assert_eq!(plan.program_keypair(), canonical(&explicit_keypair));
+		assert_eq!(
+			plan.program_keypair(),
+			Some(canonical(&explicit_keypair).as_str())
+		);
 		assert_eq!(plan.rpc_url(), TESTNET_URL);
 	}
 
@@ -1961,7 +2154,10 @@ mod tests {
 
 		assert_eq!(plan.project_root(), canonical(&fixture.root));
 		assert_eq!(plan.program(), canonical(&program));
-		assert_eq!(plan.program_keypair(), canonical(&program_keypair));
+		assert_eq!(
+			plan.program_keypair(),
+			Some(canonical(&program_keypair).as_str())
+		);
 	}
 
 	#[test]
@@ -2604,7 +2800,8 @@ mod tests {
 			let plan = prepare_deployment(&request).expect("deployment should prepare");
 			let originals = [
 				plan.program(),
-				plan.program_keypair(),
+				plan.program_keypair()
+					.expect("a conventional plan has a program keypair"),
 				plan.upgrade_authority(),
 				plan.payer(),
 			]
@@ -2669,7 +2866,7 @@ mod tests {
 		let approved_fingerprint = plan.input_fingerprint.clone();
 		plan.input_fingerprint.program[0] ^= 1;
 		let drift_error =
-			validate_snapshot_matches_plan(&plan, plan.program_id(), &approved_fingerprint)
+			validate_snapshot_matches_plan(&plan, Some(plan.program_id()), &approved_fingerprint)
 				.expect_err("a mismatched fingerprint should fail closed");
 		assert!(matches!(drift_error, DeployError::InputsChanged));
 	}
@@ -2685,7 +2882,8 @@ mod tests {
 		for expected in [
 			plan.project_root(),
 			plan.program(),
-			plan.program_keypair(),
+			plan.program_keypair()
+				.expect("a conventional plan has a program keypair"),
 			plan.upgrade_authority(),
 			plan.payer(),
 			plan.program_id(),
@@ -2723,7 +2921,10 @@ mod tests {
 			.collect::<std::collections::BTreeMap<_, _>>();
 		assert_eq!(env["PINA_DEPLOY_PROGRAM"], plan.program());
 		assert_eq!(env["PINA_DEPLOY_PROGRAM_ID"], plan.program_id());
-		assert_eq!(env["PINA_DEPLOY_PROGRAM_KEYPAIR"], plan.program_keypair());
+		assert_eq!(
+			Some(env["PINA_DEPLOY_PROGRAM_KEYPAIR"].as_str()),
+			plan.program_keypair()
+		);
 		assert_eq!(
 			env["PINA_DEPLOY_UPGRADE_AUTHORITY"],
 			plan.upgrade_authority()

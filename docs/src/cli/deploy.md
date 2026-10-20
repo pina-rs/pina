@@ -63,6 +63,18 @@ Dry runs perform no build or deployment. Consequently, `--dry-run` conflicts wit
 
 Use `--program` or `--program-keypair` to override either conventional path. `--program` conflicts with `--build`. Every resolved file is canonicalized and must be a regular file. Keypair files cannot exceed 4 KiB and must contain a valid 64-byte Solana JSON keypair. On Unix, Pina rejects keypairs with any group or world permission bits; `chmod 600 <keypair>` is the recommended mode. Pina cannot inspect equivalent Windows ACL policy, so Windows operators must restrict keypair access with the operating system's ACL tooling. The program keypair address must match the program's `declare_id!`; deploy never generates or silently replaces an identity.
 
+## Upgrades without the program keypair
+
+`--upgrade-only` upgrades the program already deployed at the declared program ID and never reads a program keypair. Pina passes the bare address to `solana program deploy --program-id`, which can upgrade with it but cannot create a program, so a first deployment still needs the program keypair and fails in the Solana CLI without one. The plan reports `"program_keypair": null` and the human plan shows `Program keypair: none (upgrade by declared program ID)`. The flag conflicts with `--program-keypair`.
+
+Use it in automation. A program keypair controls its address on every cluster, so a continuous-deployment job that upgrades devnet with `--upgrade-only` and a dedicated upgrade authority never holds the key that could claim the same address on mainnet:
+
+```bash
+pina deploy --build --upgrade-only --cluster devnet --yes \
+  --upgrade-authority ./keys/ci-authority.json \
+  --payer ./keys/ci-payer.json
+```
+
 `--upgrade-authority` and `--payer` are always explicit. Pina does not inherit wallet paths from Solana configuration and does not store deployment credentials in `pina.toml`.
 
 ## Targets and confirmation
@@ -93,15 +105,15 @@ Without `--remote-command`, deployment requires the external `solana` executable
 
 `--remote-command <COMMAND>` replaces `solana program deploy` with `sh -c <COMMAND>` (`cmd /C <COMMAND>` on Windows), for platforms that deploy through their own tooling. Every other safeguard still applies: target policy, confirmation, snapshot validation, and publication receipts. The deployment facts reach the command only as environment variables, never interpolated into the command string:
 
-| Variable                        | Value                                      |
-| ------------------------------- | ------------------------------------------ |
-| `PINA_DEPLOY_RPC_URL`           | the normalized RPC URL                     |
-| `PINA_DEPLOY_CLUSTER`           | the named cluster or `custom`              |
-| `PINA_DEPLOY_PROGRAM`           | the snapshot copy of the SBF artifact      |
-| `PINA_DEPLOY_PROGRAM_ID`        | the declared program ID                    |
-| `PINA_DEPLOY_PROGRAM_KEYPAIR`   | the snapshot copy of the program keypair   |
-| `PINA_DEPLOY_UPGRADE_AUTHORITY` | the snapshot copy of the upgrade authority |
-| `PINA_DEPLOY_PAYER`             | the snapshot copy of the fee payer         |
+| Variable                        | Value                                                                 |
+| ------------------------------- | --------------------------------------------------------------------- |
+| `PINA_DEPLOY_RPC_URL`           | the normalized RPC URL                                                |
+| `PINA_DEPLOY_CLUSTER`           | the named cluster or `custom`                                         |
+| `PINA_DEPLOY_PROGRAM`           | the snapshot copy of the SBF artifact                                 |
+| `PINA_DEPLOY_PROGRAM_ID`        | the declared program ID                                               |
+| `PINA_DEPLOY_PROGRAM_KEYPAIR`   | the snapshot copy of the program keypair; unset with `--upgrade-only` |
+| `PINA_DEPLOY_UPGRADE_AUTHORITY` | the snapshot copy of the upgrade authority                            |
+| `PINA_DEPLOY_PAYER`             | the snapshot copy of the fee payer                                    |
 
 Quote the variables inside the command (`"$PINA_DEPLOY_PAYER"`), and treat an exit status of zero as the command's claim that the deployment succeeded: Pina records the publication receipt on that claim alone.
 

@@ -187,6 +187,88 @@ fn dry_run_json_is_machine_readable_and_starts_no_child() {
 }
 
 #[test]
+fn upgrade_only_plans_by_declared_id_and_conflicts_with_a_program_keypair() {
+	let fixture = ProjectFixture::new();
+	fs::remove_file(&fixture.program_keypair)
+		.unwrap_or_else(|error| panic!("remove program keypair: {error}"));
+	let output = fixture
+		.command()
+		.args([
+			"--cluster",
+			"devnet",
+			"--upgrade-only",
+			"--dry-run",
+			"--json",
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("run upgrade-only dry deployment: {error}"));
+
+	assert!(
+		output.status.success(),
+		"stderr: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let plan = serde_json::from_slice::<serde_json::Value>(&output.stdout)
+		.unwrap_or_else(|error| panic!("parse deployment JSON: {error}"));
+	assert_eq!(plan["program_keypair"], serde_json::Value::Null);
+	assert_eq!(plan["program_id"], fixture.program_id);
+	assert_eq!(plan["commands"][0]["args"][4], fixture.program_id);
+
+	let output = fixture
+		.command()
+		.arg("--program-keypair")
+		.arg(&fixture.authority)
+		.args(["--cluster", "devnet", "--upgrade-only", "--dry-run"])
+		.output()
+		.unwrap_or_else(|error| panic!("run conflicting upgrade-only deployment: {error}"));
+	assert!(!output.status.success());
+	assert!(String::from_utf8_lossy(&output.stderr).contains("cannot be used with"));
+}
+
+#[cfg(unix)]
+#[test]
+fn upgrade_only_execution_passes_the_declared_id_to_solana() {
+	let fixture = ProjectFixture::new();
+	fs::remove_file(&fixture.program_keypair)
+		.unwrap_or_else(|error| panic!("remove program keypair: {error}"));
+	let bin = fixture.root.join("upgrade-fake-bin");
+	let log = fixture.root.join("upgrade-args.txt");
+	fs::create_dir_all(&bin).unwrap_or_else(|error| panic!("create fake bin: {error}"));
+	support::write_executable(
+		&bin.join("solana"),
+		"#!/bin/sh\nset -eu\nprintf '%s\\n' \"$@\" > \"$PINA_DEPLOY_TEST_LOG\"\n",
+	)
+	.unwrap();
+	let existing_path = std::env::var_os("PATH").unwrap_or_default();
+	let joined_path =
+		std::env::join_paths(std::iter::once(bin).chain(std::env::split_paths(&existing_path)))
+			.unwrap_or_else(|error| panic!("construct test PATH: {error}"));
+	let output = fixture
+		.command()
+		.args(["--cluster", "localnet", "--upgrade-only"])
+		.env("PATH", joined_path)
+		.env("PINA_DEPLOY_TEST_LOG", &log)
+		.output()
+		.unwrap_or_else(|error| panic!("run upgrade-only deployment: {error}"));
+
+	assert!(
+		output.status.success(),
+		"deployment failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let args = fs::read_to_string(&log)
+		.unwrap_or_else(|error| panic!("read fake Solana arguments: {error}"));
+	let args = args.lines().collect::<Vec<_>>();
+	assert_eq!(
+		[args[3], args[4]],
+		["--program-id", fixture.program_id.as_str()]
+	);
+	assert!(
+		String::from_utf8_lossy(&output.stdout).contains("none (upgrade by declared program ID)")
+	);
+}
+
+#[test]
 fn rpc_query_values_are_rejected_without_leaking_them() {
 	let fixture = ProjectFixture::new();
 	let output = fixture
