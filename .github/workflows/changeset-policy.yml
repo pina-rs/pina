@@ -15,8 +15,14 @@ on:
 permissions:
   contents: read
 
+# An edit that leaves the base branch alone, such as a title or description
+# change, gives the policy nothing new to validate. It runs in a concurrency
+# group of its own, so it cannot cancel a validation run in progress, and its
+# skipped job reports under a separate name, so it cannot replace the `check`
+# result with a skipped one. Every other event, retargeting included, shares
+# the pull request's group, and a newer run there still cancels an older one.
 concurrency:
-  group: changeset-policy-${{ github.event.pull_request.number || github.ref }}
+  group: changeset-policy-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'edited' && !github.event.changes.base && format('-edit-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 # The policy check must run on every pull request (its whole purpose is
@@ -25,6 +31,7 @@ concurrency:
 # pays for the nix/devenv setup once instead of twice.
 jobs:
   check:
+    name: ${{ github.event.action == 'edited' && !github.event.changes.base && 'check (edit ignored)' || 'check' }}
     if: ${{ github.event.action != 'edited' || github.event.changes.base }}
     timeout-minutes: 25
     runs-on: ubuntu-24.04
