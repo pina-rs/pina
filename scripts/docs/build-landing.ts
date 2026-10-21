@@ -35,7 +35,7 @@ export interface Measurement {
 	framework: string;
 	version: string;
 	bytes: number;
-	/// Compute units per instruction, keyed by instruction name.
+	/** Compute units per instruction, keyed by instruction name. */
 	cu: Record<string, number>;
 }
 
@@ -69,23 +69,27 @@ const PINA = "Pina";
 const PINOCCHIO = "Pinocchio (hand-written)";
 const ANCHOR_V1 = "Anchor v1";
 
-/// A bar is drawn past an axis break when it is this many times the next
-/// largest, so a single outlier cannot flatten every other bar to a sliver.
+/**
+ * A bar is drawn past an axis break when it is this many times the next
+ * largest, so a single outlier cannot flatten every other bar to a sliver.
+ */
 const BREAK_RATIO = 3;
 
 // ---------------------------------------------------------------------------
 // Parsing
 // ---------------------------------------------------------------------------
 
-/// Splits a markdown table row into trimmed cells.
+/** Splits a markdown table row into trimmed cells. */
 function cells(line: string): string[] {
 	return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((
 		cell,
 	) => cell.trim());
 }
 
-/// Reads the first markdown table at or after `start`, skipping the
-/// alignment row.
+/**
+ * Reads the first markdown table at or after `start`, skipping the
+ * alignment row.
+ */
 function readTable(
 	lines: string[],
 	start: number,
@@ -117,8 +121,10 @@ function parseNumber(value: string): number {
 	return parsed;
 }
 
-/// Parses the generated region of `docs/src/framework-comparison.md` into
-/// measurements keyed by program (`hello`, `counter`).
+/**
+ * Parses the generated region of `docs/src/framework-comparison.md` into
+ * measurements keyed by program (`hello`, `counter`).
+ */
 export function parseBenchmarks(
 	markdown: string,
 ): Record<string, Measurement[]> {
@@ -172,7 +178,7 @@ export function parseBenchmarks(
 	return result;
 }
 
-/// Parses the capability table under `### Capabilities` in the readme.
+/** Parses the capability table under `### Capabilities` in the readme. */
 export function parseCapabilities(readme: string): CapabilityMatrix {
 	const lines = readme.split("\n");
 	const start = lines.findIndex((line) => line.trim() === "### Capabilities");
@@ -210,7 +216,7 @@ export function parseCapabilities(readme: string): CapabilityMatrix {
 	return { frameworks, versions, rows: parsed };
 }
 
-/// Reads `[workspace.package] version` from the root manifest.
+/** Reads `[workspace.package] version` from the root manifest. */
 export function workspaceVersion(manifest: string): string {
 	const section = manifest.split(/^\[/m).find((part) =>
 		part.startsWith("workspace.package]")
@@ -237,7 +243,7 @@ function stripComments(value: string): string {
 	return value.replace(/<!--[\s\S]*?-->/g, "");
 }
 
-/// Escapes a markdown cell and renders its inline code spans.
+/** Escapes a markdown cell and renders its inline code spans. */
 function inline(value: string): string {
 	return escapeHtml(value.trim()).replace(/`([^`]+)`/g, "<code>$1</code>");
 }
@@ -246,7 +252,7 @@ function formatNumber(value: number): string {
 	return value.toLocaleString("en-US");
 }
 
-/// How a value compares with Pina's, phrased for a bar's side label.
+/** How a value compares with Pina's, phrased for a bar's side label. */
 function versusPina(value: number, pina: number): string {
 	if (value === pina) {
 		return "same as Pina";
@@ -259,7 +265,7 @@ function versusPina(value: number, pina: number): string {
 	return `${percent > 0 ? "+" : "−"}${Math.abs(percent)}% vs Pina`;
 }
 
-/// Signed percentage against the hand-written Pinocchio floor.
+/** Signed percentage against the hand-written Pinocchio floor. */
 function versusFloor(value: number, floor: number): string {
 	const percent = Math.round(((value - floor) / floor) * 100);
 	return `${percent >= 0 ? "+" : "−"}${Math.abs(percent)}%`;
@@ -281,6 +287,11 @@ function cu(entry: Measurement, instruction: string): number {
 	return value;
 }
 
+/**
+ * Renders the hero stat tiles. The size and compute tiles compare Pina's
+ * measurements with hand-written Pinocchio and Anchor v1; the last tile states
+ * the `no_std` guarantee, which no benchmark measures.
+ */
 export function renderStats(benchmarks: Record<string, Measurement[]>): string {
 	const hello = benchmarks.hello;
 	const counter = benchmarks.counter;
@@ -468,6 +479,10 @@ function renderTable(
 	}</caption><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
+/**
+ * Renders the benchmark chart: one tab and bar panel per metric, each with a
+ * table view of the same measurements.
+ */
 export function renderBenchmarks(
 	benchmarks: Record<string, Measurement[]>,
 ): string {
@@ -504,6 +519,7 @@ const MARKS: Record<CapabilityCell["status"], string> = {
 		'<span class="mark mark-no" role="img" aria-label="Not available"><svg viewBox="0 0 12 12"><path d="M3.5 3.5l5 5M8.5 3.5l-5 5"/></svg></span>',
 };
 
+/** Renders the capability matrix, with Pina's column first and highlighted. */
 export function renderCapabilities(matrix: CapabilityMatrix): string {
 	const head = matrix.frameworks.map((framework, index) =>
 		`<th scope="col"${index === 0 ? ' class="col-pina"' : ""}>${framework}${
@@ -531,6 +547,11 @@ export function renderCapabilities(matrix: CapabilityMatrix): string {
 			<p class="matrix-legend"><span>${MARKS.yes} First-class</span><span>${MARKS.partial} Partial</span><span>${MARKS.no} Not available</span></p>`;
 }
 
+/**
+ * Fills the landing template. `{{name}}` takes an escaped value and
+ * `<!-- pina:name -->` a rendered block; an unknown name throws so a template
+ * typo fails the docs build instead of shipping.
+ */
 export function renderLanding(
 	template: string,
 	sources: { manifest: string; comparison: string; readme: string },
@@ -575,6 +596,10 @@ function copyInto(source: string, destination: string): void {
 	copyFileSync(source, destination);
 }
 
+/**
+ * Writes the landing page over a built book's `index.html` and copies the
+ * page's assets, the favicon, and the theme fonts into `<bookDir>/landing/`.
+ */
 export function buildLanding(bookDir: string, root = ROOT): void {
 	if (!existsSync(join(bookDir, "introduction.html"))) {
 		throw new Error(
