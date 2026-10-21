@@ -139,6 +139,22 @@ ignore = [
 	# Removable once the Surfpool train drops reqwest 0.11 — tracked in #621.
 	"RUSTSEC-2026-0346",
 	"RUSTSEC-2026-0349",
+	# RUSTSEC-2026-0382: rustls-webpki may accept certificate paths through
+	# the distrusted emSign intermediates. Fires on rustls-webpki 0.101.7,
+	# reached through the same txtx-addon-kit → reqwest 0.11 → rustls 0.21
+	# chain as RUSTSEC-2026-0098/0099/0104 above; the fix exists only on the
+	# 0.103 line, which the workspace carries at 0.103.16. Host/test stack
+	# only (via surfpool, not in any shipped crate graph). Removable once the
+	# Surfpool train drops reqwest 0.11 — tracked in #621.
+	"RUSTSEC-2026-0382",
+	# RUSTSEC-2026-0381: webpki-roots bundles the emSign ECC Root CA - G3 that
+	# the distrusted intermediates chain to. Fires on webpki-roots 0.25.4
+	# (txtx-addon-kit → reqwest 0.11, as above) and on the 0.26.11
+	# compatibility shim (pina_test → solana-client → solana-pubsub-client →
+	# tokio-tungstenite 0.28), which re-exports the 1.x roots the workspace
+	# carries at the patched 1.0.10. Host/test stack only (via pina_test and
+	# surfpool, not in any shipped crate graph). Tracked in #621.
+	"RUSTSEC-2026-0381",
 ]
 
 [licenses]
