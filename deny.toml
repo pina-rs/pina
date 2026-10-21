@@ -88,15 +88,23 @@ ignore = [
 	# Host/test stack only (via surfpool/litesvm, not in any shipped crate
 	# graph).
 	"RUSTSEC-2024-0421",
-	# RUSTSEC-2026-0098, RUSTSEC-2026-0099, RUSTSEC-2026-0104:
-	# rustls-webpki 0.101 certificate-validation flaws. All three are reached
-	# only through surfpool-core → txtx-addon-kit → reqwest 0.11 →
-	# rustls 0.21 → rustls-webpki 0.101.7. Host/test stack only (via
-	# surfpool/litesvm, not in any shipped crate graph). The workspace's own
-	# rustls-webpki is 0.103.15.
+	# RUSTSEC-2026-0098, RUSTSEC-2026-0099, RUSTSEC-2026-0104,
+	# RUSTSEC-2026-0382: rustls-webpki 0.101 certificate-validation flaws,
+	# with no fixed 0.101 release. All four are reached only through
+	# surfpool-core → txtx-addon-kit → reqwest 0.11 → rustls 0.21 →
+	# rustls-webpki 0.101.7. Host/test stack only (via surfpool/litesvm, not
+	# in any shipped crate graph). The workspace's own rustls-webpki is
+	# 0.103.16.
 	"RUSTSEC-2026-0098",
 	"RUSTSEC-2026-0099",
 	"RUSTSEC-2026-0104",
+	"RUSTSEC-2026-0382",
+	# RUSTSEC-2026-0381: webpki-roots trusts distrusted emSign intermediates,
+	# fixed only in 1.0.10. Reached via surfpool-core → txtx-addon-kit →
+	# reqwest 0.11 → webpki-roots 0.25.4. Host/test stack only (via
+	# surfpool/litesvm, not in any shipped crate graph). The workspace's own
+	# webpki-roots is 1.0.10.
+	"RUSTSEC-2026-0381",
 	# RUSTSEC-2026-0258: h2 unbounded empty DATA frames. Reached via
 	# surfpool-core → jsonrpc-http-server → hyper 0.14 → h2 0.3.27. Host/test
 	# stack only (via surfpool/litesvm, not in any shipped crate graph).
