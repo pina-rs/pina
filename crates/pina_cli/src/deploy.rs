@@ -1958,14 +1958,11 @@ mod tests {
 	fn upgrade_by_declared_id_never_reads_a_program_keypair() {
 		let fixture = Fixture::new();
 		// The conventional keypair is gone, so a plan that touched it would fail.
-		fs::remove_file(&fixture.program_keypair)
-			.unwrap_or_else(|error| panic!("remove program keypair: {error}"));
+		fs::remove_file(&fixture.program_keypair).expect("remove program keypair");
 		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Devnet));
 		request.program_address = ProgramAddress::DeclaredId;
-		let plan =
-			prepare_deployment(&request).unwrap_or_else(|error| panic!("prepare upgrade: {error}"));
-		let json = serde_json::to_value(&plan)
-			.unwrap_or_else(|error| panic!("serialize upgrade plan: {error}"));
+		let plan = prepare_deployment(&request).expect("prepare upgrade");
+		let json = serde_json::to_value(&plan).expect("serialize upgrade plan");
 
 		assert_eq!(plan.program_keypair(), None);
 		assert_eq!(json["program_keypair"], serde_json::Value::Null);
@@ -1994,11 +1991,10 @@ mod tests {
 
 		let mut runner = FakeRunner::default();
 		execute_deployment(&plan, true, false, &mut runner, &mut rejecting_confirmer())
-			.unwrap_or_else(|error| panic!("execute upgrade: {error}"));
+			.expect("execute upgrade");
 		assert_eq!(runner.calls.len(), 1);
 		assert_eq!(runner.calls[0].1[4], plan.program_id());
-		plan.verify_inputs_unchanged()
-			.unwrap_or_else(|error| panic!("revalidate upgrade: {error}"));
+		plan.verify_inputs_unchanged().expect("revalidate upgrade");
 	}
 
 	#[test]
@@ -2007,8 +2003,7 @@ mod tests {
 		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
 		request.program_address = ProgramAddress::DeclaredId;
 		request.remote_command = Some("deploy-wrapper".to_owned());
-		let plan = prepare_deployment(&request)
-			.unwrap_or_else(|error| panic!("prepare remote upgrade: {error}"));
+		let plan = prepare_deployment(&request).expect("prepare remote upgrade");
 		let keys = |command: &CommandPlan| {
 			command
 				.env
@@ -2027,8 +2022,7 @@ mod tests {
 
 		assert_eq!(keys(&plan.commands()[0]), expected);
 
-		let snapshot = DeploymentInputSnapshot::capture(&plan)
-			.unwrap_or_else(|error| panic!("capture upgrade snapshot: {error}"));
+		let snapshot = DeploymentInputSnapshot::capture(&plan).expect("capture upgrade snapshot");
 		assert_eq!(snapshot.program_keypair, None);
 		assert_eq!(keys(&snapshot.command(&plan)), expected);
 	}
@@ -2038,18 +2032,16 @@ mod tests {
 		let fixture = Fixture::new();
 		let mut request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
 		request.program_address = ProgramAddress::DeclaredId;
-		let plan =
-			prepare_deployment(&request).unwrap_or_else(|error| panic!("prepare upgrade: {error}"));
+		let plan = prepare_deployment(&request).expect("prepare upgrade");
 
 		validate_snapshot_matches_plan(&plan, None, &plan.input_fingerprint)
-			.unwrap_or_else(|error| panic!("an unchanged upgrade snapshot matches: {error}"));
+			.expect("an unchanged upgrade snapshot matches");
 		assert!(matches!(
 			validate_snapshot_matches_plan(&plan, Some("another-program"), &plan.input_fingerprint),
 			Err(DeployError::InputsChanged)
 		));
 
-		fs::write(&fixture.program, b"changed SBF")
-			.unwrap_or_else(|error| panic!("change program: {error}"));
+		fs::write(&fixture.program, b"changed SBF").expect("change program");
 		assert!(matches!(
 			plan.verify_inputs_unchanged(),
 			Err(DeployError::InputsChanged)
