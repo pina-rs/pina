@@ -8,7 +8,7 @@ overrides:
   brace-expansion@>=4.0.0 <5.0.12: 5.0.12
   picomatch@>=4.0.0 <4.0.4: 4.0.4
   source-map-js@>=1.0.0 <1.2.2: 1.2.2
-  vite@>=7.0.0 <=7.3.4: 7.3.5
+  vite@>=7.0.0 <7.3.7: 7.3.7
   ws@>=8.0.0 <8.21.0: 8.21.0
 
 importers:
@@ -78,7 +78,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.6.4)(vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15))
+        version: 5.0.3(@types/node@26.6.4)(vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15))
 
   codama/tests/quasar-svm:
     devDependencies:
@@ -102,7 +102,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.6.4)(vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15))
+        version: 5.0.3(@types/node@26.6.4)(vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15))
 
   codama/tests/surfpool:
     devDependencies:
@@ -139,7 +139,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.6.4)(vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15))
+        version: 5.0.3(@types/node@26.6.4)(vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15))
 
   packages/codama-renderer-cpi:
     dependencies:
@@ -164,7 +164,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.6.4)(vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15))
+        version: 5.0.3(@types/node@26.6.4)(vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15))
 
   packages/nodes-from-pina:
     dependencies:
@@ -186,7 +186,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.6.4)(vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15))
+        version: 5.0.3(@types/node@26.6.4)(vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15))
 
   packages/pina__cli:
     optionalDependencies:
@@ -1846,7 +1846,7 @@ packages:
     resolution: {integrity: sha512-T8sWAIbkSyAjkwTcaEc3Iu0o9A27X1/kdXrizhZkGuSKScRQtRzclfAMpOTcGdXCsqxeWlpGy3XjqaW8CpLORg==}
     peerDependencies:
       msw: ^2.4.9
-      vite: 7.3.5
+      vite: 7.3.7
     peerDependenciesMeta:
       msw:
         optional: true
@@ -2325,8 +2325,8 @@ packages:
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
-  vite@7.3.5:
-    resolution: {integrity: sha512-KuOaNhcnGFN2zIPGA7wRmzF+lJA1sea7rHq17aiJ++9lzY1WWG6Jpwqwe1KNbRVPIqHmr8GLYx7jbrQcN/7/ww==}
+  vite@7.3.7:
+    resolution: {integrity: sha512-AHEzTORMbi7/7aXp7w7KZ5+DCUdSeLsJz0grY8xHpc9DHdYb0vQu6DqJfm2tOw3gDExNgPgnJTXxM6syYFHaCA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -2381,7 +2381,7 @@ packages:
       '@vitest/ui': 5.0.3
       happy-dom: '*'
       jsdom: '*'
-      vite: 7.3.5
+      vite: 7.3.7
     peerDependenciesMeta:
       '@edge-runtime/vm':
         optional: true
@@ -3954,14 +3954,14 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  '@vitest/mocker@5.0.3(vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15))':
+  '@vitest/mocker@5.0.3(vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.3
       estree-walker: 3.0.3
       magic-string: 1.2.3
     optionalDependencies:
-      vite: 7.3.5(@types/node@26.6.4)(tsx@4.23.15)
+      vite: 7.3.7(@types/node@26.6.4)(tsx@4.23.15)
 
   '@vitest/spy@5.0.3': {}
 
@@ -4477,9 +4477,9 @@ snapshots:
 
   undici-types@8.9.0: {}
 
-  vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15):
+  vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15):
     dependencies:
-      esbuild: 0.27.7
+      esbuild: 0.28.2
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
       postcss: 8.5.28
@@ -4490,10 +4490,10 @@ snapshots:
       fsevents: 2.3.3
       tsx: 4.23.15
 
-  vitest@5.0.3(@types/node@26.6.4)(vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15)):
+  vitest@5.0.3(@types/node@26.6.4)(vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.3(vite@7.3.5(@types/node@26.6.4)(tsx@4.23.15))
+      '@vitest/mocker': 5.0.3(vite@7.3.7(@types/node@26.6.4)(tsx@4.23.15))
       chai: 6.2.2
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -4504,7 +4504,7 @@ snapshots:
       tinybench: 6.1.4
       tinyexec: 1.3.0
       tinyglobby: 0.2.17
-      vite: 7.3.5(@types/node@26.6.4)(tsx@4.23.15)
+      vite: 7.3.7(@types/node@26.6.4)(tsx@4.23.15)
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 26.6.4
