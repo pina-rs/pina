@@ -68,6 +68,7 @@
 	--line-strong: #d6d0b9;
 	--accent: #8a5d00;
 	--accent-soft: rgba(231, 165, 21, 0.14);
+	--focus: var(--accent);
 	--shadow: 0 1px 2px rgba(32, 37, 31, 0.05), 0 18px 40px -26px rgba(32, 37, 31, 0.28);
 
 	/* Benchmark bars: Pina is emphasised, every other framework recedes. */
@@ -205,9 +206,17 @@ li code {
 }
 
 :focus-visible {
-	outline: 2px solid var(--gold);
+	outline: 2px solid var(--focus);
 	outline-offset: 3px;
 	border-radius: 6px;
+}
+
+/* Surfaces that stay dark in the light theme keep the bright focus ring. */
+.nav:not(.is-page),
+.stage,
+.card-feature,
+.cmd {
+	--focus: var(--gold-bright);
 }
 
 .skip {
@@ -701,6 +710,15 @@ li code {
 .window-tabs {
 	display: flex;
 	gap: 2px;
+}
+
+/* Without JavaScript the window shows its first file, labelled. */
+.no-js .window-tabs button[aria-selected="false"] {
+	display: none;
+}
+
+.no-js .window-tabs button {
+	cursor: default;
 }
 
 .window-tabs button {
@@ -1328,6 +1346,10 @@ li code {
 	display: none;
 }
 
+.no-js .chart-panel[hidden] {
+	display: block;
+}
+
 .chart-title {
 	display: flex;
 	flex-wrap: wrap;
@@ -1378,7 +1400,7 @@ li code {
 }
 
 .bar-row:focus-visible {
-	box-shadow: 0 0 0 2px var(--gold);
+	box-shadow: 0 0 0 2px var(--focus);
 }
 
 .bar-label {

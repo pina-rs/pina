@@ -92,6 +92,13 @@ test("capabilities keep statuses, notes, and the compared versions", () => {
 	});
 });
 
+test("capability cells without a status mark are rejected", () => {
+	assert.throws(
+		() => parseCapabilities(readme.replace("❌ std + heap", "Planned")),
+		/"`no_std` runtime" has a cell without a status mark: "Planned"/,
+	);
+});
+
 test("the workspace version comes from [workspace.package]", () => {
 	const manifest = `[package]
 version = "0.0.0"

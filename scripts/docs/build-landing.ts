@@ -75,6 +75,13 @@ const ANCHOR_V1 = "Anchor v1";
  */
 const BREAK_RATIO = 3;
 
+/** The readme's capability marks; a cell without one fails the build. */
+const STATUS_MARKS: Record<string, CapabilityCell["status"]> = {
+	"✅": "yes",
+	"🟡": "partial",
+	"❌": "no",
+};
+
 // ---------------------------------------------------------------------------
 // Parsing
 // ---------------------------------------------------------------------------
@@ -200,12 +207,16 @@ export function parseCapabilities(readme: string): CapabilityMatrix {
 			name: inline(name),
 			cells: row.slice(1).map((cell) => {
 				const text = stripComments(cell);
-				const status = text.startsWith("✅")
-					? "yes"
-					: text.startsWith("🟡")
-					? "partial"
-					: "no";
-				return { status, note: inline(text.replace(/^(✅|🟡|❌)\s*/u, "")) };
+				const mark = /^(✅|🟡|❌)\s*/u.exec(text);
+				if (!mark) {
+					throw new Error(
+						`capability "${name}" has a cell without a status mark: "${text}"`,
+					);
+				}
+				return {
+					status: STATUS_MARKS[mark[1]],
+					note: inline(text.slice(mark[0].length)),
+				};
 			}),
 		});
 	}
