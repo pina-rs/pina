@@ -512,6 +512,8 @@ fn local_deployment_passes_verified_snapshots_and_modeled_arguments_to_solana() 
 			"http://127.0.0.1:8899",
 		]
 	);
+	// The fee payer doubles as the default signer, so no Solana CLI config is read.
+	assert_eq!([args[11], args[12]], ["--keypair", args[8]]);
 	for (actual, original, name) in [
 		(args[2], &fixture.program, "program.so"),
 		(args[4], &fixture.program_keypair, "program-keypair.json"),

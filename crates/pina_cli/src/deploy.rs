@@ -1055,6 +1055,11 @@ fn build_deployment_program_with(
 /// The `solana program deploy` command. `program_id` is the program keypair
 /// path, or the bare address when upgrading by declared ID: the Solana CLI
 /// accepts either, and an address alone can only upgrade.
+///
+/// The fee payer is also the CLI's `--keypair`: `solana program deploy`
+/// loads that default signer even when every role is explicit, and without
+/// it falls back to the operator's Solana CLI configuration, which a CI
+/// runner does not have and which Pina never inherits.
 fn deploy_command(
 	program: &str,
 	program_id: &str,
@@ -1076,6 +1081,8 @@ fn deploy_command(
 			payer.to_owned(),
 			"--url".to_owned(),
 			rpc_url.to_owned(),
+			"--keypair".to_owned(),
+			payer.to_owned(),
 		],
 		env: Vec::new(),
 	}
@@ -1939,6 +1946,8 @@ mod tests {
 					canonical(&fixture.payer),
 					"--url".to_owned(),
 					DEVNET_URL.to_owned(),
+					"--keypair".to_owned(),
+					canonical(&fixture.payer),
 				],
 				env: Vec::new(),
 			}
@@ -1978,6 +1987,8 @@ mod tests {
 				canonical(&fixture.payer),
 				"--url".to_owned(),
 				DEVNET_URL.to_owned(),
+				"--keypair".to_owned(),
+				canonical(&fixture.payer),
 			]
 		);
 

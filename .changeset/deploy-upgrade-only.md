@@ -8,4 +8,6 @@ pina_cli: breaking
 
 The plan's `program_keypair` is `null` for such an upgrade, the human plan shows `Program keypair: none (upgrade by declared program ID)`, and a `--remote-command` receives no `PINA_DEPLOY_PROGRAM_KEYPAIR`. Every other safeguard is unchanged: target policy, confirmation, snapshot fingerprints, and publication receipts.
 
+`solana program deploy` now also receives the fee payer as `--keypair`. The Solana CLI loads that default signer even when every role is explicit, so a deployment on a machine without Solana CLI configuration, such as a CI runner, failed with `No default signer found`; it no longer reads that configuration at all.
+
 **Breaking:** `DeploymentRequest::program_keypair` is replaced by `program_address: ProgramAddress` (`ConventionalKeypair`, `Keypair(path)`, or `DeclaredId`), and `DeploymentPlan::program_keypair()` now returns `Option<&str>`. The `--dry-run --json` plan's `program_keypair` key is nullable.

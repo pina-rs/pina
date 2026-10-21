@@ -75,7 +75,7 @@ pina deploy --build --upgrade-only --cluster devnet --yes \
   --payer ./keys/ci-payer.json
 ```
 
-`--upgrade-authority` and `--payer` are always explicit. Pina does not inherit wallet paths from Solana configuration and does not store deployment credentials in `pina.toml`.
+`--upgrade-authority` and `--payer` are always explicit. Pina does not inherit wallet paths from Solana configuration and does not store deployment credentials in `pina.toml`. The fee payer is also passed to `solana program deploy` as `--keypair`, the default signer the Solana CLI otherwise reads from its configuration, so a deployment behaves the same on a machine, such as a CI runner, that has no Solana configuration.
 
 ## Targets and confirmation
 
