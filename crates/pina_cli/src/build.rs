@@ -346,6 +346,7 @@ pub(crate) fn compile_sbf(
 		.current_dir(&project.root)
 		.env("CARGO_TARGET_DIR", &project.target_dir)
 		.args(&args);
+	keep_host_units_unstripped(&mut command);
 	apply_size_profile(&mut command, options, declared_release_profile(project));
 
 	if compilation.line_tables {
@@ -391,6 +392,20 @@ fn apply_line_tables(command: &mut Command) {
 	command
 		.env("CARGO_PROFILE_RELEASE_DEBUG", "line-tables-only")
 		.env("CARGO_PROFILE_RELEASE_STRIP", "none");
+}
+
+/// Leave the host units of an SBF build unstripped.
+///
+/// A release build strips the build scripts, proc macros, and their
+/// dependencies that it compiles for the host. On macOS, rustc strips them
+/// with the llvm-objcopy bundled in its toolchain, and before LLVM 23 that tool
+/// leaves `__LINKEDIT` entries misaligned. Darwin 27's dyld refuses to load
+/// such a proc macro, so the build fails with "can't find crate" (Agave's
+/// platform-tools v1.54 ship LLVM 20). Host units never reach the deployed
+/// program, so keeping their symbols costs only target-directory space, and
+/// stripping them buys nothing on any host.
+fn keep_host_units_unstripped(command: &mut Command) {
+	command.env("CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP", "false");
 }
 
 /// The unstripped linker output of the project's latest SBF release build.
@@ -963,6 +978,7 @@ fn build_project_upstream_with(
 			}
 			command.env("PATH", prefixed);
 		}
+		keep_host_units_unstripped(&mut command);
 		apply_upstream_profile(&mut command, options, declared_release_profile(project));
 
 		let output = command.output().map_err(|source| {

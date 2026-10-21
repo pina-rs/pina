@@ -123,11 +123,21 @@ in
   # `CARGO_TARGET_<TARGET>_LINKER` redirects the host target only, leaving the
   # `bpfel-unknown-none` cross builds and Kani untouched. `/usr/bin/cc` is
   # Apple's driver, so it resolves the global SDK the same way `HOST_*` does.
+  #
+  # A release build strips the build scripts and proc macros it compiles for
+  # the host, and on macOS rustc strips them with the llvm-objcopy bundled in
+  # its own toolchain. Before LLVM 23 that tool leaves `__LINKEDIT` entries
+  # misaligned, and Darwin 27's dyld refuses to load the result ("mis-aligned
+  # LINKEDIT string pool"), so every proc macro under the pinned platform-tools
+  # (LLVM 20) fails with "can't find crate". Host units never ship, so keeping
+  # them unstripped changes no SBF artifact. `pina build` sets the same
+  # override for projects built outside this shell.
   // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
     HOST_CC = "/usr/bin/clang";
     HOST_CXX = "/usr/bin/clang++";
     CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER = "/usr/bin/cc";
     CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER = "/usr/bin/cc";
+    CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP = "false";
   };
 
   # Rely on the global sdk for now as the nix apple sdk is not working for me.
