@@ -10,6 +10,7 @@ on:
       - "api-docs.t.md"
       - "readme.md"
       - "devenv.nix"
+      - "scripts/docs/build-landing.ts"
       - ".github/workflows/docs-pages.yml"
   release:
     types: [published]
@@ -50,6 +51,9 @@ jobs:
         run: verify:docs
         shell: devenv shell -c -- bash -e {0}
 
+      # Builds the book and renders the pina.rs landing page over its root
+      # index. The custom domain itself is set in the repository's Pages
+      # settings; Actions deployments ignore the CNAME file mdBook writes.
       - name: build mdBook docs
         run: docs:build
         shell: devenv shell -c -- bash -e {0}

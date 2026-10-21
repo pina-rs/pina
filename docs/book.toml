@@ -1,9 +1,9 @@
 [book]
-title = "Pina Book"
+title = "Pina"
 authors = ["pina-rs contributors"]
 language = "en"
 src = "src"
-description = "Comprehensive project documentation for the Pina Solana framework."
+description = "Pina is a no_std Solana program framework built on pinocchio: the smallest binaries of any Solana framework, hand-written compute costs, and managed ABI migrations."
 
 [build]
 build-dir = "book"
@@ -14,4 +14,15 @@ default-theme = "light"
 preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/pina-rs/pina"
 edit-url-template = "https://github.com/pina-rs/pina/edit/main/docs/{path}"
-site-url = "/pina/"
+# The book is served from the root of the pina.rs custom domain. GitHub Pages
+# takes the domain from the repository settings when it deploys from Actions;
+# the CNAME file mdBook writes from `cname` records the same domain in the
+# published output.
+site-url = "/"
+cname = "pina.rs"
+additional-css = ["theme/pina.css"]
+additional-js = ["theme/pina.js"]
+
+[output.html.fold]
+enable = true
+level = 0

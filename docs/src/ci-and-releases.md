@@ -134,11 +134,11 @@ The `coverage` workflow runs focused coverage with `cargo llvm-cov` and publishe
 
 ## Docs publishing
 
-The `docs-pages` workflow publishes the mdBook to GitHub Pages:
+The `docs-pages` workflow publishes the mdBook and the landing page to GitHub Pages:
 
 - Trigger: pushes to `main` that touch docs + GitHub Release `published`
-- Build command: `docs:build` (output in `docs/book`)
-- Deploy target: GitHub Pages (`https://pina-rs.github.io/pina/`)
+- Build command: `docs:build` (output in `docs/book`). It builds the book, then `scripts/docs/build-landing.ts` renders `docs/landing/` over the book's root `index.html`, filling the version, benchmark chart, and capability matrix from `Cargo.toml`, the generated tables in [Framework comparison](./framework-comparison.md), and the readme.
+- Deploy target: GitHub Pages at the custom domain `https://pina.rs/`, configured in the repository's Pages settings. Old `https://pina-rs.github.io/pina/` links, including the ABI schema `$id` URLs, redirect to the same path on `pina.rs`.
 
 ## CLI and npm releases
 

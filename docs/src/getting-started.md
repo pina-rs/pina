@@ -100,4 +100,4 @@ docs:build
 
 <!-- {/docsBuildCommand} -->
 
-The generated site is written to `docs/book/`.
+The generated site is written to `docs/book/`. Its root `index.html` is the pina.rs landing page, rendered from `docs/landing/`; the book itself starts at `introduction.html`.
