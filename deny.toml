@@ -142,8 +142,10 @@ ignore = [
 	# RUSTSEC-2026-0381, RUSTSEC-2026-0382: webpki-roots and rustls-webpki can
 	# trust certificate paths through the distrusted emSign intermediates. Both
 	# fire on webpki-roots 0.25.4 and rustls-webpki 0.101.7, reached through the
-	# same txtx-addon-kit → reqwest 0.11 → rustls 0.21 chain. Host/test stack
-	# only (via surfpool, not in any shipped crate graph); they are patched only
+	# same txtx-addon-kit → reqwest 0.11 → rustls 0.21 chain. Reached only
+	# through pina_test's surfpool-sdk dependency (the published test harness;
+	# pina, pina_abi, pina_macros, pina_cli and pina_profile do not link it,
+	# and no on-chain program does); they are patched only
 	# on the 1.0 and 0.103 lines, which the workspace carries at 1.0.10 and
 	# 0.103.16. Removable once the Surfpool train drops reqwest 0.11 — tracked
 	# in #621.
