@@ -109,7 +109,7 @@ The analyzer resolves the validation method to Pina rather than trusting its spe
 
 Call unverified CPI methods directly with method or UFCS syntax. Taking one as a function value is denied at the function item, including casts, assignments, containers, closures, and conditional expressions. This deliberate boundary keeps the exact target argument visible to the lint instead of approximating Rust's full value and closure data flow. If a reviewed abstraction must store one of these functions, use a narrowly scoped lint allowance and document how it authenticates the supplied program.
 
-To migrate existing code, remove assertions that exist only before `.invoke()`, `.invoke_signed()`, `.invoke_with_program()`, or `.invoke_signed_with_program()`. Keep exact-target validation before the explicitly unverified methods. Propagate assertion failure, and move conditional checks so every continuing path validates the target. Existing code that used a verified method only to satisfy this lint needs no API change.
+To satisfy the lint, drop assertions that exist only before `.invoke()`, `.invoke_signed()`, `.invoke_with_program()`, or `.invoke_signed_with_program()`. Keep exact-target validation before the explicitly unverified methods. Propagate assertion failure, and move conditional checks so every continuing path validates the target.
 
 ### `require_writable_before_account_resize`
 
@@ -184,7 +184,7 @@ Keep `assert_sysvar()` when code only validates identity or deliberately borrows
 
 The lint identifies Pinocchio constructors that do not validate identity by their resolved definition: `Clock` and `Rent` byte constructors, `Instructions::new_unchecked`, and `SlotHashes::new` / `new_unchecked`. It reports direct calls at their source and rejects storing these constructors as function values. This source boundary catches replacement through adapters, helper calls, mutable borrows, aliases, and destructuring without attempting to reconstruct arbitrary downstream value provenance.
 
-To migrate existing code, replace manual byte parsing with the matching checked typed loader. Checked results and checked constructor function values can use ordinary Rust extraction, adapters, tuples, patterns, and control flow without special lint knowledge. Call an identity-unchecked constructor directly so its source remains visible to the lint. For deliberate raw parsing, call `assert_sysvar()` before borrowing the data, then place a narrow lint allowance directly on the reviewed constructor. No change is needed for identity-only checks or asserted raw account access. The separate raw-read heuristic still uses standard Solana sysvar account names, so unusually named raw accounts may require a direct, local assertion.
+To satisfy the lint, replace manual byte parsing with the matching checked typed loader. Checked results and checked constructor function values can use ordinary Rust extraction, adapters, tuples, patterns, and control flow without special lint knowledge. Call an identity-unchecked constructor directly so its source remains visible to the lint. For deliberate raw parsing, call `assert_sysvar()` before borrowing the data, then place a narrow lint allowance directly on the reviewed constructor. Identity-only checks and asserted raw account access need nothing else. The separate raw-read heuristic still uses standard Solana sysvar account names, so unusually named raw accounts may require a direct, local assertion.
 
 ```rust,ignore
 rent_account.assert_sysvar(&sysvar::rent::ID)?;

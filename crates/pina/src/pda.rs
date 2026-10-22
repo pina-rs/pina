@@ -34,24 +34,6 @@ pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Address) -> Option
 	Address::try_find_program_address(seeds, program_id)
 }
 
-/// Find a valid program derived address and its corresponding bump seed.
-///
-/// # Panics
-///
-/// Panics if no valid PDA exists.
-///
-/// Prefer [`try_find_program_address`] for recoverable error handling.
-#[deprecated(
-	since = "0.3.0",
-	note = "use `try_find_program_address` instead, which returns `Option` and avoids panicking \
-	        on-chain"
-)]
-#[inline]
-pub fn find_program_address(seeds: &[&[u8]], program_id: &Address) -> (Address, u8) {
-	try_find_program_address(seeds, program_id)
-		.unwrap_or_else(|| panic!("could not find program address from seeds"))
-}
-
 /// Create a valid program derived address without searching for a bump seed.
 ///
 /// Use this when your instruction already carries a bump and you want to

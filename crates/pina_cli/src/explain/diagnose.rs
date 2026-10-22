@@ -1202,7 +1202,6 @@ fn assertion_errors(method: &str) -> Option<(Vec<ErrorKey>, Option<&'static str>
 		| "load_pda_mut"
 		| "load_checked_pda"
 		| "load_checked_pda_mut"
-		| "with_pda"
 		| "with_stored_bump_pda"
 		| "with_checked_pda" => {
 			let mut keys = account_type();
@@ -1227,7 +1226,6 @@ fn unknown_call_reason(method: &str) -> &'static str {
 		| "load_pda_mut"
 		| "load_checked_pda"
 		| "load_checked_pda_mut"
-		| "with_pda"
 		| "with_stored_bump_pda"
 		| "with_checked_pda" => "the account type check reads the account's data at runtime",
 		_ => "the call's arguments are evaluated at runtime",
