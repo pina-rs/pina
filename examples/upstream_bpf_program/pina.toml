@@ -12,11 +12,11 @@ languages = ["cpi", "rust", "typescript", "dart", "cli-rust", "cli-ts", "cli-dar
 [clients.typescript]
 output = "js"
 
-[clients.cli-rust]
+[clients.cli_rust]
 output = "cli/rust"
 
-[clients.cli-ts]
+[clients.cli_ts]
 output = "cli/ts"
 
-[clients.cli-dart]
+[clients.cli_dart]
 output = "cli/dart"

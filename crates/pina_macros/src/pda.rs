@@ -396,10 +396,10 @@ pub(crate) fn expand(
 			}
 		})
 	});
-	// `with_pda` derives one address from the stored bump. `with_checked_pda`
-	// keeps the canonical search, and is the only compact loader that rejects a
-	// shadow account created at a noncanonical bump.
-	let with_pda = args.bump.as_ref().and_then(|bump_field| {
+	// `with_stored_bump_pda` derives one address from the stored bump.
+	// `with_checked_pda` keeps the canonical search, and is the only compact
+	// loader that rejects a shadow account created at a noncanonical bump.
+	let compact_pda_loaders = args.bump.as_ref().and_then(|bump_field| {
 		(has_account_representation && is_compact).then(|| {
 			let with_doc = format!(
 				"Load and validate `{struct_name}`, its stored-bump PDA address, and its compact \
@@ -423,9 +423,10 @@ pub(crate) fn expand(
 				 canonical bump and rejects both an account at any other address and a stored \
 				 `{bump_field}` that is not that canonical bump. This is the only compact loader \
 				 that rejects a shadow account created at a noncanonical bump. The search costs \
-				 more compute than the single derivation `with_pda` performs.\n\nUse this method \
-				 when an untrusted caller chooses which account the handler loads, or when the \
-				 program must be certain that exactly one address exists for the seeds."
+				 more compute than the single derivation `with_stored_bump_pda` \
+				 performs.\n\nUse this method when an untrusted caller chooses which account the \
+				 handler loads, or when the program must be certain that exactly one address \
+				 exists for the seeds."
 			);
 			let with_doc_attributes = doc_attributes(&with_doc);
 			let checked_doc_attributes = doc_attributes(&checked_doc);
@@ -458,27 +459,6 @@ pub(crate) fn expand(
 							use_account(state)
 						},
 					)
-				}
-
-				/// Deprecated alias for the stored-bump loader.
-				///
-				/// This name predates the split that gave the two compact PDA loaders
-				/// distinct names. It verifies only the address the stored bump derives,
-				/// exactly like `with_stored_bump_pda`. Use `with_checked_pda` instead when
-				/// an untrusted caller chooses which account the handler loads.
-				#[deprecated(
-					note = "renamed to `with_stored_bump_pda`: it verifies only the stored bump; use `with_checked_pda` when an untrusted caller chooses which account the handler loads"
-				)]
-				#[inline(always)]
-				pub fn with_pda<R>(
-					account: &#crate_path::AccountView,
-					#(#find_seed_params,)*
-					program_id: &#crate_path::Address,
-					use_account: impl FnOnce(
-						<Self as #crate_path::PinaCompactAccount>::Ref<'_>,
-					) -> ::core::result::Result<R, #crate_path::ProgramError>,
-				) -> ::core::result::Result<R, #crate_path::ProgramError> {
-					Self::with_stored_bump_pda(account, #(#seed_param_names,)* program_id, use_account)
 				}
 
 				#(#checked_doc_attributes)*
@@ -560,7 +540,7 @@ pub(crate) fn expand(
 			#assert_seeds
 			#assert_stored_bump
 			#load_pda
-			#with_pda
+			#compact_pda_loaders
 		}
 
 		impl<'a> #seeds_name<'a> {

@@ -1,6 +1,6 @@
 # Project Configuration
 
-`pina.toml` is the project marker used by `pina build` and `pina generate`. Pina searches from the command's `--project` directory, or the current directory, through its ancestors and uses the nearest configuration file. The legacy uppercase `Pina.toml` spelling is still discovered but deprecated and prints a warning, so new projects should use `pina.toml`.
+`pina.toml` is the project marker used by `pina build` and `pina generate`. Pina searches from the command's `--project` directory, or the current directory, through its ancestors and uses the nearest configuration file.
 
 The complete schema is intentionally small. Every section is optional; an empty file uses every default, and unknown sections and fields are rejected so misspellings cannot silently change a build.
 
@@ -89,7 +89,7 @@ Command-line path overrides follow normal shell behavior instead: `pina generate
 | `clients.<target>.mode`     | no       | `clients.mode`     | Destination policy for one target.                                                                                  |
 | `clients.<target>.scaffold` | no       | `clients.scaffold` | Scaffold policy for one target.                                                                                     |
 
-Selecting a CLI target implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`), and projects normally pick one CLI; selecting several prints a warning. CLI apps render into `clients/cli-rust`, `clients/cli-ts`, and `clients/cli-dart` respectively — the Dart CLIs share one package at `cli-dart` with a `bin/<library-name>.dart` executable per program. Override a CLI target under the matching table (`[clients.cli_rust]`, `[clients.cli_ts]`, `[clients.cli_dart]`), using the kebab spelling as a deprecated alias (`[clients.cli-rust]`).
+Selecting a CLI target implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`), and projects normally pick one CLI; selecting several prints a warning. CLI apps render into `clients/cli-rust`, `clients/cli-ts`, and `clients/cli-dart` respectively — the Dart CLIs share one package at `cli-dart` with a `bin/<library-name>.dart` executable per program. Override a CLI target under the matching table (`[clients.cli_rust]`, `[clients.cli_ts]`, `[clients.cli_dart]`).
 
 Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client typescript`, `--client dart`, `--client cli-rust`, `--client cli-ts`, or `--client cli-dart` flags.
 
@@ -112,14 +112,10 @@ These answers are replayed by `pina migrations create` so fresh clones and CI re
 | Field                               | Required | Default | Meaning                                                                                                                                                                                                                |
 | ----------------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `migrations.answers.rename`         | no       | `[]`    | Persisted rename answers in `from:to` form (for example `"value:points"`). `pina migrations create` consults them before prompting; command-line flags override them per field, and a contradicting flag fails closed. |
-| `migrations.answers.assume_removed` | no       | `[]`    | Persisted data-dropping acknowledgements, replayed the same way. `assume-removed` is accepted as a deprecated alias.                                                                                                   |
+| `migrations.answers.assume_removed` | no       | `[]`    | Persisted data-dropping acknowledgements, replayed the same way.                                                                                                                                                       |
 | `migrations.answers.manual`         | no       | `[]`    | Persisted `--manual` answers: added fields whose conversion is written by hand rather than generated.                                                                                                                  |
 
-The migration policy is not configured here. The version envelope width and the `auto` policy live only in `migrations/manifest.json`, the one source macros read, and `pina migrations create --version-type` and `--auto` record them there; see [Manage ABI migrations](./migrations.md#opt-whole-kinds-in). The retired `[migrations].version_type` (or `version-type`) and `[migrations].auto` keys fail every command that reads `pina.toml`, with an error naming the flag and value that replace them, for example:
-
-```text
-`[migrations].auto` no longer belongs in pina.toml: migrations/manifest.json records it, and macros read only the manifest. Remove the key and run `pina migrations create --auto true` to record it.
-```
+The migration policy is not configured here. The version envelope width and the `auto` policy live only in `migrations/manifest.json`, the one source macros read, and `pina migrations create --version-type` and `--auto` record them there; see [Manage ABI migrations](./migrations.md#opt-whole-kinds-in).
 
 Hand-editing the manifest, `migrations/publications.json`, or generated transition files is never allowed. Individual contracts can still opt out of a recorded policy with an explicit `migrations = false` attribute.
 

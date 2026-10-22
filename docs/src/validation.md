@@ -41,8 +41,6 @@ Use `#[pina(validate(...))]` on fields of `#[account]`, `#[instruction]`, and `#
 
 String lengths are UTF-8 byte lengths. Vector and array lengths are element counts. Chain bounds on the same receiver with `&&` (`value >= 1 && value <= 10`, `len == 4`) and separate rules with `,`. A range can also be written as one rule — `100 < value <= u64::MAX` — which generates the same two checks joined by `&&`. A rule that must fail in different ways takes `error = ERROR` in the same group.
 
-The `min`, `max`, `min_len`, `max_len`, and `exact_len` parameter spellings predate comparisons. They still parse and generate the identical checks, but they are deprecated and warn at the parameter.
-
 Use `validate(with = function)` in the outer macro for cross-field or domain validation. The hook is a named parameter, not a comparison: it keeps `=`. Fixed schemas pass their generated `*Zc` view; compact accounts pass their generated `*Ref<'_>` view. The function must return `ProgramResult`.
 
 ```rust
@@ -70,8 +68,6 @@ fn validate_transfer(value: &TransferInstructionZc) -> ProgramResult {
 For accounts, the default error is `ProgramError::InvalidAccountData`. Instructions and events default to `ProgramError::InvalidInstructionData`. Put `error = ...` in a validation group when callers need a domain-specific error.
 
 <!-- {/pinaValueValidationRules} -->
-
-Read [Migrate value rules to comparisons](./migrations/validation-comparisons.md) for the rewrite table from the deprecated parameter spellings.
 
 ## Instruction Account Rules
 

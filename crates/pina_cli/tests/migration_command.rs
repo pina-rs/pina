@@ -790,25 +790,13 @@ fn dropping_a_recorded_kind_from_the_policy_fails_as_an_envelope_removal() {
 }
 
 #[test]
-fn retired_pina_toml_policy_keys_name_the_create_flag() {
+fn version_type_flag_records_and_changes_the_width() {
 	let fixture = MigrationFixture::new(true);
-	fs::write(
-		fixture.root.join("pina.toml"),
-		"[project]\nprogram = \".\"\n\n[migrations]\nversion-type = \"u16\"\n",
-	)
-	.unwrap_or_else(|error| panic!("write retired config: {error}"));
-	let (_, stderr) = run_failure(&mut fixture.command("create"));
-	assert!(
-		stderr.contains("pina migrations create --version-type u16"),
-		"stderr: {stderr}"
-	);
-
-	// The flag records the same width in the manifest instead.
 	fs::write(
 		fixture.root.join("pina.toml"),
 		"[project]\nprogram = \".\"\n",
 	)
-	.unwrap_or_else(|error| panic!("restore config: {error}"));
+	.unwrap_or_else(|error| panic!("write config: {error}"));
 	run(fixture.command("create").args(["--version-type", "u16"]));
 	assert_eq!(fixture.manifest()["versionType"], "u16");
 	let widened = run(fixture.command("create").args(["--version-type", "u32"]));
