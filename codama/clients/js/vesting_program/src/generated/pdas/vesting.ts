@@ -11,13 +11,14 @@ import {
 	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type VestingSeeds = {
-	admin: Address;
-	beneficiary: Address;
-	mint: Address;
+	admin: Address | HasAddress;
+	beneficiary: Address | HasAddress;
+	mint: Address | HasAddress;
 };
 
 export async function findVestingPda(

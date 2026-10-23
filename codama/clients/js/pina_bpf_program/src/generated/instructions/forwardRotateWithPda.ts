@@ -19,6 +19,7 @@ import {
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -76,7 +77,7 @@ export type ForwardRotateWithPdaInstructionData = {
 
 export type ForwardRotateWithPdaInstructionDataArgs = {
 	bump: number;
-	newAuthority: Address;
+	newAuthority: Address | HasAddress;
 };
 
 export function getForwardRotateWithPdaInstructionDataEncoder(): FixedSizeEncoder<

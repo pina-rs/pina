@@ -29,6 +29,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -67,8 +68,8 @@ export type ProgramConfig = {
 
 export type ProgramConfigArgs = {
 	bump: number;
-	authority: Address;
-	treasury: Address;
+	authority: Address | HasAddress;
+	treasury: Address | HasAddress;
 	creationFee: number | bigint;
 };
 

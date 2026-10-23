@@ -20,6 +20,7 @@ import {
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -72,7 +73,9 @@ export type RotateAuthorityInstructionData = {
 	newAuthority: Address;
 };
 
-export type RotateAuthorityInstructionDataArgs = { newAuthority: Address };
+export type RotateAuthorityInstructionDataArgs = {
+	newAuthority: Address | HasAddress;
+};
 
 export function getRotateAuthorityInstructionDataEncoder(): FixedSizeEncoder<
 	RotateAuthorityInstructionDataArgs

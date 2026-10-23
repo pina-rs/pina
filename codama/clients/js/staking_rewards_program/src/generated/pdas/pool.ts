@@ -11,12 +11,13 @@ import {
 	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type PoolSeeds = {
-	stakeMint: Address;
-	rewardMint: Address;
+	stakeMint: Address | HasAddress;
+	rewardMint: Address | HasAddress;
 };
 
 export async function findPoolPda(

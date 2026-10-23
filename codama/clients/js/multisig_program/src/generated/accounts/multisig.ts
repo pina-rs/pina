@@ -35,6 +35,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	offsetDecoder,
@@ -122,18 +123,18 @@ export type Multisig = {
 export type MultisigArgs = {
 	bump: number;
 	/** Key that seeds the multisig PDA and namespaces proposals. */
-	createKey: Address;
+	createKey: Address | HasAddress;
 	/**
 	 * An autonomous multisig (default key) changes config through proposals;
 	 * a controlled multisig defers to this key via
 	 * [`MultisigInstruction::ConfigAuthorityExecute`].
 	 */
-	configAuthority: Address;
+	configAuthority: Address | HasAddress;
 	/**
 	 * Where terminal proposal rent is reclaimed; the default address
 	 * disables collection.
 	 */
-	rentCollector: Address;
+	rentCollector: Address | HasAddress;
 	/** Signatures required to approve a proposal. */
 	threshold: number;
 	/** Seconds between approval and permissible execution. */

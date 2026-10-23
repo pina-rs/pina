@@ -33,6 +33,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -90,7 +91,7 @@ export type DisclosureRequest = {
 export type DisclosureRequestArgs = {
 	bump: number;
 	/** Filing entity. */
-	requester: Address;
+	requester: Address | HasAddress;
 	/** Client-chosen disambiguator for repeat filings. */
 	nonce: number | bigint;
 	/** Tier this request was filed at; see the `TIER_*` constants. */

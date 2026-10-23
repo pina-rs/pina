@@ -11,12 +11,13 @@ import {
 	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type PositionSeeds = {
-	pool: Address;
-	owner: Address;
+	pool: Address | HasAddress;
+	owner: Address | HasAddress;
 };
 
 export async function findPositionPda(

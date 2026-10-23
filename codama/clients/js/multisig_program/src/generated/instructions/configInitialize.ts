@@ -22,6 +22,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -86,7 +87,7 @@ export type ConfigInitializeInstructionData = {
 
 export type ConfigInitializeInstructionDataArgs = {
 	bump: number;
-	treasury: Address;
+	treasury: Address | HasAddress;
 	creationFee: number | bigint;
 };
 

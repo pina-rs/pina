@@ -29,6 +29,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -61,7 +62,7 @@ export type RegistryConfig = {
 };
 
 export type RegistryConfigArgs = {
-	admin: Address;
+	admin: Address | HasAddress;
 	roleCount: number | bigint;
 	bump: number;
 };

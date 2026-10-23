@@ -33,6 +33,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -75,7 +76,7 @@ export type SampleArgs = {
 	/** Canonical PDA bump, persisted for inexpensive validation on resize. */
 	bump: number;
 	/** The only signer permitted to resize this sample. */
-	authority: Address;
+	authority: Address | HasAddress;
 	/** Dynamically encoded values; unused capacity occupies no account bytes. */
 	values: Array<number | bigint>;
 };

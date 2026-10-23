@@ -31,6 +31,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -64,7 +65,7 @@ export type FloatDataAccount = {
 export type FloatDataAccountArgs = {
 	dataF64: number | bigint;
 	dataF32: number;
-	authority: Address;
+	authority: Address | HasAddress;
 };
 
 /** Gets the encoder for {@link FloatDataAccountArgs} account data. */
