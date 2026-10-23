@@ -712,7 +712,6 @@ fn build_on_supported_host(
 		&snapshot_index,
 		runner,
 	)?;
-	audit_snapshot(&snapshot_root)?;
 
 	let snapshot_workspace = snapshot_root.join(workspace_relative);
 	let args = build_arguments(
@@ -944,6 +943,7 @@ fn unavailable_source() -> SourceInspection {
 /// Exports the recorded revision through a private index so concurrent worktree
 /// or index changes cannot substitute different build inputs.
 /// Attribute lookup also uses the snapshot instead of the mutable worktree.
+/// Rejects checkout conversions that change any recorded blob's bytes.
 fn stage_tracked_source(
 	root: &Path,
 	revision: &str,
@@ -983,6 +983,63 @@ fn stage_tracked_source(
 				status: output.status,
 			});
 		}
+	}
+
+	for path in audit_snapshot(destination)? {
+		verify_snapshot_file(root, revision, destination, &path, &environment, runner)?;
+	}
+
+	Ok(())
+}
+
+/// Checks raw bytes against the immutable object, without applying Git filters.
+fn verify_snapshot_file(
+	root: &Path,
+	revision: &str,
+	destination: &Path,
+	path: &Path,
+	environment: &[(&str, &OsStr)],
+	runner: &impl CommandRunner,
+) -> Result<(), VerifyBuildError> {
+	let relative = path.strip_prefix(destination).map_err(|_| {
+		VerifyBuildError::StageTrackedSource {
+			status: "snapshot file is outside the private worktree".to_owned(),
+		}
+	})?;
+	let mut object = OsString::from(revision);
+	object.push(":");
+
+	// Git tree paths use forward slashes on every host. Keep filename bytes intact.
+	for (index, component) in relative.components().enumerate() {
+		if index != 0 {
+			object.push("/");
+		}
+
+		object.push(component.as_os_str());
+	}
+	let args = [OsString::from("cat-file"), OsString::from("blob"), object];
+	let output = runner
+		.capture(OsStr::new("git"), &args, root, environment)
+		.map_err(|source| {
+			VerifyBuildError::Run {
+				command: "git cat-file",
+				source,
+			}
+		})?;
+	let contents = std::fs::read(path).map_err(|source| {
+		VerifyBuildError::CopySource {
+			path: path.to_path_buf(),
+			source,
+		}
+	})?;
+
+	if !output.success || contents != output.stdout {
+		return Err(VerifyBuildError::StageTrackedSource {
+			status: format!(
+				"exported file differs from its recorded blob: {}",
+				path.display()
+			),
+		});
 	}
 
 	Ok(())
@@ -1102,7 +1159,9 @@ fn is_public_dns_name(host: &str) -> bool {
 	)
 }
 
-fn audit_snapshot(root: &Path) -> Result<(), VerifyBuildError> {
+fn audit_snapshot(root: &Path) -> Result<Vec<PathBuf>, VerifyBuildError> {
+	let mut files = Vec::new();
+
 	for entry in walkdir::WalkDir::new(root).follow_links(false) {
 		let entry = entry.map_err(|source_error| {
 			VerifyBuildError::CopySource {
@@ -1125,9 +1184,13 @@ fn audit_snapshot(root: &Path) -> Result<(), VerifyBuildError> {
 				path: entry.path().to_path_buf(),
 			});
 		}
+
+		if kind.is_file() {
+			files.push(entry.into_path());
+		}
 	}
 
-	Ok(())
+	Ok(files)
 }
 
 fn ensure_regular_file(path: &Path) -> Result<(), VerifyBuildError> {
@@ -2361,18 +2424,62 @@ mod tests {
 
 		assert!(!snapshot.join("injected").exists());
 		assert_eq!(git(&["write-tree"])?, changed_tree);
+		git(&["replace", "--delete", &tree])?;
+		git(&[
+			"config",
+			"filter.provenance.smudge",
+			"git hash-object --stdin",
+		])?;
+
+		for attributes in [
+			"*.rs text eol=crlf\n",
+			"*.rs ident\n",
+			"*.rs working-tree-encoding=UTF-16LE\n",
+			"*.rs filter=provenance\n",
+		] {
+			fs::write(root.join(".gitattributes"), attributes)?;
+			// Store the source before attributes can normalize its bytes on add.
+			fs::write(root.join("src/lib.rs"), b"approved $Id$ source\n")?;
+			let blob = git(&["hash-object", "-w", "--no-filters", "src/lib.rs"])?;
+			git(&["add", ".gitattributes"])?;
+			git(&[
+				"update-index",
+				"--cacheinfo",
+				&format!("100644,{blob},src/lib.rs"),
+			])?;
+			let tree = git(&["write-tree"])?;
+			let destination = TempDir::new()?;
+			let snapshot = destination.path().join("source");
+			fs::create_dir(&snapshot)?;
+			let result = stage_tracked_source(
+				root,
+				&tree,
+				&snapshot,
+				&destination.path().join("index"),
+				&ProcessRunner,
+			);
+			assert!(
+				matches!(result, Err(VerifyBuildError::StageTrackedSource { .. })),
+				"content-changing attributes accepted: {attributes}: {result:?}"
+			);
+		}
+
 		Ok(())
 	}
 
 	#[test]
-	fn tracked_source_staging_uses_the_recorded_revision_and_private_index() {
+	fn tracked_source_staging_uses_the_recorded_revision_and_private_index()
+	-> Result<(), Box<dyn std::error::Error>> {
+		let temp = TempDir::new()?;
+		let destination = temp.path().join("stage with spaces");
+		fs::create_dir(&destination)?;
 		let revision = "2".repeat(40);
 		let runner = FakeRunner::with_outputs(vec![output(true, b""), output(true, b"")]);
 		let stage = |runner: &FakeRunner| {
 			stage_tracked_source(
 				Path::new("repo"),
 				&revision,
-				Path::new("stage with spaces"),
+				&destination,
 				Path::new("private index"),
 				runner,
 			)
@@ -2389,7 +2496,7 @@ mod tests {
 		assert!(
 			calls[1].args[3]
 				.to_string_lossy()
-				.starts_with("--prefix=stage with spaces")
+				.starts_with(&format!("--prefix={}", destination.display()))
 		);
 
 		for call in &calls {
@@ -2399,7 +2506,7 @@ mod tests {
 					("GIT_INDEX_FILE".to_owned(), OsString::from("private index")),
 					(
 						"GIT_WORK_TREE".to_owned(),
-						OsString::from("stage with spaces")
+						destination.as_os_str().to_owned()
 					),
 					("GIT_NO_REPLACE_OBJECTS".to_owned(), OsString::from("1")),
 				]
@@ -2432,6 +2539,49 @@ mod tests {
 
 			assert_eq!(runner.calls.borrow().len(), expected_calls);
 		}
+
+		fs::write(destination.join("binary input"), b"\0\xff\r\n")?;
+
+		for response in [
+			output(true, b"\0\xff\r\n"),
+			output(true, b"converted contents"),
+			output(false, b"\0\xff\r\n"),
+			Err(std::io::Error::other("cat-file failed")),
+		] {
+			let matches = response
+				.as_ref()
+				.is_ok_and(|output| output.success && output.stdout == b"\0\xff\r\n");
+			let runner =
+				FakeRunner::with_outputs(vec![output(true, b""), output(true, b""), response]);
+			assert_eq!(stage(&runner).is_ok(), matches);
+			assert_eq!(
+				runner.calls.borrow()[2].args,
+				["cat-file", "blob", &format!("{revision}:binary input")].map(OsString::from)
+			);
+		}
+
+		for (path, expected_calls) in [
+			(temp.path().join("outside"), 0),
+			(destination.join("missing"), 1),
+		] {
+			let runner = FakeRunner::with_outputs(vec![output(true, b"")]);
+			let result = verify_snapshot_file(
+				Path::new("repo"),
+				&revision,
+				&destination,
+				&path,
+				&[],
+				&runner,
+			);
+			assert!(matches!(
+				result,
+				Err(VerifyBuildError::StageTrackedSource { .. })
+					| Err(VerifyBuildError::CopySource { .. })
+			));
+			assert_eq!(runner.calls.borrow().len(), expected_calls);
+		}
+
+		Ok(())
 	}
 
 	#[test]
