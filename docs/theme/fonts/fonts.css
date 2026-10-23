@@ -1,0 +1,46 @@
+/*
+ * Self-hosted variable fonts, latin subset, from Fontsource. All three are
+ * licensed under the SIL Open Font License 1.1; the license texts sit beside
+ * the font files. The landing page reuses these same files, copied by
+ * `scripts/docs/build-landing.ts`.
+ */
+
+@font-face {
+	font-family: "Inter";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url('{{ resource "fonts/inter-latin-wght-normal.woff2" }}') format("woff2");
+}
+
+@font-face {
+	font-family: "Inter";
+	font-style: italic;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url('{{ resource "fonts/inter-latin-wght-italic.woff2" }}') format("woff2");
+}
+
+@font-face {
+	font-family: "Fraunces";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url('{{ resource "fonts/fraunces-latin-opsz-normal.woff2" }}') format("woff2");
+}
+
+@font-face {
+	font-family: "Fraunces";
+	font-style: italic;
+	font-display: swap;
+	font-weight: 100 900;
+	src: url('{{ resource "fonts/fraunces-latin-opsz-italic.woff2" }}') format("woff2");
+}
+
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 800;
+	src: url('{{ resource "fonts/jetbrains-mono-latin-wght-normal.woff2" }}') format("woff2");
+}

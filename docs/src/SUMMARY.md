@@ -1,8 +1,29 @@
 # Summary
 
-- [Introduction](./index.md)
+[Introduction](./introduction.md)
+
+# Start here
+
 - [Project Goals](./project-goals.md)
 - [Getting Started](./getting-started.md)
+- [Tutorials]()
+  - [Your First Program](./tutorials/first-program.md)
+  - [Compact Accounts](./tutorials/compact-accounts.md)
+  - [Token CPI Recipes](./tutorials/token-cpi-recipes.md)
+  - [Token Escrow Tutorial](./tutorials/token-escrow.md)
+  - [Migrating from Anchor](./tutorials/migrating-from-anchor.md)
+- [Examples](./examples.md)
+
+# Framework
+
+- [Core Concepts](./core-concepts.md)
+- [Declarative Validation](./validation.md)
+- [Float and Fixed-Point Fields](./floats.md)
+- [Crates and Features](./crates-and-features.md)
+- [Codama Workflow](./codama-workflow.md)
+
+# Tooling
+
 - [Pina CLI](./cli/index.md)
   - [Initialize a Program](./cli/init.md)
   - [Run Security Lints](./cli/lint.md)
@@ -28,11 +49,28 @@
   - [Deploy a Program](./cli/deploy.md)
   - [Automation and Agent Usage](./cli/automation.md)
 - [Agent Skill](./agent-skill.md)
-- [Core Concepts](./core-concepts.md)
-- [Float and Fixed-Point Fields](./floats.md)
-- [Declarative Validation](./validation.md)
+
+# ABI migrations
+
 - [How ABI Migrations Flow](./migrations/flow.md)
 - [ABI document versioning](./migrations/abi-versioning.md)
+
+# Performance
+
+- [Framework comparison](./framework-comparison.md)
+- [Compute-unit performance](./compute-unit-performance.md)
+- [Program size](./program-size.md)
+
+# Security
+
+- [Security Model](./security-model.md)
+- [PinaPod Safety Boundary](./pinapod-safety-boundary.md)
+- [Security Lints](./security-lints.md)
+- [Lint Reference](./lint-reference.md)
+- [Production Readiness](./production-readiness.md)
+
+# Project
+
 - [Architecture Decisions](./adrs/index.md)
   - [ADR 0001: Keep discriminator-first typed layouts](./adrs/0001-discriminator-first-layout.md)
   - [ADR 0002: Keep zero-copy behind explicit validation](./adrs/0002-zero-copy-account-model.md)
@@ -46,22 +84,5 @@
   - [ADR 0010: Lean entrypoint strategy for deployed-size parity](./adrs/0010-lean-entrypoint-strategy.md)
   - [ADR 0011: Dispatch-first entrypoint on the instruction-data pointer](./adrs/0011-dispatch-first-entrypoint.md)
   - [ADR 0012: Judge instruction process compatibility on wire facts only](./adrs/0012-process-wire-facts.md)
-- [Crates and Features](./crates-and-features.md)
-- [Codama Workflow](./codama-workflow.md)
-- [Examples](./examples.md)
-- [Compute-unit performance](./compute-unit-performance.md)
-- [Program size](./program-size.md)
-- [Framework comparison](./framework-comparison.md)
-- [Tutorials]()
-  - [Your First Program](./tutorials/first-program.md)
-  - [Compact Accounts](./tutorials/compact-accounts.md)
-  - [Token CPI Recipes](./tutorials/token-cpi-recipes.md)
-  - [Token Escrow Tutorial](./tutorials/token-escrow.md)
-  - [Migrating from Anchor](./tutorials/migrating-from-anchor.md)
-- [Security Model](./security-model.md)
-- [PinaPod Safety Boundary](./pinapod-safety-boundary.md)
-- [Security Lints](./security-lints.md)
-- [Lint Reference](./lint-reference.md)
-- [Production Readiness](./production-readiness.md)
 - [Development Workflow](./development-workflow.md)
 - [CI and Releases](./ci-and-releases.md)

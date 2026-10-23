@@ -41,4 +41,4 @@ The Rust-native alternative is:
 cargo install pina_cli
 ```
 
-See the [CLI reference](https://pina-rs.github.io/pina/cli/index.html) for commands, output contracts, and automation guidance.
+See the [CLI reference](https://pina.rs/cli/index.html) for commands, output contracts, and automation guidance.

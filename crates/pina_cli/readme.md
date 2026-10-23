@@ -14,7 +14,7 @@ CLI and library for generating Codama IDLs from Pina programs.
 
 The binary name is `pina`.
 
-The complete command reference is published in the [Pina CLI book](https://pina-rs.github.io/pina/cli/index.html).
+The complete command reference is published in the [Pina CLI book](https://pina.rs/cli/index.html).
 
 <!-- {=crateReadmeBadgeRow:"pina_cli"} -->
 
@@ -134,7 +134,7 @@ pina verify record \
   --authority ./upgrade-authority.json
 ```
 
-See the [verification command reference](https://pina-rs.github.io/pina/cli/verify.html) for exit codes, mainnet acknowledgement, multisig export, remote submission, and keypair/RPC safety rules.
+See the [verification command reference](https://pina.rs/cli/verify.html) for exit codes, mainnet acknowledgement, multisig export, remote submission, and keypair/RPC safety rules.
 
 ### `pina idl`
 

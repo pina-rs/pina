@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Pina · Solana programs without the framework tax</title>
+	<meta name="description" content="Pina is a no_std Solana program framework built on pinocchio: the smallest binaries of any Solana framework, hand-written compute costs, and managed ABI migrations.">
+	<link rel="canonical" href="https://pina.rs/">
+	<meta name="theme-color" content="#121711">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="Pina">
+	<meta property="og:url" content="https://pina.rs/">
+	<meta property="og:title" content="Pina · Solana programs without the framework tax">
+	<meta property="og:description" content="The smallest binaries of any Solana framework, hand-written compute costs, and managed ABI migrations. no_std, allocation-free, built on pinocchio.">
+	<meta property="og:image" content="https://pina.rs/landing/og.png">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta name="twitter:card" content="summary_large_image">
+	<link rel="icon" href="landing/favicon.svg" type="image/svg+xml">
+	<link rel="icon" href="favicon.png" type="image/png">
+	<link rel="preload" href="landing/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="preload" href="landing/fonts/fraunces-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="stylesheet" href="landing/landing.css?v={{version}}">
+	<script>
+		document.documentElement.classList.replace("no-js", "js");
+		// Share the book's saved theme so moving between the two never flips
+		// colours. mdBook stores its theme id under `mdbook-theme`.
+		try {
+			const saved = localStorage.getItem("mdbook-theme");
+			if (saved === "light" || saved === "rust") {
+				document.documentElement.dataset.theme = "light";
+			} else if (saved === "navy" || saved === "coal" || saved === "ayu") {
+				document.documentElement.dataset.theme = "dark";
+			}
+		} catch (error) {}
+	</script>
+</head>
+<body>
+	<a class="skip" href="#main">Skip to content</a>
+
+	<header class="nav" data-nav>
+		<div class="nav-inner">
+			<a class="brand" href="./" aria-label="Pina home">
+				<svg class="brand-mark" viewBox="0 0 320 320" aria-hidden="true"><use href="#pina-mark"/></svg>
+				<span class="brand-name">pina</span>
+			</a>
+			<nav class="nav-links" aria-label="Primary">
+				<a href="introduction.html">Docs</a>
+				<a href="getting-started.html">Guide</a>
+				<a href="cli/index.html">CLI</a>
+				<a href="#benchmarks">Benchmarks</a>
+				<a href="migrations/flow.html">Migrations</a>
+			</nav>
+			<div class="nav-actions">
+				<a class="version-pill" href="https://crates.io/crates/pina" title="Latest release on crates.io">v{{version}}</a>
+				<button class="icon-btn" type="button" data-theme-toggle aria-label="Switch colour theme" title="Switch colour theme">
+					<svg viewBox="0 0 24 24" aria-hidden="true" class="icon-sun"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>
+					<svg viewBox="0 0 24 24" aria-hidden="true" class="icon-moon"><path d="M20.2 14.6A8.4 8.4 0 0 1 9.4 3.8a8.4 8.4 0 1 0 10.8 10.8Z"/></svg>
+				</button>
+				<a class="icon-btn" href="https://github.com/pina-rs/pina" aria-label="Pina on GitHub" title="Pina on GitHub">
+					<svg viewBox="0 0 24 24" aria-hidden="true" class="icon-fill"><path d="M12 .8a11.2 11.2 0 0 0-3.54 21.83c.56.1.77-.24.77-.54v-1.9c-3.12.68-3.78-1.5-3.78-1.5-.5-1.3-1.24-1.65-1.24-1.65-1.02-.7.08-.68.08-.68 1.12.08 1.71 1.15 1.71 1.15 1 1.72 2.62 1.22 3.26.93.1-.72.39-1.22.71-1.5-2.49-.28-5.11-1.25-5.11-5.55 0-1.22.44-2.23 1.15-3.01-.11-.29-.5-1.43.11-2.98 0 0 .94-.3 3.08 1.15a10.7 10.7 0 0 1 5.6 0c2.14-1.45 3.08-1.15 3.08-1.15.61 1.55.23 2.69.11 2.98.72.78 1.15 1.79 1.15 3.01 0 4.31-2.63 5.26-5.13 5.54.4.35.76 1.03.76 2.08v3.08c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
+				</a>
+			</div>
+		</div>
+	</header>
+
+	<main id="main">
+		<section class="hero stage" aria-labelledby="hero-title">
+			<div class="lattice" aria-hidden="true"></div>
+			<div class="hero-glow" aria-hidden="true"></div>
+			<div class="wrap hero-grid">
+				<div class="hero-copy">
+					<div class="hero-mark" aria-hidden="true">
+						<svg viewBox="0 0 320 320" class="weave">
+							<g fill="currentColor" fill-rule="evenodd" transform="translate(-492.8 -69.9) scale(0.85 0.62)">
+								<path class="leaf" style="--i: 6" d="M768 152 L793 205 Q795 210 792 217 L768 276 L744 217 Q741 210 744 204 Z"/>
+								<path class="leaf" style="--i: 7" d="M677 209 L721 223 Q730 226 734 235 L752 281 L708 267 Q698 264 694 254 Z"/>
+								<path class="leaf" style="--i: 7" d="M859 209 L815 223 Q806 226 802 235 L784 281 L828 267 Q838 264 842 254 Z"/>
+								<path class="ribbon" style="--i: 0; --dx: -60px; --dy: -40px" d="M782 294 L724 294 Q706 292 693 306 L662 338 Q641 360 657 384 L676 404 Z"/>
+								<path class="ribbon" style="--i: 1; --dx: 70px; --dy: -30px" d="M687 415 L793 304 Q816 281 837 307 L875 344 Q896 367 878 389 L862 405 L802 344 Q790 339 778 342 L875 439 Q897 463 878 494 L873 504 L768 397 L720 447 Z"/>
+								<path class="ribbon" style="--i: 2; --dx: -70px; --dy: 10px" d="M669 418 L751 501 L716 537 L662 484 Q635 456 658 428 Z"/>
+								<path class="ribbon" style="--i: 3; --dx: 50px; --dy: 50px" d="M760 581 L727 548 L810 464 L844 498 Z"/>
+								<path class="ribbon" style="--i: 4; --dx: -50px; --dy: 60px" d="M661 505 L742 585 L719 585 Q690 584 670 563 Q645 545 655 521 Z"/>
+								<path class="ribbon" style="--i: 5; --dx: 60px; --dy: 40px" d="M854 509 L869 524 Q880 546 864 565 Q850 585 822 586 Q803 588 787 579 Z"/>
+							</g>
+						</svg>
+					</div>
+					<p class="eyebrow"><span class="dot" aria-hidden="true"></span> Built on pinocchio · <code>no_std</code> · v{{version}}</p>
+					<h1 id="hero-title">Solana programs without the <em>framework&nbsp;tax.</em></h1>
+					<p class="lede">Pina gives you macros, typed accounts, and generated clients, then compiles to the smallest binaries of any Solana framework. Compute stays at hand-written cost, and deployed programs evolve through managed ABI migrations.</p>
+					<div class="hero-ctas">
+						<a class="btn btn-primary" href="getting-started.html">Get started <span aria-hidden="true">→</span></a>
+						<a class="btn btn-ghost" href="introduction.html">Read the book</a>
+					</div>
+					<div class="install" data-copy-root>
+						<span class="install-prompt" aria-hidden="true">$</span>
+						<code data-copy-source>cargo add pina</code>
+						<button class="copy-btn" type="button" data-copy aria-label="Copy install command">
+							<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg>
+							<span class="copy-label">Copy</span>
+						</button>
+					</div>
+				</div>
+
+				<div class="hero-code">
+					<div class="window" data-tabs>
+						<div class="window-bar">
+							<span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+							<div class="window-tabs" role="tablist" aria-label="Example program">
+								<button role="tab" type="button" id="tab-account" aria-controls="panel-account" aria-selected="true">account.rs</button>
+								<button role="tab" type="button" id="tab-instruction" aria-controls="panel-instruction" aria-selected="false" tabindex="-1">increment.rs</button>
+								<button role="tab" type="button" id="tab-cli" aria-controls="panel-cli" aria-selected="false" tabindex="-1">terminal</button>
+							</div>
+						</div>
+<div class="window-body" role="tabpanel" id="panel-account" aria-labelledby="tab-account" tabindex="0"><pre><code><span class="k">use</span> pina::*;
+
+<span class="m">declare_id!</span>(<span class="s">"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS"</span>);
+
+<span class="a">#[discriminator(entrypoint)]</span>
+<span class="k">pub enum</span> <span class="t">CounterInstruction</span> {
+    <span class="t">Initialize</span> = <span class="n">0</span>,
+    <span class="t">Increment</span> = <span class="n">1</span>,
+}
+
+<span class="a">#[discriminator]</span>
+<span class="k">pub enum</span> <span class="t">CounterAccountType</span> {
+    <span class="t">CounterState</span> = <span class="n">1</span>,
+}
+
+<span class="c">// 11 bytes on-chain: discriminator, version, bump, count.</span>
+<span class="a">#[account(discriminator = CounterAccountType)]</span>
+<span class="a">#[pda(seeds = [SEED_COUNTER, authority: Address], bump = bump)]</span>
+<span class="k">pub struct</span> <span class="t">CounterState</span> {
+    <span class="k">pub</span> bump: <span class="t">u8</span>,
+    <span class="k">pub</span> count: <span class="t">u64</span>,
+}</code></pre></div>
+<div class="window-body" role="tabpanel" id="panel-instruction" aria-labelledby="tab-instruction" tabindex="0" hidden><pre><code><span class="a">#[instruction(discriminator = CounterInstruction::Increment)]</span>
+<span class="k">pub struct</span> <span class="t">IncrementInstruction</span> {}
+
+<span class="a">#[derive(Accounts, Debug)]</span>
+<span class="k">pub struct</span> <span class="t">IncrementAccounts</span>&lt;<span class="l">'a</span>&gt; {
+    <span class="k">pub</span> authority: &amp;<span class="l">'a</span> <span class="t">AccountView</span>,
+    <span class="k">pub</span> counter: &amp;<span class="l">'a</span> <span class="k">mut</span> <span class="t">AccountView</span>,
+}
+
+<span class="k">impl</span>&lt;<span class="l">'a</span>&gt; <span class="t">ProcessAccountInfos</span>&lt;<span class="l">'a</span>&gt; <span class="k">for</span> <span class="t">IncrementAccounts</span>&lt;<span class="l">'a</span>&gt; {
+    <span class="k">fn</span> <span class="f">process</span>(<span class="k">self</span>, data: &amp;[<span class="t">u8</span>]) -&gt; <span class="t">ProgramResult</span> {
+        <span class="k">let</span> _ = <span class="t">IncrementInstruction</span>::<span class="f">try_from_bytes</span>(data)?;
+        <span class="k">self</span>.authority.<span class="f">assert_signer</span>()?;
+
+        <span class="k">let mut</span> counter = <span class="t">CounterState</span>::<span class="f">load_pda_mut</span>(
+            <span class="k">self</span>.counter, <span class="k">self</span>.authority.<span class="f">address</span>(), &amp;<span class="t">ID</span>,
+        )?;
+        <span class="k">let</span> next = counter.count.<span class="f">get</span>()
+            .<span class="f">checked_add</span>(<span class="n">1</span>)
+            .<span class="f">ok_or</span>(<span class="t">ProgramError</span>::<span class="t">ArithmeticOverflow</span>)?;
+        counter.count.<span class="f">set</span>(next);
+        <span class="t">Ok</span>(())
+    }
+}
+
+<span class="m">dispatch_entrypoint!</span>(<span class="t">CounterInstruction</span>);</code></pre></div>
+<div class="window-body" role="tabpanel" id="panel-cli" aria-labelledby="tab-cli" tabindex="0" hidden><pre><code><span class="p">$</span> npm install --global @pina-rs/cli
+<span class="p">$</span> pina init my_program &amp;&amp; <span class="k">cd</span> my_program
+<span class="p">$</span> pina doctor              <span class="c"># check every prerequisite</span>
+<span class="p">$</span> pina build               <span class="c"># SBF binary and Codama IDL</span>
+<span class="p">$</span> pina test                <span class="c"># Mollusk and Surfpool suites</span>
+<span class="p">$</span> pina lint                <span class="c"># security lints on your source</span>
+<span class="p">$</span> pina profile             <span class="c"># static compute-unit estimate</span>
+<span class="p">$</span> pina generate            <span class="c"># Rust, TypeScript and Dart clients</span>
+<span class="p">$</span> pina deploy --rehearse   <span class="c"># replay real traffic first</span></code></pre></div>
+						<div class="window-foot">
+							<span><b>{{counterIncrementCu}}</b> CU per increment</span>
+							<span><b>1-byte</b> discriminators</span>
+							<span><b>0</b> heap allocations</span>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="wrap">
+				<ul class="stats" aria-label="Measured results">
+					<!-- pina:stats -->
+				</ul>
+				<p class="stats-note">Measured in a Mollusk VM with <code>cargo build-sbf --lto</code>. <a href="framework-comparison.html">Methodology</a></p>
+			</div>
+		</section>
+
+		<section class="section" id="why" aria-labelledby="why-title">
+			<div class="wrap">
+				<header class="section-head">
+					<p class="kicker">Why Pina</p>
+					<h2 id="why-title">Framework ergonomics, <em>hand-written</em> output.</h2>
+					<p class="section-lede">Macros stay minimal and predictable. The IDL is inferred from the validation code you already write, so <code>payer.assert_signer()?</code> becomes a <code>signer</code> constraint without a second source of truth.</p>
+				</header>
+
+				<div class="bento">
+					<article class="card card-feature">
+						<div class="card-copy">
+							<p class="card-kicker">Only in Pina</p>
+							<h3>Managed ABI migrations</h3>
+							<p>Version envelopes, generated transitions, and a publication ledger evolve account and instruction schemas without breaking deployed programs or the clients that read them.</p>
+							<a class="card-link" href="migrations/flow.html">How migrations flow <span aria-hidden="true">→</span></a>
+						</div>
+						<ol class="ledger" aria-label="An account moving through three schema versions">
+							<li><span class="ledger-v">v0</span><span class="ledger-body"><b>CounterState</b><i>bump · count</i></span><span class="ledger-tag">published</span></li>
+							<li><span class="ledger-v">v1</span><span class="ledger-body"><b>+ authority</b><i>generated transition</i></span><span class="ledger-tag">published</span></li>
+							<li class="is-current"><span class="ledger-v">v2</span><span class="ledger-body"><b>+ last_updated</b><i>clients decode every version</i></span><span class="ledger-tag">current</span></li>
+						</ol>
+					</article>
+
+					<article class="card">
+						<div class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/><circle cx="18" cy="16" r="3"/></svg></div>
+						<h3><code>no_std</code>, allocation-free</h3>
+						<p>Every on-chain crate compiles to the <code>bpfel-unknown-none</code> SBF target with no heap and no allocator.</p>
+					</article>
+
+					<article class="card">
+						<div class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M8 5v14M3.5 10h17"/></svg></div>
+						<h3>Validated zero-copy</h3>
+						<p>PinaPod validates account bytes before Pina hands you an in-place, typed view. No copies, no heap.</p>
+					</article>
+
+					<article class="card">
+						<div class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="7" width="4" height="10" rx="1.2"/><path d="M11 9.5h9.5M11 14.5h6"/></svg></div>
+						<h3>One-byte discriminators</h3>
+						<p>Accounts, instructions, and events carry a typed discriminator as their first field, one byte by default and up to <code>u64</code> when you need it.</p>
+					</article>
+
+					<article class="card">
+						<div class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4 4 10-10"/></svg></div>
+						<h3>Declarative validation</h3>
+						<p>Chain checks on any account, or compile <code>#[pina(validate(...))]</code> rules into allocation-free code.</p>
+						<pre class="mini"><code>payer.<span class="f">assert_signer</span>()?
+     .<span class="f">assert_writable</span>()?;</code></pre>
+					</article>
+
+					<article class="card card-wide">
+						<div class="card-copy">
+							<div class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4.5l-3 15"/></svg></div>
+							<h3>Typed clients in every language you ship</h3>
+							<p>Extract a Codama IDL with <code>pina idl</code> and generate Rust, TypeScript, and Dart clients, or a CPI crate for other programs to call yours.</p>
+						</div>
+						<ul class="chips" aria-label="Generated client targets">
+							<li>Rust</li>
+							<li>TypeScript</li>
+							<li>Dart</li>
+							<li>CPI crates</li>
+						</ul>
+					</article>
+				</div>
+			</div>
+		</section>
+
+		<section class="section section-sunken" id="benchmarks" aria-labelledby="bench-title">
+			<div class="wrap">
+				<header class="section-head">
+					<p class="kicker">Benchmarks</p>
+					<h2 id="bench-title">Measured, not claimed.</h2>
+					<p class="section-lede">The same hello-world and counter programs, written in five frameworks, built under one release profile, and executed in a Mollusk VM. Hand-written Pinocchio is the floor a framework has to justify. Lower is better.</p>
+				</header>
+				<!-- pina:benchmarks -->
+			</div>
+		</section>
+
+		<section class="section" id="compare" aria-labelledby="compare-title">
+			<div class="wrap">
+				<header class="section-head">
+					<p class="kicker">Comparison</p>
+					<h2 id="compare-title">Everything you expect, plus what nobody else ships.</h2>
+				</header>
+				<!-- pina:capabilities -->
+			</div>
+		</section>
+
+		<section class="section stage cli" id="cli" aria-labelledby="cli-title">
+			<div class="lattice lattice-soft" aria-hidden="true"></div>
+			<div class="wrap cli-grid">
+				<div>
+					<p class="kicker">Tooling</p>
+					<h2 id="cli-title">One CLI from <code>init</code> to mainnet.</h2>
+					<p class="section-lede">Scaffold, build, test, lint, profile, and deploy without leaving <code>pina</code>. Commands follow documented output contracts, with JSON where it matters, so scripts and coding agents can drive <code>pina</code> as reliably as you can.</p>
+					<a class="btn btn-primary" href="cli/index.html">Browse the CLI reference <span aria-hidden="true">→</span></a>
+				</div>
+				<ul class="commands">
+					<li><a href="cli/lint.html"><code>pina lint</code><span>Security lints for common Solana attack patterns, run on program source.</span></a></li>
+					<li><a href="cli/profile.html"><code>pina profile</code><span>Estimate compute cost from the compiled <code>.so</code>, or trace it per line from tests.</span></a></li>
+					<li><a href="cli/rehearse.html"><code>pina rehearse</code><span>Replay real traffic against an upgrade before you ship it.</span></a></li>
+					<li><a href="cli/explain.html"><code>pina explain</code><span>Name the account check that made a transaction fail.</span></a></li>
+					<li><a href="cli/dev.html"><code>pina dev</code><span>An offline Surfpool loop that rebuilds and redeploys as you edit.</span></a></li>
+					<li><a href="cli/verify.html"><code>pina verify</code><span>Compare a deployment with its source and record the verified build.</span></a></li>
+				</ul>
+			</div>
+		</section>
+
+		<section class="section" id="start" aria-labelledby="start-title">
+			<div class="wrap">
+				<header class="section-head">
+					<p class="kicker">Get started</p>
+					<h2 id="start-title">Your first program in three commands.</h2>
+				</header>
+				<ol class="steps">
+					<li class="step" data-copy-root>
+						<span class="step-n">1</span>
+						<h3>Install the CLI</h3>
+						<p>Prebuilt for macOS, Linux, Windows, and FreeBSD. Or <code>cargo install pina_cli</code>.</p>
+						<div class="cmd"><code data-copy-source>npm install --global @pina-rs/cli</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg><span class="copy-label">Copy</span></button></div>
+					</li>
+					<li class="step" data-copy-root>
+						<span class="step-n">2</span>
+						<h3>Scaffold a program</h3>
+						<p>A <code>no_std</code> program, a typed starter instruction, and host and Surfpool tests.</p>
+						<div class="cmd"><code data-copy-source>pina init my_program</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg><span class="copy-label">Copy</span></button></div>
+					</li>
+					<li class="step" data-copy-root>
+						<span class="step-n">3</span>
+						<h3>Build and test</h3>
+						<p>Compile to SBF with the Agave toolchain, then run the scaffold&rsquo;s tests.</p>
+						<div class="cmd"><code data-copy-source>cd my_program &amp;&amp; pina build &amp;&amp; pina test</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg><span class="copy-label">Copy</span></button></div>
+					</li>
+				</ol>
+				<div class="next-links">
+					<a class="next-link" href="tutorials/first-program.html"><span class="next-k">Tutorial</span><b>Your first program</b><span>Accounts, instructions, and dispatch, end to end.</span></a>
+					<a class="next-link" href="tutorials/migrating-from-anchor.html"><span class="next-k">Guide</span><b>Migrating from Anchor</b><span>Every Anchor concept, mapped to its Pina equivalent.</span></a>
+					<a class="next-link" href="examples.html"><span class="next-k">Examples</span><b>Programs to learn from</b><span>Escrow, multisig, compact accounts, token CPI, and more.</span></a>
+				</div>
+				<aside class="notice" aria-label="Readiness">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l9 16H3l9-16Z"/><path d="M12 10v4.2M12 16.8v.2"/></svg>
+					<p><b>Pina is unaudited and still hardening.</b> Read the <a href="security-model.html">security model</a> and the <a href="production-readiness.html">production-readiness gate</a> before you deploy a program that holds value.</p>
+				</aside>
+			</div>
+		</section>
+	</main>
+
+	<footer class="footer">
+		<div class="wrap footer-grid">
+			<div class="footer-brand">
+				<a class="brand" href="./" aria-label="Pina home">
+					<svg class="brand-mark" viewBox="0 0 320 320" aria-hidden="true"><use href="#pina-mark"/></svg>
+					<span class="brand-name">pina</span>
+				</a>
+				<p>A <code>no_std</code> Solana program framework built on pinocchio. Apache-2.0 licensed.</p>
+			</div>
+			<nav aria-label="Learn">
+				<h2>Learn</h2>
+				<a href="getting-started.html">Getting started</a>
+				<a href="tutorials/first-program.html">Your first program</a>
+				<a href="core-concepts.html">Core concepts</a>
+				<a href="examples.html">Examples</a>
+			</nav>
+			<nav aria-label="Reference">
+				<h2>Reference</h2>
+				<a href="cli/index.html">CLI reference</a>
+				<a href="lint-reference.html">Lint reference</a>
+				<a href="crates-and-features.html">Crates and features</a>
+				<a href="https://docs.rs/pina/">API docs</a>
+			</nav>
+			<nav aria-label="Project">
+				<h2>Project</h2>
+				<a href="https://github.com/pina-rs/pina">GitHub</a>
+				<a href="https://crates.io/crates/pina">crates.io</a>
+				<a href="https://www.npmjs.com/package/@pina-rs/cli">npm</a>
+				<a href="https://github.com/pina-rs/pina/blob/main/SECURITY.md">Security policy</a>
+			</nav>
+		</div>
+	</footer>
+
+	<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+		<symbol id="pina-mark" viewBox="0 0 320 320">
+			<g fill="currentColor" fill-rule="evenodd" transform="translate(-492.8 -69.9) scale(0.85 0.62)"><path d="M768 152 L793 205 Q795 210 792 217 L768 276 L744 217 Q741 210 744 204 Z"/><path d="M677 209 L721 223 Q730 226 734 235 L752 281 L708 267 Q698 264 694 254 Z"/><path d="M859 209 L815 223 Q806 226 802 235 L784 281 L828 267 Q838 264 842 254 Z"/><path d="M782 294 L724 294 Q706 292 693 306 L662 338 Q641 360 657 384 L676 404 Z"/><path d="M687 415 L793 304 Q816 281 837 307 L875 344 Q896 367 878 389 L862 405 L802 344 Q790 339 778 342 L875 439 Q897 463 878 494 L873 504 L768 397 L720 447 Z"/><path d="M669 418 L751 501 L716 537 L662 484 Q635 456 658 428 Z"/><path d="M760 581 L727 548 L810 464 L844 498 Z"/><path d="M661 505 L742 585 L719 585 Q690 584 670 563 Q645 545 655 521 Z"/><path d="M854 509 L869 524 Q880 546 864 565 Q850 585 822 586 Q803 588 787 579 Z"/></g>
+		</symbol>
+	</svg>
+
+	<script src="landing/landing.js?v={{version}}" defer></script>
+</body>
+</html>

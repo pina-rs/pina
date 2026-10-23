@@ -1,0 +1,907 @@
+/*
+ * Pina book theme.
+ *
+ * Layered on top of mdBook's own stylesheets through `additional-css`, so an
+ * mdBook upgrade keeps working: this file only overrides theme variables and
+ * restyles existing elements. Brand colours come from `.github/assets`:
+ * gold #E7A515, ivory #FAF8EF and dark green #20251F.
+ *
+ * Every light theme (`light`, `rust`) renders as Ivory and every dark theme
+ * (`navy`, `coal`, `ayu`) as Forest, so a reader's saved mdBook theme still
+ * lands on a branded palette. `pina.js` trims the theme menu to Auto, Light
+ * and Dark.
+ */
+
+:root {
+	--pina-gold: #e7a515;
+	--pina-ivory: #faf8ef;
+	--pina-green: #20251f;
+
+	--sans-font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	--display-font: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+	--mono-font: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+	--code-font-size: 0.86em;
+
+	--content-max-width: 780px;
+	--menu-bar-height: 60px;
+	--sidebar-target-width: 290px;
+	--page-padding: 20px;
+
+	/* Code blocks are dark in both themes. */
+	--pina-code-bg: #141913;
+	--pina-code-fg: #e8e4d4;
+	--pina-code-border: rgba(231, 165, 21, 0.14);
+	--pina-radius: 12px;
+}
+
+/* Ivory: the light palette. */
+.light,
+.rust,
+html:not(.js) {
+	--bg: #faf8ef;
+	--fg: #20251f;
+	--pina-fg-muted: #5e665a;
+	--pina-surface: #fffdf6;
+	--pina-sunken: #f3f0e3;
+	--pina-hairline: #e4dfcc;
+	--pina-accent: #8a5d00;
+	--pina-accent-soft: rgba(231, 165, 21, 0.16);
+	--pina-heading: #171b16;
+
+	--sidebar-bg: #f3f0e3;
+	--sidebar-fg: #3e463b;
+	--sidebar-non-existant: #8f968a;
+	--sidebar-active: #8a5d00;
+	--sidebar-spacer: #e3decb;
+
+	--scrollbar: #c8c2ac;
+
+	--icons: #6a7265;
+	--icons-hover: #20251f;
+
+	--links: #8a5d00;
+
+	--inline-code-color: #2f3a2c;
+	--pina-inline-code-bg: #efebdb;
+
+	--theme-popup-bg: #fffdf6;
+	--theme-popup-border: #e4dfcc;
+	--theme-hover: #f3efe0;
+
+	--quote-bg: #f3f0e3;
+	--quote-border: #e4dfcc;
+
+	--warning-border: #e7a515;
+
+	--table-border-color: #e4dfcc;
+	--table-header-bg: #f1edde;
+	--table-alternate-bg: #f6f3e8;
+
+	--searchbar-border-color: #d9d3be;
+	--searchbar-bg: #fffdf6;
+	--searchbar-fg: #20251f;
+	--searchbar-shadow-color: rgba(231, 165, 21, 0.45);
+	--searchresults-header-fg: #5e665a;
+	--searchresults-border-color: #e4dfcc;
+	--searchresults-li-bg: #f3efe0;
+	--search-mark-bg: #f6d27a;
+
+	--color-scheme: light;
+
+	--copy-button-filter: invert(72%) sepia(9%) saturate(318%) hue-rotate(43deg) brightness(92%) contrast(86%);
+	--copy-button-filter-hover: invert(70%) sepia(68%) saturate(1013%) hue-rotate(358deg) brightness(97%) contrast(88%);
+
+	--footnote-highlight: #e7a515;
+
+	--overlay-bg: rgba(32, 37, 31, 0.32);
+
+	--blockquote-note-color: #2d6a9f;
+	--blockquote-tip-color: #3f7a2a;
+	--blockquote-important-color: #7a4fb5;
+	--blockquote-warning-color: #8a5d00;
+	--blockquote-caution-color: #b23a26;
+
+	--sidebar-header-border-color: #e7a515;
+}
+
+/* Forest: the dark palette. */
+.navy,
+.coal,
+.ayu {
+	--bg: #121611;
+	--fg: #e4e1d3;
+	--pina-fg-muted: #a3aa99;
+	--pina-surface: #1a2019;
+	--pina-sunken: #0e120d;
+	--pina-hairline: #283026;
+	--pina-accent: #f2c14e;
+	--pina-accent-soft: rgba(231, 165, 21, 0.14);
+	--pina-heading: #f6f2e4;
+
+	--sidebar-bg: #0e120d;
+	--sidebar-fg: #b9bfae;
+	--sidebar-non-existant: #6b7366;
+	--sidebar-active: #f2c14e;
+	--sidebar-spacer: #252c23;
+
+	--scrollbar: #3a4237;
+
+	--icons: #8d9585;
+	--icons-hover: #f3efe0;
+
+	--links: #f2c14e;
+
+	--inline-code-color: #f3e3b5;
+	--pina-inline-code-bg: #1d241c;
+
+	--theme-popup-bg: #1a2019;
+	--theme-popup-border: #2a3228;
+	--theme-hover: #222920;
+
+	--quote-bg: #181d17;
+	--quote-border: #2a3228;
+
+	--warning-border: #e7a515;
+
+	--table-border-color: #283026;
+	--table-header-bg: #1b211a;
+	--table-alternate-bg: #151a14;
+
+	--searchbar-border-color: #2f382d;
+	--searchbar-bg: #1a2019;
+	--searchbar-fg: #f3efe0;
+	--searchbar-shadow-color: rgba(231, 165, 21, 0.4);
+	--searchresults-header-fg: #a3aa99;
+	--searchresults-border-color: #2a3228;
+	--searchresults-li-bg: #1a2019;
+	--search-mark-bg: #6b4e0a;
+
+	--color-scheme: dark;
+
+	--copy-button-filter: invert(62%) sepia(8%) saturate(345%) hue-rotate(43deg) brightness(92%) contrast(86%);
+	--copy-button-filter-hover: invert(70%) sepia(68%) saturate(1013%) hue-rotate(358deg) brightness(97%) contrast(88%);
+
+	--footnote-highlight: #e7a515;
+
+	--overlay-bg: rgba(6, 8, 6, 0.6);
+
+	--blockquote-note-color: #7fb8e0;
+	--blockquote-tip-color: #9ccb6b;
+	--blockquote-important-color: #c9a2e6;
+	--blockquote-warning-color: #f2c14e;
+	--blockquote-caution-color: #f07a63;
+
+	--sidebar-header-border-color: #e7a515;
+}
+
+/* Without JavaScript mdBook cannot pick a theme class, so follow the OS. */
+@media (prefers-color-scheme: dark) {
+	html:not(.js) {
+		--bg: #121611;
+		--fg: #e4e1d3;
+		--pina-fg-muted: #a3aa99;
+		--pina-surface: #1a2019;
+		--pina-sunken: #0e120d;
+		--pina-hairline: #283026;
+		--pina-accent: #f2c14e;
+		--pina-accent-soft: rgba(231, 165, 21, 0.14);
+		--pina-heading: #f6f2e4;
+		--sidebar-bg: #0e120d;
+		--sidebar-fg: #b9bfae;
+		--sidebar-non-existant: #6b7366;
+		--sidebar-active: #f2c14e;
+		--sidebar-spacer: #252c23;
+		--scrollbar: #3a4237;
+		--icons: #8d9585;
+		--icons-hover: #f3efe0;
+		--links: #f2c14e;
+		--inline-code-color: #f3e3b5;
+		--pina-inline-code-bg: #1d241c;
+		--quote-bg: #181d17;
+		--quote-border: #2a3228;
+		--table-border-color: #283026;
+		--table-header-bg: #1b211a;
+		--table-alternate-bg: #151a14;
+		--color-scheme: dark;
+	}
+}
+
+/* ------------------------------------------------------------------------ */
+/* Base typography                                                           */
+/* ------------------------------------------------------------------------ */
+
+html {
+	font-family: var(--sans-font);
+	font-feature-settings: "cv11", "ss01";
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+body {
+	font-size: 1.62rem;
+}
+
+::selection {
+	background: rgba(231, 165, 21, 0.32);
+}
+
+:focus-visible {
+	outline: 2px solid var(--pina-accent);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* Code panels stay dark in every theme, so they keep the bright gold ring. */
+pre:focus-visible,
+pre :focus-visible {
+	outline-color: var(--pina-gold);
+}
+
+.content main {
+	padding-block: 8px 24px;
+}
+
+.content p,
+.content ol,
+.content ul {
+	line-height: 1.72;
+}
+
+.content li + li {
+	margin-block-start: 0.3em;
+}
+
+.content h1,
+.content h2,
+.content h3,
+.content h4 {
+	color: var(--pina-heading);
+	text-wrap: balance;
+}
+
+.content h1 {
+	font-family: var(--display-font);
+	font-optical-sizing: auto;
+	font-weight: 620;
+	font-size: clamp(3.2rem, 2.4rem + 2.4vw, 4.6rem);
+	line-height: 1.08;
+	letter-spacing: -0.022em;
+	margin-block: 0.9em 0.55em;
+}
+
+.content h2 {
+	font-family: var(--display-font);
+	font-optical-sizing: auto;
+	font-weight: 600;
+	font-size: 2.85rem;
+	line-height: 1.18;
+	letter-spacing: -0.016em;
+	margin-block: 2.1em 0.6em;
+	padding-block-start: 0.9em;
+	border-block-start: 1px solid var(--pina-hairline);
+}
+
+.content h3 {
+	font-weight: 650;
+	font-size: 2.05rem;
+	line-height: 1.3;
+	letter-spacing: -0.012em;
+	margin-block: 1.9em 0.5em;
+}
+
+.content h4,
+.content h5 {
+	font-weight: 650;
+	font-size: 1.7rem;
+	letter-spacing: -0.005em;
+}
+
+.content h1 code,
+.content h2 code {
+	font-size: 0.82em;
+	padding: 0;
+	border: 0;
+	background: none;
+}
+
+.content strong {
+	font-weight: 650;
+	color: var(--pina-heading);
+}
+
+h1:target::before,
+h2:target::before,
+h3:target::before,
+h4:target::before,
+h5:target::before,
+h6:target::before {
+	content: "#";
+	color: var(--pina-gold);
+	font-family: var(--mono-font);
+	margin-inline-start: -1.1em;
+	width: 1.1em;
+}
+
+/* Links */
+
+.content a:link,
+.content a:visited {
+	color: var(--links);
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.22em;
+	text-decoration-color: color-mix(in srgb, var(--links) 35%, transparent);
+	transition: text-decoration-color 0.15s ease;
+}
+
+.content a:hover {
+	text-decoration-color: currentColor;
+}
+
+.content .header:link,
+.content .header:visited {
+	color: inherit;
+	text-decoration: none;
+}
+
+.content hr {
+	border: 0;
+	height: 1px;
+	background: var(--pina-hairline);
+	margin-block: 3em;
+}
+
+.content img {
+	border-radius: 10px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Menu bar                                                                  */
+/* ------------------------------------------------------------------------ */
+
+#mdbook-menu-bar {
+	background-color: color-mix(in srgb, var(--bg) 84%, transparent);
+	-webkit-backdrop-filter: saturate(1.4) blur(14px);
+	backdrop-filter: saturate(1.4) blur(14px);
+	align-items: center;
+}
+
+#mdbook-menu-bar.bordered {
+	border-block-end-color: var(--pina-hairline);
+}
+
+.menu-title {
+	font-weight: 600;
+	font-size: 1.8rem;
+	letter-spacing: -0.01em;
+	color: var(--pina-heading);
+}
+
+.pina-brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	color: var(--pina-heading) !important;
+	text-decoration: none !important;
+	vertical-align: middle;
+}
+
+.pina-brand svg {
+	width: 30px;
+	height: 30px;
+	color: var(--pina-gold);
+	flex: none;
+}
+
+.pina-brand-name {
+	font-family: var(--display-font);
+	font-optical-sizing: auto;
+	font-weight: 640;
+	font-size: 2.2rem;
+	letter-spacing: -0.02em;
+}
+
+.pina-brand-tag {
+	font-family: var(--mono-font);
+	font-size: 1.1rem;
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--pina-fg-muted);
+	border: 1px solid var(--pina-hairline);
+	border-radius: 999px;
+	padding: 2px 8px;
+	line-height: 1.6;
+}
+
+@media only screen and (max-width: 520px) {
+	.pina-brand-tag {
+		display: none;
+	}
+}
+
+.right-buttons {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+/* Only the branded Light and Dark themes are offered. */
+.theme-popup li:has(#mdbook-theme-rust),
+.theme-popup li:has(#mdbook-theme-coal),
+.theme-popup li:has(#mdbook-theme-ayu) {
+	display: none;
+}
+
+.theme-popup {
+	border-radius: 10px;
+	box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.35);
+	padding: 6px 0;
+	font-size: 0.78em;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Sidebar                                                                   */
+/* ------------------------------------------------------------------------ */
+
+.sidebar {
+	font-size: 0.9em;
+	border-inline-end: 1px solid var(--pina-hairline);
+}
+
+.sidebar .sidebar-scrollbox {
+	padding: 18px 14px 40px;
+}
+
+.pina-sidebar-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px 18px;
+	margin-block-end: 6px;
+	border-block-end: 1px solid var(--sidebar-spacer);
+}
+
+.pina-sidebar-head .pina-brand svg {
+	width: 26px;
+	height: 26px;
+}
+
+.pina-sidebar-head .pina-brand-name {
+	font-size: 2rem;
+}
+
+.pina-sidebar-link {
+	font-family: var(--mono-font);
+	font-size: 1.15rem;
+	color: var(--pina-fg-muted);
+	background: var(--pina-accent-soft);
+	border-radius: 999px;
+	padding: 2px 8px;
+	text-decoration: none !important;
+}
+
+.chapter {
+	line-height: 1.5;
+}
+
+.chapter li.chapter-item {
+	margin-block-start: 1px;
+	line-height: 1.45;
+}
+
+.chapter li a {
+	display: block;
+	flex: 1;
+	padding: 5px 10px;
+	border-radius: 7px;
+	transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.chapter li a:hover {
+	color: var(--sidebar-fg);
+	background-color: var(--pina-accent-soft);
+}
+
+.chapter li a.active {
+	color: var(--sidebar-active);
+	background-color: var(--pina-accent-soft);
+	font-weight: 600;
+	box-shadow: inset 2px 0 0 var(--pina-gold);
+}
+
+/* Chapter numbers add noise to a long, grouped table of contents. */
+.chapter li strong[aria-hidden="true"] {
+	display: none;
+}
+
+/* A draft chapter (a heading with no page of its own) lines up with links. */
+.chapter-link-wrapper > span {
+	flex: 1;
+	padding: 5px 10px;
+	color: var(--sidebar-fg);
+}
+
+.chapter li.part-title {
+	color: var(--pina-fg-muted);
+	font-size: 1.08rem;
+	font-weight: 650;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	margin: 22px 10px 6px;
+}
+
+.chapter li.spacer,
+.chapter .spacer {
+	height: 1px;
+	margin: 12px 8px;
+}
+
+.section {
+	padding-inline-start: 12px;
+	margin-inline-start: 10px;
+	border-inline-start: 1px solid var(--sidebar-spacer);
+}
+
+.chapter li a.chapter-fold-toggle {
+	display: flex;
+	flex: none;
+	align-items: center;
+	padding: 0 10px;
+	font-size: 0.8em;
+	color: var(--sidebar-non-existant);
+	background: none;
+	box-shadow: none;
+}
+
+.chapter li a.chapter-fold-toggle:hover {
+	color: var(--sidebar-active);
+}
+
+.chapter-fold-toggle div {
+	line-height: 1;
+}
+
+.on-this-page {
+	margin-inline-start: 12px;
+	border-inline-start: 2px solid var(--pina-gold);
+	padding-inline-start: 6px;
+}
+
+.on-this-page a {
+	font-size: 0.94em;
+	padding-block: 3px !important;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Code                                                                      */
+/* ------------------------------------------------------------------------ */
+
+code {
+	font-variant-ligatures: none;
+}
+
+:not(pre) > code,
+:not(pre) > .hljs {
+	padding: 0.14em 0.42em;
+	border-radius: 6px;
+	background: var(--pina-inline-code-bg);
+	border: 1px solid color-mix(in srgb, var(--pina-hairline) 70%, transparent);
+	font-size: 0.84em;
+}
+
+:not(pre):not(a) > .hljs {
+	color: var(--inline-code-color);
+}
+
+a > code,
+a > .hljs {
+	color: inherit !important;
+}
+
+.content pre {
+	margin-block: 1.4em;
+	border-radius: var(--pina-radius);
+	background: var(--pina-code-bg);
+	border: 1px solid var(--pina-code-border);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 18px 40px -28px rgba(20, 25, 19, 0.55);
+}
+
+pre > code,
+pre > code.hljs {
+	padding: 1.25em 1.4em;
+	border-radius: var(--pina-radius);
+	font-size: 1.36rem;
+	line-height: 1.65;
+	background: transparent;
+	color: var(--pina-code-fg);
+	tab-size: 4;
+}
+
+pre > .buttons {
+	top: 8px;
+	right: 6px;
+}
+
+pre > .buttons button {
+	background-color: rgba(255, 255, 255, 0.04);
+	border-color: rgba(255, 255, 255, 0.12);
+	border-radius: 7px;
+}
+
+pre > .buttons :hover {
+	background-color: rgba(231, 165, 21, 0.12);
+	border-color: rgba(231, 165, 21, 0.5);
+}
+
+/*
+ * Syntax colours, shared by every theme so code always sits on the same dark
+ * panel. `html` raises specificity above mdBook's highlight stylesheets.
+ */
+html .hljs {
+	color: var(--pina-code-fg);
+	background: transparent;
+}
+
+html .hljs-comment,
+html .hljs-quote {
+	color: #8a9482;
+	font-style: normal;
+}
+
+html .hljs-keyword,
+html .hljs-selector-tag,
+html .hljs-meta .hljs-keyword {
+	color: #f2b544;
+}
+
+html .hljs-string,
+html .hljs-symbol,
+html .hljs-bullet,
+html .hljs-addition {
+	color: #b5d58a;
+}
+
+html .hljs-number,
+html .hljs-literal {
+	color: #f0937a;
+}
+
+html .hljs-title,
+html .hljs-title.function_,
+html .hljs-section {
+	color: #7fb8e0;
+}
+
+html .hljs-type,
+html .hljs-built_in,
+html .hljs-builtin-name,
+html .hljs-title.class_,
+html .hljs-class .hljs-title {
+	color: #8fd3c1;
+}
+
+html .hljs-meta,
+html .hljs-attr,
+html .hljs-attribute,
+html .hljs-selector-id,
+html .hljs-selector-class {
+	color: #d7a6e8;
+}
+
+html .hljs-variable,
+html .hljs-template-variable,
+html .hljs-params,
+html .hljs-name,
+html .hljs-tag,
+html .hljs-regexp,
+html .hljs-link {
+	color: #e8c9a0;
+}
+
+html .hljs-deletion {
+	color: #f07a63;
+}
+
+html .hljs-addition,
+html .hljs-deletion {
+	background: transparent;
+}
+
+html .hljs-emphasis {
+	font-style: italic;
+}
+
+html .hljs-strong {
+	font-weight: 700;
+}
+
+/* Inline code keeps the page's own ink rather than the panel palette. */
+html :not(pre) > .hljs,
+html :not(pre) > .hljs * {
+	color: var(--inline-code-color);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Tables                                                                    */
+/* ------------------------------------------------------------------------ */
+
+.table-wrapper {
+	margin-block: 1.6em;
+	border: 1px solid var(--table-border-color);
+	border-radius: var(--pina-radius);
+	background: var(--pina-surface);
+}
+
+.table-wrapper table {
+	width: 100%;
+	margin: 0;
+	border-collapse: collapse;
+	font-size: 0.94em;
+	line-height: 1.5;
+}
+
+.table-wrapper table thead {
+	background: var(--table-header-bg);
+}
+
+.table-wrapper table thead tr {
+	border: 0;
+}
+
+.table-wrapper table th {
+	padding: 11px 16px;
+	text-align: start;
+	font-weight: 650;
+	font-size: 0.92em;
+	color: var(--pina-heading);
+	border-block-end: 1px solid var(--table-border-color);
+	white-space: nowrap;
+}
+
+.table-wrapper table td {
+	padding: 10px 16px;
+	border: 0;
+	border-block-start: 1px solid var(--table-border-color);
+	vertical-align: top;
+}
+
+.table-wrapper table tbody tr:first-child td {
+	border-block-start: 0;
+}
+
+.table-wrapper table tbody tr:nth-child(2n) {
+	background: transparent;
+}
+
+.table-wrapper table tbody tr:hover {
+	background: var(--table-alternate-bg);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Quotes and callouts                                                       */
+/* ------------------------------------------------------------------------ */
+
+.content blockquote {
+	margin: 1.6em 0;
+	padding: 0.9em 1.3em;
+	border: 0;
+	border-inline-start: 3px solid var(--pina-gold);
+	border-radius: 0 10px 10px 0;
+	background: var(--quote-bg);
+}
+
+.content blockquote > :first-child {
+	margin-block-start: 0;
+}
+
+.content blockquote > :last-child {
+	margin-block-end: 0;
+}
+
+.content .blockquote-tag {
+	background: var(--quote-bg);
+	padding: 0.9em 1.3em;
+	border-inline-start-width: 3px;
+}
+
+.warning {
+	border-radius: 0 10px 10px 0;
+}
+
+kbd {
+	font-family: var(--mono-font);
+	border-radius: 6px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Chapter navigation                                                        */
+/* ------------------------------------------------------------------------ */
+
+.nav-chapters {
+	font-size: 2em;
+	color: var(--icons);
+}
+
+.nav-chapters:hover {
+	color: var(--pina-accent);
+	background-color: var(--pina-accent-soft);
+}
+
+.mobile-nav-chapters {
+	border-radius: 999px;
+	border: 1px solid var(--pina-hairline);
+	background-color: var(--pina-surface);
+	font-size: 2em;
+	line-height: 1.6;
+	width: 64px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Search                                                                    */
+/* ------------------------------------------------------------------------ */
+
+#mdbook-searchbar {
+	border-radius: 10px;
+	padding: 10px 14px;
+	font-family: var(--sans-font);
+}
+
+#mdbook-searchbar:focus,
+#mdbook-searchbar.active {
+	box-shadow: 0 0 0 3px var(--searchbar-shadow-color);
+	outline: none;
+}
+
+ul#mdbook-searchresults li {
+	border-radius: 10px;
+	padding: 6px 10px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Footer rendered by pina.js                                                */
+/* ------------------------------------------------------------------------ */
+
+.pina-footer {
+	max-width: var(--content-max-width);
+	margin: 64px auto 0;
+	padding-block-start: 24px;
+	border-block-start: 1px solid var(--pina-hairline);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 20px;
+	justify-content: space-between;
+	font-size: 0.86em;
+	color: var(--pina-fg-muted);
+}
+
+.pina-footer a:link,
+.pina-footer a:visited {
+	color: var(--pina-fg-muted);
+	text-decoration: none;
+}
+
+.pina-footer a:hover {
+	color: var(--pina-accent);
+}
+
+.pina-footer nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		transition: none !important;
+	}
+}
+
+@media print {
+	pre,
+	.content pre {
+		box-shadow: none;
+	}
+}

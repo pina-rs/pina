@@ -1673,8 +1673,9 @@ in
       exec = ''
         set -euo pipefail
         mdbook build "$DEVENV_ROOT/docs"
+        node "$DEVENV_ROOT/scripts/docs/build-landing.ts" "$DEVENV_ROOT/docs/book"
       '';
-      description = "Build the mdBook documentation.";
+      description = "Build the mdBook documentation and the pina.rs landing page.";
       binary = "bash";
     };
     "docs:sync" = {
@@ -1708,6 +1709,7 @@ in
         [ -f ${lib.escapeShellArg "${currentDir}/docs/book.toml"} ]
         [ -f ${lib.escapeShellArg "${currentDir}/docs/src/SUMMARY.md"} ]
         ${pkgs.mdbook}/bin/mdbook build ${lib.escapeShellArg "${currentDir}/docs"} -d ${lib.escapeShellArg "${currentDir}/target/mdbook"}
+        node ${lib.escapeShellArg "${currentDir}/scripts/docs/build-landing.ts"} ${lib.escapeShellArg "${currentDir}/target/mdbook"}
         ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/docs:api"}
         node ${lib.escapeShellArg "${currentDir}/scripts/check-migration-docs.mjs"}
         # The agent skill ships inside the CLI binary (`pina skill read`), so a

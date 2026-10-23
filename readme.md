@@ -25,7 +25,7 @@
 	<a href="#why-pina"><strong>Why Pina?</strong></a> ·
 	<a href="#how-pina-compares"><strong>Comparison</strong></a> ·
 	<a href="#getting-started"><strong>Getting Started</strong></a> ·
-	<a href="https://pina-rs.github.io/pina/"><strong>Docs</strong></a> ·
+	<a href="https://pina.rs/"><strong>Docs</strong></a> ·
 	<a href="#examples"><strong>Examples</strong></a> ·
 	<a href="#contributing"><strong>Contributing</strong></a>
 </p>
@@ -57,7 +57,7 @@
 
 <!-- {/pinaFeatureHighlights} -->
 
-Macros stay minimal, the IDL is inferred from the validation code you already write (`payer.assert_signer()?` becomes a `signer` constraint in the generated IDL), and one language runs end to end: on-chain Rust, and generated Rust, TypeScript, or Dart clients. The [project goals](https://pina-rs.github.io/pina/project-goals.html) describe the philosophy in full.
+Macros stay minimal, the IDL is inferred from the validation code you already write (`payer.assert_signer()?` becomes a `signer` constraint in the generated IDL), and one language runs end to end: on-chain Rust, and generated Rust, TypeScript, or Dart clients. The [project goals](https://pina.rs/project-goals.html) describe the philosophy in full.
 
 ## How Pina compares
 
@@ -90,7 +90,7 @@ Anchor v1 is the current stable line and Anchor v2 its pre-release rewrite; both
 
 <br>
 
-The same hello-world and counter programs written in each framework, built with `cargo build-sbf --lto` under one release profile, and executed in a Mollusk VM. Pinocchio (hand-written) is the floor a framework has to justify. Regenerate with `devenv shell -- benchmark:frameworks`; the full methodology and caveats live in [the framework comparison](https://pina-rs.github.io/pina/framework-comparison.html).
+The same hello-world and counter programs written in each framework, built with `cargo build-sbf --lto` under one release profile, and executed in a Mollusk VM. Pinocchio (hand-written) is the floor a framework has to justify. Regenerate with `devenv shell -- benchmark:frameworks`; the full methodology and caveats live in [the framework comparison](https://pina.rs/framework-comparison.html).
 
 <!-- BEGIN GENERATED: readme-framework-comparison -->
 
@@ -157,23 +157,23 @@ pina build
 cargo test
 ```
 
-- [Getting started](https://pina-rs.github.io/pina/getting-started.html) — toolchain setup and project layout.
-- [Your first program](https://pina-rs.github.io/pina/tutorials/first-program.html) — accounts, instructions, and dispatch, end to end.
-- [Migrating from Anchor](https://pina-rs.github.io/pina/tutorials/migrating-from-anchor.html) — a side-by-side mapping of Anchor concepts.
-- [Crate features](https://pina-rs.github.io/pina/crates-and-features.html) — `compact`, `validation`, `token`, `account-resize`, and the logging toggles.
+- [Getting started](https://pina.rs/getting-started.html) — toolchain setup and project layout.
+- [Your first program](https://pina.rs/tutorials/first-program.html) — accounts, instructions, and dispatch, end to end.
+- [Migrating from Anchor](https://pina.rs/tutorials/migrating-from-anchor.html) — a side-by-side mapping of Anchor concepts.
+- [Crate features](https://pina.rs/crates-and-features.html) — `compact`, `validation`, `token`, `account-resize`, and the logging toggles.
 
 ## Documentation
 
 <br>
 
-The [book](https://pina-rs.github.io/pina/) is the documentation home; API docs are on [docs.rs](https://docs.rs/pina/). Frequently used pages:
+The [book](https://pina.rs/introduction.html) is the documentation home; API docs are on [docs.rs](https://docs.rs/pina/). Frequently used pages:
 
-- [Framework comparison](https://pina-rs.github.io/pina/framework-comparison.html) — how the tables above are measured.
-- [How ABI migrations flow](https://pina-rs.github.io/pina/migrations/flow.html) — version envelopes, transitions, and the publication ledger.
-- [Core concepts](https://pina-rs.github.io/pina/core-concepts.html) — accounts, instructions, discriminators, and validation chains.
-- [Security model](https://pina-rs.github.io/pina/security-model.html) and the [security guide](./security/readme.md) — vulnerable and secure patterns for all 11 common Solana attack categories.
-- [Pina CLI reference](https://pina-rs.github.io/pina/cli/index.html) — every command, including `pina lint`, `pina profile`, `pina dev`, and `pina deploy --rehearse`.
-- [Codama workflow](https://pina-rs.github.io/pina/codama-workflow.html) — IDL extraction and client generation for Rust, JS/TS, and Dart.
+- [Framework comparison](https://pina.rs/framework-comparison.html) — how the tables above are measured.
+- [How ABI migrations flow](https://pina.rs/migrations/flow.html) — version envelopes, transitions, and the publication ledger.
+- [Core concepts](https://pina.rs/core-concepts.html) — accounts, instructions, discriminators, and validation chains.
+- [Security model](https://pina.rs/security-model.html) and the [security guide](./security/readme.md) — vulnerable and secure patterns for all 11 common Solana attack categories.
+- [Pina CLI reference](https://pina.rs/cli/index.html) — every command, including `pina lint`, `pina profile`, `pina dev`, and `pina deploy --rehearse`.
+- [Codama workflow](https://pina.rs/codama-workflow.html) — IDL extraction and client generation for Rust, JS/TS, and Dart.
 - [sbpf-linker evaluation](./docs/sbpf-linker-evaluation.md) — the experimental upstream toolchain that builds smaller binaries without `cargo build-sbf`, with the measured trade-offs.
 
 ## Examples
@@ -192,7 +192,7 @@ The [book](https://pina-rs.github.io/pina/) is the documentation home; API docs 
 | [`upstream_bpf_program`](examples/upstream_bpf_program)         | Upstream-toolchain showcase: the same program built with the pinned `sbpf-linker`      |
 | [`hello_solana_program`](examples/hello_solana_program)         | Minimal program — entrypoint, accounts, logging                                        |
 
-Twenty-eight examples live in [`examples/`](./examples); the annotated list is in [the docs](https://pina-rs.github.io/pina/examples.html). The Anchor parity ports (`declare-id`, `declare-program`, duplicate-mutable-account checks, sysvar checks, custom errors, …) keep behaviour comparable while you migrate.
+Twenty-eight examples live in [`examples/`](./examples); the annotated list is in [the docs](https://pina.rs/examples.html). The Anchor parity ports (`declare-id`, `declare-program`, duplicate-mutable-account checks, sysvar checks, custom errors, …) keep behaviour comparable while you migrate.
 
 ## Workspace packages
 
@@ -227,13 +227,13 @@ Pina validates account identity, signer status, writability, ownership, and data
 pina lint
 ```
 
-See [SECURITY.md](./SECURITY.md) for the readiness statement and private vulnerability reporting, the [security model](https://pina-rs.github.io/pina/security-model.html) for the guarantees Pina does and does not make, and the [security guide](./security/readme.md) for worked vulnerable/secure pairs across all 11 common Solana attack categories.
+See [SECURITY.md](./SECURITY.md) for the readiness statement and private vulnerability reporting, the [security model](https://pina.rs/security-model.html) for the guarantees Pina does and does not make, and the [security guide](./security/readme.md) for worked vulnerable/secure pairs across all 11 common Solana attack categories.
 
 ## Contributing
 
 <br>
 
-Contributions are welcome! Please open an issue or pull request on [GitHub](https://github.com/pina-rs/pina). Read the [development workflow](https://pina-rs.github.io/pina/development-workflow.html) first — this repository reproduces every CI job locally before pushing.
+Contributions are welcome! Please open an issue or pull request on [GitHub](https://github.com/pina-rs/pina). Read the [development workflow](https://pina.rs/development-workflow.html) first — this repository reproduces every CI job locally before pushing.
 
 ## License
 
