@@ -29,7 +29,7 @@ export const INITIALIZE_COMPUTE_UNIT_LIMIT = 58300;
  * Compute units `setVerificationKey` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const SET_VERIFICATION_KEY_MEASURED_COMPUTE_UNITS = 15258;
+export const SET_VERIFICATION_KEY_MEASURED_COMPUTE_UNITS = 15257;
 
 /**
  * Compute unit limit to request for a transaction carrying `setVerificationKey`: the
@@ -81,14 +81,14 @@ export const DEPOSIT_COMPUTE_UNIT_LIMIT = 19500;
  * Compute units `withdraw` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const WITHDRAW_MEASURED_COMPUTE_UNITS = 86949;
+export const WITHDRAW_MEASURED_COMPUTE_UNITS = 92268;
 
 /**
  * Compute unit limit to request for a transaction carrying `withdraw`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const WITHDRAW_COMPUTE_UNIT_LIMIT = 104700;
+export const WITHDRAW_COMPUTE_UNIT_LIMIT = 111100;
 
 /**
  * Compute units `transfer` consumed in its most expensive recorded Surfpool

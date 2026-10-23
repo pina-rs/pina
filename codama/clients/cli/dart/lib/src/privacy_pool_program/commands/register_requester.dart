@@ -5,6 +5,7 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class RegisterRequesterCommand extends Command<void> {

@@ -13,7 +13,8 @@
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct VerifyingKeyAccount {
 	/// One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
-	/// (two public inputs), slot 1 transfer proofs (three).
+	/// (root, nullifier, recipient hash), slot 1 transfer proofs
+	/// (root, nullifier, output binding).
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,

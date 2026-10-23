@@ -7,6 +7,7 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class TransferCommand extends Command<void> {
@@ -78,9 +79,8 @@ final class TransferCommand extends Command<void> {
         : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
     final nullifierSet = (results['nullifier_set'] as String?) != null
         ? pubkey('--nullifier-set', results['nullifier_set']! as String)
-        : (await findNullifierSetPda(
-            programAddress: context.programAddress,
-          )).$1;
+        : (await findNullifierSetPda(programAddress: context.programAddress))
+              .$1;
     final verifyingKeyAccount = pubkey(
       '--verifying-key-account',
       results['verifying_key_account']! as String,

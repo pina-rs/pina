@@ -11,12 +11,12 @@
 pub const WITHDRAW_DISCRIMINATOR: u8 = 5u8;
 /// Compute units `Withdraw` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const WITHDRAW_MEASURED_COMPUTE_UNITS: u32 = 86949;
+pub const WITHDRAW_MEASURED_COMPUTE_UNITS: u32 = 92268;
 /// Compute unit limit to request for a transaction carrying `Withdraw`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const WITHDRAW_COMPUTE_UNIT_LIMIT: u32 = 104700;
+pub const WITHDRAW_COMPUTE_UNIT_LIMIT: u32 = 111100;
 
 /// Accounts.
 #[derive(Clone, Debug)]

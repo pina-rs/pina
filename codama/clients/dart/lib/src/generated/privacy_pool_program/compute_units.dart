@@ -20,7 +20,7 @@ const int initializeComputeUnitLimit = 58300;
 
 /// Compute units `setVerificationKey` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int setVerificationKeyMeasuredComputeUnits = 15258;
+const int setVerificationKeyMeasuredComputeUnits = 15257;
 
 /// Compute unit limit to request for a transaction carrying `setVerificationKey`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -56,12 +56,12 @@ const int depositComputeUnitLimit = 19500;
 
 /// Compute units `withdraw` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int withdrawMeasuredComputeUnits = 86949;
+const int withdrawMeasuredComputeUnits = 92268;
 
 /// Compute unit limit to request for a transaction carrying `withdraw`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int withdrawComputeUnitLimit = 104700;
+const int withdrawComputeUnitLimit = 111100;
 
 /// Compute units `transfer` consumed in its most expensive recorded Surfpool
 /// simulation.
