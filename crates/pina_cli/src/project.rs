@@ -490,7 +490,7 @@ impl Project {
 			.map(|raw| templates.resolve_dir(&root, "project.idl_dir", raw))
 			.transpose()?;
 		let (target_dir, idl_dir) =
-			resolve_build_output_dirs(&root, &metadata, configured_idl_dir)?;
+			resolve_build_output_dirs(&templates, &metadata, configured_idl_dir)?;
 		let clients_dir = templates.resolve_dir(&root, "clients.output", &config.clients.output)?;
 		let client_generation = config
 			.clients
@@ -559,7 +559,8 @@ impl Project {
 
 		let (library_name, library_source, library_crate_types) = library_details(package)?;
 		let root = program_dir.to_path_buf();
-		let (target_dir, idl_dir) = resolve_build_output_dirs(&root, &metadata, None)?;
+		let (target_dir, idl_dir) =
+			resolve_build_output_dirs(&PathTemplates::empty(root.clone()), &metadata, None)?;
 		let clients_dir = root.join("clients");
 		let clients_config = ClientsConfig::default();
 		let client_generation = clients_config
@@ -778,20 +779,24 @@ impl PathTemplates {
 
 	/// Return the cached git repository root, discovering it on first use.
 	fn git_root(&self, field: &'static str, raw: &str) -> Result<PathBuf, ProjectError> {
-		if let Some(root) = self.git_root.borrow().as_ref() {
-			return Ok(root.clone());
-		}
-
-		let discovered = discover_git_root(&self.discovery_dir).ok_or_else(|| {
+		self.discover_git_root().ok_or_else(|| {
 			ProjectError::InvalidConfigPath {
 				field,
 				path: PathBuf::from(raw),
 				reason: "the `{{root}}` anchor needs a git repository; run inside a repository or \
 				         add a `.git` entry to an ancestor directory",
 			}
-		})?;
+		})
+	}
+
+	fn discover_git_root(&self) -> Option<PathBuf> {
+		if let Some(root) = self.git_root.borrow().as_ref() {
+			return Some(root.clone());
+		}
+
+		let discovered = discover_git_root(&self.discovery_dir)?;
 		*self.git_root.borrow_mut() = Some(discovered.clone());
-		Ok(discovered)
+		Some(discovered)
 	}
 
 	/// Resolve a directory-valued path field to a normalized absolute path.
@@ -992,12 +997,15 @@ fn discover_git_root(start: &Path) -> Option<PathBuf> {
 
 /// Resolve build and IDL destinations before any output directories are created.
 fn resolve_build_output_dirs(
-	project_root: &Path,
+	templates: &PathTemplates,
 	metadata: &Metadata,
 	configured_idl_dir: Option<PathBuf>,
 ) -> Result<(PathBuf, PathBuf), ProjectError> {
-	let output_root =
-		output_containment_root(project_root, Some(metadata.workspace_root.as_std_path()));
+	let output_root = output_containment_root(
+		&templates.discovery_dir,
+		Some(metadata.workspace_root.as_std_path()),
+		templates.discover_git_root(),
+	);
 	let target = metadata.target_directory.as_std_path();
 	// The invoking environment is an operator choice. Repository Cargo
 	// configuration cannot grant itself permission to write outside the tree.
@@ -1103,17 +1111,21 @@ fn output_prefixes_equal(left: std::path::Prefix<'_>, right: std::path::Prefix<'
 /// configuration) is rejected in favor of `project_root`, because
 /// containment to `$HOME` would contain nothing.
 pub(crate) fn generation_containment_root(project_root: &Path) -> PathBuf {
-	output_containment_root(project_root, None)
+	output_containment_root(project_root, None, discover_git_root(project_root))
 }
 
-fn output_containment_root(project_root: &Path, cargo_workspace: Option<&Path>) -> PathBuf {
+fn output_containment_root(
+	project_root: &Path,
+	cargo_workspace: Option<&Path>,
+	git_root: Option<PathBuf>,
+) -> PathBuf {
 	let home = ["HOME", "USERPROFILE"]
 		.into_iter()
 		.find_map(std::env::var_os)
 		.map(PathBuf::from);
 
 	containment_root(
-		discover_git_root(project_root).or_else(|| {
+		git_root.or_else(|| {
 			cargo_workspace
 				.filter(|workspace| project_root.starts_with(workspace))
 				.map(Path::to_path_buf)
