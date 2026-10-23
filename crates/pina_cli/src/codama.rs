@@ -762,16 +762,16 @@ fn reject_outside_workspace(
 	targets: &[GeneratedClientTarget],
 ) -> Result<(), CodamaError> {
 	for target in targets {
-		if !target.path.starts_with(workspace_root) {
-			return Err(CodamaError::UnsafeOutput {
-				path: target.path.clone(),
-				reason: format!(
-					"configured client outputs must stay inside the Git worktree {}; pass \
-					 `--output` to publish outside it",
-					workspace_root.display()
-				),
-			});
-		}
+		crate::project::resolve_output_dir(workspace_root, "clients.output", &target.path)
+			.map_err(|error| {
+				CodamaError::UnsafeOutput {
+					path: target.path.clone(),
+					reason: format!(
+						"{error}; pass `--output` to publish clients outside {}",
+						workspace_root.display(),
+					),
+				}
+			})?;
 	}
 
 	Ok(())

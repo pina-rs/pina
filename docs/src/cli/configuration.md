@@ -51,7 +51,7 @@ Configuration paths are resolved relative to the directory containing `pina.toml
 - `{{root}}` expands to the git repository root — the working-tree top level, discovered with `git rev-parse --show-toplevel`. Linked worktrees resolve to the worktree itself, so each worktree gets its own output locations. Without a git binary, Pina falls back to the nearest ancestor containing a `.git` entry (a directory for repositories, a file for worktrees). Using `{{root}}` outside a repository is an error.
 - A declared anchor such as `{{ sdks }}` expands to the value of the `[project.paths]` entry of the same name. Entry values may only reference `{{root}}` — they cannot reference each other — which keeps resolution single-step and cycle-free. Anchor names must match `[A-Za-z_][A-Za-z0-9_-]*`; `root` is reserved. Whitespace inside the braces is allowed (`{{ sdks }}` and `{{sdks}}` are the same anchor).
 
-The discovery directory for `{{root}}` is the `pina.toml` folder, so a config nested in `programs/my_program/` can still write clients to `{{root}}/clients`. The git root is only consulted when an anchor is actually used.
+The discovery directory for `{{root}}` is the `pina.toml` folder, so a config nested in `programs/my_program/` can still write clients to `{{root}}/clients`. Output validation uses the same repository boundary even when no anchor is used.
 
 Validation rules for every configured path:
 
@@ -59,10 +59,12 @@ Validation rules for every configured path:
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Non-empty            | An empty or whitespace-only path is rejected.                                                                                                                                                                                                                                          |
 | Relative or anchored | Literal absolute paths (`/tmp/clients`, `C:\tmp`) are rejected; write `{{root}}/...` instead so the anchor is explicit.                                                                                                                                                                |
-| `..` traversal       | Allowed, including paths that leave the project directory. Traversing above the filesystem root is rejected.                                                                                                                                                                           |
+| `..` traversal       | Allowed within the repository for configured outputs. Input paths such as `project.program` may leave the repository. Traversing above the filesystem root is rejected.                                                                                                                |
 | Symbolic links       | Existing components beneath the trusted base (the project directory or the repository root for anchored paths) may not be symbolic links. Generation-time checks still refuse destinations that are themselves links, link-like targets, filesystem roots, or a git working-tree root. |
 
 Command-line path overrides follow normal shell behavior instead: `pina generate --output <DIR>` resolves a relative directory from the caller's current working directory, and `..` is accepted. Standard Cargo variables remain supported. In particular, a relative `CARGO_TARGET_DIR` is resolved by Cargo metadata and passed to the compiler as an explicit absolute target directory.
+
+Configured IDL and Cargo target directories must stay inside the Git worktree, or the Cargo workspace outside a repository. Pina checks these destinations during discovery, before creating output directories. Set `CARGO_TARGET_DIR` explicitly in the invoking environment to use an external build directory; the default IDL directory follows that override. An explicit `project.idl_dir` must still stay inside the repository. The `generate --output` flag relocates clients only and does not authorize an external IDL directory.
 
 ## `[project]` fields
 
