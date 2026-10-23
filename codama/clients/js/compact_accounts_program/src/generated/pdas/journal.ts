@@ -11,11 +11,12 @@ import {
 	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type JournalSeeds = {
-	authority: Address;
+	authority: Address | HasAddress;
 };
 
 export async function findJournalPda(

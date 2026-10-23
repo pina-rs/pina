@@ -31,6 +31,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -64,7 +65,7 @@ export type State = {
 };
 
 export type StateArgs = {
-	authority: Address;
+	authority: Address | HasAddress;
 	value: number | bigint;
 	enabled: boolean;
 	revision: number;

@@ -31,6 +31,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -67,9 +68,9 @@ export type RoleEntry = {
 };
 
 export type RoleEntryArgs = {
-	registry: Address;
+	registry: Address | HasAddress;
 	roleId: number | bigint;
-	grantee: Address;
+	grantee: Address | HasAddress;
 	permissions: number | bigint;
 	active: boolean;
 	bump: number;

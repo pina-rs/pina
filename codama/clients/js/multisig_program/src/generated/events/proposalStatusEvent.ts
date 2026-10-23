@@ -23,6 +23,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
@@ -53,7 +54,7 @@ export type ProposalStatusEventEvent = {
 };
 
 export type ProposalStatusEventEventArgs = {
-	multisig: Address;
+	multisig: Address | HasAddress;
 	index: number | bigint;
 	status: number;
 	timestamp: number | bigint;

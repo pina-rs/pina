@@ -33,6 +33,7 @@ import {
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -68,7 +69,7 @@ export type TodoState = {
 };
 
 export type TodoStateArgs = {
-	owner: Address;
+	owner: Address | HasAddress;
 	bump: number;
 	completed: boolean;
 	digest: ReadonlyUint8Array;

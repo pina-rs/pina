@@ -12,11 +12,12 @@ import {
 	getProgramDerivedAddress,
 	getU64Encoder,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type RoleEntrySeeds = {
-	registry: Address;
+	registry: Address | HasAddress;
 	roleId: number | bigint;
 };
 
