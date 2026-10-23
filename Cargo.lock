@@ -6848,6 +6848,7 @@ dependencies = [
  "pina",
  "pina_test",
  "rand 0.8.8",
+ "solana-sha256-hasher 3.1.0",
 ]
 
 [[package]]
@@ -6871,6 +6872,7 @@ dependencies = [
  "solana-instruction 3.4.1",
  "solana-pubkey 4.2.1",
  "solana-sdk-ids 3.1.0",
+ "solana-sha256-hasher 3.1.0",
 ]
 
 [[package]]

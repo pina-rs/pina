@@ -27,6 +27,8 @@ mod program;
 use mollusk_svm::Mollusk;
 use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
+use pina::PinaAccount;
+use pina::PinaPodFixed;
 use program::Address;
 use program::ApproveDisclosureIx;
 use program::CancelDisclosureIx;
@@ -483,13 +485,14 @@ fn withdraw_ix(
 	let circuit = prover::SpendCircuit {
 		root: prover::fr_from_le(&root).unwrap_or_else(|| panic!("root")),
 		nullifier: prover::fr_from_le(&nullifier).unwrap_or_else(|| panic!("nullifier")),
-		output_commitment: None,
+		output_binding: None,
 		amount: ark_bn254::Fr::from(DEPOSIT_LAMPORTS),
 		witness: Some(prover::SpendWitness {
 			spent: *secrets,
 			path_elements,
 			path_indices,
 			successor: None,
+			successor_metadata_digest: None,
 		}),
 	};
 	let proof = prover::prove_spend(pk, circuit, seed);
@@ -542,19 +545,22 @@ fn transfer_ix(
 ) -> Instruction {
 	let nullifier = nullifier_bytes(spent);
 	let new_commitment = commitment_bytes(successor, DEPOSIT_LAMPORTS);
+	let envelope: [u8; 128] = core::array::from_fn(|index| 0x40 ^ index as u8);
+	let shares: [u8; 144] = core::array::from_fn(|index| 0x80 ^ index as u8);
+	let metadata = transfer_metadata_digest(&[0x0B; 32], 96, &envelope, &shares).unwrap();
+	let binding = transfer_output_binding(&new_commitment, &metadata).unwrap();
 	let (path_elements, path_indices) = prover::build_witness(nodes, leaf_index);
 	let circuit = prover::SpendCircuit {
 		root: prover::fr_from_le(&root).unwrap_or_else(|| panic!("root")),
 		nullifier: prover::fr_from_le(&nullifier).unwrap_or_else(|| panic!("nullifier")),
-		output_commitment: Some(
-			prover::fr_from_le(&new_commitment).unwrap_or_else(|| panic!("commitment")),
-		),
+		output_binding: Some(prover::fr_from_le(&binding).unwrap()),
 		amount: ark_bn254::Fr::from(DEPOSIT_LAMPORTS),
 		witness: Some(prover::SpendWitness {
 			spent: *spent,
 			path_elements,
 			path_indices,
 			successor: Some(*successor),
+			successor_metadata_digest: Some(prover::fr_from_le(&metadata).unwrap()),
 		}),
 	};
 	let proof = prover::prove_spend(pk, circuit, seed);
@@ -566,9 +572,6 @@ fn transfer_ix(
 	let (vkey_key, _) = vkey_pda(VK_SLOT_TRANSFER);
 	let (note_key, bump) = note_pda(&new_commitment);
 
-	let envelope: [u8; 128] = core::array::from_fn(|index| 0x40 ^ index as u8);
-	let shares: [u8; 144] = core::array::from_fn(|index| 0x80 ^ index as u8);
-
 	let mut data = vec![0_u8; TransferIx::SIZE];
 	TransferIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
@@ -576,7 +579,7 @@ fn transfer_ix(
 		ix.root = root;
 		ix.new_commitment = new_commitment;
 		ix.new_view_pubkey = [0x0B; 32];
-		ix.envelope_len = 128;
+		ix.envelope_len = 96;
 		ix.envelope = envelope;
 		ix.shares = shares;
 		ix.proof_a = wire.a;
@@ -985,6 +988,74 @@ fn transfer_rekeys_a_note_with_a_real_proof() {
 	assert_eq!(
 		pool.world.get(&vault_key).lamports,
 		rent_only_vault + DEPOSIT_LAMPORTS
+	);
+}
+
+#[test]
+#[ignore = "requires the SBF artifact"]
+fn copied_transfer_cannot_replace_successor_disclosure_metadata() {
+	let mut pool = setup_pool();
+	let spent = deposit_note(&mut pool, 2, 0x88, [0x22; 32]);
+	let successor = prover::note_secrets(0xAB);
+	let commitment = commitment_bytes(&successor, DEPOSIT_LAMPORTS);
+	let target = note_pda(&commitment).0;
+	pool.world.add(target, Account::default());
+	let original = transfer_ix(
+		current_root(&pool.world),
+		&spent,
+		&successor,
+		key(3),
+		&pool.transfer_pk,
+		0,
+		&tree_nodes(&pool.world),
+		0xCD,
+	);
+
+	// Copy the proof and proof-bound fields; change only disclosure metadata.
+	let mutations: &[fn(&mut <TransferIx as PinaPodFixed>::Zc)] = &[
+		|ix| ix.new_view_pubkey[0] ^= 1,
+		|ix| ix.new_view_pubkey[31] ^= 1,
+		|ix| ix.envelope_len -= 1,
+		|ix| ix.envelope_len += 1,
+		|ix| ix.envelope[0] ^= 1,
+		|ix| ix.envelope[95] ^= 1,
+		|ix| ix.shares[0] ^= 1,
+		|ix| ix.shares[48] ^= 1,
+		|ix| ix.shares[96] ^= 1,
+		|ix| ix.shares[143] ^= 1,
+	];
+	for mutate in mutations {
+		let mut copied = original.clone();
+		mutate(TransferIx::read_exact_mut(&mut copied.data).unwrap());
+		let before = pool.world.accounts.clone();
+		pool.world.run(
+			&pool.mollusk,
+			&copied,
+			&[Check::err(PrivacyPoolError::ProofVerificationFailed.into())],
+		);
+		for (address, account) in before {
+			assert_eq!(pool.world.get(&address), &account);
+		}
+	}
+
+	// Unused envelope padding is discarded, so it has no authenticated effect.
+	let mut padded = original;
+	TransferIx::read_exact_mut(&mut padded.data)
+		.unwrap()
+		.envelope[127] ^= 1;
+	pool.world.run(&pool.mollusk, &padded, &[Check::success()]);
+	let note = NoteCommitment::try_from_bytes(&pool.world.get(&target).data).unwrap();
+	assert_eq!(note.commitment, commitment);
+	assert_eq!(note.view_pubkey, [0x0B; 32]);
+	assert_eq!(note.envelope_len, 96);
+	assert_eq!(
+		&note.envelope[..96],
+		&core::array::from_fn::<_, 96, _>(|i| 0x40 ^ i as u8)
+	);
+	assert_eq!(&note.envelope[96..], &[0; 32]);
+	assert_eq!(
+		note.shares,
+		core::array::from_fn::<_, 144, _>(|i| 0x80 ^ i as u8)
 	);
 }
 

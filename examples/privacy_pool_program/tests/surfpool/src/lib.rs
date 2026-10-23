@@ -452,13 +452,14 @@ fn withdraw_pays_out_through_a_real_proof() {
 		let circuit = prover::SpendCircuit {
 			root: prover::fr_from_le(&root).unwrap(),
 			nullifier: prover::fr_from_le(&nullifier).unwrap(),
-			output_commitment: None,
+			output_binding: None,
 			amount: prover::amount_field(),
 			witness: Some(prover::SpendWitness {
 				spent: secrets,
 				path_elements,
 				path_indices,
 				successor: None,
+				successor_metadata_digest: None,
 			}),
 		};
 		let proof = prover::prove_spend(&pk, circuit, 0x99);
@@ -701,16 +702,23 @@ fn every_instruction_discriminator_is_exercised() {
 		let successor = prover::note_secrets(0xAB);
 		let (path_elements, path_indices) = prover::build_witness(&nodes, 0);
 		let (transfer_pk, _) = prover::seeded_setup(true, 0x2222);
+		let envelope = core::array::from_fn(|index| 0x40 ^ index as u8);
+		let shares = core::array::from_fn(|index| 0x80 ^ index as u8);
+		let metadata =
+			program::transfer_metadata_digest(&[0x0B; 32], 128, &envelope, &shares).unwrap();
+		let binding =
+			program::transfer_output_binding(&commitment_bytes(&successor), &metadata).unwrap();
 		let circuit = prover::SpendCircuit {
 			root: prover::fr_from_le(&root).unwrap(),
 			nullifier: prover::fr_from_le(&nullifier).unwrap(),
-			output_commitment: Some(prover::fr_from_le(&commitment_bytes(&successor)).unwrap()),
+			output_binding: Some(prover::fr_from_le(&binding).unwrap()),
 			amount: prover::amount_field(),
 			witness: Some(prover::SpendWitness {
 				spent: secrets,
 				path_elements,
 				path_indices,
 				successor: Some(successor),
+				successor_metadata_digest: Some(prover::fr_from_le(&metadata).unwrap()),
 			}),
 		};
 		let wire = prover::serialize_proof(&prover::prove_spend(&transfer_pk, circuit, 0xCD));
@@ -723,8 +731,8 @@ fn every_instruction_discriminator_is_exercised() {
 			ix.new_commitment = commitment_bytes(&successor);
 			ix.new_view_pubkey = [0x0B; 32];
 			ix.envelope_len = 128;
-			ix.envelope = core::array::from_fn(|index| 0x40 ^ index as u8);
-			ix.shares = core::array::from_fn(|index| 0x80 ^ index as u8);
+			ix.envelope = envelope;
+			ix.shares = shares;
 			ix.proof_a = wire.a;
 			ix.proof_b = wire.b;
 			ix.proof_c = wire.c;
