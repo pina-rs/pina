@@ -241,6 +241,10 @@ jobs:
         run: security:zizmor
         shell: devenv shell -c -- bash -e {0}
 
+      - name: test privileged workflow provenance
+        run: node --test .github/tests/workflow-provenance.test.ts
+        shell: devenv shell -c -- bash -e {0}
+
   test:
     # `test:all` sweeps every workspace member, so allow the same headroom as
     # the `program-e2e` job.

@@ -7,16 +7,18 @@ on:
       - main
 
 permissions:
-  actions: write # Dispatch the publish dry run against the release branch.
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
+  authorize:
+    uses: $/.github/workflows/authorize-main.yml
+
   create:
     if: github.repository_owner == 'pina-rs'
+    needs: authorize
     outputs:
       is_release_commit: ${{ steps.release_record.outputs.is_release_commit }}
     timeout-minutes: 20
@@ -35,6 +37,7 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.authorize.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -136,11 +139,12 @@ jobs:
             echo "::error::Could not determine the release tag for the dry run." >&2
             exit 1
           fi
+          release_sha="$(git rev-parse "$release_branch^{commit}")"
           gh workflow run publish.yml \
             --repo "$GITHUB_REPOSITORY" \
-            --ref "$release_branch" \
+            --ref main \
             -f "tag=$tag" \
-            -f "checkout_ref=$release_branch" \
+            -f "checkout_ref=$release_sha" \
             -f "dry_run=true"
         shell: devenv shell -- bash -e {0}
 
@@ -154,7 +158,7 @@ jobs:
 
   tag:
     if: github.repository_owner == 'pina-rs' && needs.create.outputs.is_release_commit == 'true'
-    needs: create
+    needs: [authorize, create]
     timeout-minutes: 90
     runs-on: ubuntu-24.04
     permissions:
@@ -166,6 +170,7 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.authorize.outputs.sha }}
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
@@ -205,20 +210,23 @@ jobs:
             echo "::error::Could not determine the release tag for the dry run." >&2
             exit 1
           fi
-          # The dispatch API requires a branch or tag ref, not a raw SHA:
-          # push a stable per-release branch pointing at the release commit
-          # and dispatch against it.
-          dry_ref="publish-dry-run/$release_tag"
-          git push --force origin "+$(git rev-parse HEAD):refs/heads/$dry_ref"
+          # Load the workflow from main, while building this immutable commit.
+          release_sha="$(git rev-parse HEAD)"
           gh workflow run publish.yml \
             --repo "$GITHUB_REPOSITORY" \
-            --ref "$dry_ref" \
+            --ref main \
             -f "tag=$release_tag" \
-            -f "checkout_ref=$dry_ref" \
+            -f "checkout_ref=$release_sha" \
             -f "dry_run=true"
           sleep 20
-          dry_run_id="$(gh run list --workflow publish.yml --event workflow_dispatch \
-            --json databaseId,createdAt --jq 'sort_by(.createdAt) | last | .databaseId')"
+          dry_run_title="publish $release_tag @ $release_sha (dry-run=true)"
+          dry_run_id="$(gh run list --workflow publish.yml --event workflow_dispatch --branch main \
+            --json databaseId,createdAt,displayTitle \
+            | jq -r --arg title "$dry_run_title" '[.[] | select(.displayTitle == $title)] | sort_by(.createdAt) | last | .databaseId // empty')"
+          if [ -z "$dry_run_id" ]; then
+            echo "::error::Could not find a dry run for the exact release commit." >&2
+            exit 1
+          fi
           echo "Waiting for the publish dry run $dry_run_id..."
           gh run watch "$dry_run_id" --exit-status --interval 30
         shell: devenv shell -- bash -e {0}
@@ -240,9 +248,8 @@ jobs:
         shell: devenv shell -- bash -e {0}
 
       # A tag pushed with GITHUB_TOKEN does not trigger another workflow. Use
-      # workflow_dispatch explicitly so publish.yml always receives the release,
-      # dispatched from the tag itself so the workflow's $/ self-repository
-      # action references resolve from the published tag instead of main.
+      # workflow_dispatch loads publish.yml from main and carries the exact
+      # authorized commit separately from the release tag.
       - name: dispatch release publishing
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -292,8 +299,9 @@ jobs:
             else
               gh workflow run publish.yml \
                 --repo "$GITHUB_REPOSITORY" \
-                --ref "$tag" \
-                --field "tag=$tag"
+                --ref main \
+                --field "tag=$tag" \
+                --field "checkout_ref=$(git rev-parse HEAD)"
             fi
           done
         shell: devenv shell -- bash -e {0}

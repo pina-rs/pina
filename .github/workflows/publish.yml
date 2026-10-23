@@ -1,4 +1,5 @@
 name: publish
+run-name: "publish ${{ inputs.tag || github.ref_name }} @ ${{ inputs.checkout_ref || github.sha }} (dry-run=${{ inputs.dry_run == true }})"
 
 # Single workflow that builds release artifacts, publishes packages, and
 # publishes the GitHub release. release-pr.yml explicitly dispatches it after
@@ -18,7 +19,7 @@ on:
         type: boolean
         default: false
       checkout_ref:
-        description: "Ref to build when it points at the same commit as `tag`. A dry run against a release PR passes its branch here so the exact PR commit is validated; the resolve step rejects the run when the two disagree."
+        description: "Commit SHA to build. Release automation passes an immutable SHA, including for unmerged read-only previews. Real publishing also requires the tag to match and the commit to be merged into protected main. Dispatch this workflow from main."
         required: false
         type: string
   push:
@@ -42,6 +43,9 @@ env:
   RELEASE_ASSET_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
+  authorize:
+    uses: $/.github/workflows/authorize-main.yml
+
   # Resolve the release to exactly one commit before anything is checked out.
   # `checkout_ref` exists so a dry run can validate the release commit before
   # the tag exists; left unconstrained it would also let a manual retry build
@@ -49,6 +53,7 @@ jobs:
   # users install. Every downstream job takes its `ref:` and `sha:` from here
   # instead of re-deriving a symbolic ref.
   resolve_revision:
+    needs: authorize
     name: resolve release revision
     if: >-
       github.repository_owner == 'pina-rs' &&
@@ -66,6 +71,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           DRY_RUN: ${{ inputs.dry_run }}
           REQUESTED_REF: ${{ inputs.checkout_ref }}
+          APPROVED_MAIN_SHA: ${{ needs.authorize.outputs.main_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -115,200 +121,50 @@ jobs:
             exit 1
           fi
 
+          if [[ ! "$resolved_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checkout ref did not resolve to a full commit SHA." >&2
+            exit 1
+          fi
+
+          # Only read-only previews may build unmerged code. Every job with
+          # release credentials must build a commit already on protected main.
+          if [[ "$DRY_RUN" != true ]]; then
+            status="$(gh api "repos/$GITHUB_REPOSITORY/compare/$resolved_sha...$APPROVED_MAIN_SHA" --jq '.status')"
+            if [[ "$status" != identical && "$status" != ahead ]]; then
+              echo "::error::Release commit has not been merged into protected main." >&2
+              exit 1
+            fi
+          fi
+
           if [[ -z "$tag_sha" ]]; then
             echo "Release tag '$RELEASE_TAG' does not exist yet; pinning this dry run to $resolved_sha."
           fi
           echo "sha=$resolved_sha" >> "$GITHUB_OUTPUT"
           echo "Releasing $RELEASE_TAG from $resolved_sha"
 
-  upload_assets:
-    name: build ${{ matrix.target }}
-    needs:
-      - resolve_revision
-    if: >-
-      github.repository_owner == 'pina-rs' &&
-      startsWith(inputs.tag || github.ref_name, 'v')
-    # Upload native archives to the draft release and attest their provenance.
+  preview_assets:
+    needs: resolve_revision
+    if: inputs.dry_run == true && startsWith(inputs.tag, 'v')
+    # Unmerged previews must not write caches in main's scope.
+    cache-mode: read
     permissions:
-      attestations: write # Record provenance for the native CLI archives.
-      contents: write # Upload archives and checksums to the draft release.
-      id-token: write # Exchange GitHub's OIDC identity for an attestation.
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # The prebuilt lint driver cannot be cross-compiled: `rustc-dev`
-          # ships compiler libraries only for the toolchain's own host, so a
-          # driver can only be produced on a runner whose architecture
-          # matches the release target. Targets without a matching runner
-          # ship CLI-only archives; on those platforms `pina lint` falls back
-          # to `--build-driver`, which compiles the driver from the matching
-          # `pina_lints` release with the project's own toolchain.
-          #
-          # Each driver-capable target publishes its driver twice: inside the
-          # CLI archive (so the driver sits next to the CLI for a project on
-          # the pinned nightly) and as a standalone asset named for its exact
-          # compiler revision (so `cargo install pina_cli` users, who get no
-          # archive, can fetch one). The standalone asset is what makes the
-          # name a negotiation: it carries the commit hash, so a project on a
-          # different nightly asks for a name this release does not publish
-          # and gets a clear miss instead of an unloadable binary.
-          # The prebuilt driver loads `librustc_driver` from the project's
-          # own pinned nightly at runtime; nothing beyond the two binaries is
-          # archived.
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-24.04-arm
-            lint_driver: true
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            lint_driver: true
-          - target: aarch64-pc-windows-msvc
-            os: windows-latest
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            lint_driver: true
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-          - target: x86_64-apple-darwin
-            os: macos-latest
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            lint_driver: true
-          - target: x86_64-unknown-freebsd
-            os: ubuntu-latest
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    steps:
-      # The release-pr tag job pushes the tag (firing this workflow) and then
-      # creates the draft release. Wait for that draft release to exist before
-      # uploading assets into it. A dry run never waits (and never uploads):
-      # no draft release is created for it.
-      - name: wait for draft release
-        if: inputs.dry_run != true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Waiting for the draft release $RELEASE_TAG to be created by the release-pr tag job..."
-          for attempt in $(seq 1 30); do
-            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              echo "Draft release $RELEASE_TAG exists after $attempt attempt(s)."
-              exit 0
-            fi
-            echo "  attempt $attempt/30: release not found yet; sleeping 10s"
-            sleep 10
-          done
-          echo "::error::Release $RELEASE_TAG was not created within the wait window. Check the release-pr tag job." >&2
-          exit 1
-      - name: checkout release tag
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.resolve_revision.outputs.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: install rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
-        with:
-          # Targets without an explicit host toolchain build from the
-          # workspace's `rust-toolchain.toml` pin, which carries `rustc-dev`.
-          toolchain: ${{ matrix.toolchain || 'stable' }}
-          components: ${{ matrix.toolchain && 'rustc-dev' || '' }}
-      - name: pin build toolchain
-        if: matrix.toolchain
-        shell: bash
-        run: echo "RUSTUP_TOOLCHAIN=${{ matrix.toolchain }}" >> "$GITHUB_ENV"
-      - name: setup cross toolchain
-        if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
-        uses: taiki-e/setup-cross-toolchain-action@12b7ad4acfa95a1476779d6c06699b96ec1691f8 # v1.42.0
-        with:
-          target: ${{ matrix.target }}
-      - name: install cross
-        if: contains(matrix.target, '-musl')
-        uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
-        with:
-          tool: cross
-      - name: set static crt linkage
-        if: endsWith(matrix.target, 'windows-msvc')
-        shell: bash
-        run: echo "RUSTFLAGS=${RUSTFLAGS:-} -C target-feature=+crt-static" >> "$GITHUB_ENV"
-      - name: build prebuilt lint driver
-        if: matrix.lint_driver
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo build --release --package pina_lints --bin pina_lint_driver \
-            --target ${{ matrix.target }}
-      - name: upload binaries
-        uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
-        with:
-          bin: pina
-          manifest-path: crates/pina_cli/Cargo.toml
-          profile: release
-          # The action derives its upload target from this ref and refuses a
-          # bare SHA outside a dry run, so it gets the tag itself; resolve_revision
-          # has already proven the tag points at the validated commit.
-          ref: ${{ inputs.checkout_ref || format('refs/tags/{0}', env.RELEASE_TAG) }}
-          archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
-          target: ${{ matrix.target }}
-          include: ${{ matrix.lint_driver == true && (endsWith(matrix.target, '-windows-msvc') && format('target/{0}/release/pina_lint_driver.exe', matrix.target) || format('target/{0}/release/pina_lint_driver', matrix.target)) || '' }}
-          tar: all
-          zip: windows
-          dry-run: ${{ inputs.dry_run == true }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          checksum: sha256,sha512
-      # Publish the driver as its own asset for users who installed the CLI
-      # from crates.io and therefore have no archive to unpack. The name
-      # embeds the exact compiler revision so `pina lint` requests the driver
-      # for its active nightly by name; another nightly misses rather than
-      # downloading a binary it cannot load.
-      - name: upload standalone lint driver
-        if: matrix.lint_driver && inputs.dry_run != true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
+      contents: read
+    uses: $/.github/workflows/build-release.yml
+    with:
+      sha: ${{ needs.resolve_revision.outputs.sha }}
+      tag: ${{ inputs.tag }}
+      dry_run: true
 
-          # The revision is read from the compiler that just built the
-          # driver, which is the toolchain this release pins.
-          revision="$(rustc -vV | sed -n 's/^commit-hash: //p')"
-          if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Could not read a full commit hash from rustc -vV (got '$revision')" >&2
-            exit 1
-          fi
-
-          extension=""
-          case "${{ matrix.target }}" in
-            *windows*) extension=".exe" ;;
-          esac
-          built="target/${{ matrix.target }}/release/pina_lint_driver${extension}"
-          asset="pina-lint-driver-${{ matrix.target }}-${revision}${extension}"
-
-          if [[ ! -f "$built" ]]; then
-            echo "::error::The lint driver was not built at $built" >&2
-            exit 1
-          fi
-
-          staged="$RUNNER_TEMP/$asset"
-          cp "$built" "$staged"
-          chmod 755 "$staged"
-          gh release upload "$RELEASE_TAG" "$staged" \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
-          echo "Uploaded $asset"
-
-          # `pina lint` verifies a downloaded driver against this file before
-          # installing it, so the checksum must ship beside the asset. The
-          # standalone driver has no archive, so the `checksum: sha256,sha512`
-          # option on the archive upload does not cover it.
-          sha256sum "$staged" | sed "s|$RUNNER_TEMP/||" > "$staged.sha256"
-          gh release upload "$RELEASE_TAG" "$staged.sha256" \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
-          echo "Uploaded $asset.sha256"
+  upload_assets:
+    needs: resolve_revision
+    if: inputs.dry_run != true && startsWith(inputs.tag || github.ref_name, 'v')
+    permissions:
+      contents: write # Upload assets only after the commit is approved.
+    uses: $/.github/workflows/build-release.yml
+    with:
+      sha: ${{ needs.resolve_revision.outputs.sha }}
+      tag: ${{ inputs.tag || github.ref_name }}
+      dry_run: false
 
   attest_assets:
     name: attest release assets
