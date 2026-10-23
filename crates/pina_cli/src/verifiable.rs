@@ -261,6 +261,7 @@ trait CommandRunner {
 		program: &OsStr,
 		args: &[OsString],
 		cwd: &Path,
+		environment: &[(&str, &OsStr)],
 	) -> Result<CommandOutput, std::io::Error>;
 
 	fn inherit(
@@ -279,8 +280,13 @@ impl CommandRunner for ProcessRunner {
 		program: &OsStr,
 		args: &[OsString],
 		cwd: &Path,
+		environment: &[(&str, &OsStr)],
 	) -> Result<CommandOutput, std::io::Error> {
-		let output = Command::new(program).args(args).current_dir(cwd).output()?;
+		let output = Command::new(program)
+			.args(args)
+			.current_dir(cwd)
+			.envs(environment.iter().copied())
+			.output()?;
 
 		Ok(CommandOutput {
 			success: output.status.success(),
@@ -670,12 +676,15 @@ fn build_on_supported_host(
 		.root
 		.as_deref()
 		.ok_or(VerifyBuildError::SourceControlRequired)?;
+
 	if source.dirty != Some(false) {
 		return Err(VerifyBuildError::DirtySource);
 	}
-	if source.revision.is_none() {
-		return Err(VerifyBuildError::SourceRevisionUnavailable);
-	}
+
+	let revision = source
+		.revision
+		.as_deref()
+		.ok_or(VerifyBuildError::SourceRevisionUnavailable)?;
 
 	let workspace_root = project.workspace_root().map_err(|source| {
 		VerifyBuildError::WorkspaceDiscovery {
@@ -689,9 +698,16 @@ fn build_on_supported_host(
 		.tempdir()
 		.map_err(|source| VerifyBuildError::CreateSnapshot { source })?;
 	let snapshot_root = snapshot.path().join("source");
+	let snapshot_index = snapshot.path().join("index");
 	std::fs::create_dir(&snapshot_root)
 		.map_err(|source| VerifyBuildError::CreateSnapshot { source })?;
-	stage_tracked_source(source_root, &snapshot_root, runner)?;
+	stage_tracked_source(
+		source_root,
+		revision,
+		&snapshot_root,
+		&snapshot_index,
+		runner,
+	)?;
 	audit_snapshot(&snapshot_root)?;
 
 	let snapshot_workspace = snapshot_root.join(workspace_relative);
@@ -783,7 +799,7 @@ fn check_version(
 	runner: &impl CommandRunner,
 ) -> Result<(), VerifyBuildError> {
 	let output = runner
-		.capture(executable, &[OsString::from("--version")], cwd)
+		.capture(executable, &[OsString::from("--version")], cwd, &[])
 		.map_err(|source| {
 			VerifyBuildError::Run {
 				command: "solana-verify --version",
@@ -866,6 +882,7 @@ fn inspect_source(project: &Project, runner: &impl CommandRunner) -> SourceInspe
 			OsString::from("--show-toplevel"),
 		],
 		&project.root,
+		&[],
 	);
 	let Ok(root_output) = root_output else {
 		return unavailable_source();
@@ -876,8 +893,8 @@ fn inspect_source(project: &Project, runner: &impl CommandRunner) -> SourceInspe
 	let Ok(root) = std::fs::canonicalize(root) else {
 		return unavailable_source();
 	};
-	let revision =
-		git_text(runner, &root, &["rev-parse", "HEAD"]).filter(|value| is_git_revision(value));
+	let revision = git_text(runner, &root, &["rev-parse", "--verify", "HEAD^{commit}"])
+		.filter(|value| is_git_revision(value));
 	let repository = git_text(runner, &root, &["config", "--get", "remote.origin.url"])
 		.filter(|value| is_public_https_url(value));
 	let dirty = git_capture(
@@ -920,14 +937,24 @@ fn unavailable_source() -> SourceInspection {
 	}
 }
 
+/// Exports the recorded revision through a private index so concurrent worktree
+/// or index changes cannot substitute different build inputs.
+/// Attribute lookup also uses the snapshot instead of the mutable worktree.
 fn stage_tracked_source(
 	root: &Path,
+	revision: &str,
 	destination: &Path,
+	index: &Path,
 	runner: &impl CommandRunner,
 ) -> Result<(), VerifyBuildError> {
 	let mut prefix = destination.as_os_str().to_owned();
 	prefix.push(std::path::MAIN_SEPARATOR_STR);
-	let args = [
+	let environment = [
+		("GIT_INDEX_FILE", index.as_os_str()),
+		("GIT_WORK_TREE", destination.as_os_str()),
+		("GIT_NO_REPLACE_OBJECTS", OsStr::new("1")),
+	];
+	let checkout_args = vec![
 		OsString::from("checkout-index"),
 		OsString::from("--all"),
 		OsString::from("--force"),
@@ -937,19 +964,21 @@ fn stage_tracked_source(
 			argument
 		},
 	];
-	let output = runner
-		.capture(OsStr::new("git"), &args, root)
-		.map_err(|source| {
-			VerifyBuildError::Run {
-				command: "git checkout-index",
-				source,
-			}
-		})?;
+	let read_args = vec![OsString::from("read-tree"), OsString::from(revision)];
 
-	if !output.success {
-		return Err(VerifyBuildError::StageTrackedSource {
-			status: output.status,
-		});
+	for (command, args) in [
+		("git read-tree", read_args),
+		("git checkout-index", checkout_args),
+	] {
+		let output = runner
+			.capture(OsStr::new("git"), &args, root, &environment)
+			.map_err(|source| VerifyBuildError::Run { command, source })?;
+
+		if !output.success {
+			return Err(VerifyBuildError::StageTrackedSource {
+				status: output.status,
+			});
+		}
 	}
 
 	Ok(())
@@ -964,7 +993,7 @@ fn git_text(runner: &impl CommandRunner, root: &Path, args: &[&str]) -> Option<S
 
 fn git_capture(runner: &impl CommandRunner, root: &Path, args: &[&str]) -> Option<Vec<u8>> {
 	let args = args.iter().map(OsString::from).collect::<Vec<_>>();
-	let output = runner.capture(OsStr::new("git"), &args, root).ok()?;
+	let output = runner.capture(OsStr::new("git"), &args, root, &[]).ok()?;
 	output.success.then_some(output.stdout)
 }
 
@@ -1217,6 +1246,7 @@ mod tests {
 		args: Vec<OsString>,
 		cwd: PathBuf,
 		inherit: bool,
+		environment: Vec<(String, OsString)>,
 	}
 
 	#[derive(Default)]
@@ -1239,12 +1269,17 @@ mod tests {
 			args: &[OsString],
 			cwd: &Path,
 			inherit: bool,
+			environment: &[(&str, &OsStr)],
 		) -> Result<CommandOutput, std::io::Error> {
 			self.calls.borrow_mut().push(Invocation {
 				program: program.to_owned(),
 				args: args.to_vec(),
 				cwd: cwd.to_path_buf(),
 				inherit,
+				environment: environment
+					.iter()
+					.map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+					.collect(),
 			});
 			self.outputs
 				.borrow_mut()
@@ -1259,8 +1294,9 @@ mod tests {
 			program: &OsStr,
 			args: &[OsString],
 			cwd: &Path,
+			environment: &[(&str, &OsStr)],
 		) -> Result<CommandOutput, std::io::Error> {
-			self.next(program, args, cwd, false)
+			self.next(program, args, cwd, false, environment)
 		}
 
 		fn inherit(
@@ -1269,7 +1305,7 @@ mod tests {
 			args: &[OsString],
 			cwd: &Path,
 		) -> Result<CommandOutput, std::io::Error> {
-			self.next(program, args, cwd, true)
+			self.next(program, args, cwd, true, &[])
 		}
 	}
 
@@ -1352,6 +1388,7 @@ mod tests {
 				args: vec![OsString::from("--version")],
 				cwd: PathBuf::from("project"),
 				inherit: false,
+				environment: Vec::new(),
 			}]
 		);
 
@@ -1985,6 +2022,7 @@ mod tests {
 			output(true, b""),
 		));
 		outputs.push(output(true, b""));
+		outputs.push(output(true, b""));
 		outputs.push(Err(std::io::Error::other("build spawn failed")));
 		let runner = FakeRunner::with_outputs(outputs);
 		let error = build_on_supported_host(&project, &features, false, &options, &runner).err();
@@ -2006,6 +2044,7 @@ mod tests {
 			b"https://github.com/pina-rs/program",
 			output(true, b""),
 		));
+		outputs.push(output(true, b""));
 		outputs.push(output(true, b""));
 		outputs.push(output(true, b""));
 		let runner = FakeRunner::with_outputs(outputs);
@@ -2228,32 +2267,137 @@ mod tests {
 	}
 
 	#[test]
-	fn tracked_source_staging_uses_a_single_structured_git_invocation() {
-		let runner = FakeRunner::with_outputs(vec![output(true, b"")]);
-		stage_tracked_source(Path::new("repo"), Path::new("stage with spaces"), &runner)
-			.unwrap_or_else(|error| panic!("staging failed: {error}"));
+	fn tracked_source_staging_ignores_later_index_changes() -> Result<(), Box<dyn std::error::Error>>
+	{
+		let repo = TempDir::new()?;
+		let destination = TempDir::new()?;
+		let root = repo.path();
+		let git = |args: &[&str]| {
+			git_text(&ProcessRunner, root, args).ok_or(format!("git command failed: {args:?}"))
+		};
+		git(&["init", "--quiet"])?;
+		fs::create_dir(root.join("src"))?;
+
+		for (path, contents) in [
+			(".gitattributes", b"* -text\n".as_slice()),
+			("src/lib.rs", b"approved source\n".as_slice()),
+			("Cargo.lock", b"approved lockfile\n".as_slice()),
+			("binary input", b"\x00\xff\r\n".as_slice()),
+		] {
+			fs::write(root.join(path), contents)?;
+		}
+
+		git(&["add", "."])?;
+		let tree = git(&["write-tree"])?;
+		assert!(is_git_revision(&tree));
+		let paths = [".gitattributes", "src/lib.rs", "Cargo.lock", "binary input"];
+		let expected_hashes = paths.map(|path| git(&["rev-parse", &format!("{tree}:{path}")]));
+		fs::write(root.join(".gitattributes"), b"*.rs text eol=crlf\n")?;
+		fs::write(root.join("src/lib.rs"), b"unreviewed source\n")?;
+		fs::remove_file(root.join("Cargo.lock"))?;
+		fs::write(root.join("injected"), b"unreviewed input\n")?;
+		git(&["add", "--all"])?;
+		let changed_tree = git(&["write-tree"])?;
+		assert_ne!(tree, changed_tree);
+		git(&["replace", &tree, &changed_tree])?;
+
+		let snapshot = destination.path().join("source");
+		fs::create_dir(&snapshot)?;
+		stage_tracked_source(
+			root,
+			&tree,
+			&snapshot,
+			&destination.path().join("index"),
+			&ProcessRunner,
+		)?;
+
+		for (path, expected) in paths.into_iter().zip(expected_hashes) {
+			let expected = expected?;
+			let staged = snapshot.join(path);
+			let actual = git(&[
+				"hash-object",
+				"--no-filters",
+				staged.to_str().ok_or("non-UTF-8 temp path")?,
+			])?;
+			assert_eq!(
+				actual, expected,
+				"snapshot differs from recorded tree: {path}"
+			);
+		}
+
+		assert!(!snapshot.join("injected").exists());
+		assert_eq!(git(&["write-tree"])?, changed_tree);
+		Ok(())
+	}
+
+	#[test]
+	fn tracked_source_staging_uses_the_recorded_revision_and_private_index() {
+		let revision = "2".repeat(40);
+		let runner = FakeRunner::with_outputs(vec![output(true, b""), output(true, b"")]);
+		let stage = |runner: &FakeRunner| {
+			stage_tracked_source(
+				Path::new("repo"),
+				&revision,
+				Path::new("stage with spaces"),
+				Path::new("private index"),
+				runner,
+			)
+		};
+		stage(&runner).unwrap_or_else(|error| panic!("staging failed: {error}"));
 		let calls = runner.calls.into_inner();
-		assert_eq!(calls.len(), 1);
+		assert_eq!(calls.len(), 2);
 		assert_eq!(calls[0].program, OsString::from("git"));
-		assert_eq!(calls[0].args[0], OsString::from("checkout-index"));
-		assert_eq!(calls[0].args[1], OsString::from("--all"));
-		assert_eq!(calls[0].args[2], OsString::from("--force"));
+		assert_eq!(calls[0].args, ["read-tree", &revision].map(OsString::from));
+		assert_eq!(calls[1].program, OsString::from("git"));
+		assert_eq!(calls[1].args[0], OsString::from("checkout-index"));
+		assert_eq!(calls[1].args[1], OsString::from("--all"));
+		assert_eq!(calls[1].args[2], OsString::from("--force"));
 		assert!(
-			calls[0].args[3]
+			calls[1].args[3]
 				.to_string_lossy()
 				.starts_with("--prefix=stage with spaces")
 		);
 
-		let runner = FakeRunner::with_outputs(vec![output(false, b"")]);
-		assert!(matches!(
-			stage_tracked_source(Path::new("repo"), Path::new("stage"), &runner),
-			Err(VerifyBuildError::StageTrackedSource { .. })
-		));
-		let runner = FakeRunner::with_outputs(vec![Err(std::io::Error::other("failed"))]);
-		assert!(matches!(
-			stage_tracked_source(Path::new("repo"), Path::new("stage"), &runner),
-			Err(VerifyBuildError::Run { .. })
-		));
+		for call in &calls {
+			assert_eq!(
+				call.environment,
+				[
+					("GIT_INDEX_FILE".to_owned(), OsString::from("private index")),
+					(
+						"GIT_WORK_TREE".to_owned(),
+						OsString::from("stage with spaces")
+					),
+					("GIT_NO_REPLACE_OBJECTS".to_owned(), OsString::from("1")),
+				]
+			);
+		}
+
+		for (outputs, expected_command) in [
+			(vec![output(false, b"")], None),
+			(vec![output(true, b""), output(false, b"")], None),
+			(
+				vec![Err(std::io::Error::other("failed"))],
+				Some("git read-tree"),
+			),
+			(
+				vec![output(true, b""), Err(std::io::Error::other("failed"))],
+				Some("git checkout-index"),
+			),
+		] {
+			let expected_calls = outputs.len();
+			let runner = FakeRunner::with_outputs(outputs);
+			let error = stage(&runner).unwrap_err();
+
+			if let Some(expected) = expected_command {
+				assert!(
+					matches!(error, VerifyBuildError::Run { command, .. } if command == expected)
+				);
+			} else {
+				assert!(matches!(error, VerifyBuildError::StageTrackedSource { .. }));
+			}
+
+			assert_eq!(runner.calls.borrow().len(), expected_calls);
+		}
 	}
 
 	#[test]
