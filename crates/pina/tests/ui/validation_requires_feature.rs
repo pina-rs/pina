@@ -7,7 +7,7 @@ enum Kind {
 
 #[instruction(discriminator = Kind)]
 struct InvalidInstruction {
-	#[pina(validate(min = 1))]
+	#[pina(validate(value >= 1))]
 	amount: u64,
 }
 

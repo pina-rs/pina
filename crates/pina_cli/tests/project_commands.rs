@@ -858,23 +858,6 @@ fn build_uses_metadata_target_from_configless_nested_start() {
 }
 
 #[test]
-fn discover_falls_back_to_legacy_uppercase_config_spelling() {
-	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-	let project = temp.path().join("project");
-	write_project(&project);
-	fs::rename(project.join("pina.toml"), project.join("Pina.toml"))
-		.unwrap_or_else(|error| panic!("failed to rename config: {error}"));
-	let nested = project.join("src");
-	let root = fs::canonicalize(&project)
-		.unwrap_or_else(|error| panic!("failed to canonicalize root: {error}"));
-
-	let discovered =
-		Project::discover(&nested).unwrap_or_else(|error| panic!("discovery failed: {error}"));
-
-	assert_eq!(discovered.root, root);
-}
-
-#[test]
 fn failed_build_does_not_publish_an_artifact() {
 	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 	let project = temp.path().join("project");
@@ -1791,7 +1774,7 @@ fn generate_cli_dart_preserves_sibling_program_entrypoints() {
 		fs::write(
 			program.join("pina.toml"),
 			"[clients]\noutput = \"clients\"\nlanguages = [\"rust\", \
-			 \"cli-rust\"]\n\n[clients.cli-rust]\noutput = \"cli/rust\"\n",
+			 \"cli-rust\"]\n\n[clients.cli_rust]\noutput = \"cli/rust\"\n",
 		)
 		.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
 		// The renderer resolves its CLI package from the workspace install.

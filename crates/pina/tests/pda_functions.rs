@@ -140,15 +140,6 @@ fn try_find_program_address_matches_an_independent_derivation() {
 }
 
 #[test]
-#[allow(deprecated)]
-fn find_program_address_returns_the_canonical_address_and_bump() {
-	assert_eq!(
-		pina::find_program_address(&VAULT_SEEDS, &VAULT_PROGRAM),
-		(VAULT_ADDRESS, VAULT_BUMP)
-	);
-}
-
-#[test]
 fn try_find_program_address_rejects_invalid_seeds() {
 	let too_long = [7_u8; pina::MAX_SEED_LEN + 1];
 	assert_eq!(try_find_program_address(&[&too_long], &VAULT_PROGRAM), None);
@@ -157,14 +148,6 @@ fn try_find_program_address_rejects_invalid_seeds() {
 	// no room for it.
 	let too_many: [&[u8]; 16] = [b"seed"; 16];
 	assert_eq!(try_find_program_address(&too_many, &VAULT_PROGRAM), None);
-}
-
-#[test]
-#[allow(deprecated)]
-#[should_panic(expected = "could not find program address from seeds")]
-fn find_program_address_panics_for_invalid_seeds() {
-	let too_long = [7_u8; pina::MAX_SEED_LEN + 1];
-	let _ = pina::find_program_address(&[&too_long], &VAULT_PROGRAM);
 }
 
 /// The associated token addresses of one wallet and mint under each token

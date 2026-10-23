@@ -41,7 +41,6 @@ pub(crate) fn expand(
 		Ok(value) => value,
 		Err(error) => return error.to_compile_error(),
 	};
-	let deprecation_warnings = validation::deprecation_warnings(&schema_validations.deprecations);
 	let capacity_proofs = schema::resolve_capacities(&mut item_struct);
 
 	// Extract configuration
@@ -158,7 +157,6 @@ pub(crate) fn expand(
 	};
 
 	quote! {
-		#deprecation_warnings
 		#item_struct
 		#capacity_proofs
 		#schema_proofs

@@ -3094,29 +3094,9 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
             },
         )
     }
-    /// Deprecated alias for the stored-bump loader.
-    ///
-    /// This name predates the split that gave the two compact PDA loaders
-    /// distinct names. It verifies only the address the stored bump derives,
-    /// exactly like `with_stored_bump_pda`. Use `with_checked_pda` instead when
-    /// an untrusted caller chooses which account the handler loads.
-    #[deprecated(
-        note = "renamed to `with_stored_bump_pda`: it verifies only the stored bump; use `with_checked_pda` when an untrusted caller chooses which account the handler loads"
-    )]
-    #[inline(always)]
-    pub fn with_pda<R>(
-        account: &pina::AccountView,
-        authority: &pina::Address,
-        program_id: &pina::Address,
-        use_account: impl FnOnce(
-            <Self as pina::PinaCompactAccount>::Ref<'_>,
-        ) -> ::core::result::Result<R, pina::ProgramError>,
-    ) -> ::core::result::Result<R, pina::ProgramError> {
-        Self::with_stored_bump_pda(account, authority, program_id, use_account)
-    }
     /// Load and validate `CompactState`, its canonical stored bump, and its PDA address for the duration of `use_account`.
     ///
-    /// Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the only compact loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `with_pda` performs.
+    /// Searches the seeds for the canonical bump and rejects both an account at any other address and a stored `bump` that is not that canonical bump. This is the only compact loader that rejects a shadow account created at a noncanonical bump. The search costs more compute than the single derivation `with_stored_bump_pda` performs.
     ///
     /// Use this method when an untrusted caller chooses which account the handler loads, or when the program must be certain that exactly one address exists for the seeds.
     #[inline(always)]

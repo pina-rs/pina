@@ -93,7 +93,6 @@ const PDA_VALIDATION_CALLS: &[&str] = &[
 	"load_pda_mut",
 	"load_checked_pda",
 	"load_checked_pda_mut",
-	"with_pda",
 	"with_stored_bump_pda",
 	"with_checked_pda",
 ];

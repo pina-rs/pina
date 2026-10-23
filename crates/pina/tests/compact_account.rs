@@ -577,9 +577,9 @@ fn shadow_compact_pda(authority: Address) -> (TestAccount<{ CompactPdaState::MAX
 
 #[test]
 fn compact_pda_loader_loads_the_address_the_stored_bump_derives() {
-	// `with_pda` verifies one derivation from the stored bump, so it accepts a
-	// shadow account. That is the documented trade: it trusts whoever wrote the
-	// bump field, and a creation builder only writes canonical ones.
+	// `with_stored_bump_pda` verifies one derivation from the stored bump, so it
+	// accepts a shadow account. That is the documented trade: it trusts whoever
+	// wrote the bump field, and a creation builder only writes canonical ones.
 	let authority = Address::new_from_array([13; 32]);
 	let (mut stored, bump) = shadow_compact_pda(authority);
 	let account = stored.view();

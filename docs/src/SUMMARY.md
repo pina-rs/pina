@@ -54,15 +54,6 @@
 
 - [How ABI Migrations Flow](./migrations/flow.md)
 - [ABI document versioning](./migrations/abi-versioning.md)
-- [Migrate value rules to comparisons](./migrations/validation-comparisons.md)
-- [Migrate to the reset ABI document](./migrations/abi-document-reset.md)
-- [Migrate to automatic migrations](./migrations/automatic-migrations.md)
-- [Migrate to PinaPod v0.2](./migrations/pinapod-v0.2.md)
-- [Migrate lamport mutation calls](./migrations/lamport-mutation-ownership.md)
-- [Migrate to safe token loaders](./migrations/safe-token-loaders.md)
-- [Migrate to hardened security lints](./migrations/lint-reliability.md)
-- [Migrate to internal creation emptiness checks](./migrations/creation-emptiness.md)
-- [Migrate to canonical PDA builders](./migrations/canonical-pda-builders.md)
 
 # Performance
 

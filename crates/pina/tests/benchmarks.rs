@@ -278,8 +278,8 @@ fn benchmark_pda_creation_validation_paths() {
 // Compact PDA loader benchmarks
 // ---------------------------------------------------------------------------
 
-/// What the generated `with_pda` and `with_checked_pda` pay for address
-/// validation, isolated from compact parsing.
+/// What the generated `with_stored_bump_pda` and `with_checked_pda` pay for
+/// address validation, isolated from compact parsing.
 #[test]
 fn benchmark_compact_pda_loader_address_checks() {
 	let authority = [42u8; 32];
@@ -289,7 +289,8 @@ fn benchmark_compact_pda_loader_address_checks() {
 	let bump_seed = [bump];
 	let seeds_with_bump: &[&[u8]] = &[b"compact-state", &authority, &bump_seed];
 
-	// `with_pda`: one derivation from the stored bump plus an address compare.
+	// `with_stored_bump_pda`: one derivation from the stored bump plus an
+	// address compare.
 	bench("compact PDA loader (stored bump)", || {
 		let derived = black_box(create_program_address(
 			black_box(seeds_with_bump),
