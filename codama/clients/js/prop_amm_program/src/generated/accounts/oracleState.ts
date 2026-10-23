@@ -29,6 +29,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -58,7 +59,10 @@ export type OracleState = {
 	price: bigint;
 };
 
-export type OracleStateArgs = { authority: Address; price: number | bigint };
+export type OracleStateArgs = {
+	authority: Address | HasAddress;
+	price: number | bigint;
+};
 
 /** Gets the encoder for {@link OracleStateArgs} account data. */
 export function getOracleStateEncoder(): FixedSizeEncoder<OracleStateArgs> {

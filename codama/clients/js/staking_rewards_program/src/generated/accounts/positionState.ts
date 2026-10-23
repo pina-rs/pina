@@ -29,6 +29,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -64,8 +65,8 @@ export type PositionState = {
 };
 
 export type PositionStateArgs = {
-	pool: Address;
-	owner: Address;
+	pool: Address | HasAddress;
+	owner: Address | HasAddress;
 	stakedAmount: number | bigint;
 	rewardDebt: number | bigint;
 	pendingRewards: number | bigint;

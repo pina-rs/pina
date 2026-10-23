@@ -11,11 +11,12 @@ import {
 	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type RegistryConfigSeeds = {
-	admin: Address;
+	admin: Address | HasAddress;
 };
 
 export async function findRegistryConfigPda(

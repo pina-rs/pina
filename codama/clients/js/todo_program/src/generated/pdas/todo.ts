@@ -11,11 +11,12 @@ import {
 	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type TodoSeeds = {
-	owner: Address;
+	owner: Address | HasAddress;
 };
 
 export async function findTodoPda(

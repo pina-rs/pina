@@ -20,6 +20,7 @@ import {
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -78,7 +79,7 @@ export type ForwardRotateWithSignerInstructionData = {
 };
 
 export type ForwardRotateWithSignerInstructionDataArgs = {
-	newAuthority: Address;
+	newAuthority: Address | HasAddress;
 };
 
 export function getForwardRotateWithSignerInstructionDataEncoder(): FixedSizeEncoder<

@@ -12,11 +12,12 @@ import {
 	getProgramDerivedAddress,
 	getU64Encoder,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type ProposalSeeds = {
-	multisig: Address;
+	multisig: Address | HasAddress;
 	index: number | bigint;
 };
 

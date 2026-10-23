@@ -20,6 +20,7 @@ import {
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -81,7 +82,7 @@ export type RegisterRequesterInstructionData = {
 };
 
 export type RegisterRequesterInstructionDataArgs = {
-	requester: Address;
+	requester: Address | HasAddress;
 	/** Highest tier the entity may file at. */
 	maxTier: number;
 };

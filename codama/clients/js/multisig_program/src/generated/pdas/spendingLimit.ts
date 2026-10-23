@@ -11,12 +11,13 @@ import {
 	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export type SpendingLimitSeeds = {
-	multisig: Address;
-	createKey: Address;
+	multisig: Address | HasAddress;
+	createKey: Address | HasAddress;
 };
 
 export async function findSpendingLimitPda(

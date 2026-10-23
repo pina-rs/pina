@@ -28,6 +28,7 @@ import {
 	getU32Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -127,9 +128,9 @@ export type MultisigCreateInstructionDataArgs = {
 	/** Permission masks aligned with the trailing member accounts. */
 	memberPermissions: ReadonlyUint8Array;
 	/** The default address makes the multisig autonomous. */
-	configAuthority: Address;
+	configAuthority: Address | HasAddress;
 	/** The default address disables rent collection. */
-	rentCollector: Address;
+	rentCollector: Address | HasAddress;
 };
 
 export function getMultisigCreateInstructionDataEncoder(): FixedSizeEncoder<

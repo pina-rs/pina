@@ -37,6 +37,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	offsetDecoder,
@@ -107,8 +108,8 @@ export type SpendingLimit = {
 
 export type SpendingLimitArgs = {
 	bump: number;
-	multisig: Address;
-	createKey: Address;
+	multisig: Address | HasAddress;
+	createKey: Address | HasAddress;
 	/** Vault the allowance draws from. */
 	vaultIndex: number;
 	/**
@@ -118,7 +119,7 @@ export type SpendingLimitArgs = {
 	 */
 	vaultBump: number;
 	/** The default address means SOL; anything else is an SPL mint. */
-	mint: Address;
+	mint: Address | HasAddress;
 	/** Allowance per period, in native mint decimals. */
 	amount: number | bigint;
 	/** Remaining allowance in the current period. */

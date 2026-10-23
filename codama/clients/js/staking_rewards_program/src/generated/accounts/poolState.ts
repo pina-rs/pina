@@ -31,6 +31,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -76,9 +77,9 @@ export type PoolState = {
 };
 
 export type PoolStateArgs = {
-	admin: Address;
-	stakeMint: Address;
-	rewardMint: Address;
+	admin: Address | HasAddress;
+	stakeMint: Address | HasAddress;
+	rewardMint: Address | HasAddress;
 	totalStaked: number | bigint;
 	rewardIndex: number | bigint;
 	/**

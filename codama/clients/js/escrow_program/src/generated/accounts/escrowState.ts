@@ -29,6 +29,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -67,9 +68,9 @@ export type EscrowState = {
 };
 
 export type EscrowStateArgs = {
-	maker: Address;
-	mintA: Address;
-	mintB: Address;
+	maker: Address | HasAddress;
+	mintA: Address | HasAddress;
+	mintB: Address | HasAddress;
 	/** The amount of token A that was sent by sender. */
 	amountA: number | bigint;
 	/** The amount of token B to be received by the recipient. */

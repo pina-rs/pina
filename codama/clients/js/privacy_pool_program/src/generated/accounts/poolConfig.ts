@@ -33,6 +33,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -76,7 +77,7 @@ export type PoolConfig = {
 export type PoolConfigArgs = {
 	bump: number;
 	/** The key that may rotate custodians, requesters, and verifying keys. */
-	authority: Address;
+	authority: Address | HasAddress;
 	/** Custodian approvals required to execute a disclosure. */
 	custodianThreshold: number;
 	/** Tier-1 challenge window length in seconds. */

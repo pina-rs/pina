@@ -37,6 +37,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	offsetDecoder,
@@ -109,8 +110,8 @@ export type Proposal = {
 
 export type ProposalArgs = {
 	bump: number;
-	multisig: Address;
-	creator: Address;
+	multisig: Address | HasAddress;
+	creator: Address | HasAddress;
 	/** The index this proposal occupies in the multisig's namespace. */
 	index: number | bigint;
 	/** [`KIND_VAULT`] or [`KIND_CONFIG`]. */

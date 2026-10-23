@@ -31,6 +31,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -71,9 +72,9 @@ export type VestingState = {
 };
 
 export type VestingStateArgs = {
-	admin: Address;
-	beneficiary: Address;
-	mint: Address;
+	admin: Address | HasAddress;
+	beneficiary: Address | HasAddress;
+	mint: Address | HasAddress;
 	totalAmount: number | bigint;
 	claimedAmount: number | bigint;
 	startTs: number | bigint;

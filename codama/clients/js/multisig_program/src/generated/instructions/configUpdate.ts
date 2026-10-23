@@ -24,6 +24,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithAccounts,
 	type InstructionWithData,
@@ -89,7 +90,7 @@ export type ConfigUpdateInstructionData = {
 export type ConfigUpdateInstructionDataArgs = {
 	/** When set, `treasury` replaces the configured treasury. */
 	setTreasury: boolean;
-	treasury: Address;
+	treasury: Address | HasAddress;
 	/** When set, `creation_fee` replaces the configured fee. */
 	setCreationFee: boolean;
 	creationFee: number | bigint;

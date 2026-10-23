@@ -41,6 +41,7 @@ import {
 	getU8Encoder,
 	getUtf8Decoder,
 	getUtf8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	offsetDecoder,
@@ -107,7 +108,7 @@ export type JournalArgs = {
 	/** Canonical PDA bump. */
 	bump: number;
 	/** Signer permitted to mutate and fund this journal. */
-	authority: Address;
+	authority: Address | HasAddress;
 	/** Number of successful resize or write operations. */
 	revision: number;
 	/** Most recently written entry value, stored as `PodOption<PodU64>`. */
