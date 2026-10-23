@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -59,6 +65,9 @@ if (endpoint.endsWith("/branches/main")) {
 				...process.env,
 				PATH: `${root}:${process.env.PATH}`,
 				GITHUB_REPOSITORY: "pina-rs/pina",
+				GITHUB_SERVER_URL: "https://github.com",
+				GITHUB_RUN_ID: "123",
+				GITHUB_RUN_ATTEMPT: "2",
 				GITHUB_EVENT_NAME: "workflow_dispatch",
 				GITHUB_REF: "refs/heads/main",
 				GITHUB_SHA: MAIN,
@@ -73,6 +82,7 @@ if (endpoint.endsWith("/branches/main")) {
 				REQUESTED_SHA: RELEASE,
 				REQUESTED_REF: RELEASE,
 				...env,
+				RUNNER_TEMP: root,
 				GITHUB_OUTPUT: join(root, "output"),
 				API_LOG: join(root, "calls"),
 			},
@@ -82,6 +92,9 @@ if (endpoint.endsWith("/branches/main")) {
 			...result,
 			output: readFileSync(join(root, "output"), "utf8"),
 			calls: readFileSync(join(root, "calls"), "utf8"),
+			predicate: existsSync(join(root, "release-provenance.json"))
+				? readFileSync(join(root, "release-provenance.json"), "utf8")
+				: undefined,
 		};
 	} finally {
 		rmSync(root, { recursive: true, force: true });
@@ -205,6 +218,58 @@ test("pre-tag previews can resolve unmerged commits without authorizing a real p
 	assert.doesNotMatch(result.calls, /\/compare\//);
 });
 
+test("provenance identifies the release source separately from the workflow commit", () => {
+	for (const event of ["workflow_dispatch", "push"]) {
+		const ref = event === "push" ? "refs/tags/v1.0.0" : "refs/heads/main";
+		const workflowSha = event === "push" ? RELEASE : MAIN;
+		const workflowRef = `pina-rs/pina/.github/workflows/publish.yml@${ref}`;
+		const inputs = event === "push" ? null : {
+			tag: "v1.0.0",
+			checkout_ref: 'release/"quoted"',
+		};
+		const result = runStep("publish", "record release source provenance", {
+			GITHUB_EVENT_NAME: event,
+			GITHUB_REF: ref,
+			WORKFLOW_REF: workflowRef,
+			WORKFLOW_SHA: workflowSha,
+			SOURCE_SHA: RELEASE,
+			DISPATCH_INPUTS: JSON.stringify(inputs),
+		});
+		assert.equal(result.status, 0, result.stderr);
+		assert.ok(result.predicate);
+		const predicate: unknown = JSON.parse(result.predicate);
+		assert.deepEqual(predicate, {
+			buildDefinition: {
+				buildType: "https://actions.github.io/buildtypes/workflow/v1",
+				externalParameters: {
+					workflow: {
+						repository: "https://github.com/pina-rs/pina",
+						ref,
+						path: ".github/workflows/publish.yml",
+					},
+					...(inputs === null ? {} : { inputs }),
+				},
+				resolvedDependencies: [{
+					name: "workflow",
+					uri: `git+https://github.com/pina-rs/pina@${ref}`,
+					digest: { gitCommit: workflowSha },
+				}, {
+					name: "release-source",
+					uri: "git+https://github.com/pina-rs/pina@refs/tags/v1.0.0",
+					digest: { gitCommit: RELEASE },
+				}],
+			},
+			runDetails: {
+				builder: { id: `https://github.com/${workflowRef}` },
+				metadata: {
+					invocationId:
+						"https://github.com/pina-rs/pina/actions/runs/123/attempts/2",
+				},
+			},
+		});
+	}
+});
+
 test("preview builds inherit only read access and all entry points depend on authorization", () => {
 	const publish = readFileSync(
 		new URL("../workflows/publish.yml", import.meta.url),
@@ -231,6 +296,10 @@ test("preview builds inherit only read access and all entry points depend on aut
 	);
 	assert.match(builder, /ref: \$\{\{ inputs\.sha \}\}/);
 	assert.match(builder, /dry-run: \$\{\{ inputs\.dry_run == true \}\}/);
+	assert.match(
+		publish,
+		/predicate-path: \$\{\{ runner\.temp \}\}\/release-provenance\.json/,
+	);
 
 	for (const workflow of ["release-pr", "docs-pages"]) {
 		const source = readFileSync(

@@ -216,10 +216,60 @@ jobs:
             exit 1
           fi
           sha256sum "$asset_dir"/*
+      - name: record release source provenance
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          SOURCE_SHA: ${{ needs.resolve_revision.outputs.sha }}
+          DISPATCH_INPUTS: ${{ toJSON(github.event.inputs || null) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow_path="${WORKFLOW_REF#"$GITHUB_REPOSITORY/"}"
+          workflow_path="${workflow_path%"@$GITHUB_REF"}"
+          # The default predicate records only the triggering workflow commit.
+          # A main dispatch can build an older approved release, so identify
+          # that source separately while retaining the workflow dependency.
+          jq -n \
+            --arg repository "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --arg ref "$GITHUB_REF" \
+            --arg path "$workflow_path" \
+            --arg workflow_sha "$WORKFLOW_SHA" \
+            --arg tag "$RELEASE_TAG" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg builder "$GITHUB_SERVER_URL/$WORKFLOW_REF" \
+            --arg invocation "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" \
+            --argjson inputs "$DISPATCH_INPUTS" '
+            {
+              buildDefinition: {
+                buildType: "https://actions.github.io/buildtypes/workflow/v1",
+                externalParameters: ({
+                  workflow: {repository: $repository, ref: $ref, path: $path}
+                } + if $inputs == null then {} else {inputs: $inputs} end),
+                resolvedDependencies: [
+                  {
+                    name: "workflow",
+                    uri: ("git+" + $repository + "@" + $ref),
+                    digest: {gitCommit: $workflow_sha}
+                  },
+                  {
+                    name: "release-source",
+                    uri: ("git+" + $repository + "@refs/tags/" + $tag),
+                    digest: {gitCommit: $source_sha}
+                  }
+                ]
+              },
+              runDetails: {
+                builder: {id: $builder},
+                metadata: {invocationId: $invocation}
+              }
+            }' > "$RUNNER_TEMP/release-provenance.json"
       - name: attest all release archives
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ runner.temp }}/release-asset-attestations/*
+          predicate-type: https://slsa.dev/provenance/v1
+          predicate-path: ${{ runner.temp }}/release-provenance.json
       - name: verify all release archive attestations
         env:
           GH_TOKEN: ${{ github.token }}
