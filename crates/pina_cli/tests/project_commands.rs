@@ -446,6 +446,7 @@ fn cargo_config_target_escape_is_rejected_with_and_without_pina_config() {
 
 		let output = project_command(&project, &cargo, &project.join("target"))
 			.env_remove("CARGO_TARGET_DIR")
+			.env_remove("CARGO_BUILD_TARGET_DIR")
 			.args(["generate", "--client", "rust"])
 			.output()
 			.unwrap();
@@ -472,6 +473,7 @@ fn cargo_target_symlink_is_rejected_before_default_idl_generation() {
 
 	let output = project_command(&project, &cargo, &project.join("target"))
 		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
 		.args(["generate", "--client", "rust"])
 		.output()
 		.unwrap();
@@ -508,6 +510,7 @@ fn build_and_generate_allow_sibling_outputs_within_a_cargo_workspace() {
 	for arguments in [vec!["build"], vec!["generate", "--client", "rust"]] {
 		let output = project_command(&project, &cargo, &project.join("target"))
 			.env_remove("CARGO_TARGET_DIR")
+			.env_remove("CARGO_BUILD_TARGET_DIR")
 			.args(&arguments)
 			.output()
 			.unwrap();
@@ -525,6 +528,34 @@ fn build_and_generate_allow_sibling_outputs_within_a_cargo_workspace() {
 			.is_file()
 	);
 	assert!(project.join("clients/rust/custom_program").is_dir());
+}
+
+#[test]
+fn operator_target_environment_overrides_remain_supported() {
+	let temp = TempDir::new().unwrap();
+	let project = temp.path().join("project");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	for (index, name) in ["CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR"]
+		.into_iter()
+		.enumerate()
+	{
+		let target = temp.path().join(format!("external-{index}"));
+		let output = project_command(&project, &cargo, &target)
+			.env_remove("CARGO_TARGET_DIR")
+			.env_remove("CARGO_BUILD_TARGET_DIR")
+			.env(name, format!("../external-{index}"))
+			.args(["generate", "--client", "rust"])
+			.output()
+			.unwrap();
+		assert!(
+			output.status.success(),
+			"{name}: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
+		assert!(target.join("idl/custom_program.json").is_file());
+	}
 }
 
 #[test]

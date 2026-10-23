@@ -1001,8 +1001,10 @@ fn resolve_build_output_dirs(
 	let target = metadata.target_directory.as_std_path();
 	// The invoking environment is an operator choice. Repository Cargo
 	// configuration cannot grant itself permission to write outside the tree.
-	let target_root = if std::env::var_os("CARGO_TARGET_DIR").is_some_and(|value| !value.is_empty())
-	{
+	let operator_target = ["CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR"]
+		.into_iter()
+		.any(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()));
+	let target_root = if operator_target {
 		target
 	} else {
 		&output_root
@@ -1030,16 +1032,63 @@ pub(crate) fn resolve_output_dir(
 	let normalized = normalize_absolute(path, field, &raw)?;
 	let root = normalize_absolute(root, field, &root.to_string_lossy())?;
 
-	if !normalized.starts_with(&root) {
-		return Err(ProjectError::InvalidConfigPath {
+	let relative = strip_output_root(&root, &normalized).ok_or_else(|| {
+		ProjectError::InvalidConfigPath {
 			field,
 			path: path.to_path_buf(),
 			reason: "configured outputs must stay inside the Git worktree or Cargo workspace",
-		});
-	}
+		}
+	})?;
+	let normalized = root.join(relative);
 
 	PathTemplates::empty(root).reject_symlink_prefix(&normalized, field, &raw)?;
 	Ok(normalized)
+}
+
+#[cfg(not(windows))]
+fn strip_output_root<'a>(root: &Path, path: &'a Path) -> Option<&'a Path> {
+	path.strip_prefix(root).ok()
+}
+
+#[cfg(windows)]
+fn strip_output_root<'a>(root: &Path, path: &'a Path) -> Option<&'a Path> {
+	let mut components = path.components();
+
+	for root_component in root.components() {
+		let matches = match (root_component, components.next()?) {
+			(Component::Prefix(left), Component::Prefix(right)) => {
+				output_prefixes_equal(left.kind(), right.kind())
+			}
+			(left, right) => left == right,
+		};
+
+		if !matches {
+			return None;
+		}
+	}
+
+	Some(components.as_path())
+}
+
+/// Cargo's canonical paths use verbatim prefixes; Git reports ordinary ones.
+#[cfg(any(windows, test))]
+fn output_prefixes_equal(left: std::path::Prefix<'_>, right: std::path::Prefix<'_>) -> bool {
+	use std::path::Prefix;
+
+	match (left, right) {
+		(
+			Prefix::Disk(left) | Prefix::VerbatimDisk(left),
+			Prefix::Disk(right) | Prefix::VerbatimDisk(right),
+		) => left.eq_ignore_ascii_case(&right),
+		(
+			Prefix::UNC(left_server, left_share) | Prefix::VerbatimUNC(left_server, left_share),
+			Prefix::UNC(right_server, right_share) | Prefix::VerbatimUNC(right_server, right_share),
+		) => {
+			left_server.eq_ignore_ascii_case(right_server)
+				&& left_share.eq_ignore_ascii_case(right_share)
+		}
+		_ => left == right,
+	}
 }
 
 /// The root that configured outputs must stay within.
@@ -2383,6 +2432,68 @@ mode = "overwrite"
 			package_for_manifest(&metadata, &manifest_path, &root),
 			Err(ProjectError::CargoMetadata { .. })
 		));
+	}
+
+	#[test]
+	fn output_prefixes_accept_only_equivalent_windows_namespaces() {
+		use std::ffi::OsStr;
+		use std::path::Prefix;
+
+		let server = OsStr::new("server");
+		let share = OsStr::new("share");
+		let other = OsStr::new("other");
+		let cases = [
+			(Prefix::Disk(b'C'), Prefix::VerbatimDisk(b'c'), true),
+			(Prefix::VerbatimDisk(b'C'), Prefix::Disk(b'D'), false),
+			(
+				Prefix::UNC(server, share),
+				Prefix::VerbatimUNC(server, share),
+				true,
+			),
+			(
+				Prefix::VerbatimUNC(server, share),
+				Prefix::UNC(server, other),
+				false,
+			),
+			(
+				Prefix::UNC(server, share),
+				Prefix::VerbatimUNC(other, share),
+				false,
+			),
+			(Prefix::DeviceNS(server), Prefix::DeviceNS(server), true),
+			(Prefix::DeviceNS(server), Prefix::Verbatim(server), false),
+			(Prefix::Disk(b'C'), Prefix::UNC(server, share), false),
+		];
+
+		for (left, right, expected) in cases {
+			assert_eq!(output_prefixes_equal(left, right), expected);
+			assert_eq!(output_prefixes_equal(right, left), expected);
+		}
+	}
+
+	#[cfg(windows)]
+	#[test]
+	fn output_roots_accept_windows_namespace_aliases_without_widening_containment() {
+		for (root, path) in [
+			(r"D:\repository", r"\\?\D:\repository\target\idl"),
+			(r"\\?\D:\repository", r"D:\repository\target\idl"),
+			(
+				r"\\server\share\repository",
+				r"\\?\UNC\server\share\repository\target\idl",
+			),
+		] {
+			assert_eq!(
+				strip_output_root(Path::new(root), Path::new(path)),
+				Some(Path::new(r"target\idl"))
+			);
+		}
+
+		for path in [
+			r"\\?\E:\repository\target",
+			r"\\?\D:\repository-other\target",
+		] {
+			assert!(strip_output_root(Path::new(r"D:\repository"), Path::new(path)).is_none());
+		}
 	}
 
 	#[test]
