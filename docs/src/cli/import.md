@@ -39,6 +39,8 @@ pina import squads \
   --cluster mainnet-beta
 ```
 
+URL imports require HTTPS, with HTTP allowed only for loopback development. Redirects may change the path or query on the original origin (scheme, host, and port), but may not add credentials or change origins. At most five redirects are followed within the fetch's 30-second timeout. For a cross-origin redirect, pass the destination URL explicitly after checking it.
+
 ## What the generated crate contains
 
 Each instruction becomes a call struct holding its accounts in the target program's own order plus a typed `ix` field for the arguments:
