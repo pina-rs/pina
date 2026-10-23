@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use std::path::Component;
+use std::path::Path;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -57,18 +59,9 @@ fn run() -> Result<(), RenderError> {
 
 	for idl_path in &idl_paths {
 		let root = read_root_node(idl_path)?;
-		let stem = idl_path
-			.file_stem()
-			.and_then(|stem| stem.to_str())
-			.ok_or_else(|| {
-				RenderError::ReadFile {
-					path: idl_path.clone(),
-					source: std::io::Error::other("invalid file name"),
-				}
-			})?
-			.to_owned();
+		let stem = crate_dir_name(idl_path)?;
 		let client_path = match &args.client_path {
-			Some(path) => join_client_path(path, &stem),
+			Some(path) => join_client_path(path, stem),
 			None => format!("../../rust/{stem}"),
 		};
 		let client_package = args
@@ -81,10 +74,30 @@ fn run() -> Result<(), RenderError> {
 			client_package,
 			client_path,
 		};
-		render_root_node(&root, &args.output.join(&stem), &config)?;
+		render_root_node(&root, &args.output.join(stem), &config)?;
 	}
 
 	Ok(())
+}
+
+/// Reject path syntax and dot aliases before using an IDL stem as a child name.
+fn crate_dir_name(idl: &Path) -> Result<&str, RenderError> {
+	idl.file_stem()
+		.and_then(|stem| stem.to_str())
+		.filter(|stem| {
+			matches!(
+				Path::new(stem).components().next(),
+				Some(Component::Normal(_))
+			) && Path::new(stem).components().count() == 1
+				&& !stem.contains(['\\', ':'])
+				&& !stem.ends_with(['.', ' '])
+		})
+		.ok_or_else(|| {
+			RenderError::UnsafeOutputPath {
+				path: idl.to_path_buf(),
+				reason: "file stem must name a UTF-8 child output directory".to_string(),
+			}
+		})
 }
 
 /// Treat `--client-path` as a prefix and append the program stem.
@@ -122,4 +135,70 @@ fn collect_idl_paths(args: &Args) -> Result<Vec<PathBuf>, RenderError> {
 
 	idl_paths.sort();
 	Ok(idl_paths)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn output_names_are_child_components() {
+		for name in [
+			"",
+			"/",
+			"..json",
+			"...json",
+			"....json",
+			"name .json",
+			"name:.json",
+			"name\\child.json",
+		] {
+			assert!(crate_dir_name(Path::new(name)).is_err(), "{name:?}");
+		}
+
+		for name in [
+			"counter.json",
+			"hello-world.json",
+			"hello_world.json",
+			"program.v1.json",
+		] {
+			let stem = crate_dir_name(Path::new(name)).unwrap();
+			let output = Path::new("clients").join(stem);
+			assert_eq!(output.parent(), Some(Path::new("clients")));
+			assert!(matches!(
+				Path::new(stem).components().next(),
+				Some(Component::Normal(_))
+			));
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn rejects_non_utf8_file_stems() {
+		use std::ffi::OsStr;
+		use std::os::unix::ffi::OsStrExt;
+
+		let path = Path::new(OsStr::from_bytes(b"invalid\xff.json"));
+		assert!(crate_dir_name(path).is_err());
+	}
+
+	#[test]
+	fn accepted_names_never_escape_the_output_root() {
+		let alphabet = ['a', '.', ' ', ':', '\\', '/', '_', 'é'];
+
+		for first in alphabet {
+			for second in alphabet {
+				for third in alphabet {
+					let filename = format!("{first}{second}{third}.json");
+
+					if let Ok(stem) = crate_dir_name(Path::new(&filename)) {
+						assert_eq!(
+							Path::new("clients").join(stem).parent(),
+							Some(Path::new("clients"))
+						);
+					}
+				}
+			}
+		}
+	}
 }

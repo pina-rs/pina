@@ -1,10 +1,12 @@
 #![allow(missing_docs)]
 
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
 use clap::Parser;
 use pina_cpi_renderer::RenderConfig;
+use pina_cpi_renderer::RenderError;
 use pina_cpi_renderer::RenderMode;
 use pina_cpi_renderer::read_root_node;
 use pina_cpi_renderer::render_root_node;
@@ -81,7 +83,10 @@ fn main() {
 	let single_idl = idls.len() == 1;
 
 	for idl in &idls {
-		let crate_dir = crate_output_dir(&args.output, idl, single_idl);
+		let crate_dir = crate_output_dir(&args.output, idl, single_idl).unwrap_or_else(|error| {
+			eprintln!("{error}");
+			std::process::exit(1);
+		});
 
 		let root = read_root_node(idl).unwrap_or_else(|error| {
 			eprintln!("failed to read `{}`: {error}", idl.display());
@@ -137,20 +142,32 @@ fn dir_read_error(dir: &Path, error: &std::io::Error) -> String {
 }
 
 /// The crate directory for one IDL inside a multi-IDL output root.
-fn crate_dir_name(idl: &Path) -> String {
-	idl.file_stem().map_or_else(
-		|| "program".to_string(),
-		|stem| stem.to_string_lossy().into_owned(),
-	)
+fn crate_dir_name(idl: &Path) -> Result<&str, RenderError> {
+	idl.file_stem()
+		.and_then(|stem| stem.to_str())
+		.filter(|stem| {
+			matches!(
+				Path::new(stem).components().next(),
+				Some(Component::Normal(_))
+			) && Path::new(stem).components().count() == 1
+				&& !stem.contains(['\\', ':'])
+				&& !stem.ends_with(['.', ' '])
+		})
+		.ok_or_else(|| {
+			RenderError::UnsafeOutputPath {
+				path: idl.to_path_buf(),
+				reason: "file stem must name a UTF-8 child output directory".to_string(),
+			}
+		})
 }
 
 /// A single IDL writes its crate straight into `--output`; several IDLs become
 /// sibling crates named after each file.
-fn crate_output_dir(output: &Path, idl: &Path, single_idl: bool) -> PathBuf {
+fn crate_output_dir(output: &Path, idl: &Path, single_idl: bool) -> Result<PathBuf, RenderError> {
 	if single_idl {
-		output.to_path_buf()
+		Ok(output.to_path_buf())
 	} else {
-		output.join(crate_dir_name(idl))
+		Ok(output.join(crate_dir_name(idl)?))
 	}
 }
 
@@ -168,6 +185,67 @@ mod tests {
 	use clap::CommandFactory;
 
 	use super::*;
+
+	#[test]
+	fn output_names_are_child_components() {
+		for name in [
+			"",
+			"/",
+			"..json",
+			"...json",
+			"....json",
+			"name .json",
+			"name:.json",
+			"name\\child.json",
+		] {
+			assert!(crate_dir_name(Path::new(name)).is_err(), "{name:?}");
+		}
+
+		for name in [
+			"counter.json",
+			"hello-world.json",
+			"hello_world.json",
+			"program.v1.json",
+		] {
+			let stem = crate_dir_name(Path::new(name)).unwrap();
+			let output = Path::new("clients").join(stem);
+			assert_eq!(output.parent(), Some(Path::new("clients")));
+			assert!(matches!(
+				Path::new(stem).components().next(),
+				Some(Component::Normal(_))
+			));
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn rejects_non_utf8_file_stems() {
+		use std::ffi::OsStr;
+		use std::os::unix::ffi::OsStrExt;
+
+		let path = Path::new(OsStr::from_bytes(b"invalid\xff.json"));
+		assert!(crate_dir_name(path).is_err());
+	}
+
+	#[test]
+	fn accepted_names_never_escape_the_output_root() {
+		let alphabet = ['a', '.', ' ', ':', '\\', '/', '_', 'é'];
+
+		for first in alphabet {
+			for second in alphabet {
+				for third in alphabet {
+					let filename = format!("{first}{second}{third}.json");
+
+					if let Ok(stem) = crate_dir_name(Path::new(&filename)) {
+						assert_eq!(
+							Path::new("clients").join(stem).parent(),
+							Some(Path::new("clients"))
+						);
+					}
+				}
+			}
+		}
+	}
 
 	#[test]
 	fn converts_every_generation_mode() {
@@ -214,23 +292,24 @@ mod tests {
 		let output = Path::new("/tmp/clients");
 
 		assert_eq!(
-			crate_output_dir(output, idl, true),
+			crate_output_dir(output, idl, true).unwrap_or_else(|error| panic!("{error}")),
 			PathBuf::from("/tmp/clients")
 		);
 		assert_eq!(
-			crate_output_dir(output, idl, false),
+			crate_output_dir(output, idl, false).unwrap_or_else(|error| panic!("{error}")),
 			PathBuf::from("/tmp/clients/vesting_program")
 		);
-		// An IDL without a file stem still gets a deterministic crate name.
-		assert_eq!(crate_dir_name(Path::new("/")), "program");
+		assert!(crate_dir_name(Path::new("/")).is_err());
 	}
 
 	#[test]
-	fn falls_back_to_program_when_the_idl_has_no_stem() {
-		let name = crate_dir_name(Path::new("/"));
-		assert_eq!(name, "program");
-
-		let named = crate_dir_name(Path::new("/tmp/counter.json"));
-		assert_eq!(named, "counter");
+	fn single_idl_output_does_not_depend_on_the_file_stem() {
+		let output = Path::new("clients");
+		let idl = Path::new("...json");
+		assert_eq!(
+			crate_output_dir(output, idl, true).unwrap_or_else(|error| panic!("{error}")),
+			output
+		);
+		assert!(crate_output_dir(output, idl, false).is_err());
 	}
 }
