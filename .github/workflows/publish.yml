@@ -159,7 +159,7 @@ jobs:
     needs: resolve_revision
     if: inputs.dry_run != true && startsWith(inputs.tag || github.ref_name, 'v')
     permissions:
-      contents: write # Upload assets only after the commit is approved.
+      contents: read # Builders preserve immutable CI artifacts without release authority.
     uses: $/.github/workflows/build-release.yml
     with:
       sha: ${{ needs.resolve_revision.outputs.sha }}
@@ -169,8 +169,7 @@ jobs:
   attest_assets:
     name: attest release assets
     # Require every direct asset-producing dependency to succeed before the
-    # release archives are attested.
-    # Nothing was uploaded in a dry run, so there is nothing to attest.
+    # release inventory is sealed. Read-only previews stop at the builder.
     if: >-
       needs.resolve_revision.result == 'success' &&
       needs.upload_assets.result == 'success' &&
@@ -180,10 +179,13 @@ jobs:
     needs:
       - resolve_revision
       - upload_assets
-    # Read release archives, then attach OIDC-backed provenance attestations.
+    outputs:
+      artifact_id: ${{ steps.sealed.outputs.artifact-id }}
+      manifest_sha256: ${{ steps.inventory.outputs.sha256 }}
+    # Read immutable builder artifacts, then attach OIDC-backed provenance.
     permissions:
       attestations: write # Record provenance for every release asset.
-      contents: write # Download assets from the draft release for verification.
+      contents: read
       id-token: write # Exchange GitHub's OIDC identity for an attestation.
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -193,29 +195,25 @@ jobs:
         with:
           ref: ${{ needs.resolve_revision.outputs.sha }}
           persist-credentials: false
-      - name: download all release archives for attestation
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: setup node for inventory
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: download immutable builder assets
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-build-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/sealed-release/assets
+      - name: seal release inventory
+        id: inventory
         shell: bash
         run: |
           set -euo pipefail
-          asset_dir="$RUNNER_TEMP/release-asset-attestations"
-          mkdir -p "$asset_dir"
-
-          # This gate runs only after every CLI matrix job succeeds.
-          # Download the draft release as the source of truth so attestation
-          # covers exactly the artifacts users will receive, not job-local files.
-          gh release download "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern 'pina-*' \
-            --dir "$asset_dir"
-          shopt -s nullglob
-          archives=("$asset_dir"/*)
-          if [ ${#archives[@]} -eq 0 ]; then
-            echo "::error::No release archives downloaded for $RELEASE_TAG" >&2
-            exit 1
-          fi
-          sha256sum "$asset_dir"/*
+          digest="$(node scripts/release-assets.ts create \
+            "$RUNNER_TEMP/sealed-release/assets" "$RUNNER_TEMP/sealed-release/manifest.sha256")"
+          echo "sha256=$digest" >> "$GITHUB_OUTPUT"
       - name: record release source provenance
         env:
           WORKFLOW_REF: ${{ github.workflow_ref }}
@@ -264,19 +262,23 @@ jobs:
                 metadata: {invocationId: $invocation}
               }
             }' > "$RUNNER_TEMP/release-provenance.json"
-      - name: attest all release archives
+      - name: attest exact release inventory and assets
+        if: inputs.dry_run != true
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ runner.temp }}/release-asset-attestations/*
+          subject-path: |
+            ${{ runner.temp }}/sealed-release/assets/*
+            ${{ runner.temp }}/sealed-release/manifest.sha256
           predicate-type: https://slsa.dev/provenance/v1
           predicate-path: ${{ runner.temp }}/release-provenance.json
       - name: verify all release archive attestations
+        if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          for archive in "$RUNNER_TEMP/release-asset-attestations"/*; do
+          for archive in "$RUNNER_TEMP/sealed-release/assets"/* "$RUNNER_TEMP/sealed-release/manifest.sha256"; do
             verified=false
             for attempt in 1 2 3 4 5; do
               if gh attestation verify "$archive" --repo "$GITHUB_REPOSITORY"; then
@@ -291,6 +293,14 @@ jobs:
               exit 1
             fi
           done
+      - name: preserve sealed release
+        id: sealed
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sealed-release-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/sealed-release/
+          if-no-files-found: error
+          retention-days: 7
 
   publish:
     name: publish packages and release
@@ -311,8 +321,7 @@ jobs:
       contents: write # Publish the draft GitHub release after registry publication.
       id-token: write # Authenticate to crates.io and npm trusted publishing.
     # Never publish unless every release asset was attested successfully.
-    # A dry run stops here: assets are built and attested against the draft
-    # release but no registry publish happens and the release stays draft.
+    # Read-only previews stop after building immutable CI artifacts.
     if: >-
       needs.resolve_revision.result == 'success' &&
       needs.attest_assets.result == 'success' &&
@@ -355,6 +364,27 @@ jobs:
           # trusted publishing and fail with ENEEDAUTH.
           node-version: 24
           package-manager-cache: false
+      - name: download sealed release by immutable ID
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.attest_assets.outputs.artifact_id }}
+          path: ${{ runner.temp }}/sealed-release
+      - name: verify sealed release before packaging
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANIFEST_SHA256: ${{ needs.attest_assets.outputs.manifest_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-assets.ts verify "$RUNNER_TEMP/sealed-release/assets" \
+            "$RUNNER_TEMP/sealed-release/manifest.sha256" "$MANIFEST_SHA256"
+          for asset in "$RUNNER_TEMP/sealed-release/assets"/* "$RUNNER_TEMP/sealed-release/manifest.sha256"; do
+            gh attestation verify "$asset" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml" \
+              --signer-digest "$GITHUB_SHA" --deny-self-hosted-runners
+          done
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets \
+            --jq 'if .isDraft and (.assets | length == 0) then true else error("release must be an empty draft") end'
       - name: prepare npm packages
         env:
           GH_TOKEN: ${{ github.token }}
@@ -379,16 +409,9 @@ jobs:
           pnpm run check:npm-packages
           pnpm run test:npm-packages
 
-          assets_dir="$RUNNER_TEMP/release-assets"
-          mkdir -p "$assets_dir"
-          gh release download "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "pina-*-${RELEASE_TAG}.tar.gz" \
-            --pattern "pina-*-${RELEASE_TAG}.zip" \
-            --dir "$assets_dir"
           node scripts/npm/package-cli.mjs \
             --release-tag "$RELEASE_TAG" \
-            --assets-dir "$assets_dir"
+            --assets-dir "$RUNNER_TEMP/sealed-release/assets"
 
           pack_report="$RUNNER_TEMP/pina-codama-nodes-pack.json"
           npm pack ./packages/nodes-from-pina --dry-run --json > "$pack_report"
@@ -483,6 +506,25 @@ jobs:
             --format json
         shell: devenv shell -- bash -e {0}
       - name: publish draft release
-        run: gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-assets.ts verify "$RUNNER_TEMP/sealed-release/assets" \
+            "$RUNNER_TEMP/sealed-release/manifest.sha256" "$MANIFEST_SHA256"
+          # Fail closed on pre-existing assets. Only this job can write release
+          # assets, and it uploads the bytes used for attestation and npm packaging.
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets \
+            --jq 'if .isDraft and (.assets | length == 0) then true else error("release must be an empty draft") end'
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/sealed-release/assets"/* \
+            "$RUNNER_TEMP/sealed-release/manifest.sha256" --repo "$GITHUB_REPOSITORY"
+          # Check the entire remote inventory, including extras, before promotion.
+          mkdir -p "$RUNNER_TEMP/final-release/assets"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir "$RUNNER_TEMP/final-release/assets"
+          mv "$RUNNER_TEMP/final-release/assets/manifest.sha256" "$RUNNER_TEMP/final-release/manifest.sha256"
+          node scripts/release-assets.ts verify "$RUNNER_TEMP/final-release/assets" \
+            "$RUNNER_TEMP/final-release/manifest.sha256" "$MANIFEST_SHA256"
+          gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ github.token }}
+          MANIFEST_SHA256: ${{ needs.attest_assets.outputs.manifest_sha256 }}

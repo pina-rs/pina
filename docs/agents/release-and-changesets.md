@@ -10,6 +10,10 @@ monochange run release
 monochange step publish-packages
 ```
 
+Native builders pass archives, standalone lint drivers, and checksums through CI artifacts. The attestation job seals their exact names and SHA-256 digests into a manifest. The publisher downloads that sealed artifact by ID, verifies its inventory and attestations, and packages those bytes for npm. Only the publisher can upload release assets, without clobbering; it checks the complete uploaded inventory again before making the release public.
+
+Publication requires an empty draft release. A retry after a partial asset upload stops instead of replacing files. Inspect the failed run and remove its draft assets deliberately before retrying; never bypass the inventory checks or overwrite assets automatically.
+
 ## First-time package publication
 
 Trusted publishing cannot publish a new crates.io crate or npm package until the package exists and its registry-side trusted publisher has been configured. Before merging a release that introduces a public package:
