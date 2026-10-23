@@ -2314,11 +2314,8 @@ mod tests {
 		for (path, expected) in paths.into_iter().zip(expected_hashes) {
 			let expected = expected?;
 			let staged = snapshot.join(path);
-			let actual = git(&[
-				"hash-object",
-				"--no-filters",
-				staged.to_str().ok_or("non-UTF-8 temp path")?,
-			])?;
+			let staged_path = staged.to_str().ok_or("non-UTF-8 temp path")?;
+			let actual = git(&["hash-object", "--no-filters", staged_path])?;
 			assert_eq!(
 				actual, expected,
 				"snapshot differs from recorded tree: {path}"
