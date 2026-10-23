@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/cli_snapshots.rs
-assertion_line: 563
 info:
   program: pina
   args:
@@ -29,6 +28,9 @@ Options:
       --program-keypair <KEYPAIR>
           Keypair whose public key is the deployed program address
 
+      --upgrade-only
+          Upgrade the program already deployed at the declared program ID without reading a program keypair
+
       --upgrade-authority <KEYPAIR>
           Keypair authorized to upgrade the deployed program
 
@@ -54,7 +56,7 @@ Options:
           Record migration publication receipts even for loopback targets. Useful for exercising the full publication lifecycle against a local network such as Surfpool
 
       --remote-command <COMMAND>
-          Run this command instead of `solana program deploy`. The deployment facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`, `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR`, `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and `PINA_DEPLOY_CLUSTER` environment variables
+          Run this command instead of `solana program deploy`. The deployment facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`, `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR` (absent with --upgrade-only), `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and `PINA_DEPLOY_CLUSTER` environment variables
 
       --rehearse
           Rehearse the upgrade against the target cluster's recent traffic first.
@@ -87,6 +89,9 @@ Examples:
   pina deploy --build --rehearse --cluster devnet \
     --payer ./keys/devnet-payer.json \
     --upgrade-authority ./keys/devnet-authority.json
+  pina deploy --build --upgrade-only --cluster devnet --yes \
+    --payer ./keys/ci-payer.json \
+    --upgrade-authority ./keys/ci-authority.json
 
 Safety:
   No cluster is selected by default. --cluster accepts a named cluster or explicit RPC URL.
@@ -96,6 +101,9 @@ Safety:
   Remote deployment prompts for the word deploy; use --yes only in reviewed automation.
   Mainnet and custom remote deployment additionally require --allow-mainnet.
   --dry-run never builds or deploys and --json is available only with --dry-run.
+  --upgrade-only upgrades the program already deployed at the declared program ID and never
+  reads a program keypair, so automation need not hold the key that owns the address on
+  other clusters. A first deployment still needs the program keypair.
 
 Rehearsal:
   --rehearse replays the target cluster's recent transactions against the exact artifact the

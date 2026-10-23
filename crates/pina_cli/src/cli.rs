@@ -991,6 +991,9 @@ Network safety:
   pina deploy --build --rehearse --cluster devnet \
     --payer ./keys/devnet-payer.json \
     --upgrade-authority ./keys/devnet-authority.json
+  pina deploy --build --upgrade-only --cluster devnet --yes \
+    --payer ./keys/ci-payer.json \
+    --upgrade-authority ./keys/ci-authority.json
 
 Safety:
   No cluster is selected by default. --cluster accepts a named cluster or explicit RPC URL.
@@ -1000,6 +1003,9 @@ Safety:
   Remote deployment prompts for the word deploy; use --yes only in reviewed automation.
   Mainnet and custom remote deployment additionally require --allow-mainnet.
   --dry-run never builds or deploys and --json is available only with --dry-run.
+  --upgrade-only upgrades the program already deployed at the declared program ID and never
+  reads a program keypair, so automation need not hold the key that owns the address on
+  other clusters. A first deployment still needs the program keypair.
 
 Rehearsal:
   --rehearse replays the target cluster's recent transactions against the exact artifact the
@@ -1031,6 +1037,11 @@ Rehearsal:
 		/// Keypair whose public key is the deployed program address.
 		#[arg(long, value_name = "KEYPAIR")]
 		program_keypair: Option<PathBuf>,
+
+		/// Upgrade the program already deployed at the declared program ID
+		/// without reading a program keypair.
+		#[arg(long, conflicts_with = "program_keypair")]
+		upgrade_only: bool,
 
 		/// Keypair authorized to upgrade the deployed program.
 		#[arg(long, value_name = "KEYPAIR")]
@@ -1068,9 +1079,9 @@ Rehearsal:
 
 		/// Run this command instead of `solana program deploy`. The deployment
 		/// facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`,
-		/// `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR`,
-		/// `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and
-		/// `PINA_DEPLOY_CLUSTER` environment variables.
+		/// `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR` (absent with
+		/// --upgrade-only), `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`,
+		/// and `PINA_DEPLOY_CLUSTER` environment variables.
 		#[arg(long, value_name = "COMMAND")]
 		remote_command: Option<String>,
 

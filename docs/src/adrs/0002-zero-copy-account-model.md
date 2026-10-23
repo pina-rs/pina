@@ -4,7 +4,7 @@
 - Date: 2026-04-18
 - Last amended: 2026-09-07
 - Deciders: Pina maintainers
-- Related: [Security model](../security-model.md), [PinaPod v0.2 migration](../migrations/pinapod-v0.2.md), `security/loaders-audit.md`
+- Related: [Security model](../security-model.md), `security/loaders-audit.md`
 
 ## Context
 
@@ -49,7 +49,7 @@ Unbounded dynamic data models must use explicit versioning or companion accounts
 
 ## Historical comparison
 
-The original ADR compared Pina with Quasar and kept collections outside Pina's schema macros. That restriction was correct for the earlier container implementation, which could leave inactive backing bytes uninitialized and exposed staged compact mutation. PinaPod v0.2 removes those two blockers while preserving the existing wire format. The [migration guide](../migrations/pinapod-v0.2.md) records the source changes, and the [PinaPod safety boundary](../pinapod-safety-boundary.md) records the current invariants.
+The original ADR compared Pina with Quasar and kept collections outside Pina's schema macros. That restriction was correct for the earlier container implementation, which could leave inactive backing bytes uninitialized and exposed staged compact mutation. PinaPod v0.2 removes those two blockers while preserving the existing wire format; the changelog records the source changes, and the [PinaPod safety boundary](../pinapod-safety-boundary.md) records the current invariants.
 
 ## Alternatives considered
 

@@ -500,7 +500,8 @@ pub trait CompactAccountInfoValidation {
 	///
 	/// Use this method when code only needs to validate an account. When code
 	/// also reads the compact view, use [`AsCompactAccount::with_compact_account`]
-	/// or a generated compact `with_pda` helper so Pina validates the data once.
+	/// or a generated compact `with_stored_bump_pda` helper so Pina validates
+	/// the data once.
 	fn assert_compact_type<T: PinaCompactAccount>(
 		self,
 		program_id: &Address,

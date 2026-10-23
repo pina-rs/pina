@@ -59,7 +59,7 @@ The macro generates `JournalHeader`, `JournalRef`, and `JournalPatch`. It also g
 
 Pina uses PinaPod for validated alignment-one storage. PinaPod initializes inactive collection capacity and validates each active nested value before Pina returns safe access.
 
-When a compact account also declares `#[pda(..., bump = bump)]`, the macro generates two closure-scoped loaders that differ in how they treat the canonical bump. `Type::with_stored_bump_pda` (named `with_pda` before the split that gave the loaders distinct names) derives one address from the stored bump, so it checks owner, compact data, and the stored-bump PDA address while one runtime borrow remains active. `Type::with_checked_pda` searches the seeds for the canonical bump instead, which additionally rejects an account at any other address and a stored bump that is not canonical. That search makes it the only compact loader that rejects a shadow account created at a noncanonical bump, and it costs more compute than the single derivation `with_pda` performs.
+When a compact account also declares `#[pda(..., bump = bump)]`, the macro generates two closure-scoped loaders that differ in how they treat the canonical bump. `Type::with_stored_bump_pda` derives one address from the stored bump, so it checks owner, compact data, and the stored-bump PDA address while one runtime borrow remains active. `Type::with_checked_pda` searches the seeds for the canonical bump instead, which additionally rejects an account at any other address and a stored bump that is not canonical. That search makes it the only compact loader that rejects a shadow account created at a noncanonical bump, and it costs more compute than the single derivation `with_stored_bump_pda` performs.
 
 <!-- {/compactAccountQuickstart} -->
 
@@ -143,7 +143,7 @@ Use `invoke_signed::<Journal>(signers)` when `rent_account` is a PDA that must s
 
 The `rent_account` field has the same meaning across `UpdateResizableAccount`, `ReallocAccount`, `ReallocAccountZeroed`, and `ReallocCompactAccount`: it funds growth and receives a shrink refund. The lower-level builders take an explicit `target_size`; the high-level builder derives it from the patch.
 
-The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Use `Journal::with_pda` to read a stored-bump compact PDA without a separate `assert_compact_type` or `assert_seeds` pass. End the closure before invoking `UpdateResizableAccount`.
+The generated patch owns the update plan, so callers do not coordinate `set_*`, `commit`, and `ReallocCompactAccount`. Use `Journal::with_stored_bump_pda` to read a stored-bump compact PDA without a separate `assert_compact_type` or `assert_seeds` pass. End the closure before invoking `UpdateResizableAccount`.
 
 <!-- {/compactAccountResizeOrdering} -->
 
@@ -154,7 +154,7 @@ Solana limits the per-instruction increase of account data. A schema can declare
 Immutable reads are closure-scoped so Pinocchio's borrow guard stays alive for the compact view:
 
 ```rust
-let (revision, count) = Journal::with_pda(
+let (revision, count) = Journal::with_stored_bump_pda(
 	journal,
 	authority,
 	&ID,
@@ -162,7 +162,7 @@ let (revision, count) = Journal::with_pda(
 )?;
 ```
 
-`Journal::with_pda` checks the owner, discriminator, size, prefixes, active elements, and the address the stored bump derives before the closure runs, using a single derivation. `Journal::with_checked_pda` searches for the canonical bump instead, which also rejects a shadow account created at a noncanonical bump; use it when an untrusted caller chooses which account the handler loads. Check the signer and stored authority separately because loading an account does not grant authority.
+`Journal::with_stored_bump_pda` checks the owner, discriminator, size, prefixes, active elements, and the address the stored bump derives before the closure runs, using a single derivation. `Journal::with_checked_pda` searches for the canonical bump instead, which also rejects a shadow account created at a noncanonical bump; use it when an untrusted caller chooses which account the handler loads. Check the signer and stored authority separately because loading an account does not grant authority.
 
 For a compact account without a stored bump, use `with_compact_account::<T, _>`. Use `assert_compact_type::<T>` only when code validates the account without reading its fields. Calling it before either loader repeats the complete compact-data validation.
 

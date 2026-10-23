@@ -70,20 +70,6 @@ pub fn assert_current_instruction_program_id(
 	Ok(())
 }
 
-/// Deprecated alias for [`assert_current_instruction_program_id`].
-///
-/// This function cannot detect self-CPI because the Instructions sysvar does
-/// not expose invocation stack height. Use it only to validate the
-/// transaction-level instruction's program ID.
-#[deprecated(
-	since = "0.9.0",
-	note = "cannot detect self-CPI; use assert_current_instruction_program_id for the actual \
-	        guarantee"
-)]
-pub fn assert_no_cpi(instructions_account: &AccountView, program_id: &Address) -> ProgramResult {
-	assert_current_instruction_program_id(instructions_account, program_id)
-}
-
 /// Returns the total number of instructions in the transaction.
 ///
 /// # Arguments

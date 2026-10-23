@@ -177,8 +177,6 @@ Use `#[pina(validate(...))]` on fields of `#[account]`, `#[instruction]`, and `#
 
 String lengths are UTF-8 byte lengths. Vector and array lengths are element counts. Chain bounds on the same receiver with `&&` (`value >= 1 && value <= 10`, `len == 4`) and separate rules with `,`. A range can also be written as one rule — `100 < value <= u64::MAX` — which generates the same two checks joined by `&&`. A rule that must fail in different ways takes `error = ERROR` in the same group.
 
-The `min`, `max`, `min_len`, `max_len`, and `exact_len` parameter spellings predate comparisons. They still parse and generate the identical checks, but they are deprecated and warn at the parameter.
-
 Use `validate(with = function)` in the outer macro for cross-field or domain validation. The hook is a named parameter, not a comparison: it keeps `=`. Fixed schemas pass their generated `*Zc` view; compact accounts pass their generated `*Ref<'_>` view. The function must return `ProgramResult`.
 
 ```rust
@@ -318,7 +316,7 @@ The existing `events_program` also enables `validation` and applies event rules 
 - Generated instructions, events, and ordinary accounts accept audited scalars, addresses, byte arrays, bounded `String` and `Vec` fields, and recursively fixed `Option` fields. PinaPod supplies alignment-one storage and load-bearing validation.
 - `#[account(compact)]` accepts a final suffix made from `String<N>`, `Vec<T, N>` for fixed `T`, `Option<String<N>>`, `Option<Vec<T, N>>` for fixed `T`, and `Vec<String<M>, N>`. Fixed `Option<T>` fields stay in the header. Unsupported nesting produces a compile-time error that lists these forms.
 - A fixed `#[account]` with `#[pda(bump = ...)]` generates `load_pda` and `load_pda_mut`. These methods validate the typed representation and stored-bump PDA address before returning a guard, without repeating recursive validation.
-- A compact `#[account]` with `#[pda(bump = ...)]` generates `with_pda` and `with_checked_pda`. Both validate compact data and the PDA address during one runtime borrow: `with_pda` derives the address once from the stored bump, while `with_checked_pda` searches for the canonical bump and so also rejects a shadow account created at a noncanonical bump.
+- A compact `#[account]` with `#[pda(bump = ...)]` generates `with_stored_bump_pda` and `with_checked_pda`. Both validate compact data and the PDA address during one runtime borrow: `with_stored_bump_pda` derives the address once from the stored bump, while `with_checked_pda` searches for the canonical bump and so also rejects a shadow account created at a noncanonical bump.
 - Use `PodString<N, PFX>` or `PodVec<T, N, PFX>` for an explicit `1`, `2`, `4`, or `8` byte prefix. Prefix widths are const arguments, not macro attributes.
 - The macros are designed for `no_std` Solana program crates.
 - If you use `pina`, these macros are available directly without importing `pina_macros`.

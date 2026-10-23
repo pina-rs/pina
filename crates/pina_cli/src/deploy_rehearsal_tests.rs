@@ -52,7 +52,7 @@ impl RehearsedProject {
 			project: self.root.clone(),
 			remote_command: None,
 			program: Some(self.program.clone()),
-			program_keypair: Some(self.program_keypair.clone()),
+			program_address: ProgramAddress::Keypair(self.program_keypair.clone()),
 			upgrade_authority: self.authority.clone(),
 			payer: self.authority.clone(),
 			target: DeploymentTarget::from_cluster_arg(cluster),

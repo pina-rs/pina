@@ -1581,15 +1581,6 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	}
 }
 
-/// Deprecated name for [`AllocateAccountWithNonCanonicalBump`].
-#[deprecated(
-	since = "0.16.0",
-	note = "use `AllocateAccountWithNonCanonicalBump`; explicit-bump allocation accepts any valid \
-	        PDA bump"
-)]
-pub type AllocateAccountWithBump<'account, 'address, 'seeds, 'seed> =
-	AllocateAccountWithNonCanonicalBump<'account, 'address, 'seeds, 'seed>;
-
 /// Maximum number of bytes an account may grow by in a single instruction.
 ///
 /// Currently `10 KiB` (`1_024 * 10 = 10_240` bytes), mirroring the Solana

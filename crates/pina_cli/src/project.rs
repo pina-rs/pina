@@ -21,17 +21,11 @@ use crate::lint_catalog::LintLevel;
 /// Name of the project-local Pina configuration file.
 pub const CONFIG_FILE_NAME: &str = "pina.toml";
 
-/// Deprecated uppercase spelling of the project configuration file, still
-/// supported for discovery (`pina.toml` wins in the same directory) but emits
-/// a deprecation warning when selected.
-pub const LEGACY_CONFIG_FILE_NAME: &str = "Pina.toml";
-
 /// A generated client ecosystem.
 ///
 /// The CLI variants use their kebab-case spelling — the one [`Self::as_str`],
 /// the CLI flag, and the generated directory name already use — so `languages`
-/// no longer needs a second spelling. The squashed legacy form keeps parsing so
-/// existing checkouts keep building.
+/// needs no second spelling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ClientLanguage {
@@ -39,11 +33,11 @@ pub enum ClientLanguage {
 	Typescript,
 	Dart,
 	Cpi,
-	#[serde(rename = "cli-rust", alias = "clirust")]
+	#[serde(rename = "cli-rust")]
 	CliRust,
-	#[serde(rename = "cli-ts", alias = "clits")]
+	#[serde(rename = "cli-ts")]
 	CliTs,
-	#[serde(rename = "cli-dart", alias = "clidart")]
+	#[serde(rename = "cli-dart")]
 	CliDart,
 }
 
@@ -199,17 +193,10 @@ struct LintsConfig(BTreeMap<String, String>);
 /// Program-wide migration settings.
 ///
 /// The version envelope width and the auto policy are recorded only in
-/// `migrations/manifest.json`, the one source macros read. Their retired
-/// `pina.toml` keys are still parsed so discovery can name the flag that now
-/// sets them instead of failing with a bare unknown-field error.
+/// `migrations/manifest.json`, the one source macros read.
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct MigrationsConfig {
-	/// Retired: set with `pina migrations create --version-type`.
-	#[serde(alias = "version-type")]
-	version_type: Option<toml::Value>,
-	/// Retired: set with `pina migrations create --auto`.
-	auto: Option<toml::Value>,
 	/// Persisted disambiguation answers consulted before `pina migrations
 	/// make` prompts; command-line flags override these per field.
 	#[serde(default)]
@@ -223,7 +210,6 @@ pub struct MigrationsAnswersConfig {
 	/// Persisted rename answers in `from:to` form.
 	pub rename: Vec<String>,
 	/// Persisted data-dropping acknowledgements.
-	#[serde(alias = "assume-removed")]
 	pub assume_removed: Vec<String>,
 	/// Added fields whose conversion is written by hand rather than generated.
 	pub manual: Vec<String>,
@@ -268,13 +254,8 @@ struct ClientsConfig {
 	rust: ClientGenerationOverride,
 	typescript: ClientGenerationOverride,
 	dart: ClientGenerationOverride,
-	/// Per-language overrides for the generated CLI clients. The kebab-case
-	/// aliases match the language spelling used everywhere else.
-	#[serde(alias = "cli-rust")]
 	cli_rust: ClientGenerationOverride,
-	#[serde(alias = "cli-ts")]
 	cli_ts: ClientGenerationOverride,
-	#[serde(alias = "cli-dart")]
 	cli_dart: ClientGenerationOverride,
 }
 
@@ -424,17 +405,6 @@ pub enum ProjectError {
 		"Invalid level `{level}` for lint `{name}` in [lints]; expected `allow`, `warn`, or `deny`"
 	)]
 	InvalidLintLevel { name: String, level: String },
-
-	#[error(
-		"`[migrations].{key}` no longer belongs in pina.toml: migrations/manifest.json records \
-		 it, and macros read only the manifest. Remove the key and run `pina migrations create \
-		 {flag} {value}` to record it."
-	)]
-	RetiredMigrationSetting {
-		key: &'static str,
-		flag: &'static str,
-		value: String,
-	},
 }
 
 impl Project {
@@ -479,13 +449,10 @@ impl Project {
 	///
 	/// Returns an error when the configuration file cannot be read or parsed.
 	pub fn locks_config(&self) -> Result<LocksConfig, ProjectError> {
-		let Some(config_path) = [CONFIG_FILE_NAME, LEGACY_CONFIG_FILE_NAME]
-			.iter()
-			.map(|name| self.root.join(name))
-			.find(|path| path.is_file())
-		else {
+		let config_path = self.root.join(CONFIG_FILE_NAME);
+		if !config_path.is_file() {
 			return Ok(LocksConfig::default());
-		};
+		}
 
 		Ok(read_project_config(&config_path)?.locks)
 	}
@@ -529,7 +496,6 @@ impl Project {
 			.clients
 			.resolved_generation(&templates, &clients_dir)?;
 		let lint_levels = resolve_lint_levels(config.lints.0)?;
-		reject_retired_migration_settings(&config.migrations)?;
 
 		Ok(Self {
 			program_dir,
@@ -1192,49 +1158,6 @@ fn resolve_lint_levels(
 	Ok(levels)
 }
 
-/// Refuse the migration keys the manifest now owns, naming the flag and the
-/// value that record the same setting.
-fn reject_retired_migration_settings(config: &MigrationsConfig) -> Result<(), ProjectError> {
-	let retired = [
-		(
-			"version_type",
-			"--version-type",
-			config.version_type.as_ref(),
-		),
-		("auto", "--auto", config.auto.as_ref()),
-	];
-	for (key, flag, value) in retired {
-		if let Some(value) = value {
-			return Err(ProjectError::RetiredMigrationSetting {
-				key,
-				flag,
-				value: retired_flag_value(value),
-			});
-		}
-	}
-	Ok(())
-}
-
-/// Spell a retired `pina.toml` value the way its `create` flag accepts it.
-fn retired_flag_value(value: &toml::Value) -> String {
-	match value {
-		toml::Value::String(text) => text.clone(),
-		toml::Value::Boolean(flag) => flag.to_string(),
-		toml::Value::Array(entries) => {
-			entries
-				.iter()
-				.map(|entry| {
-					entry
-						.as_str()
-						.map_or_else(|| entry.to_string(), str::to_owned)
-				})
-				.collect::<Vec<_>>()
-				.join(",")
-		}
-		other => other.to_string(),
-	}
-}
-
 fn is_link_like(metadata: &std::fs::Metadata) -> bool {
 	#[cfg(windows)]
 	{
@@ -1397,23 +1320,12 @@ fn find_ancestor_config(start: &Path) -> Option<PathBuf> {
 }
 
 fn find_config_in_directory(directory: &Path) -> Option<PathBuf> {
-	let mut legacy = None;
-
 	for entry in std::fs::read_dir(directory).ok()?.flatten() {
 		let name = entry.file_name();
 
 		if name == CONFIG_FILE_NAME && entry.path().is_file() {
 			return Some(entry.path());
 		}
-
-		if name == LEGACY_CONFIG_FILE_NAME && entry.path().is_file() {
-			legacy = Some(entry.path());
-		}
-	}
-
-	if let Some(config) = legacy {
-		eprintln!("warning: Pina.toml is deprecated; rename it to pina.toml");
-		return Some(config);
 	}
 
 	None
@@ -1509,20 +1421,6 @@ crate-type = ["cdylib", "lib"]
 		let locks = discovered_locks(temp.path());
 
 		assert_eq!(locks.allow, ["program_config", "fee_vault"]);
-	}
-
-	#[test]
-	fn locks_config_reads_the_legacy_config_file() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		write_program(temp.path(), "legacy-program");
-		write_file(
-			&temp.path().join(LEGACY_CONFIG_FILE_NAME),
-			b"[locks]\nallow = [\"state\"]\n",
-		);
-
-		let locks = discovered_locks(temp.path());
-
-		assert_eq!(locks.allow, ["state"]);
 	}
 
 	#[test]
@@ -1777,60 +1675,36 @@ mode = "overwrite"
 		Ok(())
 	}
 
-	/// The manifest owns the version width and the auto policy, so their old
-	/// `pina.toml` keys fail discovery with the flag and value that replace
-	/// them, including the legacy kebab spelling.
+	/// The manifest owns the version width and the auto policy, so their
+	/// `pina.toml` keys are unknown fields that fail discovery.
 	#[test]
-	fn retired_migration_keys_name_the_flag_that_replaces_them() {
-		for (config, expected) in [
-			(
-				"version_type = \"u16\"\n",
-				"`[migrations].version_type` no longer belongs in pina.toml",
-			),
-			("version-type = \"u32\"\n", "--version-type u32"),
-			("auto = true\n", "pina migrations create --auto true"),
-			(
-				"auto = [\"accounts\", \"events\"]\n",
-				"--auto accounts,events",
-			),
-			("auto = [\"accounts\", 3]\n", "--auto accounts,3"),
-			("auto = 7\n", "--auto 7"),
-		] {
-			let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-			discover_with_migrations(temp.path(), config);
-			let error = Project::discover(temp.path()).expect_err("retired keys must fail closed");
-			assert!(
-				matches!(error, ProjectError::RetiredMigrationSetting { .. }),
-				"unexpected error for {config}: {error}"
-			);
-			assert!(
-				error.to_string().contains(expected),
-				"unexpected message for {config}: {error}"
-			);
-		}
+	fn migration_policy_keys_are_rejected_as_unknown_fields() {
+		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		write_program(temp.path(), "counter");
+		write_file(
+			&temp.path().join(CONFIG_FILE_NAME),
+			b"[project]\nprogram = \".\"\n\n[migrations]\nversion_type = \"u16\"\n",
+		);
+
+		let error = Project::discover(temp.path()).expect_err("retired keys must fail closed");
+
+		assert!(
+			error.to_string().contains("unknown field"),
+			"unexpected message: {error}"
+		);
 	}
 
-	/// Snake case is the canonical `pina.toml` spelling; the kebab-case keys
-	/// that shipped first keep parsing so existing checkouts keep building.
+	/// Snake case is the canonical `pina.toml` spelling for `[migrations.answers]`.
 	#[test]
-	fn migrations_answers_accept_snake_case_and_the_legacy_kebab_spelling() {
+	fn migrations_answers_read_snake_case_keys() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 		discover_with_migrations(
 			temp.path(),
-			"\n[migrations.answers]\nassume_removed = [\"legacy\"]\n",
+			"\n[migrations.answers]\nassume_removed = [\"dropped\"]\n",
 		);
 		let project = Project::discover(temp.path())
 			.unwrap_or_else(|error| panic!("snake_case must parse: {error}"));
-		assert_eq!(project.migration_answers.assume_removed, vec!["legacy"]);
-
-		let legacy = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
-		discover_with_migrations(
-			legacy.path(),
-			"\n[migrations.answers]\nassume-removed = [\"legacy\"]\n",
-		);
-		let project = Project::discover(legacy.path())
-			.unwrap_or_else(|error| panic!("the legacy kebab spelling must keep parsing: {error}"));
-		assert_eq!(project.migration_answers.assume_removed, vec!["legacy"]);
+		assert_eq!(project.migration_answers.assume_removed, vec!["dropped"]);
 	}
 
 	#[test]
@@ -1852,7 +1726,7 @@ mode = "overwrite"
 	/// The CLI ecosystem spellings must match the rest of the CLI surface: the
 	/// `--client` flag, the generated directory name, and `ClientLanguage::as_str`.
 	#[test]
-	fn client_languages_read_kebab_case_and_the_legacy_squashed_spelling() {
+	fn client_languages_read_the_kebab_case_spelling() {
 		fn languages(entries: &str) -> Vec<ClientLanguage> {
 			let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
 			write_program(temp.path(), "counter");
@@ -1876,7 +1750,6 @@ mode = "overwrite"
 			languages("\"cli-rust\", \"cli-ts\", \"cli-dart\""),
 			expected
 		);
-		assert_eq!(languages("\"clirust\", \"clits\", \"clidart\""), expected);
 		assert_eq!(ClientLanguage::CliRust.as_str(), "cli-rust");
 	}
 
