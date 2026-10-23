@@ -128,6 +128,10 @@ if [[ -n "${FAKE_CARGO_ARGS:-}" ]]; then
 	printf '%s\n' "$@" > "$FAKE_CARGO_ARGS"
 fi
 
+if [[ -n "${FAKE_CARGO_HOST_STRIP:-}" ]]; then
+	printf '%s' "${CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP-unset}" > "$FAKE_CARGO_HOST_STRIP"
+fi
+
 target_dir=""
 previous=""
 for argument in "$@"; do
@@ -854,6 +858,37 @@ fn build_uses_metadata_target_from_configless_nested_start() {
 	assert_eq!(
 		generated_idl_name(&target.join("idl/custom_program.json")),
 		"customProgram"
+	);
+}
+
+// Darwin 27's dyld rejects proc macros stripped by the llvm-objcopy in
+// platform-tools (LLVM 20), so `pina build` must keep every host unit
+// unstripped even when the caller's environment says nothing about it.
+#[test]
+fn build_keeps_host_units_unstripped() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	let host_strip = temp.path().join("host-strip.txt");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.env_remove("CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP")
+		.env("FAKE_CARGO_HOST_STRIP", &host_strip)
+		.arg("build")
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run build command: {error}"));
+
+	assert!(
+		output.status.success(),
+		"build failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert_eq!(
+		fs::read_to_string(&host_strip)
+			.unwrap_or_else(|error| panic!("failed to read the host strip setting: {error}")),
+		"false"
 	);
 }
 

@@ -45,6 +45,7 @@ fi
 	printf ' %q' "$@"
 	printf '\n'
 	printf 'rustflags=%s\n' "${CARGO_TARGET_BPFEL_UNKNOWN_NONE_RUSTFLAGS:-}"
+	printf 'host_strip=%s\n' "${CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP-unset}"
 	printf 'lto=%s\n' "${CARGO_PROFILE_RELEASE_LTO:-}"
 } >> "$FAKE_UPSTREAM_ARGS"
 
@@ -162,6 +163,7 @@ fn upstream_build_drives_the_upstream_recipe() {
 		.env("PINA_SBPF_LINKER", &linker)
 		.env("FAKE_UPSTREAM_ARGS", &args_log)
 		.env("CARGO_TARGET_DIR", &target_dir)
+		.env_remove("CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP")
 		.output()
 		.unwrap_or_else(|error| panic!("failed to execute pina binary: {error}"));
 	assert!(
@@ -200,6 +202,12 @@ fn upstream_build_drives_the_upstream_recipe() {
 	assert!(
 		log.contains("lto=false"),
 		"expected LTO to be forced off, log: {log}"
+	);
+	// Darwin 27's dyld rejects proc macros stripped by an llvm-objcopy older
+	// than LLVM 23, which an upstream nightly may still bundle.
+	assert!(
+		log.contains("host_strip=false"),
+		"expected host units to stay unstripped, log: {log}"
 	);
 
 	assert!(
