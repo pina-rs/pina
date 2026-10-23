@@ -17,6 +17,7 @@ use sha2::Sha256;
 use tempfile::TempDir;
 
 use crate::project::Project;
+use crate::project::sanitize_git_environment;
 
 pub(super) const SUPPORTED_SOLANA_VERIFY_VERSION: &str = "0.5.1";
 
@@ -282,11 +283,14 @@ impl CommandRunner for ProcessRunner {
 		cwd: &Path,
 		environment: &[(&str, &OsStr)],
 	) -> Result<CommandOutput, std::io::Error> {
-		let output = Command::new(program)
-			.args(args)
-			.current_dir(cwd)
-			.envs(environment.iter().copied())
-			.output()?;
+		let mut command = Command::new(program);
+		command.args(args).current_dir(cwd);
+
+		if program == OsStr::new("git") {
+			sanitize_git_environment(&mut command);
+		}
+
+		let output = command.envs(environment.iter().copied()).output()?;
 
 		Ok(CommandOutput {
 			success: output.status.success(),
@@ -2269,6 +2273,39 @@ mod tests {
 	#[test]
 	fn tracked_source_staging_ignores_later_index_changes() -> Result<(), Box<dyn std::error::Error>>
 	{
+		const CHILD_MARKER: &str = "PINA_TEST_VERIFIABLE_GIT_ENVIRONMENT_ISOLATION";
+
+		if std::env::var_os(CHILD_MARKER).is_none() {
+			let parent = TempDir::new()?;
+			let parent_git = parent.path().join("git-dir");
+			let mut command = Command::new(std::env::current_exe()?);
+			sanitize_git_environment(&mut command);
+			command
+				.args([
+					"verifiable::tests::tracked_source_staging_ignores_later_index_changes",
+					"--exact",
+					"--nocapture",
+				])
+				.env(CHILD_MARKER, "1")
+				.env("GIT_CONFIG_COUNT", "1")
+				.env("GIT_CONFIG_KEY_0", "core.bare")
+				.env("GIT_CONFIG_VALUE_0", "true")
+				.env("GIT_DIR", &parent_git)
+				.env("GIT_COMMON_DIR", &parent_git)
+				.env("GIT_WORK_TREE", parent.path())
+				.env("GIT_INDEX_FILE", parent.path().join("index"));
+			let output = command.output()?;
+			let diagnostics = format!(
+				"isolated fixture failed:\n{}\n{}",
+				String::from_utf8_lossy(&output.stdout),
+				String::from_utf8_lossy(&output.stderr),
+			);
+			assert!(output.status.success(), "{diagnostics}");
+			assert!(!parent_git.exists());
+			assert!(!parent.path().join("index").exists());
+			return Ok(());
+		}
+
 		let repo = TempDir::new()?;
 		let destination = TempDir::new()?;
 		let root = repo.path();
@@ -2409,6 +2446,18 @@ mod tests {
 			.unwrap_or_else(|error| panic!("inherit failed: {error}"));
 		assert!(result.success);
 		assert!(runner.calls.borrow()[0].inherit);
+	}
+
+	#[test]
+	fn process_runner_captures_non_git_command_output() -> Result<(), Box<dyn std::error::Error>> {
+		let temp = TempDir::new()?;
+		let executable = std::env::current_exe()?;
+		let args = [OsString::from("--list")];
+		let output = ProcessRunner.capture(executable.as_os_str(), &args, temp.path(), &[])?;
+		let stdout = String::from_utf8_lossy(&output.stdout);
+		assert!(output.success, "{}", output.status);
+		assert!(stdout.contains("verifiable::tests::tracked_source_staging_"));
+		Ok(())
 	}
 
 	#[test]

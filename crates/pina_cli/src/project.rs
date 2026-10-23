@@ -1032,7 +1032,7 @@ fn containment_root(
 	root
 }
 
-fn sanitize_git_environment(command: &mut Command) {
+pub(crate) fn sanitize_git_environment(command: &mut Command) {
 	for variable in [
 		"GIT_ALTERNATE_OBJECT_DIRECTORIES",
 		"GIT_COMMON_DIR",
