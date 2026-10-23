@@ -1,0 +1,71 @@
+name: authorize protected revision
+
+on:
+  workflow_call:
+    outputs:
+      sha:
+        description: Immutable, authorized event revision.
+        value: ${{ jobs.authorize.outputs.sha }}
+      main_sha:
+        description: Protected main revision used for the ancestry check.
+        value: ${{ jobs.authorize.outputs.main_sha }}
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.authorize.outputs.sha }}
+      main_sha: ${{ steps.authorize.outputs.main_sha }}
+    steps:
+      # This job never checks out or executes repository code. A descendant
+      # of main is insufficient: an unmerged branch can contain all of main.
+      - name: authorize workflow and event revisions
+        id: authorize
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REPOSITORY" != pina-rs/pina ]]; then
+            echo "::error::Privileged workflows are restricted to pina-rs/pina." >&2
+            exit 1
+          fi
+
+          case "$GITHUB_EVENT_NAME:$GITHUB_REF" in
+            push:refs/heads/main|workflow_dispatch:refs/heads/main) ;;
+            push:refs/tags/v*|push:refs/tags/abi/v*|release:refs/tags/v*) ;;
+            *)
+              echo "::error::Run this workflow from main or an approved release tag." >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ "$WORKFLOW_REF" != "$GITHUB_REPOSITORY/.github/workflows/"*"@$GITHUB_REF" ]]; then
+            echo "::error::Workflow definition does not match the event ref." >&2
+            exit 1
+          fi
+
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq 'select(.protected == true) | .commit.sha')"
+          for revision in "$main_sha" "$WORKFLOW_SHA" "$GITHUB_SHA"; do
+            if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Expected full commit SHAs and a protected main branch." >&2
+              exit 1
+            fi
+          done
+
+          for revision in "$WORKFLOW_SHA" "$GITHUB_SHA"; do
+            status="$(gh api "repos/$GITHUB_REPOSITORY/compare/$revision...$main_sha" --jq '.status')"
+            if [[ "$status" != identical && "$status" != ahead ]]; then
+              echo "::error::Revision $revision has not been merged into protected main." >&2
+              exit 1
+            fi
+          done
+
+          echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "main_sha=$main_sha" >> "$GITHUB_OUTPUT"

@@ -53,12 +53,12 @@ assert.deepEqual(
 	platformNames,
 );
 
-const publishWorkflow = readFileSync(
-	join(repositoryRoot, ".github/workflows/publish.yml"),
+const buildWorkflow = readFileSync(
+	join(repositoryRoot, ".github/workflows/build-release.yml"),
 	"utf8",
 );
 const releaseTargets = new Set(
-	[...publishWorkflow.matchAll(/^\s+- target: (\S+)$/gm)].map(
+	[...buildWorkflow.matchAll(/^\s+- target: (\S+)$/gm)].map(
 		(match) => match[1],
 	),
 );

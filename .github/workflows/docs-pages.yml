@@ -24,8 +24,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  authorize:
+    uses: $/.github/workflows/authorize-main.yml
+
   build:
     name: build documentation
+    needs: authorize
     if: >-
       github.repository_owner == 'pina-rs' &&
       (github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v'))
@@ -37,6 +41,7 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.authorize.outputs.sha }}
           persist-credentials: false
 
       - name: setup
@@ -66,7 +71,7 @@ jobs:
   deploy:
     name: deploy documentation
     if: github.repository_owner == 'pina-rs'
-    needs: build
+    needs: [authorize, build]
     permissions:
       id-token: write # Authenticate the Pages deployment with GitHub OIDC.
       pages: write # Publish the built documentation artifact to GitHub Pages.

@@ -163,6 +163,14 @@ The same trusted-publishing workflow also publishes `@pina-rs/codama-nodes` and 
 
 ## Release workflow
 
+Release automation, publishing, and Pages run a read-only, checkout-free authorization job before executing repository code. Manual runs must select `main`; release tags and the workflow definition must name commits already in protected `main`'s history. An unmerged descendant of `main` is rejected. Every checkout uses the authorized immutable SHA.
+
+The release handoff dispatches `publish.yml` from `main` with a separate `checkout_ref` commit SHA. Unmerged release previews use the shared binary builder with only `contents: read` and read-only cache access, without OIDC permissions. Real uploads require the tag to match a commit already merged into protected `main`; registry publication still requires the `publisher` environment's reviewer approval.
+
+Release asset provenance records the workflow commit and the approved release source as separate resolved dependencies, together with the dispatch inputs. This preserves the exact build revision when `main` has advanced since the release commit.
+
+Keep the `main` branch protection, the `github-pages` environment's `main`-only branch policy, and the `publisher` environment's reviewer rule enabled. The Actions execution policy for `release-pr.yml`, `publish.yml`, and `docs-pages.yml` allows repository administrators and the GitHub Actions app. Keep that allowlist enabled, and protect release tag creation and updates in repository settings. These controls cover the named entry points; a repository writer who can introduce other privileged workflows remains a trusted principal. The workflow gate does not replace repository-side access controls.
+
 Use `monochange` for changelog/release management:
 
 <!-- {=releaseWorkflowCommands} -->
