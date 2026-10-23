@@ -853,7 +853,7 @@ mod tests {
 			.unwrap_or_else(|error| panic!("create failed: {error}"));
 		fs::write(
 			root.join("Cargo.toml"),
-			"[package]\nname = \"demo-program\"\n",
+			"[package]\nname = \"demo-program\"\n\n[workspace]\n",
 		)
 		.unwrap_or_else(|error| panic!("write failed: {error}"));
 		fs::write(
