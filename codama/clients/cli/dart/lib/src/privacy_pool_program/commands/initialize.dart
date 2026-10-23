@@ -59,6 +59,12 @@ final class InitializeCommand extends Command<void> {
         'disclosure_log',
         mandatory: false,
         help: "The disclosure_log account [default: derived]",
+      )
+      ..addOption(
+        'program_data',
+        mandatory: true,
+        help:
+            "Canonical `ProgramData` for this program, owned by the upgradeable loader",
       );
   }
 
@@ -108,6 +114,10 @@ final class InitializeCommand extends Command<void> {
         : (await findDisclosureLogPda(
             programAddress: context.programAddress,
           )).$1;
+    final programData = pubkey(
+      '--program-data',
+      results['program_data']! as String,
+    );
     final configBumpValue = integer(
       '--config-bump',
       results['config_bump']! as String,
@@ -148,6 +158,7 @@ final class InitializeCommand extends Command<void> {
       requesterRegistry: requesterRegistry,
       disclosureLog: disclosureLog,
       systemProgram: Address("11111111111111111111111111111111"),
+      programData: programData,
       configBump: configBumpValue,
       vaultBump: vaultBumpValue,
       treeBump: treeBumpValue,

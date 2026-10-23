@@ -11,7 +11,7 @@
 pub const DEPOSIT_DISCRIMINATOR: u8 = 4u8;
 /// Compute units `Deposit` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const DEPOSIT_MEASURED_COMPUTE_UNITS: u32 = 15996;
+pub const DEPOSIT_MEASURED_COMPUTE_UNITS: u32 = 15995;
 /// Compute unit limit to request for a transaction carrying `Deposit`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to

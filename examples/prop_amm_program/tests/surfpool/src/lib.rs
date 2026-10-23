@@ -10,22 +10,10 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
 use program::ID;
-use program::UPDATE_AUTHORITY;
 
-/// The committed fixture seed: the 32 ASCII bytes of a descriptive phrase,
-/// documented on `UPDATE_AUTHORITY` in `src/lib.rs`. Deterministic, and
-/// outside the uniform-seed brute-force space the old `[7u8; 32]` fixture
-/// lived in.
-const UPDATE_AUTHORITY_SEED: [u8; 32] = *b"pina example fixture updater key";
-
+/// The compromised historical signer, retained only for rejection tests.
 fn fixture_update_authority() -> Keypair {
-	let keypair = Keypair::new_from_array(UPDATE_AUTHORITY_SEED);
-	assert_eq!(
-		keypair.pubkey(),
-		UPDATE_AUTHORITY,
-		"the committed fixture seed must keep deriving UPDATE_AUTHORITY"
-	);
-	keypair
+	Keypair::new_from_array(*b"pina example fixture updater key")
 }
 use program::PropAmmInstruction;
 
@@ -125,12 +113,10 @@ fn initialize_records_the_payer_as_authority() {
 	});
 }
 
-/// The oracle's recorded authority can update the price. At initialize that is
-/// the payer, and the gate stays narrow: a key that is neither the static
-/// updater nor the recorded authority is still refused.
+/// Only the oracle's recorded authority can update the price.
 #[test]
 #[ignore = "run with pina test"]
-fn update_requires_the_recorded_or_the_static_authority() {
+fn update_requires_the_recorded_authority() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
@@ -159,9 +145,7 @@ fn update_requires_the_recorded_or_the_static_authority() {
 		);
 		drop(account);
 
-		// A stranger — neither the stored authority nor the static updater —
-		// is still refused, so the stored-authority branch does not widen the
-		// gate to everyone.
+		// A stranger is refused without changing the price.
 		let stranger = Keypair::new_from_array([4; 32]);
 		program
 			.fund(&stranger.pubkey(), 1_000_000_000)
@@ -257,8 +241,7 @@ fn rotate_hands_over_the_oracle_authority() {
 		);
 		drop(account);
 
-		// The key it replaced is no longer the stored authority and is not the
-		// static updater, so it has no update capability left.
+		// The replaced authority can no longer publish.
 		let error = program
 			.send_instruction(update_instruction(
 				&program,
@@ -282,12 +265,10 @@ fn rotate_hands_over_the_oracle_authority() {
 	});
 }
 
-/// The rebuilt fixture update authority — deterministic from the committed
-/// seed, and no longer recoverable from a uniform one — can still sign a
-/// price update, so the D1 reseed introduced no functional regression.
+/// The published historical private key grants no price-update privilege.
 #[test]
 #[ignore = "run with pina test"]
-fn fixture_update_authority_still_publishes_prices() {
+fn compromised_fixture_authority_cannot_publish_prices() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
@@ -309,7 +290,7 @@ fn fixture_update_authority_still_publishes_prices() {
 			.fund(&update_authority.pubkey(), 1_000_000_000)
 			.expect("fund the fixture update authority");
 
-		program
+		let error = program
 			.send_with_signers(
 				update_instruction(
 					&program,
@@ -319,13 +300,17 @@ fn fixture_update_authority_still_publishes_prices() {
 				),
 				&[&update_authority],
 			)
-			.expect("the fixture update authority signs the price update");
+			.expect_err("the compromised fixture authority cannot update");
+		pina_test::assert_custom_error(
+			&error,
+			program::PropAmmError::UnauthorizedUpdateAuthority as u32,
+		);
 
 		let account = program.account(&oracle.pubkey()).expect("fetch oracle");
 		assert_eq!(
 			&account.data[34..42],
-			&999_999_u64.to_le_bytes(),
-			"the authorized update wrote the new price on-chain"
+			&0_u64.to_le_bytes(),
+			"the refused update leaves the price untouched"
 		);
 
 		program.stop().expect("stop isolated program test");
@@ -335,20 +320,11 @@ fn fixture_update_authority_still_publishes_prices() {
 // ---------------------------------------------------------------------------
 // Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
 //
-// Each test below asserts the *secure* behavior from the audit report. It
-// fails on the current tree because the exploit is still live, and must pass
-// once the corresponding fix lands. Run with `pina test --project
-// examples/prop_amm_program --filter audit_sec_`.
+// Run with `pina test --project examples/prop_amm_program --filter audit_sec_`.
 // ---------------------------------------------------------------------------
 
-/// SEC-32: `RotateAuthority` changes the stored authority, but `Update`
-/// still authorizes the immutable global `UPDATE_AUTHORITY` constant, so the
-/// advertised rotation cannot transfer publishing power and the old global
-/// key remains authorized forever. After a rotation, the new authority must
-/// be able to publish and the previous one must not.
-///
-/// Current behavior: the rotated-in authority cannot update, so the `expect`
-/// below fails and the test proves the rotation is inert.
+/// SEC-32: rotation grants publishing to the new authority and revokes the old
+/// one, including the compromised global fixture that used to bypass rotation.
 #[test]
 #[ignore = "run with pina test"]
 fn audit_sec_32_update_follows_the_rotated_authority() {
@@ -396,6 +372,30 @@ fn audit_sec_32_update_follows_the_rotated_authority() {
 			u64::from_le_bytes(account.data[34..42].try_into().expect("price")),
 			1_234_567,
 			"the rotated-in authority's price landed on-chain"
+		);
+
+		let error = program
+			.send_instruction(update_instruction(&program, &oracle.pubkey(), &payer, 7))
+			.expect_err("the previous authority cannot publish after rotation");
+		pina_test::assert_custom_error(
+			&error,
+			program::PropAmmError::UnauthorizedUpdateAuthority as u32,
+		);
+		let compromised = fixture_update_authority();
+		program.fund(&compromised.pubkey(), 1_000_000).unwrap();
+		let error = program
+			.send_with_signers(
+				update_instruction(&program, &oracle.pubkey(), &compromised.pubkey(), 8),
+				&[&compromised],
+			)
+			.expect_err("the compromised global key cannot bypass rotation");
+		pina_test::assert_custom_error(
+			&error,
+			program::PropAmmError::UnauthorizedUpdateAuthority as u32,
+		);
+		assert_eq!(
+			program.account(&oracle.pubkey()).unwrap().data,
+			account.data
 		);
 
 		program.stop().expect("stop isolated program test");

@@ -36,7 +36,7 @@ use solana_sdk::pubkey::Pubkey;
 /// ## Instructions
 ///
 /// - `Initialize` — create and initialize an oracle account
-/// - `Update` — allow a fixed global updater to publish a new price
+/// - `Update` — allow the oracle's current authority to publish a new price
 /// - `RotateAuthority` — let the oracle authority rotate its control key
 #[derive(Debug, Parser)]
 #[command(name = "prop-amm-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]

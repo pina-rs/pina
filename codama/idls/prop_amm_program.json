@@ -25,7 +25,7 @@
 			"## Instructions",
 			"",
 			"- `Initialize` — create and initialize an oracle account",
-			"- `Update` — allow a fixed global updater to publish a new price",
+			"- `Update` — allow the oracle's current authority to publish a new price",
 			"- `RotateAuthority` — let the oracle authority rotate its control key"
 		],
 		"accounts": [
@@ -261,7 +261,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 500,
-							"measured": 113
+							"measured": 111
 						}
 					}
 				]

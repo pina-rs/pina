@@ -11,7 +11,7 @@
 pub const TRANSFER_DISCRIMINATOR: u8 = 6u8;
 /// Compute units `Transfer` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const TRANSFER_MEASURED_COMPUTE_UNITS: u32 = 104148;
+pub const TRANSFER_MEASURED_COMPUTE_UNITS: u32 = 104147;
 /// Compute unit limit to request for a transaction carrying `Transfer`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to

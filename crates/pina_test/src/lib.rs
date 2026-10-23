@@ -473,6 +473,31 @@ impl ProgramTest {
 		self.surfnet.payer()
 	}
 
+	/// Set this deployment's upgrade authority inside the isolated Surfnet.
+	///
+	/// This cheatcode configures loader state for bootstrap authorization tests.
+	/// It does not send an on-chain authority-transfer instruction.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC rejects the authority change.
+	pub fn set_upgrade_authority(&self, authority: Option<Pubkey>) -> Result<(), TestError> {
+		self.surfnet
+			.inner
+			.rpc_client()
+			.send::<serde_json::Value>(
+				RpcRequest::Custom {
+					method: "surfnet_setProgramAuthority",
+				},
+				serde_json::json!([
+					self.program_id.to_string(),
+					authority.map(|key| key.to_string())
+				]),
+			)
+			.map(|_| ())
+			.map_err(|error| test_error("set program upgrade authority", error))
+	}
+
 	/// Build an instruction addressed to the deployed program.
 	#[must_use]
 	pub fn instruction(&self, data: &[u8], accounts: Vec<AccountMeta>) -> Instruction {

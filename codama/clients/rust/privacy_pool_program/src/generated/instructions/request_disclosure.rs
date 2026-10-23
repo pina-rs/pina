@@ -11,7 +11,7 @@
 pub const REQUEST_DISCLOSURE_DISCRIMINATOR: u8 = 7u8;
 /// Compute units `RequestDisclosure` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const REQUEST_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 11015;
+pub const REQUEST_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 11014;
 /// Compute unit limit to request for a transaction carrying `RequestDisclosure`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to

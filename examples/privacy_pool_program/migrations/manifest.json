@@ -431,6 +431,9 @@
 							{
 								"name": "system_program",
 								"defaultValue": "publicKey:11111111111111111111111111111111"
+							},
+							{
+								"name": "program_data"
 							}
 						]
 					}

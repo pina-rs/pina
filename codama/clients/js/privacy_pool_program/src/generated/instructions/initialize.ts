@@ -74,6 +74,7 @@ export type InitializeInstruction<
 	TAccountDisclosureLog extends string | AccountMeta<string> = string,
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
+	TAccountProgramData extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
@@ -105,6 +106,8 @@ export type InitializeInstruction<
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
+			TAccountProgramData extends string ? ReadonlyAccount<TAccountProgramData>
+				: TAccountProgramData,
 			...TRemainingAccounts,
 		]
 	>;
@@ -203,6 +206,7 @@ export type InitializeAsyncInput<
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
+	TAccountProgramData extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	authority: TAccountAuthority;
 	poolConfig?: TAccountPoolConfig;
@@ -213,6 +217,8 @@ export type InitializeAsyncInput<
 	requesterRegistry?: TAccountRequesterRegistry;
 	disclosureLog?: TAccountDisclosureLog;
 	systemProgram?: TAccountSystemProgram;
+	/** Canonical `ProgramData` for this program, owned by the upgradeable loader. */
+	programData: TAccountProgramData;
 	configBump: InitializeInstructionDataArgs["configBump"];
 	vaultBump: InitializeInstructionDataArgs["vaultBump"];
 	treeBump: InitializeInstructionDataArgs["treeBump"];
@@ -233,6 +239,7 @@ export async function getInitializeInstructionAsync<
 	TAccountRequesterRegistry extends InstructionAccountInput,
 	TAccountDisclosureLog extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountProgramData extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeAsyncInput<
@@ -244,7 +251,8 @@ export async function getInitializeInstructionAsync<
 		TAccountCustodianRegistry,
 		TAccountRequesterRegistry,
 		TAccountDisclosureLog,
-		TAccountSystemProgram
+		TAccountSystemProgram,
+		TAccountProgramData
 	>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
@@ -285,6 +293,10 @@ export async function getInitializeInstructionAsync<
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
 			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramData,
+			InstructionAccountInputAddress<TAccountProgramData>
 		>
 	>
 > {
@@ -339,6 +351,11 @@ export async function getInitializeInstructionAsync<
 		},
 		systemProgram: {
 			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		programData: {
+			value: input.programData ?? null,
 			isSigner: false,
 			isWritable: false,
 		},
@@ -397,6 +414,7 @@ export async function getInitializeInstructionAsync<
 			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
 			getAccountMeta("disclosureLog", accounts.disclosureLog),
 			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("programData", accounts.programData),
 		],
 		data: getInitializeInstructionDataEncoder().encode(
 			args as InitializeInstructionDataArgs,
@@ -439,6 +457,10 @@ export async function getInitializeInstructionAsync<
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
 			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramData,
+			InstructionAccountInputAddress<TAccountProgramData>
 		>
 	>);
 }
@@ -458,6 +480,7 @@ export type InitializeInput<
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
+	TAccountProgramData extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	authority: TAccountAuthority;
 	poolConfig: TAccountPoolConfig;
@@ -468,6 +491,8 @@ export type InitializeInput<
 	requesterRegistry: TAccountRequesterRegistry;
 	disclosureLog: TAccountDisclosureLog;
 	systemProgram?: TAccountSystemProgram;
+	/** Canonical `ProgramData` for this program, owned by the upgradeable loader. */
+	programData: TAccountProgramData;
 	configBump: InitializeInstructionDataArgs["configBump"];
 	vaultBump: InitializeInstructionDataArgs["vaultBump"];
 	treeBump: InitializeInstructionDataArgs["treeBump"];
@@ -488,6 +513,7 @@ export function getInitializeInstruction<
 	TAccountRequesterRegistry extends InstructionAccountInput,
 	TAccountDisclosureLog extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountProgramData extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeInput<
@@ -499,7 +525,8 @@ export function getInitializeInstruction<
 		TAccountCustodianRegistry,
 		TAccountRequesterRegistry,
 		TAccountDisclosureLog,
-		TAccountSystemProgram
+		TAccountSystemProgram,
+		TAccountProgramData
 	>,
 	config?: { programAddress?: TProgramAddress },
 ): InitializeInstruction<
@@ -539,6 +566,10 @@ export function getInitializeInstruction<
 	ResolvedInstructionAccountMeta<
 		TAccountSystemProgram,
 		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProgramData,
+		InstructionAccountInputAddress<TAccountProgramData>
 	>
 > {
 	// Program address.
@@ -595,6 +626,11 @@ export function getInitializeInstruction<
 			isSigner: false,
 			isWritable: false,
 		},
+		programData: {
+			value: input.programData ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -623,6 +659,7 @@ export function getInitializeInstruction<
 			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
 			getAccountMeta("disclosureLog", accounts.disclosureLog),
 			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("programData", accounts.programData),
 		],
 		data: getInitializeInstructionDataEncoder().encode(
 			args as InitializeInstructionDataArgs,
@@ -665,6 +702,10 @@ export function getInitializeInstruction<
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
 			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramData,
+			InstructionAccountInputAddress<TAccountProgramData>
 		>
 	>);
 }
@@ -684,6 +725,8 @@ export type ParsedInitializeInstruction<
 		requesterRegistry: TAccountMetas[6];
 		disclosureLog: TAccountMetas[7];
 		systemProgram: TAccountMetas[8];
+		/** Canonical `ProgramData` for this program, owned by the upgradeable loader. */
+		programData: TAccountMetas[9];
 	};
 	data: InitializeInstructionData;
 };
@@ -697,12 +740,12 @@ export function parseInitializeInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 9) {
+	if (instruction.accounts.length < 10) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 9,
+				expectedAccountMetas: 10,
 			},
 		);
 	}
@@ -724,6 +767,7 @@ export function parseInitializeInstruction<
 			requesterRegistry: getNextAccount(),
 			disclosureLog: getNextAccount(),
 			systemProgram: getNextAccount(),
+			programData: getNextAccount(),
 		},
 		data: getInitializeInstructionDataDecoder().decode(instruction.data),
 	};
