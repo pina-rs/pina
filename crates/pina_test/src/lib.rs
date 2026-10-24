@@ -2104,6 +2104,27 @@ mod tests {
 	}
 
 	#[test]
+	fn upgrade_authority_changes_report_a_missing_deployment() {
+		run(async {
+			let mut program = ProgramTest {
+				benchmark_program: None,
+				program_id: Pubkey::new_from_array([39; 32]),
+				surfnet: OfflineSurfnet::start().await.unwrap(),
+			};
+
+			for authority in [Some(program.payer()), None] {
+				let error = program
+					.set_upgrade_authority(authority)
+					.expect_err("a missing deployment cannot change upgrade authority");
+
+				assert_eq!(error.operation(), "set program upgrade authority");
+			}
+
+			program.stop().unwrap();
+		});
+	}
+
+	#[test]
 	fn installs_historical_state_and_proves_rejected_transaction_rollback() {
 		run(async {
 			let mut surfnet = OfflineSurfnet::start()
