@@ -61,7 +61,7 @@
 // `AccountView` is small and `Copy`, but every pina accessor and example
 // passes it by reference; match the shared signature style.
 #![expect(clippy::trivially_copy_pass_by_ref)]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 #[cfg(all(
 	not(any(target_os = "solana", target_arch = "bpf")),
@@ -2802,7 +2802,12 @@ mod tests {
 	fn challenge_deadline_is_checked_and_tier_scoped() {
 		// A tier-1 window is added to the filing time.
 		assert_eq!(
-			challenge_deadline(1_700, DEFAULT_CHALLENGE_WINDOW_SECS as u64, TIER_VERIFIED).unwrap(),
+			challenge_deadline(
+				1_700,
+				u64::from(DEFAULT_CHALLENGE_WINDOW_SECS),
+				TIER_VERIFIED
+			)
+			.unwrap(),
 			2_300
 		);
 		// Consent and compelled requests carry no window: the deadline is the

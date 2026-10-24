@@ -1559,6 +1559,30 @@ mod tests {
 	}
 
 	#[test]
+	fn account_data_validation_checks_layout_and_discriminator() {
+		let mut data = [0_u8; 17];
+		data[0] = 7;
+		assert_eq!(TestType::validate_account_data(&data), Ok(()));
+
+		assert_eq!(
+			TestType::validate_account_data(&data[..16]),
+			Err(ProgramError::InvalidAccountData)
+		);
+
+		let oversized = [7_u8; 18];
+		assert_eq!(
+			TestType::validate_account_data(&oversized),
+			Err(ProgramError::InvalidAccountData)
+		);
+
+		data[0] = 99;
+		assert_eq!(
+			TestType::validate_account_data(&data),
+			Err(ProgramError::InvalidAccountData)
+		);
+	}
+
+	#[test]
 	fn discriminator_from_bytes_u8() {
 		let data = [42u8, 0, 0, 0];
 		let d = u8::discriminator_from_bytes(&data).unwrap();

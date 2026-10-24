@@ -29,27 +29,6 @@ use mollusk_svm::result::Check;
 use mollusk_svm::result::InstructionResult;
 use pina::PinaAccount;
 use pina::PinaPodFixed;
-use program::Address;
-use program::ApproveDisclosureIx;
-use program::CancelDisclosureIx;
-use program::ChallengeDisclosureIx;
-use program::DEPOSIT_LAMPORTS;
-use program::DepositIx;
-use program::GrantDisclosureIx;
-use program::InitializeIx;
-use program::PrivacyPoolError;
-use program::RegisterRequesterIx;
-use program::RequestDisclosureIx;
-use program::ResolveChallengeIx;
-use program::SetVerificationKeyIx;
-use program::TREE_DEPTH;
-use program::TREE_NODES;
-use program::TransferIx;
-use program::VK_SLOT_TRANSFER;
-use program::VK_SLOT_WITHDRAW;
-use program::WithdrawIx;
-use program::prover;
-use program::zero_hashes;
 pub use program::*;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
@@ -67,7 +46,7 @@ const TREE_NEXT_LEAF: usize = HEADER + 1;
 const TREE_NODES_AT: usize = TREE_NEXT_LEAF + 8;
 
 fn program_id() -> Pubkey {
-	let bytes: &[u8] = program::ID.as_ref();
+	let bytes: &[u8] = ID.as_ref();
 	let array: [u8; 32] = bytes.try_into().unwrap_or_else(|_| panic!("id"));
 	Pubkey::new_from_array(array)
 }
@@ -177,21 +156,8 @@ fn vkey_pda(slot: u8) -> (Pubkey, u8) {
 // World
 // ---------------------------------------------------------------------------
 
-fn stored_account(data: Vec<u8>, lamports: u64) -> Account {
-	Account {
-		lamports,
-		data,
-		owner: program_id(),
-		executable: false,
-		rent_epoch: 0,
-	}
-}
-
 fn wallet(seed: u8) -> (Pubkey, Account) {
-	(
-		key(seed),
-		Account::new(FUND, 0, &solana_sdk_ids::system_program::id()),
-	)
+	(key(seed), Account::new(FUND, 0, &system_program::id()))
 }
 
 struct World {
@@ -333,21 +299,16 @@ struct Pool {
 	mollusk: Mollusk,
 	world: World,
 	authority: Pubkey,
-	custodians: [Pubkey; 3],
 	withdraw_pk: ark_groth16::ProvingKey<ark_bn254::Bn254>,
-	withdraw_vk: ark_groth16::VerifyingKey<ark_bn254::Bn254>,
 	transfer_pk: ark_groth16::ProvingKey<ark_bn254::Bn254>,
 }
 
 fn setup_pool() -> Pool {
-	let mut mollusk = create_mollusk();
+	let mollusk = create_mollusk();
 	let mut world = World::new();
 
 	let authority = bootstrap_authority();
-	world.add(
-		authority,
-		Account::new(FUND, 0, &solana_sdk_ids::system_program::id()),
-	);
+	world.add(authority, Account::new(FUND, 0, &system_program::id()));
 	for seed in 2..=10 {
 		let (pubkey, account) = wallet(seed);
 		world.add(pubkey, account);
@@ -362,23 +323,29 @@ fn setup_pool() -> Pool {
 	world.add(requesters_pda().0, Account::default());
 	world.add(log_pda().0, Account::default());
 	world.add(
-		solana_sdk_ids::system_program::id(),
+		system_program::id(),
 		mollusk_svm::program::keyed_account_for_system_program().1,
 	);
 	world.run(&mollusk, &initialize_ix(custodians), &[Check::success()]);
 
-	let (withdraw_pk, withdraw_vk) = prover::seeded_setup(false, 0x1111);
-	let (transfer_pk, transfer_vk) = prover::seeded_setup(true, 0x2222);
+	let (withdraw_pk, withdraw_verification_key) = prover::seeded_setup(false, 0x1111);
+	let (transfer_pk, transfer_verification_key) = prover::seeded_setup(true, 0x2222);
 	world.add(vkey_pda(VK_SLOT_WITHDRAW).0, Account::default());
 	world.add(vkey_pda(VK_SLOT_TRANSFER).0, Account::default());
 	world.run(
 		&mollusk,
-		&set_vkey_ix(VK_SLOT_WITHDRAW, &prover::serialize_vk(&withdraw_vk)),
+		&set_vkey_ix(
+			VK_SLOT_WITHDRAW,
+			&prover::serialize_vk(&withdraw_verification_key),
+		),
 		&[Check::success()],
 	);
 	world.run(
 		&mollusk,
-		&set_vkey_ix(VK_SLOT_TRANSFER, &prover::serialize_vk(&transfer_vk)),
+		&set_vkey_ix(
+			VK_SLOT_TRANSFER,
+			&prover::serialize_vk(&transfer_verification_key),
+		),
 		&[Check::success()],
 	);
 
@@ -386,28 +353,26 @@ fn setup_pool() -> Pool {
 		mollusk,
 		world,
 		authority,
-		custodians,
 		withdraw_pk,
-		withdraw_vk,
 		transfer_pk,
 	}
 }
 
 /// Host-side commitment for a note: `poseidon(poseidon(secret, seed), amount)`.
 fn commitment_bytes(secrets: &prover::NoteSecrets, amount_lamports: u64) -> [u8; 32] {
-	let inner = program::poseidon2(
+	let inner = poseidon2(
 		&prover::fr_to_le(&secrets.secret),
 		&prover::fr_to_le(&secrets.nullifier_seed),
 	)
 	.unwrap_or_else(|e| panic!("host commitment: {e:?}"));
 	let mut amount = [0_u8; 32];
 	amount[..8].copy_from_slice(&amount_lamports.to_le_bytes());
-	program::poseidon2(&inner, &amount).unwrap_or_else(|e| panic!("host commitment: {e:?}"))
+	poseidon2(&inner, &amount).unwrap_or_else(|e| panic!("host commitment: {e:?}"))
 }
 
 /// Host-side nullifier: `poseidon(seed, secret)`.
 fn nullifier_bytes(secrets: &prover::NoteSecrets) -> [u8; 32] {
-	program::poseidon2(
+	poseidon2(
 		&prover::fr_to_le(&secrets.nullifier_seed),
 		&prover::fr_to_le(&secrets.secret),
 	)
@@ -535,8 +500,7 @@ fn withdraw_ix(
 
 fn transfer_ix(
 	root: [u8; 32],
-	spent: &prover::NoteSecrets,
-	successor: &prover::NoteSecrets,
+	(spent, successor): (&prover::NoteSecrets, &prover::NoteSecrets),
 	payer: Pubkey,
 	pk: &ark_groth16::ProvingKey<ark_bn254::Bn254>,
 	leaf_index: usize,
@@ -632,10 +596,9 @@ fn deposit_note(
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn initialize_creates_the_pool_accounts() {
-	let mut pool = setup_pool();
+	let pool = setup_pool();
 	let (config_key, _) = config_pda();
 	let (vault_key, _) = vault_pda();
-	let (tree_key, _) = tree_pda();
 	let (nullifiers_key, _) = nullifiers_pda();
 
 	let config = pool.world.get(&config_key);
@@ -658,13 +621,10 @@ fn initialize_creates_the_pool_accounts() {
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn initialize_rejects_a_duplicate_custodian() {
-	let mut mollusk = create_mollusk();
+	let mollusk = create_mollusk();
 	let mut world = World::new();
 	let authority = bootstrap_authority();
-	world.add(
-		authority,
-		Account::new(FUND, 0, &solana_sdk_ids::system_program::id()),
-	);
+	world.add(authority, Account::new(FUND, 0, &system_program::id()));
 
 	world.add(config_pda().0, Account::default());
 	world.add(vault_pda().0, Account::default());
@@ -674,7 +634,7 @@ fn initialize_rejects_a_duplicate_custodian() {
 	world.add(requesters_pda().0, Account::default());
 	world.add(log_pda().0, Account::default());
 	world.add(
-		solana_sdk_ids::system_program::id(),
+		system_program::id(),
 		mollusk_svm::program::keyed_account_for_system_program().1,
 	);
 
@@ -790,10 +750,10 @@ fn deposit_matches_the_host_predicted_root() {
 	// (written through the syscall) must agree byte for byte.
 	let zeros = zero_hashes().unwrap_or_else(|e| panic!("zeros: {e:?}"));
 	let mut expected =
-		program::poseidon2(&commitment, &zeros[0]).unwrap_or_else(|e| panic!("host fold: {e:?}"));
+		poseidon2(&commitment, &zeros[0]).unwrap_or_else(|e| panic!("host fold: {e:?}"));
 	for level in 2..=TREE_DEPTH {
-		expected = program::poseidon2(&expected, &zeros[level - 1])
-			.unwrap_or_else(|e| panic!("host fold: {e:?}"));
+		expected =
+			poseidon2(&expected, &zeros[level - 1]).unwrap_or_else(|e| panic!("host fold: {e:?}"));
 	}
 	assert_eq!(current_root(&pool.world), expected);
 
@@ -957,8 +917,7 @@ fn transfer_rekeys_a_note_with_a_real_proof() {
 		&pool.mollusk,
 		&transfer_ix(
 			root,
-			&spent,
-			&successor,
+			(&spent, &successor),
 			key(3),
 			&pool.transfer_pk,
 			0,
@@ -981,7 +940,7 @@ fn transfer_rekeys_a_note_with_a_real_proof() {
 	assert_eq!(u64::from_le_bytes(count), 1);
 	let (vault_key, _) = vault_pda();
 	let rent_only_vault = {
-		let mut pool2 = setup_pool();
+		let pool2 = setup_pool();
 		let (vk, _) = vault_pda();
 		pool2.world.get(&vk).lamports
 	};
@@ -1002,8 +961,7 @@ fn copied_transfer_cannot_replace_successor_disclosure_metadata() {
 	pool.world.add(target, Account::default());
 	let original = transfer_ix(
 		current_root(&pool.world),
-		&spent,
-		&successor,
+		(&spent, &successor),
 		key(3),
 		&pool.transfer_pk,
 		0,
@@ -1167,7 +1125,7 @@ impl DisclosureWorld {
 		};
 		self.pool.world.add(
 			signer_key,
-			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+			Account::new(1_000_000_000, 0, &system_program::id()),
 		);
 		let mut data = vec![0_u8; GrantDisclosureIx::SIZE];
 		GrantDisclosureIx::initialize(&mut data, |_| Ok(()))
@@ -1251,7 +1209,7 @@ impl DisclosureWorld {
 		let viewer = self.viewer;
 		self.pool.world.add(
 			Pubkey::new_from_array(viewer),
-			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+			Account::new(1_000_000_000, 0, &system_program::id()),
 		);
 		self.pool.mollusk.sysvars.clock.unix_timestamp = timestamp;
 		let (clock_key, clock_account) = self.pool.mollusk.sysvars.keyed_account_for_clock_sysvar();
@@ -1343,7 +1301,7 @@ impl DisclosureWorld {
 
 		self.pool.world.add(
 			key(custodian),
-			Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::id()),
+			Account::new(1_000_000_000, 0, &system_program::id()),
 		);
 		let mut data = vec![0_u8; ApproveDisclosureIx::SIZE];
 		ApproveDisclosureIx::initialize(&mut data, |_| Ok(()))
@@ -1377,7 +1335,7 @@ fn tier_zero_requires_consent_then_executes_and_logs() {
 	let mut world = disclosure_world(None);
 
 	// Anyone may file at tier 0, but execution needs the view key's grant.
-	world.request(1, program::TIER_CONSENT, [0; 32]);
+	world.request(1, TIER_CONSENT, [0; 32]);
 	world.approve(1, 21, Some(PrivacyPoolError::ConsentRequired));
 
 	// A key other than the note's view key cannot grant.
@@ -1403,7 +1361,7 @@ fn tier_zero_requires_consent_then_executes_and_logs() {
 		&log.data[HEADER + 9 + 32..HEADER + 9 + 64],
 		&world.note_commitment[..]
 	);
-	assert_eq!(log.data[HEADER + 9 + 64], program::TIER_CONSENT);
+	assert_eq!(log.data[HEADER + 9 + 64], TIER_CONSENT);
 
 	// A third approval on the executed request is a status error, and a
 	// repeat approval by an approving custodian is rejected.
@@ -1413,17 +1371,17 @@ fn tier_zero_requires_consent_then_executes_and_logs() {
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn tier_one_holds_a_challenge_window_then_executes() {
-	let mut world = disclosure_world(Some(program::TIER_VERIFIED));
+	let mut world = disclosure_world(Some(TIER_VERIFIED));
 
 	// Filing above tier 0 requires a registered requester and a legal basis.
-	world.request(1, program::TIER_VERIFIED, [0x77; 32]);
+	world.request(1, TIER_VERIFIED, [0x77; 32]);
 
 	// Inside the window the committee cannot execute.
 	world.approve(1, 21, Some(PrivacyPoolError::ChallengeWindowOpen));
 
 	// Advance the clock past the window, then execute with two approvals.
 	world.pool.mollusk.sysvars.clock.unix_timestamp =
-		1_000_000 + program::DEFAULT_CHALLENGE_WINDOW_SECS as i64 + 1;
+		1_000_000 + i64::from(DEFAULT_CHALLENGE_WINDOW_SECS) + 1;
 	world.approve(1, 21, None);
 	world.approve(1, 22, None);
 
@@ -1432,14 +1390,14 @@ fn tier_one_holds_a_challenge_window_then_executes() {
 	let mut count = [0_u8; 8];
 	count.copy_from_slice(&log.data[HEADER + 1..HEADER + 9]);
 	assert_eq!(u64::from_le_bytes(count), 1);
-	assert_eq!(log.data[HEADER + 9 + 64], program::TIER_VERIFIED);
+	assert_eq!(log.data[HEADER + 9 + 64], TIER_VERIFIED);
 }
 
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn tier_one_challenge_freezes_and_the_authority_resolves() {
-	let mut world = disclosure_world(Some(program::TIER_VERIFIED));
-	world.request(1, program::TIER_VERIFIED, [0x77; 32]);
+	let mut world = disclosure_world(Some(TIER_VERIFIED));
+	world.request(1, TIER_VERIFIED, [0x77; 32]);
 
 	// Before the window closes, the subject challenges.
 	world.challenge_window(1, 1_000_001, None);
@@ -1450,7 +1408,7 @@ fn tier_one_challenge_freezes_and_the_authority_resolves() {
 	// The authority resolves in the requester's favor; execution proceeds.
 	world.resolve(1, 1, None);
 	world.pool.mollusk.sysvars.clock.unix_timestamp =
-		1_000_000 + program::DEFAULT_CHALLENGE_WINDOW_SECS as i64 + 1;
+		1_000_000 + i64::from(DEFAULT_CHALLENGE_WINDOW_SECS) + 1;
 	world.approve(1, 21, None);
 	world.approve(1, 22, None);
 
@@ -1464,14 +1422,14 @@ fn tier_one_challenge_freezes_and_the_authority_resolves() {
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn tier_two_executes_immediately() {
-	let mut world = disclosure_world(Some(program::TIER_COMPELLED));
+	let mut world = disclosure_world(Some(TIER_COMPELLED));
 
 	// An unregistered tier cannot file, and neither can a tier-1 registrant.
-	world.request(9, program::TIER_COMPELLED, [0x77; 32]);
+	world.request(9, TIER_COMPELLED, [0x77; 32]);
 
 	// The registered tier-2 requester files with a legal basis and the
 	// committee executes without a window or consent.
-	world.request(1, program::TIER_COMPELLED, [0x55; 32]);
+	world.request(1, TIER_COMPELLED, [0x55; 32]);
 	world.approve(1, 21, None);
 	world.approve(1, 22, None);
 
@@ -1480,7 +1438,7 @@ fn tier_two_executes_immediately() {
 	let mut count = [0_u8; 8];
 	count.copy_from_slice(&log.data[HEADER + 1..HEADER + 9]);
 	assert_eq!(u64::from_le_bytes(count), 1);
-	assert_eq!(log.data[HEADER + 9 + 64], program::TIER_COMPELLED);
+	assert_eq!(log.data[HEADER + 9 + 64], TIER_COMPELLED);
 }
 
 #[test]
@@ -1490,25 +1448,25 @@ fn unregistered_requesters_cannot_file_tiered_requests() {
 	// No registry entry: tier 1 and tier 2 both fail at filing time.
 	world.request_expect_error(
 		1,
-		program::TIER_VERIFIED,
+		TIER_VERIFIED,
 		[1; 32],
 		PrivacyPoolError::RequesterNotEntitled,
 	);
 	world.request_expect_error(
 		2,
-		program::TIER_COMPELLED,
+		TIER_COMPELLED,
 		[1; 32],
 		PrivacyPoolError::RequesterNotEntitled,
 	);
 	// Tier 0 remains open to anyone.
-	world.request(3, program::TIER_CONSENT, [0; 32]);
+	world.request(3, TIER_CONSENT, [0; 32]);
 }
 
 #[test]
 #[ignore = "requires the SBF artifact"]
 fn non_custodians_cannot_approve() {
 	let mut world = disclosure_world(None);
-	world.request(1, program::TIER_CONSENT, [0; 32]);
+	world.request(1, TIER_CONSENT, [0; 32]);
 	world.grant(1, None, None);
 	world.approve(1, 21, None);
 	// A non-custodian signing key is rejected outright.
@@ -1521,7 +1479,7 @@ fn non_custodians_cannot_approve() {
 #[ignore = "requires the SBF artifact"]
 fn cancel_closes_a_pending_request() {
 	let mut world = disclosure_world(None);
-	world.request(1, program::TIER_CONSENT, [0; 32]);
+	world.request(1, TIER_CONSENT, [0; 32]);
 	world.cancel(1, None);
 	// A cancelled request can no longer execute.
 	world.grant(1, None, Some(PrivacyPoolError::InvalidRequestStatus));
