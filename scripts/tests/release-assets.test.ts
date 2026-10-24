@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+	copyFileSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
@@ -12,7 +13,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
 import { createManifest, sha256, verifyManifest } from "../release-assets.ts";
 
@@ -153,6 +153,14 @@ function publisherFixture(t: test.TestContext) {
 	const calls = join(setup.root, "github-calls");
 	const digest = createManifest(setup.assets, setup.manifest);
 	mkdirSync(bin);
+	// The release checkout can predate this helper; only the trusted tools
+	// checkout supplies it to the publisher's actual shell gates.
+	const tools = join(setup.root, ".release-tools/scripts");
+	mkdirSync(tools, { recursive: true });
+	copyFileSync(
+		new URL("../release-assets.ts", import.meta.url),
+		join(tools, "release-assets.ts"),
+	);
 	writeFileSync(
 		join(bin, "gh"),
 		`#!/usr/bin/env node
@@ -189,7 +197,7 @@ if (args[1] === "download") {
 		...setup,
 		run(name: string, failure = "") {
 			return spawnSync("bash", ["-c", workflowStep(name)], {
-				cwd: fileURLToPath(new URL("../..", import.meta.url)),
+				cwd: setup.root,
 				encoding: "utf8",
 				env: {
 					...process.env,
@@ -198,6 +206,7 @@ if (args[1] === "download") {
 					MANIFEST_SHA256: digest,
 					GITHUB_REPOSITORY: "example/project",
 					GITHUB_SHA: "a".repeat(40),
+					WORKFLOW_SHA: "b".repeat(40),
 					RELEASE_TAG: "v1",
 					GH_CALLS: calls,
 					GH_FAILURE: failure,
@@ -244,7 +253,7 @@ test("publisher verifies every asset and the manifest with the expected signer",
 	);
 	assert.match(
 		fixture.calls(),
-		/--signer-digest\ta{40}\t--deny-self-hosted-runners/,
+		/--signer-digest\tb{40}\t--deny-self-hosted-runners/,
 	);
 });
 

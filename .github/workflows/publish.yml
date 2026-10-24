@@ -195,6 +195,16 @@ jobs:
         with:
           ref: ${{ needs.resolve_revision.outputs.sha }}
           persist-credentials: false
+      # Older release commits may predate the inventory helper. Run the helper
+      # from the trusted workflow revision while keeping the build source pinned.
+      - name: checkout trusted release tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tools
+          sparse-checkout: scripts/release-assets.ts
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: setup node for inventory
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -211,7 +221,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          digest="$(node scripts/release-assets.ts create \
+          digest="$(node .release-tools/scripts/release-assets.ts create \
             "$RUNNER_TEMP/sealed-release/assets" "$RUNNER_TEMP/sealed-release/manifest.sha256")"
           echo "sha256=$digest" >> "$GITHUB_OUTPUT"
       - name: record release source provenance
@@ -345,6 +355,14 @@ jobs:
           ref: ${{ needs.resolve_revision.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: checkout trusted release tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tools
+          sparse-checkout: scripts/release-assets.ts
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: setup
         uses: $/.github/actions/devenv
         with:
@@ -373,15 +391,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           MANIFEST_SHA256: ${{ needs.attest_assets.outputs.manifest_sha256 }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/release-assets.ts verify "$RUNNER_TEMP/sealed-release/assets" \
+          node .release-tools/scripts/release-assets.ts verify "$RUNNER_TEMP/sealed-release/assets" \
             "$RUNNER_TEMP/sealed-release/manifest.sha256" "$MANIFEST_SHA256"
           for asset in "$RUNNER_TEMP/sealed-release/assets"/* "$RUNNER_TEMP/sealed-release/manifest.sha256"; do
             gh attestation verify "$asset" --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml" \
-              --signer-digest "$GITHUB_SHA" --deny-self-hosted-runners
+              --signer-digest "$WORKFLOW_SHA" --deny-self-hosted-runners
           done
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets \
             --jq 'if .isDraft and (.assets | length == 0) then true else error("release must be an empty draft") end'
@@ -509,7 +528,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/release-assets.ts verify "$RUNNER_TEMP/sealed-release/assets" \
+          node .release-tools/scripts/release-assets.ts verify "$RUNNER_TEMP/sealed-release/assets" \
             "$RUNNER_TEMP/sealed-release/manifest.sha256" "$MANIFEST_SHA256"
           # Fail closed on pre-existing assets. Only this job can write release
           # assets, and it uploads the bytes used for attestation and npm packaging.
@@ -522,7 +541,7 @@ jobs:
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --dir "$RUNNER_TEMP/final-release/assets"
           mv "$RUNNER_TEMP/final-release/assets/manifest.sha256" "$RUNNER_TEMP/final-release/manifest.sha256"
-          node scripts/release-assets.ts verify "$RUNNER_TEMP/final-release/assets" \
+          node .release-tools/scripts/release-assets.ts verify "$RUNNER_TEMP/final-release/assets" \
             "$RUNNER_TEMP/final-release/manifest.sha256" "$MANIFEST_SHA256"
           gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
         env:
