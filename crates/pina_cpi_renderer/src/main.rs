@@ -196,6 +196,7 @@ mod tests {
 			"....json",
 			"name .json",
 			"name:.json",
+			#[cfg(not(windows))]
 			"name\\child.json",
 		] {
 			assert!(crate_dir_name(Path::new(name)).is_err(), "{name:?}");
@@ -206,6 +207,8 @@ mod tests {
 			"hello-world.json",
 			"hello_world.json",
 			"program.v1.json",
+			#[cfg(windows)]
+			r"C:\idls\counter.json",
 		] {
 			let stem = crate_dir_name(Path::new(name)).unwrap();
 			let output = Path::new("clients").join(stem);
