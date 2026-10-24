@@ -974,34 +974,16 @@ fn deposit_rejects_a_substituted_vault() {
 // ---------------------------------------------------------------------------
 // Audit regression (2026-09-26 deep audit)
 //
-// This test asserts the *secure* behavior. It fails on the current tree
-// because the exploit is live, and must pass once the fix lands: run with
+// This test rejects an unapproved initializer. Run with
 // `pina test --project examples/privacy_pool_program --filter audit_init_`.
 // ---------------------------------------------------------------------------
 
-/// Audit 2026-09-26, finding 1: `Initialize` has no bootstrap binding. The
-/// config, vault, tree, registries, and log are singleton PDAs derived from
-/// fixed seeds, and the first funded signer to call `Initialize` becomes the
-/// permanent, irrevocable `PoolConfig.authority` — the key that installs
-/// Groth16 verifying keys (`SetVerificationKey`), rotates the disclosure
-/// committee (`SetCustodians`), and registers compelled-disclosure requesters
-/// (`RegisterRequester`). There is no transfer or renounce path.
+/// Audit 2026-09-26, finding 1: singleton initialization must bind the signer
+/// to the deployment's current upgrade authority. The resulting pool authority
+/// controls verification keys, custodians, and disclosure requesters.
 ///
-/// An attacker watching the deployment mempool front-runs the deployer's
-/// first `Initialize` and captures the pool. Every honest depositor's escrow
-/// and disclosure policy is then governed by the attacker:
-///
-/// 1. The attacker installs *their own* verifying keys. Because a real spend
-///    must verify against the installed key, a key the attacker generated
-///    lets them prove spends on notes they never deposited (a spend can be
-///    proven directly against the attacker's key without holding any note),
-///    or simply marks the pool unspendable for honest users.
-/// 2. The attacker registers themselves at `TIER_COMPELLED` and rotates the
-///    custodian committee to their own keys, so every tier-2 disclosure
-///    executes on their signature and the "governed, logged disclosure"
-///    guarantee becomes attacker-controlled surveillance.
-///
-/// The deployment authority must reject an unapproved first initializer.
+/// An unapproved first initializer must not capture the pool or create any
+/// singleton pool state.
 #[test]
 #[ignore = "run with pina test"]
 fn audit_init_2026_09_26_unapproved_first_initializer_cannot_capture_the_pool() {
