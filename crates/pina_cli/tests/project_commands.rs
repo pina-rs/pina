@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
 
-use pina_cli::project::Project;
 use tempfile::TempDir;
 
 mod support;
@@ -377,6 +376,186 @@ fn project_command(project: &Path, fake_cargo: &Path, target: &Path) -> Command 
 		.env("REAL_CARGO", env!("CARGO"))
 		.env("CARGO_TARGET_DIR", target);
 	command
+}
+
+#[test]
+fn configured_idl_escape_is_rejected_before_build_or_generation_writes() {
+	let temp = TempDir::new().unwrap();
+	let repository = temp.path().join("repository");
+	let project = repository.join("project");
+	let target = project.join("target");
+	let outside = temp.path().join("outside");
+	write_project(&project);
+	fs::create_dir(repository.join(".git")).unwrap();
+	fs::create_dir(&outside).unwrap();
+	let victim = outside.join("custom_program.json");
+	fs::write(&victim, "keep this file").unwrap();
+	let cargo = fake_cargo(temp.path());
+	let args_path = temp.path().join("cargo-args.txt");
+
+	for idl_dir in ["../../outside", "{{root}}/../outside", "../../missing/idls"] {
+		fs::write(
+			project.join("pina.toml"),
+			format!("[project]\nprogram = \".\"\nidl_dir = \"{idl_dir}\"\n"),
+		)
+		.unwrap();
+
+		for arguments in [
+			vec!["build"],
+			vec!["generate", "--client", "rust"],
+			vec!["generate", "--client", "rust", "--output", "relocated"],
+		] {
+			let output = project_command(&project, &cargo, &target)
+				.env("FAKE_CARGO_ARGS", &args_path)
+				.args(&arguments)
+				.output()
+				.unwrap();
+			let stderr = String::from_utf8_lossy(&output.stderr);
+			assert!(!output.status.success(), "{idl_dir}: {arguments:?}");
+			assert!(stderr.contains("must stay inside"), "{stderr}");
+			assert!(stderr.contains("project.idl_dir"), "{stderr}");
+			assert!(!args_path.exists(), "the compiler must not run");
+			assert!(!target.exists(), "discovery must not create outputs");
+			assert!(!project.join("relocated").exists());
+			assert!(!temp.path().join("missing").exists());
+			assert_eq!(fs::read_to_string(&victim).unwrap(), "keep this file");
+		}
+	}
+}
+
+#[test]
+fn cargo_config_target_escape_is_rejected_with_and_without_pina_config() {
+	let temp = TempDir::new().unwrap();
+	let repository = temp.path().join("repository");
+	let project = repository.join("project");
+	let outside = temp.path().join("outside");
+	write_project(&project);
+	fs::create_dir(repository.join(".git")).unwrap();
+	fs::create_dir(project.join(".cargo")).unwrap();
+	fs::write(
+		project.join(".cargo/config.toml"),
+		"[build]\ntarget-dir = \"../../outside\"\n",
+	)
+	.unwrap();
+	let cargo = fake_cargo(temp.path());
+
+	for configured in [true, false] {
+		if !configured {
+			fs::remove_file(project.join("pina.toml")).unwrap();
+		}
+
+		let output = project_command(&project, &cargo, &project.join("target"))
+			.env_remove("CARGO_TARGET_DIR")
+			.env_remove("CARGO_BUILD_TARGET_DIR")
+			.args(["generate", "--client", "rust"])
+			.output()
+			.unwrap();
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		assert!(!output.status.success(), "configured: {configured}");
+		assert!(stderr.contains("must stay inside"), "{stderr}");
+		assert!(stderr.contains("target_directory"), "{stderr}");
+		assert!(
+			!outside.exists(),
+			"discovery must not create escaped outputs"
+		);
+	}
+}
+
+#[test]
+fn cargo_target_symlink_is_rejected_before_default_idl_generation() {
+	let temp = TempDir::new().unwrap();
+	let project = temp.path().join("project");
+	let outside = temp.path().join("outside");
+	write_project(&project);
+	fs::create_dir(&outside).unwrap();
+	std::os::unix::fs::symlink(&outside, project.join("target")).unwrap();
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &project.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success());
+	assert!(stderr.contains("target_directory"), "{stderr}");
+	assert!(stderr.contains("symbolic links"), "{stderr}");
+	assert_eq!(fs::read_dir(&outside).unwrap().count(), 0);
+}
+
+#[test]
+fn build_and_generate_allow_sibling_outputs_within_a_cargo_workspace() {
+	let temp = TempDir::new().unwrap();
+	let project = temp.path().join("project");
+	write_project(&project);
+	fs::write(
+		temp.path().join("Cargo.toml"),
+		"[workspace]\nmembers = [\"project\"]\nresolver = \"3\"\n",
+	)
+	.unwrap();
+	fs::create_dir(project.join(".cargo")).unwrap();
+	fs::write(
+		project.join(".cargo/config.toml"),
+		"[build]\ntarget-dir = \"../build-cache\"\n",
+	)
+	.unwrap();
+	fs::write(
+		project.join("pina.toml"),
+		"[project]\nprogram = \".\"\nidl_dir = \"../idls\"\n",
+	)
+	.unwrap();
+	let cargo = fake_cargo(temp.path());
+
+	for arguments in [vec!["build"], vec!["generate", "--client", "rust"]] {
+		let output = project_command(&project, &cargo, &project.join("target"))
+			.env_remove("CARGO_TARGET_DIR")
+			.env_remove("CARGO_BUILD_TARGET_DIR")
+			.args(&arguments)
+			.output()
+			.unwrap();
+		assert!(
+			output.status.success(),
+			"{arguments:?}: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
+	}
+
+	assert!(temp.path().join("idls/custom_program.json").is_file());
+	assert!(
+		temp.path()
+			.join("build-cache/deploy/custom_program.so")
+			.is_file()
+	);
+	assert!(project.join("clients/rust/custom_program").is_dir());
+}
+
+#[test]
+fn operator_target_environment_overrides_remain_supported() {
+	let temp = TempDir::new().unwrap();
+	let project = temp.path().join("project");
+	write_project(&project);
+	let cargo = fake_cargo(temp.path());
+
+	for (index, name) in ["CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR"]
+		.into_iter()
+		.enumerate()
+	{
+		let target = temp.path().join(format!("external-{index}"));
+		let output = project_command(&project, &cargo, &target)
+			.env_remove("CARGO_TARGET_DIR")
+			.env_remove("CARGO_BUILD_TARGET_DIR")
+			.env(name, format!("../external-{index}"))
+			.args(["generate", "--client", "rust"])
+			.output()
+			.unwrap();
+		assert!(
+			output.status.success(),
+			"{name}: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
+		assert!(target.join("idl/custom_program.json").is_file());
+	}
 }
 
 #[test]

@@ -422,8 +422,10 @@ in
     "test:all" = {
       exec = ''
         set -euo pipefail
+        # Pina refuses a repository root that contains the user's home.
+        # A clean CI shell's temporary home must therefore sit outside it.
         if [ -z "''${HOME:-}" ]; then
-          export HOME="$DEVENV_ROOT/.cache/home"
+          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
         fi
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
@@ -728,7 +730,7 @@ in
           -p validation_program
 
         if [ -z "''${HOME:-}" ]; then
-          export HOME="$DEVENV_ROOT/.cache/home"
+          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
         fi
         mkdir -p "$HOME"
         if [ "$(uname -s)" = "Linux" ]; then
@@ -995,7 +997,7 @@ in
       exec = ''
         set -euo pipefail
         if [ -z "''${HOME:-}" ]; then
-          export HOME="$DEVENV_ROOT/.cache/home"
+          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
         fi
         mkdir -p "$HOME"
 
@@ -1146,7 +1148,7 @@ in
       exec = ''
         set -euo pipefail
         if [ -z "''${HOME:-}" ]; then
-          export HOME="$PWD/.cache/home"
+          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
         fi
         mkdir -p "$HOME"
         # The raw Anchor CPI integration test invokes the pinned local converter.
@@ -1255,7 +1257,7 @@ in
         # Tests expect a home directory, which a clean CI shell may not set;
         # `test:all` uses the same fallback.
         if [ -z "''${HOME:-}" ]; then
-          export HOME="$DEVENV_ROOT/.cache/home"
+          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
         fi
         mkdir -p "$HOME"
 
@@ -1312,7 +1314,7 @@ in
         # cargo-mutants does not copy either into a scratch tree, so pair this
         # with `--in-place`.
         if [ -z "''${HOME:-}" ]; then
-          export HOME="$DEVENV_ROOT/.cache/home"
+          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
         fi
         mkdir -p "$HOME"
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile

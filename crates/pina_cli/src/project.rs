@@ -482,15 +482,15 @@ impl Project {
 		// so metadata must use the same root to report the artifact directory.
 		let metadata = cargo_metadata(&root, Some(&manifest_path))?;
 		let package = package_for_manifest(&metadata, &manifest_path, &root)?;
-		let target_dir = metadata.target_directory.as_std_path().to_path_buf();
 		let (library_name, library_source, library_crate_types) = library_details(package)?;
-		let idl_dir = config
+		let configured_idl_dir = config
 			.project
 			.idl_dir
 			.as_deref()
 			.map(|raw| templates.resolve_dir(&root, "project.idl_dir", raw))
-			.transpose()?
-			.unwrap_or_else(|| target_dir.join("idl"));
+			.transpose()?;
+		let (target_dir, idl_dir) =
+			resolve_build_output_dirs(&templates, &metadata, configured_idl_dir)?;
 		let clients_dir = templates.resolve_dir(&root, "clients.output", &config.clients.output)?;
 		let client_generation = config
 			.clients
@@ -559,7 +559,8 @@ impl Project {
 
 		let (library_name, library_source, library_crate_types) = library_details(package)?;
 		let root = program_dir.to_path_buf();
-		let target_dir = metadata.target_directory.as_std_path().to_path_buf();
+		let (target_dir, idl_dir) =
+			resolve_build_output_dirs(&PathTemplates::empty(root.clone()), &metadata, None)?;
 		let clients_dir = root.join("clients");
 		let clients_config = ClientsConfig::default();
 		let client_generation = clients_config
@@ -571,7 +572,7 @@ impl Project {
 			library_name,
 			library_source,
 			library_crate_types,
-			idl_dir: target_dir.join("idl"),
+			idl_dir,
 			target_dir,
 			clients_dir,
 			clients: clients_config.languages,
@@ -778,20 +779,24 @@ impl PathTemplates {
 
 	/// Return the cached git repository root, discovering it on first use.
 	fn git_root(&self, field: &'static str, raw: &str) -> Result<PathBuf, ProjectError> {
-		if let Some(root) = self.git_root.borrow().as_ref() {
-			return Ok(root.clone());
-		}
-
-		let discovered = discover_git_root(&self.discovery_dir).ok_or_else(|| {
+		self.discover_git_root().ok_or_else(|| {
 			ProjectError::InvalidConfigPath {
 				field,
 				path: PathBuf::from(raw),
 				reason: "the `{{root}}` anchor needs a git repository; run inside a repository or \
 				         add a `.git` entry to an ancestor directory",
 			}
-		})?;
+		})
+	}
+
+	fn discover_git_root(&self) -> Option<PathBuf> {
+		if let Some(root) = self.git_root.borrow().as_ref() {
+			return Some(root.clone());
+		}
+
+		let discovered = discover_git_root(&self.discovery_dir)?;
 		*self.git_root.borrow_mut() = Some(discovered.clone());
-		Ok(discovered)
+		Some(discovered)
 	}
 
 	/// Resolve a directory-valued path field to a normalized absolute path.
@@ -990,7 +995,111 @@ fn discover_git_root(start: &Path) -> Option<PathBuf> {
 	None
 }
 
-/// The root that configured client outputs must stay within.
+/// Resolve build and IDL destinations before any output directories are created.
+fn resolve_build_output_dirs(
+	templates: &PathTemplates,
+	metadata: &Metadata,
+	configured_idl_dir: Option<PathBuf>,
+) -> Result<(PathBuf, PathBuf), ProjectError> {
+	let output_root = output_containment_root(
+		&templates.discovery_dir,
+		Some(metadata.workspace_root.as_std_path()),
+		templates.discover_git_root(),
+	);
+	let target = metadata.target_directory.as_std_path();
+	// The invoking environment is an operator choice. Repository Cargo
+	// configuration cannot grant itself permission to write outside the tree.
+	let operator_target = ["CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR"]
+		.into_iter()
+		.any(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()));
+	let target_root = if operator_target {
+		target
+	} else {
+		&output_root
+	};
+	let target_dir = resolve_output_dir(target_root, "target_directory", target)?;
+	let idl_dir = match configured_idl_dir {
+		Some(path) => resolve_output_dir(&output_root, "project.idl_dir", &path)?,
+		None => resolve_output_dir(&target_dir, "project.idl_dir", &target_dir.join("idl"))?,
+	};
+
+	Ok((target_dir, idl_dir))
+}
+
+/// Normalize an output and require containment beneath its trusted root.
+///
+/// Existing components below the root cannot be links, so lexical containment
+/// also holds on disk, including when the destination has a nonexistent suffix.
+/// The root itself may use platform aliases such as macOS's `/var` link.
+pub(crate) fn resolve_output_dir(
+	root: &Path,
+	field: &'static str,
+	path: &Path,
+) -> Result<PathBuf, ProjectError> {
+	let raw = path.to_string_lossy();
+	let normalized = normalize_absolute(path, field, &raw)?;
+	let root = normalize_absolute(root, field, &root.to_string_lossy())?;
+
+	let relative = strip_output_root(&root, &normalized).ok_or_else(|| {
+		ProjectError::InvalidConfigPath {
+			field,
+			path: path.to_path_buf(),
+			reason: "configured outputs must stay inside the Git worktree or Cargo workspace",
+		}
+	})?;
+	let normalized = root.join(relative);
+
+	PathTemplates::empty(root).reject_symlink_prefix(&normalized, field, &raw)?;
+	Ok(normalized)
+}
+
+#[cfg(not(windows))]
+fn strip_output_root<'a>(root: &Path, path: &'a Path) -> Option<&'a Path> {
+	path.strip_prefix(root).ok()
+}
+
+#[cfg(windows)]
+fn strip_output_root<'a>(root: &Path, path: &'a Path) -> Option<&'a Path> {
+	let mut components = path.components();
+
+	for root_component in root.components() {
+		let matches = match (root_component, components.next()?) {
+			(Component::Prefix(left), Component::Prefix(right)) => {
+				output_prefixes_equal(left.kind(), right.kind())
+			}
+			(left, right) => left == right,
+		};
+
+		if !matches {
+			return None;
+		}
+	}
+
+	Some(components.as_path())
+}
+
+/// Cargo's canonical paths use verbatim prefixes; Git reports ordinary ones.
+#[cfg(any(windows, test))]
+fn output_prefixes_equal(left: std::path::Prefix<'_>, right: std::path::Prefix<'_>) -> bool {
+	use std::path::Prefix;
+
+	match (left, right) {
+		(
+			Prefix::Disk(left) | Prefix::VerbatimDisk(left),
+			Prefix::Disk(right) | Prefix::VerbatimDisk(right),
+		) => left.eq_ignore_ascii_case(&right),
+		(
+			Prefix::UNC(left_server, left_share) | Prefix::VerbatimUNC(left_server, left_share),
+			Prefix::UNC(right_server, right_share) | Prefix::VerbatimUNC(right_server, right_share),
+		) => {
+			left_server.eq_ignore_ascii_case(right_server)
+				&& left_share.eq_ignore_ascii_case(right_share)
+		}
+		_ => left == right,
+	}
+}
+
+/// The root that configured outputs must stay within.
 ///
 /// A `pina.toml` file ships with the repository, so its outputs are
 /// repository data: they may write anywhere inside the repository's own
@@ -1002,13 +1111,25 @@ fn discover_git_root(start: &Path) -> Option<PathBuf> {
 /// configuration) is rejected in favor of `project_root`, because
 /// containment to `$HOME` would contain nothing.
 pub(crate) fn generation_containment_root(project_root: &Path) -> PathBuf {
+	output_containment_root(project_root, None, discover_git_root(project_root))
+}
+
+fn output_containment_root(
+	project_root: &Path,
+	cargo_workspace: Option<&Path>,
+	git_root: Option<PathBuf>,
+) -> PathBuf {
 	let home = ["HOME", "USERPROFILE"]
 		.into_iter()
 		.find_map(std::env::var_os)
 		.map(PathBuf::from);
 
 	containment_root(
-		discover_git_root(project_root),
+		git_root.or_else(|| {
+			cargo_workspace
+				.filter(|workspace| project_root.starts_with(workspace))
+				.map(Path::to_path_buf)
+		}),
 		project_root,
 		home.as_deref(),
 	)
@@ -1789,6 +1910,7 @@ mode = "overwrite"
 		let sibling_program = temp.path().join("other");
 		write_program(&project_dir, "configured-program");
 		write_program(&sibling_program, "sibling-program");
+		fs::create_dir(temp.path().join(".git")).expect("create repository boundary");
 		fs::write(
 			project_dir.join(CONFIG_FILE_NAME),
 			"[project]\nprogram = \"../other\"\n\n[clients]\noutput = \"../clients\"\n",
@@ -2322,6 +2444,112 @@ mode = "overwrite"
 			package_for_manifest(&metadata, &manifest_path, &root),
 			Err(ProjectError::CargoMetadata { .. })
 		));
+	}
+
+	#[test]
+	fn output_prefixes_accept_only_equivalent_windows_namespaces() {
+		use std::ffi::OsStr;
+		use std::path::Prefix;
+
+		let server = OsStr::new("server");
+		let share = OsStr::new("share");
+		let other = OsStr::new("other");
+		let cases = [
+			(Prefix::Disk(b'C'), Prefix::VerbatimDisk(b'c'), true),
+			(Prefix::VerbatimDisk(b'C'), Prefix::Disk(b'D'), false),
+			(
+				Prefix::UNC(server, share),
+				Prefix::VerbatimUNC(server, share),
+				true,
+			),
+			(
+				Prefix::VerbatimUNC(server, share),
+				Prefix::UNC(server, other),
+				false,
+			),
+			(
+				Prefix::UNC(server, share),
+				Prefix::VerbatimUNC(other, share),
+				false,
+			),
+			(Prefix::DeviceNS(server), Prefix::DeviceNS(server), true),
+			(Prefix::DeviceNS(server), Prefix::Verbatim(server), false),
+			(Prefix::Disk(b'C'), Prefix::UNC(server, share), false),
+		];
+
+		for (left, right, expected) in cases {
+			assert_eq!(output_prefixes_equal(left, right), expected);
+			assert_eq!(output_prefixes_equal(right, left), expected);
+		}
+	}
+
+	#[cfg(windows)]
+	#[test]
+	fn output_roots_accept_windows_namespace_aliases_without_widening_containment() {
+		for (root, path) in [
+			(r"D:\repository", r"\\?\D:\repository\target\idl"),
+			(r"\\?\D:\repository", r"D:\repository\target\idl"),
+			(
+				r"\\server\share\repository",
+				r"\\?\UNC\server\share\repository\target\idl",
+			),
+		] {
+			assert_eq!(
+				strip_output_root(Path::new(root), Path::new(path)),
+				Some(Path::new(r"target\idl"))
+			);
+		}
+
+		for path in [
+			r"\\?\E:\repository\target",
+			r"\\?\D:\repository-other\target",
+		] {
+			assert!(strip_output_root(Path::new(r"D:\repository"), Path::new(path)).is_none());
+		}
+	}
+
+	#[test]
+	fn output_directories_are_normalized_and_contained_before_creation() {
+		let temp = TempDir::new().unwrap();
+		let root = fs::canonicalize(temp.path()).unwrap();
+		let path = root.join("new/../idls/nested");
+		assert_eq!(
+			resolve_output_dir(&root, "test.output", &path).unwrap(),
+			root.join("idls/nested")
+		);
+		assert_eq!(
+			resolve_output_dir(&root, "test.output", &root).unwrap(),
+			root
+		);
+
+		for path in [
+			root.join("new/../../outside/idls"),
+			root.with_file_name("other").join("idls"),
+		] {
+			assert!(matches!(
+				resolve_output_dir(&root, "test.output", &path),
+				Err(ProjectError::InvalidConfigPath {
+					field: "test.output",
+					..
+				})
+			));
+		}
+
+		assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn output_directories_reject_links_before_nonexistent_suffixes() {
+		let temp = TempDir::new().unwrap();
+		let root = fs::canonicalize(temp.path()).unwrap();
+		fs::create_dir(root.join("inside")).unwrap();
+		std::os::unix::fs::symlink(root.join("inside"), root.join("linked")).unwrap();
+
+		let error = resolve_output_dir(&root, "test.output", &root.join("linked/new/idls"))
+			.expect_err("links are refused even when their canonical target is contained");
+		assert!(error.to_string().contains("symbolic links"), "{error}");
+		assert!(!root.join("inside/new").exists());
 	}
 
 	#[test]

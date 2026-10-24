@@ -73,11 +73,9 @@ jobs:
     runs-on: ubuntu-24.04
     needs: changes
     env:
-      # An absolute cache root, as `program-e2e` sets. Without it the task's
-      # `HOME="$DEVENV_ROOT/.cache/home"` fallback puts the cargo registry at a
-      # workspace-relative path, and rustc prints that path in diagnostics;
-      # trybuild's `$CARGO` normalizer only rewrites absolute registry paths,
-      # so two UI snapshots mismatched on CI while passing locally.
+      # Keep the tool cache at an absolute path, as `program-e2e` does. Test
+      # tasks create a temporary HOME outside the worktree when CI omits it,
+      # so generated-output containment never includes the home directory.
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
     # The status functions are required: without one, a skipped `changes`
     # dependency (pushes to `main`) would skip this job too.
