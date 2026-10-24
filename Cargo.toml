@@ -326,7 +326,7 @@ syn = { default-features = false, version = "^3", features = ["full"] }
 tempfile = { default-features = false, version = "^3" }
 termimad = { default-features = false, version = "^0.35.1" }
 thiserror = { default-features = false, version = "^2" }
-tokio = { default-features = false, version = "^1" }
+tokio = { default-features = false, version = "^1.53.3" }
 toml = { default-features = false, version = "^1", features = ["parse", "serde"] }
 trybuild = { default-features = false, version = "^1" }
 ureq = { default-features = false, version = "^3", features = ["json", "rustls"] }
