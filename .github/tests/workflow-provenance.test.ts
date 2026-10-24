@@ -270,7 +270,7 @@ test("provenance identifies the release source separately from the workflow comm
 	}
 });
 
-test("preview builds inherit only read access and all entry points depend on authorization", () => {
+test("builders have only read access and all entry points depend on authorization", () => {
 	const publish = readFileSync(
 		new URL("../workflows/publish.yml", import.meta.url),
 		"utf8",
@@ -289,13 +289,17 @@ test("preview builds inherit only read access and all entry points depend on aut
 		new URL("../workflows/build-release.yml", import.meta.url),
 		"utf8",
 	);
+	assert.match(
+		builder,
+		/^permissions:\n {2}contents: read\n/m,
+		"The builder must cap the caller's token at read access",
+	);
 	assert.doesNotMatch(
 		builder,
-		/^\s*permissions:/m,
-		"The builder must inherit the caller's restricted token",
+		/contents: write|id-token: write|gh release upload/,
 	);
 	assert.match(builder, /ref: \$\{\{ inputs\.sha \}\}/);
-	assert.match(builder, /dry-run: \$\{\{ inputs\.dry_run == true \}\}/);
+	assert.match(builder, /dry-run: true/);
 	assert.match(
 		publish,
 		/predicate-path: \$\{\{ runner\.temp \}\}\/release-provenance\.json/,
