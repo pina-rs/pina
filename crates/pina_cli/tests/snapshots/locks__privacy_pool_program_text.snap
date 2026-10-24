@@ -3,7 +3,7 @@ source: crates/pina_cli/tests/locks.rs
 expression: report.render_text()
 ---
 privacy_pool_program (DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D)
-13 instructions; accounts: 8 fixed, 3 keyed, 19 caller-chosen; 7 hotspots (0 allowed)
+13 instructions; accounts: 8 fixed, 3 keyed, 20 caller-chosen; 7 hotspots (0 allowed)
 
 Hotspots
   A fixed account has one address for every caller, so every instruction that
