@@ -200,7 +200,7 @@ fn validate_type<T: PinaAccount>(account: AccountView, program_id: &Address) -> 
 			return Err(ProgramError::InvalidAccountData);
 		}
 
-		return Ok(());
+		Ok(())
 	}
 
 	#[cfg(feature = "validation")]

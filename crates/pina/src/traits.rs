@@ -82,11 +82,11 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 	{
 		#[cfg(not(feature = "validation"))]
 		{
-			return <Self as PinaPodFixed>::initialize(data, |value| {
+			<Self as PinaPodFixed>::initialize(data, |value| {
 				Self::write_zc_discriminator(value);
 				initialize(value)
 			})
-			.map_err(|_| ProgramError::InvalidAccountData);
+			.map_err(|_| ProgramError::InvalidAccountData)
 		}
 
 		#[cfg(feature = "validation")]
@@ -127,8 +127,8 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 		#[cfg(not(feature = "validation"))]
 		{
-			return <Self as PinaPodFixed>::validate_exact(data)
-				.map_err(|_| ProgramError::InvalidAccountData);
+			<Self as PinaPodFixed>::validate_exact(data)
+				.map_err(|_| ProgramError::InvalidAccountData)
 		}
 
 		#[cfg(feature = "validation")]
@@ -150,8 +150,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 		#[cfg(not(feature = "validation"))]
 		{
-			return <Self as PinaPodFixed>::read_exact(data)
-				.map_err(|_| ProgramError::InvalidAccountData);
+			<Self as PinaPodFixed>::read_exact(data).map_err(|_| ProgramError::InvalidAccountData)
 		}
 
 		#[cfg(feature = "validation")]
@@ -174,8 +173,8 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 		#[cfg(not(feature = "validation"))]
 		{
-			return <Self as PinaPodFixed>::read_exact_mut(data)
-				.map_err(|_| ProgramError::InvalidAccountData);
+			<Self as PinaPodFixed>::read_exact_mut(data)
+				.map_err(|_| ProgramError::InvalidAccountData)
 		}
 
 		#[cfg(feature = "validation")]
