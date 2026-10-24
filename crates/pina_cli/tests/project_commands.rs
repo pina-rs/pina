@@ -1606,7 +1606,7 @@ fn generate_real_typescript_and_dart_clients_preserves_scaffold_until_overwrite(
 
 #[test]
 fn generate_refuses_untracked_renderer_directories_in_every_mode() {
-	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let temp = TempDir::new().unwrap();
 	let cargo = fake_cargo(temp.path());
 	let target = temp.path().join("custom-target");
 
@@ -1622,26 +1622,24 @@ fn generate_refuses_untracked_renderer_directories_in_every_mode() {
 			project.join("pina.toml"),
 			format!("[clients]\nlanguages = [\"{renderer}\"]\n"),
 		)
-		.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+		.unwrap();
 		std::os::unix::fs::symlink(
 			workspace_root().join("node_modules"),
 			project.join("node_modules"),
 		)
-		.unwrap_or_else(|error| panic!("failed to expose Node dependencies: {error}"));
+		.unwrap();
 		let destination = project.join("clients").join(directory);
-		fs::create_dir_all(destination.join("nested"))
-			.unwrap_or_else(|error| panic!("failed to create destination: {error}"));
+		fs::create_dir_all(destination.join("nested")).unwrap();
 
 		for path in ["keep.txt", "nested/keep.txt", "index.ts"] {
-			fs::write(destination.join(path), "user content\n")
-				.unwrap_or_else(|error| panic!("failed to write sentinel: {error}"));
+			fs::write(destination.join(path), "user content\n").unwrap();
 		}
 
 		for mode in ["auto", "create", "update", "overwrite"] {
 			let output = project_command(&project, &cargo, &target)
 				.args(["generate", "--npx", "node", "--mode", mode])
 				.output()
-				.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+				.unwrap();
 			let stderr = String::from_utf8_lossy(&output.stderr);
 			assert!(
 				!output.status.success(),
@@ -1670,7 +1668,7 @@ fn generate_refuses_untracked_renderer_directories_in_every_mode() {
 
 #[test]
 fn generate_cli_ts_requires_its_manifest_to_regenerate() {
-	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let temp = TempDir::new().unwrap();
 	let project = temp.path().join("project");
 	let target = temp.path().join("custom-target");
 	write_project(&project);
@@ -1678,23 +1676,22 @@ fn generate_cli_ts_requires_its_manifest_to_regenerate() {
 		project.join("pina.toml"),
 		"[clients]\nlanguages = [\"cli-ts\"]\n",
 	)
-	.unwrap_or_else(|error| panic!("failed to configure clients: {error}"));
+	.unwrap();
 	std::os::unix::fs::symlink(
 		workspace_root().join("node_modules"),
 		project.join("node_modules"),
 	)
-	.unwrap_or_else(|error| panic!("failed to expose Node dependencies: {error}"));
+	.unwrap();
 	let cargo = fake_cargo(temp.path());
 	let generate = |mode| {
 		project_command(&project, &cargo, &target)
 			.args(["generate", "--npx", "node", "--mode", mode])
 			.output()
-			.unwrap_or_else(|error| panic!("failed to run generation: {error}"))
+			.unwrap()
 	};
 	let destination = project.join("clients/cli-ts/custom_program");
 	// Start with an empty directory; the implied TypeScript client is absent.
-	fs::create_dir_all(&destination)
-		.unwrap_or_else(|error| panic!("failed to create empty destination: {error}"));
+	fs::create_dir_all(&destination).unwrap();
 
 	for mode in ["auto", "update", "overwrite"] {
 		let output = generate(mode);
@@ -1705,36 +1702,27 @@ fn generate_cli_ts_requires_its_manifest_to_regenerate() {
 		);
 
 		if mode == "auto" {
-			fs::write(destination.join("keep.txt"), "user content\n")
-				.unwrap_or_else(|error| panic!("failed to write sentinel: {error}"));
+			fs::write(destination.join("keep.txt"), "user content\n").unwrap();
 		}
 
 		assert_eq!(
-			fs::read_to_string(destination.join("keep.txt"))
-				.unwrap_or_else(|error| panic!("failed to read sentinel: {error}")),
+			fs::read_to_string(destination.join("keep.txt")).unwrap(),
 			"user content\n"
 		);
 	}
 
-	fs::remove_file(destination.join(".pina-generated.json"))
-		.unwrap_or_else(|error| panic!("failed to remove tracking manifest: {error}"));
-	let package = fs::read(destination.join("package.json"))
-		.unwrap_or_else(|error| panic!("failed to read generated package: {error}"));
+	fs::remove_file(destination.join(".pina-generated.json")).unwrap();
+	let package = fs::read(destination.join("package.json")).unwrap();
 
 	for mode in ["auto", "update"] {
 		let output = generate(mode);
 		assert!(!output.status.success());
 		assert!(String::from_utf8_lossy(&output.stderr).contains("no tracked manifest"));
 		assert_eq!(
-			fs::read_to_string(destination.join("keep.txt"))
-				.unwrap_or_else(|error| panic!("failed to read sentinel: {error}")),
+			fs::read_to_string(destination.join("keep.txt")).unwrap(),
 			"user content\n"
 		);
-		assert_eq!(
-			fs::read(destination.join("package.json"))
-				.unwrap_or_else(|error| panic!("failed to read generated package: {error}")),
-			package
-		);
+		assert_eq!(fs::read(destination.join("package.json")).unwrap(), package);
 		assert!(!destination.join(".pina-generated.json").exists());
 	}
 }
