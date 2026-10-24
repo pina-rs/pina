@@ -1657,10 +1657,9 @@ fn generate_refuses_untracked_renderer_directories_in_every_mode() {
 
 			for path in ["keep.txt", "nested/keep.txt", "index.ts"] {
 				assert_eq!(
-					fs::read_to_string(destination.join(path)).unwrap_or_else(|error| {
-						panic!("{renderer} {mode} lost {path}: {error}")
-					}),
-					"user content\n"
+					fs::read_to_string(destination.join(path)).unwrap(),
+					"user content\n",
+					"{renderer} {mode} changed {path}"
 				);
 			}
 
