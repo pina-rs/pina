@@ -4,6 +4,162 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.24.0](https://github.com/pina-rs/pina/releases/tag/v0.24.0) (2026-10-24)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Remove the deprecated pre-release compatibility surface
+
+_Packages:_ 🔴 _pina_, 🔴 _pina_cli_, 🔴 _pina_macros_, ⚪ _pina_lints_, ⚪ _pina_skill_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #645](https://github.com/pina-rs/pina/pull/645)
+
+- **`pina`** drops `find_program_address` (use `try_find_program_address`), `introspection::assert_no_cpi` (use `assert_current_instruction_program_id`), and the `AllocateAccountWithBump` alias (use `AllocateAccountWithNonCanonicalBump`).
+- **`pina_macros`** no longer generates the deprecated `with_pda` alias for the compact stored-bump PDA loader (use `with_stored_bump_pda`) and no longer parses the `min`/`max`/`min_len`/`max_len`/`exact_len` validation spellings or warns about them. Write every bound as a comparison, as in `value >= 1` or `len == 4`.
+- **`pina_cli`** no longer discovers the uppercase `Pina.toml` spelling, accepts the squashed client spellings (`clirust`, `clits`, `clidart`), the kebab override tables (`[clients.cli-rust]`; write `[clients.cli_rust]`), or the `assume-removed` alias in `[migrations.answers]`. The `[migrations].version_type` and `[migrations].auto` keys are unknown fields like any other misspelling; record those settings with `pina migrations create --version-type` and `--auto`.
+- The book drops the release-upgrade migration guides and every deprecated-spelling mention; the on-chain migration feature docs (`migrations/flow.md`, `migrations/abi-versioning.md`, `cli/migrations.md`) stay.
+
+#### Carry program docs into generated CLI help
+
+_Packages:_ 🔴 _pina_cli_, 🟠 _pina_cli_renderer_, 🟠 _pina_cpi_renderer_, 🟠 _pina_codama_renderer_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #612](https://github.com/pina-rs/pina/pull/612)
+
+The IDL's program node now carries documentation from the program crate itself: the crate root's module docs (`//!`) come first, followed by the doc comment on the entrypoint surface — the hand-written `process_instruction` function when it has one, else the `#[discriminator(entrypoint)]` enum that generates it. A hand-written dispatch is authoritative, so its docs win over the enum's when both surfaces are annotated.
+
+Every generated CLI renders those lines as its main description. The Rust clap CLI emits them as the `Cli` doc comment, so the first paragraph shows as `about` and the full text as the long help behind `--help`; the TypeScript CLI passes them to commander's `.description()` and keeps the first line in `package.json`; the Dart CLI passes them to the `CommandRunner` description. A program without either doc source keeps the previous `Command-line interface for <program>` fallback.
+
+Per-instruction subcommands, argument flags, and account flags were already doc-derived from the IDL; this closes the one gap at the program level. The committed IDL and client fixtures are regenerated with the new program `docs`, and `pina_bpf_program` (which documents neither surface) regenerates unchanged. The generated CPI crates also pick the docs up on their program-ID constants, which that renderer already supported; those constants now carry an `#[allow(rustdoc::broken_intra_doc_links)]`, because the copied docs' intra-doc links resolve in the program crate but not in the generated one.
+
+**Breaking:** `ProgramIr` and `DiscriminatorEnum` gain a public `docs` field, so exhaustive struct literals in downstream code need the new field. Everything else assembles those types through the parse and construction helpers, which fill the field in.
+
+#### Upgrade a deployed program without its program keypair
+
+_Packages:_ 🔴 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #636](https://github.com/pina-rs/pina/pull/636)
+
+`pina deploy --upgrade-only` upgrades the program already deployed at the source's declared program ID without reading a program keypair. Pina passes the bare address to `solana program deploy --program-id`, which can upgrade with it but not create a program, so a first deployment still needs the program keypair. A continuous-deployment job can now upgrade devnet with a dedicated upgrade authority and never hold the key that controls the program's address on mainnet.
+
+The plan's `program_keypair` is `null` for such an upgrade, the human plan shows `Program keypair: none (upgrade by declared program ID)`, and a `--remote-command` receives no `PINA_DEPLOY_PROGRAM_KEYPAIR`. Every other safeguard is unchanged: target policy, confirmation, snapshot fingerprints, and publication receipts.
+
+`solana program deploy` now also receives the fee payer as `--keypair`. The Solana CLI loads that default signer even when every role is explicit, so a deployment on a machine without Solana CLI configuration, such as a CI runner, failed with `No default signer found`; it no longer reads that configuration at all.
+
+**Breaking:** `DeploymentRequest::program_keypair` is replaced by `program_address: ProgramAddress` (`ConventionalKeypair`, `Keypair(path)`, or `DeclaredId`), and `DeploymentPlan::program_keypair()` now returns `Option<&str>`. The `--dry-run --json` plan's `program_keypair` key is nullable.
+
+### Features
+
+#### Remove published authority keys from deployable examples
+
+_Packages:_ 🟢 _pina_, 🟠 _pina_test_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #655](https://github.com/pina-rs/pina/pull/655)
+
+Bind privacy-pool initialization to the deployment's upgrade authority through its canonical loader-owned ProgramData account. Initializers must pass that read-only account after the system program and initialize before revoking the program's upgrade authority. Restrict prop-AMM price updates to the stored oracle authority so rotation removes every previous publisher's privilege.
+
+Add an isolated Surfnet helper for configuring deployment authority in tests.
+
+Existing pool accounts retain their stored authority after a code upgrade. Pools initialized with a disclosed fixture key need separate recovery or redeployment.
+
+#### Add the experimental upstream sbpf-linker toolchain
+
+_Packages:_ 🟠 _pina_cli_, 🟠 _pina_profile_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #617](https://github.com/pina-rs/pina/pull/617)
+
+`sbpf-linker` 0.2.3 is pinned in `[workspace.metadata.bin]`, and the `[target.bpfel-unknown-none]` rustflags in `.cargo/config.toml` now carry the static-syscall configuration the linker requires: without the two `--cfg` flags the pinocchio syscall externs fall back to relocation-based resolution that sbpf-linker mishandles, producing programs that load but silently corrupt data.
+
+A `sbpf-linker = true` key under `[project]` in pina.toml routes every `pina build` through the upstream recipe (nightly `bpfel-unknown-none` with `-Z build-std`, static syscalls, LTO forced off) and retries with `--export=<symbol>` flags when the linker reports missing libcall symbols such as u128 division's `__udivti3`; removing the key reverts to the `cargo-build-sbf` driver. `pina init --sbpf-linker` records the key and scaffolds the matching `.cargo/config.toml`; `PINA_SBPF_LINKER` points the build at a specific sbpf-linker binary, for example the repository pin.
+
+`examples/upstream_bpf_program` showcases the toolchain with a Surfpool suite that functionally gates both build paths, and `docs/sbpf-linker-evaluation.md` records the measured caveats and the comparison matrix against `cargo build-sbf`: binaries 6-31% smaller, runtime compute units at parity, fat LTO a measured regression (17-77%), u128 division needing export flags, and large entrypoint frames (the multisig example) not building upstream at all.
+
+`pina profile` now also reads section-less program-header-only ELFs, the artifact layout sbpf-linker emits for static-syscall programs, so static compute-unit profiling works for both toolchains.
+
+### Fixes
+
+#### Upgrade pinapod to 0.4.7
+
+_Packages:_ 🟢 _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #616](https://github.com/pina-rs/pina/pull/616)
+
+Bump the workspace `pinapod` dependency from 0.4.5 to 0.4.7 and refresh the root, `pina_fuzz`, and `pina_fuzz/fuzz` lock files (0.4.6 in between was a formatting-only release). No pina source changes are required — pina re-exports and type-mentions the pinapod API, and 0.4.7 adds no public API and changes no wire format, validation order, or error variants.
+
+The release hardens the contracts around the generated code. The generated compact modules bind the prelude names they spell to `core` explicitly, so a schema module that defines an `Ok`-, `Some`-, or `None`-shaped item, or a primitive-named type, can no longer rebind generated code — previously a matching `Ok` function compiled into every generated validation return and panicked at runtime inside the commit path. Zero-variant enums are rejected with a focused derive diagnostic instead of opaque errors from the generated module, and `PodString`'s accessors now document the UTF-8 precondition they trust rather than implying the length clamp is the whole contract.
+
+The wincode writers additionally validate stored content at the boundary before writing, so invalid values fail serialization instead of producing bytes their own reader refuses; pina does not enable the `wincode` feature, so that path does not compile into pina at all.
+
+The one source-visible change in this repository is `tests/expand/pda.expanded.rs`: the generated module gains the three prelude-binding `use` lines and nothing else. The generated module bodies are unchanged, so the compiled instruction paths are identical by construction and no compute-unit movement is expected.
+
+The same release also pins the fuzz dependency set behind a `cargo metadata --locked` check, adds advisories to cargo-deny and gitleaks to CI, and moves the coverage upload's `id-token: write` into a job that runs no repository code — verification-boundary changes on the pinapod side, recorded here for completeness.
+
+- **Drop the unused `pastey` dependency.** `pina` declared `pastey` as a direct dependency but never referenced it; it was left behind by an early manifest restructure. Removing it shrinks the published dependency graph and clears the `unused dependency` build warning. _Packages:_ 🟢 _pina_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)
+- **Scrub the Anchor converter's `PATH`.** `pina cpi` runs the pinned `@codama/nodes-from-anchor` converter through `npx -p <package> node`, and `npx` resolves the `node` interpreter through the inherited `PATH`. The converter child now runs with workspace-local `PATH` entries removed and `NODE_PATH` dropped — the same isolation the client renderers already apply — so a committed `node_modules/.bin/node` can no longer shadow the interpreter during Anchor IDL conversion. The npx cache the converter script resolves its package from lives outside the workspace and is unaffected. Passing a Node executable with `--npx <node>` keeps resolving from the project on purpose. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)
+
+#### Build SBF programs on Darwin 27
+
+_Packages:_ 🟢 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #637](https://github.com/pina-rs/pina/pull/637)
+
+`pina build` failed on macOS 27 for every program that depends on a proc macro, the scaffolded program included: rustc reported `can't find crate for <macro crate>` as soon as a dependency used a derive. A release build strips the build scripts and proc macros it compiles for the host, and on macOS rustc strips them with the llvm-objcopy bundled in its toolchain. Before LLVM 23 that tool leaves `__LINKEDIT` entries misaligned, and Darwin 27's dyld now refuses to load such a library ("mis-aligned LINKEDIT string pool"). Agave's platform-tools v1.54 ship LLVM 20, so every `cargo build-sbf` run was affected.
+
+Both the `cargo-build-sbf` and the sbpf-linker builds now set `CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=false`, which keeps host units unstripped. Host units never reach the deployed program, so the published `.so` is unchanged; the only cost is a slightly larger target directory and a one-time rebuild of host dependencies.
+
+- **Update constant-time dependency to patched ctutils.** Refresh the host CLI Cargo lockfile to ctutils 0.4.4, fixing RUSTSEC-2026-0385 in constant-time mask generation and u128 comparisons. On-chain program dependencies are unchanged. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #648](https://github.com/pina-rs/pina/pull/648)
+- **Contain configured IDL and build outputs.** Reject configured IDL and Cargo target directories that escape the repository or traverse symbolic links before creating outputs. Workspace-contained sibling paths remain supported. Set `CARGO_TARGET_DIR` or `CARGO_BUILD_TARGET_DIR` in the invoking environment to select an external build directory; `generate --output` continues to relocate clients only. Equivalent Windows drive and UNC path prefixes share the same containment boundary. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #650](https://github.com/pina-rs/pina/pull/650)
+- **Update the locked Tokio dependency to 1.53.3 to address RUSTSEC-2026-0386.** _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #651](https://github.com/pina-rs/pina/pull/651)
+- **Address the sbpf-linker PR review findings.** Corrects the example documentation (`Clock::from_account_view`, not the unimplemented `sol_get_sysvar` syscall), uses `std::env::join_paths` for the linker PATH prefix so the separator matches the platform, prints the captured compiler diagnostics before returning `BuildError::CargoFailed` so upstream-build failures are diagnosable, and removes the process-wide env-var-mutating routing test in favor of the existing child-process integration test that covers the same path safely. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #620](https://github.com/pina-rs/pina/pull/620)
+
+#### Build verifiable source snapshots from the recorded Git revision using a private index and worktree, so concurrent repository changes cannot substitute different build inputs.
+
+_Packages:_ 🟢 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #651](https://github.com/pina-rs/pina/pull/651)
+
+Clear inherited Git repository overrides before inspecting or staging the requested project.
+
+Reject exported files whose bytes differ from the recorded Git blobs, including changes from checkout filters, line-ending conversion, identifier expansion, or working-tree encoding.
+
+#### Patch the webpki emSign advisories
+
+_Packages:_ 🟢 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #640](https://github.com/pina-rs/pina/pull/640) · _Related issues:_ [#621](https://github.com/pina-rs/pina/issues/621)
+
+The advisory database published RUSTSEC-2026-0381, -0382, and -0383 on 2026-10-21, failing the `cargo-deny` and `security` gates for every pull request. Each lets TLS certificate validation trust the distrusted emSign intermediates. `pina_cli` ships `rustls-webpki` and `webpki-roots` in its `ureq` client, so the lockfile now carries the patched `rustls-webpki` 0.103.16, `webpki-roots` 1.0.10, and `webpki-root-certs` 1.0.10.
+
+The remaining hits are `rustls-webpki` 0.101.7 and `webpki-roots` 0.25.4, which have no patched release on those lines. They are reached only through `pina_test → surfpool → txtx-addon-kit → reqwest 0.11`, a host/test stack that no shipped crate links, so they are suppressed in `deny.toml` alongside the earlier rustls 0.21 advisories until the Surfpool train drops `reqwest 0.11` (tracked in #621). The `vite` override moves to 7.3.7 for the three `launch-editor` advisories in the vitest dev stack, which the `security` job reaches once the Rust audit passes.
+
+### Documentation
+
+- **Use the original Weave logo.** Replace the S-Weave mark with the original interlocking Weave pineapple across the READMEs, documentation, favicons, and static and animated assets. _Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_codama_renderer_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_cli_npm_, ⚪ _pina_skill_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #609](https://github.com/pina-rs/pina/pull/609)
+- **Lead the readme with the framework comparison.** Rewrite the readme to open with what Pina is for: a centered landing header, a capability matrix against Anchor v1 (1.2.1), Anchor v2 (2.0.0-rc.1), and Quasar (rev `b0de7db`), and generated on-chain cost tables for the hello-world and counter fixtures. Detailed guides move behind links to the book. Add Anchor v1 fixtures to the framework-comparison benchmark and a version column to every published table, and interpolate the current Pina release version into the readme through mdt so every monochange release refreshes it. _Packages:_ ⚪ _pina_, ⚪ _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #611](https://github.com/pina-rs/pina/pull/611) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619)
+- **Update the Pina logo.** Replace the origami pineapple with S-Weave across the READMEs, documentation, and favicon. Add vector, monochrome, avatar, GIF, and Rive files for the new identity. _Packages:_ ⚪ _pina_, ⚪ _pina_cli_, ⚪ _pina_lints_, ⚪ _pina_macros_, ⚪ _pina_codama_renderer_, ⚪ _pina_profile_, ⚪ _pina_sdk_ids_, ⚪ _pina_test_, ⚪ _pina_codama_nodes_, ⚪ _pina_cli_npm_, ⚪ _pina_skill_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #607](https://github.com/pina-rs/pina/pull/607)
+- **Point the CLI readmes at the pina.rs documentation.** The crate and npm package readmes now link the CLI reference at `https://pina.rs/cli/`, where the redesigned documentation site is published. Old `pina-rs.github.io/pina` links redirect to the same pages. _Packages:_ ⚪ _pina_cli_, ⚪ _pina_cli_npm_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #646](https://github.com/pina-rs/pina/pull/646)
+
+### Testing
+
+- **Test the public PDA and token-account helpers directly.** `find_program_address`, `try_find_program_address`, and `try_get_associated_token_address` are now checked against addresses and bumps derived independently with `@solana/kit`, including a canonical bump of 250 and the Token-2022 associated address, and against seeds too long or too many to derive. `TokenAccountRef`'s state, native-reserve, and field readers are checked for both token programs on accounts whose fields all hold distinct values, covering initialized, frozen, and uninitialized accounts and native and non-native reserves. _Packages:_ ⚪ _pina_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #632](https://github.com/pina-rs/pina/pull/632) · _Closed issues:_ [#583](https://github.com/pina-rs/pina/issues/583)
+- **Close mutation-testing gaps in verified-build validation.** Nightly mutation testing showed that several verified-build record checks could be weakened without any test failing. Some existing cases were rejected by an earlier check (an out-of-order feature list, a record filename that no longer matched its manifest) before reaching the check they were written for. The record cases now name each file for its own manifest and assert the exact rejection reason, and new cases cover the inclusive feature-byte and record-size limits, the file-type checks on record paths, IPv6 port suffixes, public `2001::/16` addresses, the 253-byte host and 63-byte label limits, and a zero run that spans a read boundary in the executable hash. _Packages:_ ⚪ _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #633](https://github.com/pina-rs/pina/pull/633) · _Related issues:_ [#580](https://github.com/pina-rs/pina/issues/580)
+
+### Notes
+
+#### Stop rejoined multisig members reusing old grants
+
+_Packages:_ ⚪ _pina_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #624](https://github.com/pina-rs/pina/pull/624) · _Closed issues:_ [#581](https://github.com/pina-rs/pina/issues/581)
+
+`multisig_program` now tracks membership generations. The multisig bumps `member_generation` on every `AddMember` and records the generation each member joined at in a new `member_generations` tail, and each spending limit records the generation it was granted at. `SpendingLimitUse` refuses a drawer who joined after the grant.
+
+Previously, removing a member pruned only the spending limits passed to that execution, so an omitted limit kept the member on its roster, and re-adding the same address let the old grant authorize draws again. A returning member now needs a new grant, while members who never left keep theirs. The `Multisig` and `SpendingLimit` layouts gain the new fields in the unpublished v0 contract, and the IDL and generated clients are regenerated to match.
+
+- **Patch the rustls stack and suppress the 0.21 advisories.** The advisory database published four rustls vulnerabilities (RUSTSEC-2026-0346, -0347, -0348, -0349) on 2026-10-14, failing the `cargo-deny` gate for every pull request. The 0.23 line is patched at 0.23.46: the lockfile now carries it for `pina_cli`'s `ureq` graph and the `reqwest 0.12` stack, alongside `ruzstd` 0.9.1 for RUSTSEC-2026-0344. The remaining hits are on the end-of-life `rustls 0.21.12`, reached only through `pina_test → surfpool → txtx-addon-kit → reqwest 0.11` — host/test stack only, no shipped crate links it — so those two are suppressed in `deny.toml` until the Surfpool train drops `reqwest 0.11`, tracked in #621 (same shape as the #619 `unsafe-libyaml` suppression). _Packages:_ ⚪ _pina_test_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #622](https://github.com/pina-rs/pina/pull/622) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619), [#621](https://github.com/pina-rs/pina/issues/621)
+- **Suppress the unmaintained unsafe-libyaml advisory.** [RUSTSEC-2024-0449](https://rustsec.org/advisories/RUSTSEC-2024-0449) flags `unsafe-libyaml` as unmaintained, reached through `pina_test → surfpool-sdk → surfpool-core → serde_yaml`. The advisory database picked the entry up on 2026-10-12, which failed the `cargo-deny` CI gate for every open pull request. Host/test stack only; the suppression is tracked in #619 and is removable once surfpool drops the deprecated `serde_yaml`. _Packages:_ ⚪ _pina_test_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #611](https://github.com/pina-rs/pina/pull/611) · _Related issues:_ [#619](https://github.com/pina-rs/pina/issues/619)
+
 ## [0.23.0](https://github.com/pina-rs/pina/releases/tag/v0.23.0) (2026-10-05)
 
 Grouped release for `core`.
