@@ -854,14 +854,10 @@ mod coverage {
 
 	#[test]
 	fn rejects_redirects_to_nonloopback_http_before_connecting() {
-		let (result, requests) = fetch_http_responses(|port, request, _| {
-			if request == 0 {
-				format!(
-					"HTTP/1.1 302 Found\r\nLocation: http://0.0.0.0:{port}/idl.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-				)
-			} else {
-				"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}".to_string()
-			}
+		let (result, requests) = fetch_http_responses(|port, _, _| {
+			format!(
+				"HTTP/1.1 302 Found\r\nLocation: http://0.0.0.0:{port}/idl.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+			)
 		});
 		assert!(result.is_err(), "redirect bypass returned {result:?}");
 		assert_eq!(
@@ -874,16 +870,10 @@ mod coverage {
 	fn fetch_http_responses(
 		response: impl Fn(u16, usize, &str) -> String + Send + 'static,
 	) -> (Result<Vec<u8>, ImportError>, usize) {
-		let listener = std::net::TcpListener::bind("127.0.0.1:0")
-			.unwrap_or_else(|error| panic!("bind: {error}"));
-		let port = listener
-			.local_addr()
-			.unwrap_or_else(|error| panic!("addr: {error}"))
-			.port();
+		let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+		let port = listener.local_addr().unwrap().port();
 		let (stop, stopped) = std::sync::mpsc::channel();
-		listener
-			.set_nonblocking(true)
-			.unwrap_or_else(|error| panic!("nonblocking: {error}"));
+		listener.set_nonblocking(true).unwrap();
 		let server = std::thread::spawn(move || {
 			let mut requests = 0;
 
@@ -892,27 +882,22 @@ mod coverage {
 				Err(std::sync::mpsc::TryRecvError::Empty)
 			) {
 				let (mut stream, _) = match listener.accept() {
-					Ok(connection) => connection,
 					Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
 						std::thread::sleep(std::time::Duration::from_millis(1));
 						continue;
 					}
-					Err(error) => panic!("accept: {error}"),
+					connection => connection.unwrap(),
 				};
-				stream
-					.set_nonblocking(false)
-					.unwrap_or_else(|error| panic!("blocking: {error}"));
+				stream.set_nonblocking(false).unwrap();
 				stream
 					.set_read_timeout(Some(std::time::Duration::from_secs(2)))
-					.unwrap_or_else(|error| panic!("timeout: {error}"));
+					.unwrap();
 				let mut reader = std::io::BufReader::new(&stream);
 				let mut line = String::new();
 
 				loop {
 					use std::io::BufRead as _;
-					let read = reader
-						.read_line(&mut line)
-						.unwrap_or_else(|error| panic!("read: {error}"));
+					let read = reader.read_line(&mut line).unwrap();
 
 					if read == 0 || line.ends_with("\r\n\r\n") {
 						break;
@@ -921,9 +906,7 @@ mod coverage {
 
 				let response = response(port, requests, &line);
 				use std::io::Write as _;
-				stream
-					.write_all(response.as_bytes())
-					.unwrap_or_else(|error| panic!("write: {error}"));
+				stream.write_all(response.as_bytes()).unwrap();
 				requests += 1;
 			}
 
@@ -931,11 +914,8 @@ mod coverage {
 		});
 
 		let result = fetch_url(&format!("http://127.0.0.1:{port}/start"));
-		stop.send(())
-			.unwrap_or_else(|error| panic!("stop: {error}"));
-		let requests = server
-			.join()
-			.unwrap_or_else(|error| panic!("server: {error:?}"));
+		stop.send(()).unwrap();
+		let requests = server.join().unwrap();
 
 		(result, requests)
 	}
@@ -1005,9 +985,7 @@ mod coverage {
 					"HTTP/1.1 302 Redirect\r\nLocation: /idl/{next}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
 				)
 			});
-			let error = result
-				.err()
-				.unwrap_or_else(|| panic!("redirect chain must fail"));
+			let error = result.unwrap_err();
 			assert!(error.to_string().contains("5-redirect limit"));
 			assert_eq!(requests, MAX_IDL_REDIRECTS + 1);
 		}
@@ -1025,9 +1003,7 @@ mod coverage {
 					"HTTP/1.1 302 Redirect\r\n{header}Content-Length: 0\r\nConnection: close\r\n\r\n"
 				)
 			});
-			let error = result
-				.err()
-				.unwrap_or_else(|| panic!("invalid redirect must fail"));
+			let error = result.unwrap_err();
 			assert!(error.to_string().contains("Location"));
 			assert!(!error.to_string().contains("hidden"));
 			assert_eq!(requests, 1);
@@ -1057,9 +1033,7 @@ mod coverage {
 			("https://example.com/idl", "file:///idl.json"),
 		] {
 			let current = url::Url::parse(source).unwrap_or_else(|error| panic!("source: {error}"));
-			let error = resolve_idl_redirect(&current, location)
-				.err()
-				.unwrap_or_else(|| panic!("redirect must fail: {location}"));
+			let error = resolve_idl_redirect(&current, location).unwrap_err();
 			assert!(error.to_string().contains("original origin"));
 			assert!(!error.to_string().contains("hidden"));
 		}
