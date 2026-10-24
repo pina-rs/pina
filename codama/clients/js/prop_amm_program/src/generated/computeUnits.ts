@@ -29,7 +29,7 @@ export const INITIALIZE_COMPUTE_UNIT_LIMIT = 2100;
  * Compute units `update` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const UPDATE_MEASURED_COMPUTE_UNITS = 113;
+export const UPDATE_MEASURED_COMPUTE_UNITS = 111;
 
 /**
  * Compute unit limit to request for a transaction carrying `update`: the

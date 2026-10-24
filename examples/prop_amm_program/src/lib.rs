@@ -15,7 +15,7 @@
 //! ## Instructions
 //!
 //! - `Initialize` — create and initialize an oracle account
-//! - `Update` — allow a fixed global updater to publish a new price
+//! - `Update` — allow the oracle's current authority to publish a new price
 //! - `RotateAuthority` — let the oracle authority rotate its control key
 
 #![allow(missing_docs)]
@@ -32,23 +32,6 @@ extern crate std;
 use pina::*;
 
 declare_id!("55555555555555555555555555555555555555555555");
-
-/// Matches the Anchor v2 benchmark's hard-coded updater key.
-///
-/// The benchmark shape keeps a fixed, source-visible updater key so the test
-/// suites can rebuild the signing key deterministically. A fixed seed must
-/// therefore stay committed, but never a uniform one: the previous fixture
-/// derived the key from `[7u8; 32]`, so anyone reading this public source
-/// recovered the private key — and with it full price control — in at most
-/// 256 guesses (security sweep finding D1). The keypair seed is instead the
-/// 32 ASCII bytes of `b"pina example fixture updater key"`: still fully
-/// deterministic, but outside the repeated-single-byte brute-force space that
-/// `tests/update_authority.rs` sweeps. A real program must generate its
-/// authority keypair off-circuit and commit only the public key.
-pub const UPDATE_AUTHORITY: Address = Address::new_from_array([
-	9, 236, 45, 194, 55, 26, 2, 54, 152, 179, 31, 243, 24, 140, 167, 99, 120, 168, 252, 172, 10,
-	173, 160, 155, 241, 194, 170, 126, 40, 228, 171, 52,
-]);
 
 #[error]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,11 +97,7 @@ fn oracle_size() -> usize {
 }
 
 fn assert_update_authority(authority: AccountView, oracle_authority: &Address) -> ProgramResult {
-	// Either the benchmark's static updater key or the oracle's own stored
-	// authority may publish a price. Without the stored-authority branch
-	// `RotateAuthority` would be cosmetic: the rotated key could never do
-	// the one thing rotation implies.
-	if authority.address() == &UPDATE_AUTHORITY || authority.address() == oracle_authority {
+	if authority.address() == oracle_authority {
 		return Ok(());
 	}
 
@@ -255,12 +234,5 @@ mod tests {
 			.unwrap_or_else(|e| panic!("decode: {e:?}"));
 
 		assert_eq!(decoded.new_authority, Address::from([9u8; ADDRESS_BYTES]));
-	}
-
-	#[test]
-	fn update_authority_is_stable() {
-		let bytes: &[u8] = UPDATE_AUTHORITY.as_ref();
-		assert_eq!(bytes.len(), ADDRESS_BYTES);
-		assert_ne!(UPDATE_AUTHORITY, Address::default());
 	}
 }

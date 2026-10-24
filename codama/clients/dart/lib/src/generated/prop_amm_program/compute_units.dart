@@ -20,7 +20,7 @@ const int initializeComputeUnitLimit = 2100;
 
 /// Compute units `update` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int updateMeasuredComputeUnits = 113;
+const int updateMeasuredComputeUnits = 111;
 
 /// Compute unit limit to request for a transaction carrying `update`: the
 /// measurement plus the project's margin and the cost of the compute budget

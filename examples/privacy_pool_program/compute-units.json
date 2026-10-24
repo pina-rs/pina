@@ -1,58 +1,58 @@
 {
 	"schemaVersion": 1,
 	"measurement": "surfpool-simulation-max",
-	"artifactSha256": "7794afd8c4f7d3021a9b692583027b30d683d50d8a4092d24fd7891effd9723f",
+	"artifactSha256": "785279354a82e4eb2daba7e8a9221df7908b167eb63102d3acfb66b3f3094140",
 	"instructions": {
 		"approveDisclosure": {
-			"computeUnits": 438,
+			"computeUnits": 437,
 			"samples": 2
 		},
 		"cancelDisclosure": {
-			"computeUnits": 121,
+			"computeUnits": 120,
 			"samples": 1
 		},
 		"challengeDisclosure": {
-			"computeUnits": 1943,
+			"computeUnits": 1942,
 			"samples": 1
 		},
 		"deposit": {
-			"computeUnits": 15996,
+			"computeUnits": 15995,
 			"samples": 5
 		},
 		"grantDisclosure": {
-			"computeUnits": 1893,
+			"computeUnits": 1892,
 			"samples": 1
 		},
 		"initialize": {
-			"computeUnits": 46616,
+			"computeUnits": 48259,
 			"samples": 5
 		},
 		"registerRequester": {
-			"computeUnits": 319,
+			"computeUnits": 318,
 			"samples": 1
 		},
 		"requestDisclosure": {
-			"computeUnits": 11015,
+			"computeUnits": 11014,
 			"samples": 3
 		},
 		"resolveChallenge": {
-			"computeUnits": 198,
+			"computeUnits": 197,
 			"samples": 1
 		},
 		"setCustodians": {
-			"computeUnits": 243,
+			"computeUnits": 242,
 			"samples": 1
 		},
 		"setVerificationKey": {
-			"computeUnits": 15259,
+			"computeUnits": 15258,
 			"samples": 10
 		},
 		"transfer": {
-			"computeUnits": 104148,
+			"computeUnits": 104147,
 			"samples": 1
 		},
 		"withdraw": {
-			"computeUnits": 86950,
+			"computeUnits": 86949,
 			"samples": 1
 		}
 	}

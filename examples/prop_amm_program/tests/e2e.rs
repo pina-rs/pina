@@ -3,7 +3,7 @@
 //! These tests cover the semantic port of Anchor v2's `prop-amm` benchmark:
 //!
 //! - initializing a fresh oracle account
-//! - publishing prices through the fixed global updater
+//! - publishing prices through the oracle's current authority
 //! - rotating the stored oracle authority
 //! - rejecting unauthorized update and authority-rotation attempts
 //!
@@ -34,7 +34,6 @@ use program::OracleState;
 use program::OracleStateZc;
 use program::PropAmmError;
 use program::RotateAuthorityInstruction;
-use program::UPDATE_AUTHORITY;
 use program::UpdateInstruction;
 use solana_account::Account;
 use solana_instruction::AccountMeta;
@@ -75,11 +74,11 @@ fn try_create_mollusk() -> Option<Mollusk> {
 }
 
 fn update_authority_pubkey() -> Pubkey {
-	let bytes: [u8; 32] = UPDATE_AUTHORITY
-		.as_ref()
-		.try_into()
-		.unwrap_or_else(|_| panic!("address must be 32 bytes"));
-	Pubkey::new_from_array(bytes)
+	// Historical compromised fixture, retained only to prove it has no privilege.
+	Pubkey::new_from_array([
+		9, 236, 45, 194, 55, 26, 2, 54, 152, 179, 31, 243, 24, 140, 167, 99, 120, 168, 252, 172,
+		10, 173, 160, 155, 241, 194, 170, 126, 40, 228, 171, 52,
+	])
 }
 
 fn system_account(lamports: u64) -> Account {
@@ -238,7 +237,7 @@ fn rotate_authority_rejects_wrong_authority() {
 }
 
 #[test]
-fn update_accepts_global_update_authority() {
+fn update_rejects_the_compromised_global_authority() {
 	let Some(mollusk) = try_create_mollusk() else {
 		eprintln!("{SKIP_MSG}");
 		return;
@@ -266,18 +265,18 @@ fn update_accepts_global_update_authority() {
 		(update_authority, system_account(1_000_000_000)),
 	];
 
-	let result =
-		mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+	let result = mollusk.process_and_validate_instruction(
+		&instruction,
+		&accounts,
+		&[Check::err(PropAmmError::UnauthorizedUpdateAuthority.into())],
+	);
 	let updated_oracle = result
 		.get_account(&oracle)
 		.expect("oracle account should remain after update");
 	let oracle_state = read_oracle(&updated_oracle);
 
-	eprintln!(
-		"[CU] prop_amm update with authorized updater: {} compute units consumed",
-		result.compute_units_consumed
-	);
-	assert_eq!(oracle_state.price.get(), 1_234);
+	assert_eq!(updated_oracle, oracle_account);
+	assert_eq!(oracle_state.price.get(), 0);
 	assert_eq!(oracle_state.authority.as_ref(), payer.as_ref());
 }
 
@@ -328,9 +327,7 @@ fn update_accepts_the_stored_oracle_authority() {
 	);
 }
 
-/// A key that is neither the static updater nor the oracle's recorded
-/// authority is still refused, so the new stored-authority branch does not
-/// widen the gate to everyone.
+/// A signer other than the oracle's recorded authority is refused.
 #[test]
 fn update_rejects_a_stranger() {
 	let Some(mollusk) = try_create_mollusk() else {
@@ -411,8 +408,7 @@ fn update_after_rotation_honours_the_new_authority() {
 	let oracle_state = read_oracle(rotated_oracle);
 	assert_eq!(oracle_state.authority.as_ref(), new_authority.as_ref());
 
-	// The rotated-in authority publishes a price: this is the capability
-	// rotation implies and the reason the stored-authority branch exists.
+	// The rotated-in authority can publish a price.
 	let update = Instruction::new_with_bytes(
 		program_id(),
 		&update_ix_data(7_777),
@@ -431,8 +427,7 @@ fn update_after_rotation_honours_the_new_authority() {
 		.expect("oracle account should remain after update");
 	assert_eq!(read_oracle(updated_oracle).price.get(), 7_777);
 
-	// The key it replaced is no longer the stored authority and is not the
-	// static updater, so it must not publish any more.
+	// The replaced authority can no longer publish.
 	let stale = Instruction::new_with_bytes(
 		program_id(),
 		&update_ix_data(1_111),

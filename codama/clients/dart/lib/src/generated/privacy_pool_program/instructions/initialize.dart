@@ -150,6 +150,7 @@ Instruction getInitializeInstruction({
   required Address requesterRegistry,
   required Address disclosureLog,
   required Address systemProgram,
+  required Address programData,
   required int configBump,
   required int vaultBump,
   required int treeBump,
@@ -182,6 +183,7 @@ Instruction getInitializeInstruction({
       AccountMeta(address: requesterRegistry, role: AccountRole.writable),
       AccountMeta(address: disclosureLog, role: AccountRole.writable),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: programData, role: AccountRole.readonly),
     ],
     data: getInitializeInstructionDataEncoder().encode(instructionData),
   );

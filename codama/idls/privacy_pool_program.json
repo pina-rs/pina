@@ -1636,6 +1636,16 @@
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
 						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "programData",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Canonical `ProgramData` for this program, owned by the upgradeable loader."
+						]
 					}
 				],
 				"arguments": [
@@ -1755,8 +1765,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 56300,
-							"measured": 46616
+							"limit": 58300,
+							"measured": 48259
 						}
 					}
 				]
@@ -1959,7 +1969,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 18700,
-							"measured": 15259
+							"measured": 15258
 						}
 					}
 				]
@@ -2055,7 +2065,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 600,
-							"measured": 243
+							"measured": 242
 						}
 					}
 				]
@@ -2159,7 +2169,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 700,
-							"measured": 319
+							"measured": 318
 						}
 					}
 				]
@@ -2350,7 +2360,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 19500,
-							"measured": 15996
+							"measured": 15995
 						}
 					}
 				]
@@ -2542,7 +2552,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 104700,
-							"measured": 86950
+							"measured": 86949
 						}
 					}
 				]
@@ -2788,7 +2798,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 125300,
-							"measured": 104148
+							"measured": 104147
 						}
 					}
 				]
@@ -2982,7 +2992,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 13600,
-							"measured": 11015
+							"measured": 11014
 						}
 					}
 				]
@@ -3065,7 +3075,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 2600,
-							"measured": 1893
+							"measured": 1892
 						}
 					}
 				]
@@ -3155,7 +3165,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 2700,
-							"measured": 1943
+							"measured": 1942
 						}
 					}
 				]
@@ -3246,7 +3256,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 600,
-							"measured": 198
+							"measured": 197
 						}
 					}
 				]
@@ -3371,7 +3381,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 900,
-							"measured": 438
+							"measured": 437
 						}
 					}
 				]
@@ -3447,7 +3457,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 500,
-							"measured": 121
+							"measured": 120
 						}
 					}
 				]

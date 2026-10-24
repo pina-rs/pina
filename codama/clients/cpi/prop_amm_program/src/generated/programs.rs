@@ -28,7 +28,7 @@ use pina::Program;
 /// ## Instructions
 ///
 /// - `Initialize` — create and initialize an oracle account
-/// - `Update` — allow a fixed global updater to publish a new price
+/// - `Update` — allow the oracle's current authority to publish a new price
 /// - `RotateAuthority` — let the oracle authority rotate its control key
 #[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
 pub const PROP_AMM_PROGRAM_ID: Address =

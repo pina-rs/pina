@@ -38,7 +38,14 @@
 		"token_loader_cu_program/token_2022_mint_success": true,
 		"token_loader_cu_program/token_2022_mint_wrong_owner": false
 	},
-	"staticCuApprovals": {},
+	"staticCuApprovals": {
+		"privacy_pool_program": {
+			"baseRevision": "095ecdc573f63f0e054593ed4260f6f50263a6fa",
+			"base": 14133,
+			"head": 14305,
+			"reason": "Approved by @ifiokjr on 2026-10-24 in #655: authenticate the singleton pool's initializer against the loader-owned deployment authority instead of a disclosed signing key."
+		}
+	},
 	"runtimeCuApprovals": {
 		"multisig_program/configAuthorityExecute": {
 			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
@@ -111,6 +118,12 @@
 			"base": 8321,
 			"head": 8326,
 			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"privacy_pool_program/initialize": {
+			"baseRevision": "095ecdc573f63f0e054593ed4260f6f50263a6fa",
+			"base": 46616,
+			"head": 48259,
+			"reason": "Approved by @ifiokjr on 2026-10-24 in #655: authenticate the singleton pool's initializer against the loader-owned deployment authority instead of a disclosed signing key."
 		}
 	},
 	"binarySizeApprovals": {
@@ -119,6 +132,12 @@
 			"base": 158992,
 			"head": 162608,
 			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+		},
+		"privacy_pool_program": {
+			"baseRevision": "095ecdc573f63f0e054593ed4260f6f50263a6fa",
+			"base": 120008,
+			"head": 121600,
+			"reason": "Approved by @ifiokjr on 2026-10-24 in #655: authenticate the singleton pool's initializer against the loader-owned deployment authority instead of a disclosed signing key."
 		}
 	}
 }

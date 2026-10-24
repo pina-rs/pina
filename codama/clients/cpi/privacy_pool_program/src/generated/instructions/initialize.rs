@@ -57,6 +57,11 @@ pub struct Initialize<'account> {
 	/// Required privileges: read-only.
 	pub system_program: &'account AccountView,
 
+	/// CPI account `programData`.
+	/// Canonical `ProgramData` for this program, owned by the upgradeable loader.
+	/// Required privileges: read-only.
+	pub program_data: &'account AccountView,
+
 	/// Instruction arguments encoded and sent as CPI data for `initialize`.
 	pub ix: InitializeIx,
 }
@@ -127,7 +132,7 @@ impl<'account> Initialize<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 9] = [
+		let accounts: [CpiHandle<'_>; 10] = [
 			CpiHandle::writable_signer(self.authority)?,
 			CpiHandle::writable(self.pool_config)?,
 			CpiHandle::writable(self.pool_vault)?,
@@ -137,6 +142,7 @@ impl<'account> Initialize<'account> {
 			CpiHandle::writable(self.requester_registry)?,
 			CpiHandle::writable(self.disclosure_log)?,
 			CpiHandle::readonly(self.system_program),
+			CpiHandle::readonly(self.program_data),
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);

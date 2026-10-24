@@ -67,11 +67,18 @@ fn pina_address(pubkey: &Pubkey) -> Address {
 	Address::new_from_array(pubkey.to_bytes())
 }
 
-/// The committed bootstrap authority: the only key `Initialize` accepts.
-/// The seed is the documented fixture seed behind
-/// [`program::BOOTSTRAP_AUTHORITY`].
+/// Test-only deployer, installed in this isolated Surfnet's loader state.
 fn bootstrap_authority() -> Keypair {
-	Keypair::new_from_array(*b"pina-pool-bootstrap-2026-09-26!!")
+	Keypair::new_from_array([0xB0; 32])
+}
+
+/// ProgramData address derived by the upgradeable loader at deployment.
+fn program_data_address() -> Pubkey {
+	Pubkey::find_program_address(
+		&[program_id().as_ref()],
+		&Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111"),
+	)
+	.0
 }
 
 fn custodian_a() -> Keypair {
@@ -176,6 +183,68 @@ fn nullifier_bytes(secrets: &prover::NoteSecrets) -> [u8; 32] {
 /// runloops until RPC polls time out.
 static JOURNEY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+/// Published seeds and stale deployment authorities cannot capture the pool.
+#[test]
+#[ignore = "run with pina test"]
+fn bootstrap_requires_the_current_deployment_authority() {
+	let _guard = journey_guard();
+	pina_test::run(async {
+		let mut program = ProgramTest::start(program_id()).await.unwrap();
+		let deployer = bootstrap_authority();
+		program
+			.set_upgrade_authority(Some(deployer.pubkey()))
+			.unwrap();
+		let published = Keypair::new_from_array(*b"pina-pool-bootstrap-2026-09-26!!");
+		let mut data = vec![0; InitializeIx::SIZE];
+		InitializeIx::initialize(&mut data, |_| Ok(())).unwrap();
+
+		for signer in [&published, &deployer] {
+			// Rotate away before trying the old deployer; the published key is
+			// rejected even while the legitimate deployment authority is active.
+			if signer.pubkey() == deployer.pubkey() {
+				program
+					.set_upgrade_authority(Some(custodian_a().pubkey()))
+					.unwrap();
+			}
+
+			program.fund(&signer.pubkey(), 1_000_000_000).unwrap();
+			let balance = program.balance(&signer.pubkey()).unwrap();
+			let error = program
+				.send_with_signers(
+					Instruction::new_with_bytes(
+						program_id(),
+						&data,
+						vec![
+							AccountMeta::new(signer.pubkey(), true),
+							AccountMeta::new(config_pda().0, false),
+							AccountMeta::new(vault_pda().0, false),
+							AccountMeta::new(tree_pda().0, false),
+							AccountMeta::new(nullifiers_pda().0, false),
+							AccountMeta::new(custodians_pda().0, false),
+							AccountMeta::new(requesters_pda().0, false),
+							AccountMeta::new(log_pda().0, false),
+							AccountMeta::new_readonly(system(), false),
+							AccountMeta::new_readonly(program_data_address(), false),
+						],
+					),
+					&[signer],
+				)
+				.expect_err("only the deployment authority may initialize");
+			pina_test::assert_custom_error(&error, PrivacyPoolError::InvalidAuthority as u32);
+			assert_eq!(program.balance(&signer.pubkey()).unwrap(), balance);
+			assert!(program.account(&config_pda().0).is_err());
+		}
+
+		program.set_upgrade_authority(None).unwrap();
+		let metadata = program.account(&program_data_address()).unwrap();
+		assert_eq!(
+			metadata.data[12], 0,
+			"immutable loader state has no authority"
+		);
+		program.stop().unwrap();
+	});
+}
+
 fn journey_guard() -> std::sync::MutexGuard<'static, ()> {
 	JOURNEY_LOCK
 		.lock()
@@ -188,9 +257,10 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 		.await
 		.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
-	// Initialize as the committed bootstrap authority — the only key the
-	// program accepts — and let it double as the pool's operating authority.
 	let auth = bootstrap_authority();
+	program
+		.set_upgrade_authority(Some(auth.pubkey()))
+		.unwrap_or_else(|error| panic!("configure test deployer: {error:?}"));
 	program
 		.fund(&auth.pubkey(), 3_000_000_000)
 		.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
@@ -240,6 +310,7 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 					AccountMeta::new(requesters_key, false),
 					AccountMeta::new(log_key, false),
 					AccountMeta::new_readonly(system(), false),
+					AccountMeta::new_readonly(program_data_address(), false),
 				],
 			),
 			&[&auth],
@@ -903,35 +974,16 @@ fn deposit_rejects_a_substituted_vault() {
 // ---------------------------------------------------------------------------
 // Audit regression (2026-09-26 deep audit)
 //
-// This test asserts the *secure* behavior. It fails on the current tree
-// because the exploit is live, and must pass once the fix lands: run with
+// This test rejects an unapproved initializer. Run with
 // `pina test --project examples/privacy_pool_program --filter audit_init_`.
 // ---------------------------------------------------------------------------
 
-/// Audit 2026-09-26, finding 1: `Initialize` has no bootstrap binding. The
-/// config, vault, tree, registries, and log are singleton PDAs derived from
-/// fixed seeds, and the first funded signer to call `Initialize` becomes the
-/// permanent, irrevocable `PoolConfig.authority` — the key that installs
-/// Groth16 verifying keys (`SetVerificationKey`), rotates the disclosure
-/// committee (`SetCustodians`), and registers compelled-disclosure requesters
-/// (`RegisterRequester`). There is no transfer or renounce path.
+/// Audit 2026-09-26, finding 1: singleton initialization must bind the signer
+/// to the deployment's current upgrade authority. The resulting pool authority
+/// controls verification keys, custodians, and disclosure requesters.
 ///
-/// An attacker watching the deployment mempool front-runs the deployer's
-/// first `Initialize` and captures the pool. Every honest depositor's escrow
-/// and disclosure policy is then governed by the attacker:
-///
-/// 1. The attacker installs *their own* verifying keys. Because a real spend
-///    must verify against the installed key, a key the attacker generated
-///    lets them prove spends on notes they never deposited (a spend can be
-///    proven directly against the attacker's key without holding any note),
-///    or simply marks the pool unspendable for honest users.
-/// 2. The attacker registers themselves at `TIER_COMPELLED` and rotates the
-///    custodian committee to their own keys, so every tier-2 disclosure
-///    executes on their signature and the "governed, logged disclosure"
-///    guarantee becomes attacker-controlled surveillance.
-///
-/// Current behavior: the attacker's `Initialize` succeeds and the
-/// `expect_err` below fails, proving the capture is live.
+/// An unapproved first initializer must not capture the pool or create any
+/// singleton pool state.
 #[test]
 #[ignore = "run with pina test"]
 fn audit_init_2026_09_26_unapproved_first_initializer_cannot_capture_the_pool() {
@@ -941,6 +993,9 @@ fn audit_init_2026_09_26_unapproved_first_initializer_cannot_capture_the_pool() 
 		let mut program = ProgramTest::start(pid)
 			.await
 			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
+		program
+			.set_upgrade_authority(Some(bootstrap_authority().pubkey()))
+			.unwrap();
 
 		// The attacker races the intended deployer to the singleton PDAs.
 		let attacker = Keypair::new_from_array([0xA1; 32]);
@@ -990,6 +1045,7 @@ fn audit_init_2026_09_26_unapproved_first_initializer_cannot_capture_the_pool() 
 						AccountMeta::new(requesters_key, false),
 						AccountMeta::new(log_key, false),
 						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(program_data_address(), false),
 					],
 				),
 				&[&attacker],
@@ -1011,14 +1067,7 @@ fn audit_init_2026_09_26_unapproved_first_initializer_cannot_capture_the_pool() 
 			program.account(&tree_key).is_err(),
 			"a rejected initialization must not create the merkle tree"
 		);
-		assert!(
-			matches!(
-				error.transaction_error(),
-				Some(pina_test::TransactionError::InstructionError(0, _))
-			),
-			"expected an authorization rejection, got: {:?}",
-			error.transaction_error()
-		);
+		pina_test::assert_custom_error(&error, PrivacyPoolError::InvalidAuthority as u32);
 
 		program
 			.stop()

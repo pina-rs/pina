@@ -473,6 +473,31 @@ impl ProgramTest {
 		self.surfnet.payer()
 	}
 
+	/// Set this deployment's upgrade authority inside the isolated Surfnet.
+	///
+	/// This cheatcode configures loader state for bootstrap authorization tests.
+	/// It does not send an on-chain authority-transfer instruction.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC rejects the authority change.
+	pub fn set_upgrade_authority(&self, authority: Option<Pubkey>) -> Result<(), TestError> {
+		self.surfnet
+			.inner
+			.rpc_client()
+			.send::<serde_json::Value>(
+				RpcRequest::Custom {
+					method: "surfnet_setProgramAuthority",
+				},
+				serde_json::json!([
+					self.program_id.to_string(),
+					authority.map(|key| key.to_string())
+				]),
+			)
+			.map(|_| ())
+			.map_err(|error| test_error("set program upgrade authority", error))
+	}
+
 	/// Build an instruction addressed to the deployed program.
 	#[must_use]
 	pub fn instruction(&self, data: &[u8], accounts: Vec<AccountMeta>) -> Instruction {
@@ -2075,6 +2100,27 @@ mod tests {
 			surfnet
 				.stop()
 				.unwrap_or_else(|error| panic!("stop offline Surfpool test instance: {error}"));
+		});
+	}
+
+	#[test]
+	fn upgrade_authority_changes_report_a_missing_deployment() {
+		run(async {
+			let mut program = ProgramTest {
+				benchmark_program: None,
+				program_id: Pubkey::new_from_array([39; 32]),
+				surfnet: OfflineSurfnet::start().await.unwrap(),
+			};
+
+			for authority in [Some(program.payer()), None] {
+				let error = program
+					.set_upgrade_authority(authority)
+					.expect_err("a missing deployment cannot change upgrade authority");
+
+				assert_eq!(error.operation(), "set program upgrade authority");
+			}
+
+			program.stop().unwrap();
 		});
 	}
 

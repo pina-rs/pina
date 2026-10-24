@@ -58,6 +58,10 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 		"--disclosure-log <disclosureLog>",
 		"The `disclosure_log` account [default: derived]",
 	)
+	.requiredOption(
+		"--program-data <programData>",
+		"Canonical `ProgramData` for this program, owned by the upgradeable loader",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
@@ -91,6 +95,7 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 			disclosureLog: options.disclosureLog === undefined
 				? undefined
 				: pubkey("--disclosure-log", options.disclosureLog),
+			programData: pubkey("--program-data", options.programData),
 		};
 		const instruction = await getInitializeInstructionAsync(
 			...[input],

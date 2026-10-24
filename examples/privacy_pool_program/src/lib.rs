@@ -89,27 +89,8 @@ const SEED_REQUEST: &[u8] = b"privacy-pool-request";
 const SEED_LOG: &[u8] = b"privacy-pool-log";
 const SEED_VKEY: &[u8] = b"privacy-pool-vkey";
 
-/// The only key that may initialize the pool.
-///
-/// Every pool account is a singleton PDA over a fixed seed, so
-/// `Initialize` is a one-time, winner-takes-all instruction: whoever runs it
-/// becomes the permanent `PoolConfig.authority`, and that authority installs
-/// Groth16 verifying keys, rotates the custodian committee, and registers
-/// compelled-disclosure requesters. Without a bootstrap binding the first
-/// funded signer to arrive — front-running the deployer — captures the
-/// pool and every honest deposit's escrow and disclosure policy with it.
-///
-/// This example therefore pins the initializer to one committed public key,
-/// the same shape the `prop_amm_program` fixture uses for its updater key:
-/// the seed is the 32 ASCII bytes of `b"pina-pool-bootstrap-2026-09-26!!"`,
-/// deterministic for the test suites but outside the repeated-single-byte
-/// brute-force space. A real deployment must instead follow the production
-/// pattern: generate the bootstrap authority off-circuit, commit only its
-/// public key, and initialize in the same ceremony that deploys the program.
-pub const BOOTSTRAP_AUTHORITY: Address = Address::new_from_array([
-	4, 5, 103, 14, 185, 216, 77, 249, 127, 54, 139, 75, 24, 56, 109, 200, 228, 79, 11, 15, 164, 93,
-	251, 141, 218, 100, 201, 67, 220, 208, 120, 205,
-]);
+/// Loader that owns the deployment's `ProgramData` and upgrade authority.
+const UPGRADEABLE_LOADER: Address = address!("BPFLoaderUpgradeab1e11111111111111111111111");
 
 /// Merkle tree depth. 128 leaves keeps the full node store under the
 /// 10,240-byte ceiling the runtime places on accounts created inside inner
@@ -884,6 +865,8 @@ pub struct InitializeAccounts<'a> {
 	pub requester_registry: &'a mut AccountView,
 	pub disclosure_log: &'a mut AccountView,
 	pub system_program: &'a AccountView,
+	/// Canonical `ProgramData` for this program, owned by the upgradeable loader.
+	pub program_data: &'a AccountView,
 }
 
 #[derive(Accounts)]
@@ -997,20 +980,35 @@ pub struct CancelDisclosureAccounts<'a> {
 // Instruction: Initialize
 // ---------------------------------------------------------------------------
 
+/// Bind singleton initialization to the deployment's current upgrade authority.
+fn assert_bootstrap_authority(
+	authority: &AccountView,
+	program_data: &AccountView,
+) -> ProgramResult {
+	let (expected, _) = Address::find_program_address(&[ID.as_ref()], &UPGRADEABLE_LOADER);
+	program_data
+		.assert_address(&expected)?
+		.assert_owner(&UPGRADEABLE_LOADER)?;
+	let data = program_data.try_borrow()?;
+
+	// UpgradeableLoaderState::ProgramData: u32 tag, u64 slot, Option<Address>.
+	// Require Some(authority); an immutable deployment cannot bootstrap a pool.
+	if data.get(..4) != Some(&3_u32.to_le_bytes())
+		|| data.get(12) != Some(&1)
+		|| data.get(13..45) != Some(authority.address().as_ref())
+	{
+		return Err(PrivacyPoolError::InvalidAuthority.into());
+	}
+
+	Ok(())
+}
+
 impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let args = InitializeIx::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?.assert_writable()?;
-		// The pool is a set of singleton PDAs, so initialization is a
-		// one-time capture of the governance root. Only the committed
-		// bootstrap key may run it; an unapproved first signer must be
-		// refused before any account or lamport moves. This is a single
-		// 32-byte comparison against a constant — no derivation, no extra
-		// CPI, no measurable compute cost on any later instruction.
-		if self.authority.address() != &BOOTSTRAP_AUTHORITY {
-			return Err(PrivacyPoolError::InvalidAuthority.into());
-		}
+		assert_bootstrap_authority(self.authority, self.program_data)?;
 		self.system_program.assert_address(&system::ID)?;
 
 		validate_custodian_set(&args.custodians)?;

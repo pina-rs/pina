@@ -81,19 +81,21 @@ fn key(seed: u8) -> Pubkey {
 	Pubkey::new_from_array(bytes)
 }
 
-/// The committed bootstrap authority, the only key `Initialize` accepts.
-///
-/// This is the ed25519 public key derived from the documented fixture seed
-/// `b"pina-pool-bootstrap-2026-09-26!!"` behind
-/// [`program::BOOTSTRAP_AUTHORITY`] — the raw seed is the
-/// signing key, never the address.
+/// Test-only authority installed in Mollusk's synthetic loader state.
 fn bootstrap_authority() -> Pubkey {
-	Pubkey::new_from_array(
-		program::BOOTSTRAP_AUTHORITY
-			.as_ref()
-			.try_into()
-			.unwrap_or_else(|_| panic!("bootstrap authority must be 32 bytes")),
-	)
+	key(42)
+}
+
+/// Canonical loader-owned metadata for the test deployment.
+fn program_data_fixture() -> (Pubkey, Account) {
+	let loader = solana_pubkey::pubkey!("BPFLoaderUpgradeab1e11111111111111111111111");
+	let address = Pubkey::find_program_address(&[program_id().as_ref()], &loader).0;
+	let mut account = Account::new(RENT_LAMPORTS, 45, &loader);
+	account.data[..4].copy_from_slice(&3_u32.to_le_bytes());
+	account.data[12] = 1;
+	account.data[13..45].copy_from_slice(bootstrap_authority().as_ref());
+
+	(address, account)
 }
 
 fn create_mollusk() -> Mollusk {
@@ -197,7 +199,7 @@ struct World {
 impl World {
 	fn new() -> Self {
 		World {
-			accounts: Vec::new(),
+			accounts: vec![program_data_fixture()],
 		}
 	}
 
@@ -282,6 +284,7 @@ fn initialize_ix(custodians: [Pubkey; 3]) -> Instruction {
 				solana_pubkey::pubkey!("11111111111111111111111111111111"),
 				false,
 			),
+			AccountMeta::new_readonly(program_data_fixture().0, false),
 		],
 	)
 }
@@ -684,6 +687,87 @@ fn initialize_rejects_a_duplicate_custodian() {
 // ---------------------------------------------------------------------------
 // Tests: the pool with real proofs
 // ---------------------------------------------------------------------------
+
+/// Loader metadata is authenticated before any pool account or lamport moves.
+#[test]
+#[ignore = "requires the SBF artifact"]
+fn initialize_rejects_untrusted_bootstrap_authorities() {
+	let mollusk = create_mollusk();
+	let (metadata_key, metadata) = program_data_fixture();
+	let mut cases = Vec::new();
+
+	let mut wrong_authority = metadata.clone();
+	wrong_authority.data[13..45].copy_from_slice(key(99).as_ref());
+	cases.push((
+		metadata_key,
+		wrong_authority,
+		PrivacyPoolError::InvalidAuthority.into(),
+	));
+
+	let mut immutable = metadata.clone();
+	immutable.data[12] = 0;
+	cases.push((
+		metadata_key,
+		immutable,
+		PrivacyPoolError::InvalidAuthority.into(),
+	));
+
+	let mut invalid_option = metadata.clone();
+	invalid_option.data[12] = 2;
+	cases.push((
+		metadata_key,
+		invalid_option,
+		PrivacyPoolError::InvalidAuthority.into(),
+	));
+
+	let mut wrong_variant = metadata.clone();
+	wrong_variant.data[..4].copy_from_slice(&2_u32.to_le_bytes());
+	cases.push((
+		metadata_key,
+		wrong_variant,
+		PrivacyPoolError::InvalidAuthority.into(),
+	));
+
+	for len in [0, 3, 12, 13, 44] {
+		let mut truncated = metadata.clone();
+		truncated.data.truncate(len);
+		cases.push((
+			metadata_key,
+			truncated,
+			PrivacyPoolError::InvalidAuthority.into(),
+		));
+	}
+
+	let mut forged_owner = metadata.clone();
+	forged_owner.owner = system_program::id();
+	cases.push((
+		metadata_key,
+		forged_owner,
+		pina::ProgramError::InvalidAccountOwner,
+	));
+	cases.push((key(98), metadata, pina::ProgramError::InvalidAccountData));
+
+	for (address, metadata, expected_error) in cases {
+		let mut instruction = initialize_ix([key(21), key(22), key(23)]);
+		instruction.accounts.last_mut().unwrap().pubkey = address;
+		let mut accounts: Vec<_> = instruction
+			.accounts
+			.iter()
+			.map(|meta| (meta.pubkey, Account::default()))
+			.collect();
+		accounts[0].1 = Account::new(FUND, 0, &system_program::id());
+		accounts.last_mut().unwrap().1 = metadata;
+		let result = mollusk.process_and_validate_instruction(
+			&instruction,
+			&accounts,
+			&[Check::err(expected_error)],
+		);
+
+		for (key, account) in &accounts {
+			assert_eq!(result.get_account(key).unwrap(), account);
+		}
+	}
+}
 
 #[test]
 #[ignore = "requires the SBF artifact"]

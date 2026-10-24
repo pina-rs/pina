@@ -58,6 +58,9 @@ pub struct InitializeArgs {
 	/// The `disclosure_log` account [default: derived]
 	#[arg(long)]
 	disclosure_log: Option<String>,
+	/// Canonical `ProgramData` for this program, owned by the upgradeable loader
+	#[arg(long)]
+	program_data: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliError> {
@@ -130,6 +133,7 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 				.0
 		}
 	};
+	let program_data = CliContext::pubkey("--program_data", &args.program_data)?;
 	let data = InitializeInstructionData::new(|data| {
 		data.config_bump = args.config_bump;
 		data.vault_bump = args.vault_bump;
@@ -156,6 +160,7 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		requester_registry,
 		disclosure_log,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
+		program_data,
 	};
 
 	context.send(
