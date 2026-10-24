@@ -11,10 +11,11 @@ git-fetch-with-cli = true
 # This list is the repository's single advisory policy: `security:deny` runs
 # the advisories check, and `security:audit` passes no ignore list of its own.
 #
-# Every entry below is reachable only from the host-side dev/test stack
+# Except for crypto-bigint's additional host CLI path documented below,
+# every entry is reachable only from the host-side dev/test stack
 # (surfpool, litesvm, mollusk, solana-runtime, and the Agave precompile host
 # crates) pulled in through `pina_test` and the `*/tests/surfpool` harnesses.
-# None of them appears in the dependency graph of a runtime crate
+# Those dev/test-only dependencies do not appear in the graph of a runtime crate
 # (`pina`, `pina_abi`, `pina_macros`, `pina_cli`, `pina_profile`), and none is
 # compiled into an on-chain program. `pina_test` is published too, as a
 # host-side test harness, so its dependents do pull in this stack. Verify the
@@ -152,6 +153,18 @@ ignore = [
 	# reqwest 0.11 — tracked in #621.
 	"RUSTSEC-2026-0382",
 	"RUSTSEC-2026-0381",
+	# RUSTSEC-2026-0387: crypto-bigint 0.5.5 has variable-time arithmetic.
+	# Reached through elliptic-curve 0.13 → k256 0.13 from both Surfpool's
+	# txtx-addon-kit → bip32 test-key derivation and Solana's host-side
+	# secp256k1 recovery. The latter also reaches generated CLI applications
+	# through solana-sdk → solana-program → solana-secp256k1-recover; it is
+	# public-input signature recovery, not secret-key arithmetic. No on-chain
+	# program includes this dependency. This exception accepts the remaining
+	# timing risk in the host test stack; it does not claim the crate is fixed.
+	# Patched releases start at 0.7.6, incompatible with elliptic-curve 0.13.
+	# Reviewed 2026-10-24. Remove when the Surfpool/BIP32 and Solana recovery
+	# dependency trains both resolve crypto-bigint >=0.7.6 — tracked in #654.
+	"RUSTSEC-2026-0387",
 ]
 
 [licenses]
