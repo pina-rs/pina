@@ -80,6 +80,13 @@ pub(super) fn write_all(
 #[derive(Debug)]
 pub(super) struct MigrationLock(File);
 
+#[cfg(test)]
+thread_local! {
+	/// Signal that this thread has reached the lock, before it can block.
+	pub(super) static BEFORE_MIGRATION_LOCK: std::cell::Cell<Option<std::sync::mpsc::Sender<()>>> =
+		const { std::cell::Cell::new(None) };
+}
+
 impl Drop for MigrationLock {
 	fn drop(&mut self) {
 		let _ = fs2::FileExt::unlock(&self.0);
@@ -109,6 +116,12 @@ pub(super) fn acquire_migration_lock(program_dir: &Path) -> Result<MigrationLock
 				source,
 			}
 		})?;
+	#[cfg(test)]
+	BEFORE_MIGRATION_LOCK.with(|notification| {
+		if let Some(sender) = notification.take() {
+			assert!(sender.send(()).is_ok(), "notify lock attempt");
+		}
+	});
 	fs2::FileExt::lock_exclusive(&file).map_err(|source| MigrationError::Lock { path, source })?;
 	Ok(MigrationLock(file))
 }
