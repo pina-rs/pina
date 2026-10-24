@@ -122,6 +122,14 @@ expression: report
       "seeds": []
     },
     {
+      "id": "caller:initialize.program_data",
+      "name": "program_data",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
       "id": "caller:set_verification_key.authority",
       "name": "authority",
       "class": "caller",
@@ -385,6 +393,12 @@ expression: report
         {
           "node": "address:11111111111111111111111111111111",
           "slot": "system_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:initialize.program_data",
+          "slot": "program_data",
           "signer": false,
           "optional": false
         }
