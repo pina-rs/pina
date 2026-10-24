@@ -669,7 +669,10 @@ export function renderTypeScript(
 	files.set("src/endpoint.ts", ENDPOINT_SOURCE);
 	files.set(
 		"src/context.ts",
-		CONTEXT.replace("PROGRAM_ADDRESS", JSON.stringify(model.programAddress)),
+		CONTEXT.replace(
+			"PROGRAM_ADDRESS",
+			() => JSON.stringify(model.programAddress),
+		),
 	);
 	files.set("src/main.ts", renderMain(model));
 
