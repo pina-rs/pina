@@ -34,6 +34,18 @@ afterAll(() => {
 });
 
 describe("renderTypeScript", () => {
+	it("keeps replacement patterns in an IDL address inside its string literal", () => {
+		const model = extractCliModel(
+			JSON.parse(readFileSync(join(idls, "counter_program.json"), "utf8")),
+		);
+		model.programAddress = "$&$`$'";
+		const files = renderTypeScript(model, { clientImportPath: "../client" });
+
+		expect(files.get("src/context.ts")).toContain(
+			JSON.stringify(model.programAddress),
+		);
+	});
+
 	it("emits a runnable commander app importing the generated client", () => {
 		const files = renderCounterProgram();
 

@@ -115,8 +115,39 @@ export interface CliModel {
 	errors: ErrorModel[];
 }
 
-const toSnake = (value: string): string =>
-	value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+// These names become bare identifiers in Dart and path components in both
+// emitters. Reject unsafe input rather than silently renaming client symbols.
+const reservedIdentifiers = new Set(
+	("abstract arguments as assert async augment await base break case catch class const " +
+		"continue covariant debugger default deferred delete do dynamic else enum " +
+		"eval export extends extension external factory false final finally for function " +
+		"get hide if implements import in infer instanceof interface is late let " +
+		"library mixin native new null of on operator package part private protected public rethrow return sealed set " +
+		"show static super switch sync this throw true try type typedef typeof " +
+		"undefined var void when while with yield").split(" "),
+);
+
+/** Validate external names before deriving identifiers or file names. */
+const toSnake = (value: string): string => {
+	if (
+		typeof value !== "string" ||
+		!/^[a-zA-Z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)*$/.test(value)
+	) {
+		throw new Error(`Invalid CLI identifier: ${JSON.stringify(value)}`);
+	}
+
+	const snake = value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+	const camel = snake.replace(
+		/_([a-z0-9])/g,
+		(_, letter: string) => letter.toUpperCase(),
+	);
+
+	if (reservedIdentifiers.has(camel)) {
+		throw new Error(`Reserved CLI identifier: ${JSON.stringify(value)}`);
+	}
+
+	return snake;
+};
 
 const toCamel = (value: string): string => {
 	const snake = toSnake(value);
