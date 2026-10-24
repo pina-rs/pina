@@ -21,6 +21,10 @@ const buildWorkflow = readFileSync(
 	join(repositoryRoot, ".github/workflows/build-release.yml"),
 	"utf8",
 );
+const publishWorkflow = readFileSync(
+	join(repositoryRoot, ".github/workflows/publish.yml"),
+	"utf8",
+);
 
 /** The driver asset name the CLI builds, mirrored from `driver_asset_name`. */
 function driverAssetName(host, commitHash) {
@@ -53,7 +57,7 @@ test("the standalone driver asset name matches the CLI format", () => {
 		assert.equal(asset, driverAssetName(target, hash));
 		assert.ok(
 			asset.startsWith("pina-"),
-			`${asset} must match the pina-* glob the release downloads and attests`,
+			`${asset} must match the sealed release inventory's asset name prefix`,
 		);
 	}
 
@@ -70,7 +74,7 @@ test("only driver-capable targets publish a standalone asset", () => {
 	// that cannot build one cannot advertise an asset for it either.
 	assert.match(
 		buildWorkflow,
-		/- name: upload standalone lint driver\n\s+if: matrix\.lint_driver && inputs\.dry_run != true/,
+		/- name: stage standalone lint driver\n\s+if: matrix\.lint_driver\n/,
 	);
 	assert.match(
 		buildWorkflow,
@@ -90,9 +94,14 @@ test("the published driver revision comes from the compiler that built it", () =
 });
 
 test("a dry run never uploads the standalone driver", () => {
+	const builderJob = buildWorkflow;
+	const publisherJob = publishWorkflow.split("\n  publish:\n")[1];
+	assert.doesNotMatch(builderJob, /gh release upload|contents: write/);
+	assert.match(builderJob, /dry-run: true/);
 	assert.match(
-		buildWorkflow,
-		/if: matrix\.lint_driver && inputs\.dry_run != true/,
+		publisherJob,
+		/inputs\.dry_run != true/,
 		"a dry run must not write to the draft release",
 	);
+	assert.match(publisherJob, /gh release upload/);
 });

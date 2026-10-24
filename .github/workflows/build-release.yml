@@ -16,8 +16,9 @@ on:
         required: true
         type: boolean
 
-# Inherit the caller's permissions: previews get contents:read only, while
-# approved release uploads get contents:write. Never elevate them here.
+# Both previews and approved builds produce CI artifacts without release authority.
+permissions:
+  contents: read
 env:
   RELEASE_TAG: ${{ inputs.tag }}
   RELEASE_ASSET_TAG: ${{ inputs.tag }}
@@ -73,28 +74,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-      # The release-pr tag job pushes the tag (firing this workflow) and then
-      # creates the draft release. Wait for that draft release to exist before
-      # uploading assets into it. A dry run never waits (and never uploads):
-      # no draft release is created for it.
-      - name: wait for draft release
-        if: inputs.dry_run != true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Waiting for the draft release $RELEASE_TAG to be created by the release-pr tag job..."
-          for attempt in $(seq 1 30); do
-            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              echo "Draft release $RELEASE_TAG exists after $attempt attempt(s)."
-              exit 0
-            fi
-            echo "  attempt $attempt/30: release not found yet; sleeping 10s"
-            sleep 10
-          done
-          echo "::error::Release $RELEASE_TAG was not created within the wait window. Check the release-pr tag job." >&2
-          exit 1
       - name: checkout release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -133,33 +112,31 @@ jobs:
           set -euo pipefail
           cargo build --release --package pina_lints --bin pina_lint_driver \
             --target ${{ matrix.target }}
-      - name: upload binaries
+      - name: build binary archives
+        id: archives
         uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
         with:
           bin: pina
           manifest-path: crates/pina_cli/Cargo.toml
           profile: release
-          # The action derives its upload target from this ref and refuses a
-          # bare SHA outside a dry run, so it gets the tag itself; resolve_revision
-          # has already proven the tag points at the validated commit.
-          ref: ${{ inputs.dry_run && inputs.sha || format('refs/tags/{0}', inputs.tag) }}
+          # The checkout is pinned above. This action only builds local files;
+          # the publisher promotes the attested inventory to the draft release.
+          ref: ${{ inputs.sha }}
           archive: pina-$target-${{ env.RELEASE_ASSET_TAG }}
           target: ${{ matrix.target }}
           include: ${{ matrix.lint_driver == true && (endsWith(matrix.target, '-windows-msvc') && format('target/{0}/release/pina_lint_driver.exe', matrix.target) || format('target/{0}/release/pina_lint_driver', matrix.target)) || '' }}
           tar: all
           zip: windows
-          dry-run: ${{ inputs.dry_run == true }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          dry-run: true
+          dry-run-intended: true
           checksum: sha256,sha512
       # Publish the driver as its own asset for users who installed the CLI
       # from crates.io and therefore have no archive to unpack. The name
       # embeds the exact compiler revision so `pina lint` requests the driver
       # for its active nightly by name; another nightly misses rather than
       # downloading a binary it cannot load.
-      - name: upload standalone lint driver
-        if: matrix.lint_driver && inputs.dry_run != true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: stage standalone lint driver
+        if: matrix.lint_driver
         shell: bash
         run: |
           set -euo pipefail
@@ -184,20 +161,44 @@ jobs:
             exit 1
           fi
 
-          staged="$RUNNER_TEMP/$asset"
+          mkdir -p "$RUNNER_TEMP/release-build-assets"
+          staged="$RUNNER_TEMP/release-build-assets/$asset"
           cp "$built" "$staged"
           chmod 755 "$staged"
-          gh release upload "$RELEASE_TAG" "$staged" \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
-          echo "Uploaded $asset"
 
           # `pina lint` verifies a downloaded driver against this file before
           # installing it, so the checksum must ship beside the asset. The
           # standalone driver has no archive, so the `checksum: sha256,sha512`
           # option on the archive upload does not cover it.
-          sha256sum "$staged" | sed "s|$RUNNER_TEMP/||" > "$staged.sha256"
-          gh release upload "$RELEASE_TAG" "$staged.sha256" \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
-          echo "Uploaded $asset.sha256"
+          (
+            cd "$RUNNER_TEMP/release-build-assets"
+            if command -v sha256sum >/dev/null; then
+              sha256sum "$asset"
+            else
+              shasum -a 256 "$asset"
+            fi
+          ) > "$staged.sha256"
+      - name: stage binary archives and checksums
+        env:
+          TAR_ASSET: ${{ steps.archives.outputs.tar }}
+          ZIP_ASSET: ${{ steps.archives.outputs.zip }}
+          SHA256_ASSET: ${{ steps.archives.outputs.sha256 }}
+          SHA512_ASSET: ${{ steps.archives.outputs.sha512 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release-build-assets"
+          cp "$TAR_ASSET" "$SHA256_ASSET" "$SHA512_ASSET" "$RUNNER_TEMP/release-build-assets/"
+          if [[ -n "$ZIP_ASSET" ]]; then
+            cp "$ZIP_ASSET" "$RUNNER_TEMP/release-build-assets/"
+          fi
+      - name: preserve builder assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          # A failed-job rerun replaces only its target. The attestation job
+          # then seals all successful targets into a new artifact with its own ID.
+          name: release-build-${{ matrix.target }}
+          overwrite: true
+          path: ${{ runner.temp }}/release-build-assets/*
+          if-no-files-found: error
+          retention-days: 7
