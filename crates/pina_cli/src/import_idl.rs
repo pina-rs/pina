@@ -1041,27 +1041,15 @@ mod coverage {
 
 	#[test]
 	fn reads_idl_bodies_from_http_sources() {
-		let body = br#"{"kind":"rootNode","standard":"codama"}"#;
-		let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-		let port = listener.local_addr().expect("addr").port();
-		let server = std::thread::spawn(move || {
-			let (mut stream, _) = listener.accept().expect("accept");
-			let head = format!(
-				"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
-				 {}\r\nconnection: close\r\n\r\n",
+		let body = r#"{"kind":"rootNode","standard":"codama"}"#;
+		let (result, requests) = fetch_http_responses(move |_, _, _| {
+			format!(
+				"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
 				body.len()
-			);
-			use std::io::Write as _;
-			stream.write_all(head.as_bytes()).expect("write head");
-			stream.write_all(body).expect("write body");
-			let _ = stream.shutdown(std::net::Shutdown::Write);
-			let mut sink = [0_u8; 512];
-			while matches!(stream.read(&mut sink), Ok(read) if read > 0) {}
+			)
 		});
-
-		let bytes = fetch_url(&format!("http://127.0.0.1:{port}/idl.json")).expect("fetch");
-		server.join().expect("server");
-		assert_eq!(bytes, body.to_vec());
+		assert_eq!(result.unwrap(), body.as_bytes());
+		assert_eq!(requests, 1);
 	}
 
 	#[test]
