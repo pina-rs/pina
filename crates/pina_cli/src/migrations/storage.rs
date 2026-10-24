@@ -119,9 +119,7 @@ pub(super) fn acquire_migration_lock(program_dir: &Path) -> Result<MigrationLock
 	#[cfg(test)]
 	BEFORE_MIGRATION_LOCK.with(|notification| {
 		if let Some(sender) = notification.take() {
-			sender
-				.send(())
-				.unwrap_or_else(|error| panic!("notify lock attempt: {error}"));
+			assert!(sender.send(()).is_ok(), "notify lock attempt");
 		}
 	});
 	fs2::FileExt::lock_exclusive(&file).map_err(|source| MigrationError::Lock { path, source })?;
