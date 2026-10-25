@@ -61,7 +61,7 @@
 // `AccountView` is small and `Copy`, but every pina accessor and example
 // passes it by reference; match the shared signature style.
 #![expect(clippy::trivially_copy_pass_by_ref)]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 #[cfg(all(
 	not(any(target_os = "solana", target_arch = "bpf")),
@@ -2196,14 +2196,14 @@ pub mod prover {
 						.map(|w| w.path_elements[level])
 						.ok_or(SynthesisError::AssignmentMissing)
 				})?;
-				let index = FpVar::new_witness(cs.clone(), || {
-					Ok(Fr::from(u64::from(
-						witness.as_ref().is_some_and(|w| w.path_indices[level]),
-					)))
+				let index = Boolean::new_witness(cs.clone(), || {
+					witness
+						.as_ref()
+						.map(|w| w.path_indices[level])
+						.ok_or(SynthesisError::AssignmentMissing)
 				})?;
-				// select left/right placement: one_of linear choice
-				let chosen_left = select_left(&index, &current, &sibling);
-				let chosen_right = select_left(&index, &sibling, &current);
+				let chosen_left = select_left(&index, &current, &sibling)?;
+				let chosen_right = select_left(&index, &sibling, &current)?;
 				current = poseidon2_var(&params, &chosen_left, &chosen_right)?;
 			}
 			current.enforce_equal(&root)?;
@@ -2244,10 +2244,14 @@ pub mod prover {
 		}
 	}
 
-	/// `index == 0` yields `on_zero`, `index == 1` yields `on_one`:
-	/// `on_zero + index * (on_one - on_zero)`.
-	fn select_left(index: &FpVar<Fr>, on_zero: &FpVar<Fr>, on_one: &FpVar<Fr>) -> FpVar<Fr> {
-		on_zero + index * (on_one - on_zero)
+	/// Select a Merkle child using a constrained bit so a prover cannot
+	/// interpolate between the two child hashes with a field-valued index.
+	fn select_left(
+		index: &Boolean<Fr>,
+		on_zero: &FpVar<Fr>,
+		on_one: &FpVar<Fr>,
+	) -> Result<FpVar<Fr>, SynthesisError> {
+		index.select(on_one, on_zero)
 	}
 
 	// -------------------------------------------------------------------
@@ -2376,7 +2380,65 @@ pub mod prover {
 
 	#[cfg(test)]
 	mod tests {
+		use ark_relations::r1cs::ConstraintSystem;
+		use ark_relations::r1cs::Variable;
+
 		use super::*;
+
+		#[test]
+		fn merkle_selection_rejects_non_boolean_assignments() {
+			let zero = Fr::from(0_u64);
+			let one = Fr::from(1_u64);
+			let left_value = Fr::from(5_u64);
+			let right_value = Fr::from(11_u64);
+
+			for direction in [zero, one, Fr::from(2_u64), -one, one / Fr::from(2_u64)] {
+				let cs = ConstraintSystem::<Fr>::new_ref();
+				let index = Boolean::new_witness(cs.clone(), || Ok(false)).unwrap();
+				let left = FpVar::new_witness(cs.clone(), || Ok(left_value)).unwrap();
+				let right = FpVar::new_witness(cs.clone(), || Ok(right_value)).unwrap();
+				let selected_left = select_left(&index, &left, &right).unwrap();
+				let selected_right = select_left(&index, &right, &left).unwrap();
+
+				let Boolean::Var(bit) = index else {
+					panic!("direction must be a witness");
+				};
+
+				let FpVar::Var(selected_left) = selected_left else {
+					panic!("left selection must be a witness");
+				};
+
+				let FpVar::Var(selected_right) = selected_right else {
+					panic!("right selection must be a witness");
+				};
+
+				// Bypass the honest bool API and satisfy both interpolation
+				// equations. Only Booleanity should reject these assignments.
+				for (variable, value) in [
+					(bit.variable(), direction),
+					(
+						selected_left.variable,
+						left_value + direction * (right_value - left_value),
+					),
+					(
+						selected_right.variable,
+						right_value + direction * (left_value - right_value),
+					),
+				] {
+					let Variable::Witness(position) = variable else {
+						panic!("selection must allocate witness variables");
+					};
+
+					cs.borrow_mut().unwrap().witness_assignment[position] = value;
+				}
+
+				assert_eq!(
+					cs.is_satisfied().unwrap(),
+					direction == zero || direction == one,
+					"direction {direction}"
+				);
+			}
+		}
 
 		fn u256_from_be(bytes: &[u8]) -> ark_ff::BigInteger256 {
 			let mut limbs = [0_u64; 4];
@@ -2391,12 +2453,12 @@ pub mod prover {
 		#[test]
 		fn wire_codec_round_trips_points() {
 			use ark_ec::short_weierstrass::SWCurveConfig;
-			let g1: ark_bn254::g1::G1Affine = ark_bn254::g1::Config::GENERATOR;
+			let g1: G1Affine = ark_bn254::g1::Config::GENERATOR;
 			let wire = g1_to_be(&g1);
 			assert_eq!(ark_bn254::Fq::from(u256_from_be(&wire[..32])), g1.x, "g1 x");
 			assert_eq!(ark_bn254::Fq::from(u256_from_be(&wire[32..])), g1.y, "g1 y");
 
-			let g2: ark_bn254::g2::G2Affine = ark_bn254::g2::Config::GENERATOR;
+			let g2: G2Affine = ark_bn254::g2::Config::GENERATOR;
 			let wire2 = g2_to_be(&g2);
 			assert_eq!(
 				ark_bn254::Fq::from(u256_from_be(&wire2[..32])),
@@ -2488,6 +2550,7 @@ pub mod prover {
 			);
 		}
 
+		#[test]
 		fn circuit_is_satisfied_by_a_consistent_witness() {
 			let amount = Fr::from(super::super::DEPOSIT_LAMPORTS);
 			let secrets = note_secrets(0x1234);
@@ -2506,9 +2569,13 @@ pub mod prover {
 
 			let mut nodes = vec![0_u8; super::super::TREE_NODES_BYTES];
 			super::super::prefill_zero_nodes(&mut nodes).unwrap();
-			let root_bytes = super::super::insert_leaf(&mut nodes, 0, &commitment_bytes).unwrap();
+			// Alternating bits exercise both child placements across the path.
+			let leaf_index = 0b0101_0101_u8;
+			let root_bytes =
+				super::super::insert_leaf(&mut nodes, u64::from(leaf_index), &commitment_bytes)
+					.unwrap();
 
-			let (path_elements, path_indices) = build_witness(&nodes, 0);
+			let (path_elements, path_indices) = build_witness(&nodes, usize::from(leaf_index));
 			let nullifier_bytes = super::super::poseidon2(
 				&fr_to_le(&secrets.nullifier_seed),
 				&fr_to_le(&secrets.secret),
@@ -2529,7 +2596,7 @@ pub mod prover {
 				}),
 			};
 
-			let cs = ark_relations::r1cs::ConstraintSystem::<Fr>::new_ref();
+			let cs = ConstraintSystem::<Fr>::new_ref();
 			circuit.clone().generate_constraints(cs.clone()).unwrap();
 			assert!(
 				cs.is_satisfied().unwrap(),
@@ -2735,7 +2802,12 @@ mod tests {
 	fn challenge_deadline_is_checked_and_tier_scoped() {
 		// A tier-1 window is added to the filing time.
 		assert_eq!(
-			challenge_deadline(1_700, DEFAULT_CHALLENGE_WINDOW_SECS as u64, TIER_VERIFIED).unwrap(),
+			challenge_deadline(
+				1_700,
+				u64::from(DEFAULT_CHALLENGE_WINDOW_SECS),
+				TIER_VERIFIED
+			)
+			.unwrap(),
 			2_300
 		);
 		// Consent and compelled requests carry no window: the deadline is the
