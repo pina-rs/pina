@@ -434,31 +434,38 @@ function copyTree(staged, destination, root) {
 }
 
 function publishDartCli() {
+	// The package is shared by every program. Check the selected entrypoints
+	// and shared helpers before changing any generated output.
+	const filePaths = [
+		...names.map((name) => join("bin", `${name}.dart`)),
+		...["endpoint_guard", "compute_budget"].flatMap((shared) => [
+			join("lib", "src", `${shared}.dart`),
+			join("test", `${shared}_test.dart`),
+		]),
+	];
+	const tracked = loadTracked(outputRoot);
+	for (const path of filePaths) {
+		const destination = join(outputRoot, path);
+		if (lstatSync(destination, { throwIfNoEntry: false })
+			&& !tracked?.has(path.split(sep).join("/"))) {
+			throw new Error(
+				`cannot replace untracked file ${destination}; move it aside or choose an empty output directory`,
+			);
+		}
+	}
+
 	for (const name of names) {
 		publishDirectory(
 			outputRoot,
 			join(stagingRoot, "lib", "src", name),
 			join(outputRoot, "lib", "src", name),
 		);
-		// The Dart CLI package is shared by every program, so publishing the
-		// whole staged bin directory would drop the entrypoints of programs
-		// that are not part of this invocation.
-		publishFile(
-			outputRoot,
-			join(stagingRoot, "bin", `${name}.dart`),
-			join(outputRoot, "bin", `${name}.dart`),
-		);
 	}
-	for (const shared of ["endpoint_guard", "compute_budget"]) {
+	for (const path of filePaths) {
 		publishFile(
 			outputRoot,
-			join(stagingRoot, "lib", "src", `${shared}.dart`),
-			join(outputRoot, "lib", "src", `${shared}.dart`),
-		);
-		publishFile(
-			outputRoot,
-			join(stagingRoot, "test", `${shared}_test.dart`),
-			join(outputRoot, "test", `${shared}_test.dart`),
+			join(stagingRoot, path),
+			join(outputRoot, path),
 		);
 	}
 

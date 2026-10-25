@@ -542,6 +542,7 @@ fn local_deployment_passes_verified_snapshots_and_modeled_arguments_to_solana() 
 	assert_eq!(cwd.trim(), canonical(&fixture.root));
 }
 
+/// A deployment subprocess receives EOF while the parent CLI's stdin stays open.
 #[cfg(unix)]
 #[test]
 fn solana_child_receives_eof_while_pina_stdin_remains_open() {
