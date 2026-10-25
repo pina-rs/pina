@@ -23,7 +23,7 @@
 		"check:migration-docs": "node scripts/check-migration-docs.mjs"
 	},
 	"dependencies": {
-		"@codama/renderers-js": "^2.6.0",
+		"@codama/renderers-js": "^2.7.0",
 		"@pina-rs/codama-renderer-cli": "workspace:*",
 		"codama": "^1.11.0",
 		"codama-renderers-dart": "0.5.7"
