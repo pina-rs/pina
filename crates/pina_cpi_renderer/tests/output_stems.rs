@@ -5,7 +5,15 @@ use std::process::Command;
 
 #[test]
 fn rejects_parent_directory_stems_before_writing() {
-	for directory_input in [false, true] {
+	for (malicious_name, directory_input, unsafe_first) in [
+		("...json", false, true),
+		("...json", false, false),
+		("...json", true, true),
+		#[cfg(unix)]
+		("z:name.json", false, false),
+		#[cfg(unix)]
+		("z:name.json", true, false),
+	] {
 		let temp = tempfile::tempdir().unwrap();
 		let idls = temp.path().join("idls");
 		let parent = temp.path().join("destination");
@@ -16,7 +24,7 @@ fn rejects_parent_directory_stems_before_writing() {
 
 		let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
 			.join("../../codama/idls/hello_solana_program.json");
-		let malicious = idls.join("...json");
+		let malicious = idls.join(malicious_name);
 		let ordinary = idls.join("hello.json");
 
 		for path in [&malicious, &ordinary] {
@@ -28,11 +36,14 @@ fn rejects_parent_directory_stems_before_writing() {
 		if directory_input {
 			command.arg("--idl-dir").arg(&idls);
 		} else {
-			command
-				.arg("--idl")
-				.arg(&malicious)
-				.arg("--idl")
-				.arg(&ordinary);
+			let explicit_idls = if unsafe_first {
+				[&malicious, &ordinary]
+			} else {
+				[&ordinary, &malicious]
+			};
+			for idl in explicit_idls {
+				command.arg("--idl").arg(idl);
+			}
 		}
 
 		let result = command.arg("--output").arg(&output).output().unwrap();

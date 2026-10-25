@@ -56,10 +56,13 @@ fn main() {
 fn run() -> Result<(), RenderError> {
 	let args = Args::parse();
 	let idl_paths = collect_idl_paths(&args)?;
+	let outputs = idl_paths
+		.iter()
+		.map(|idl| crate_dir_name(idl).map(|stem| (idl, stem)))
+		.collect::<Result<Vec<_>, _>>()?;
 
-	for idl_path in &idl_paths {
+	for (idl_path, stem) in outputs {
 		let root = read_root_node(idl_path)?;
-		let stem = crate_dir_name(idl_path)?;
 		let client_path = match &args.client_path {
 			Some(path) => join_client_path(path, stem),
 			None => format!("../../rust/{stem}"),

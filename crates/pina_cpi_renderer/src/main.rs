@@ -81,13 +81,18 @@ fn main() {
 	}
 
 	let single_idl = idls.len() == 1;
-
-	for idl in &idls {
-		let crate_dir = crate_output_dir(&args.output, idl, single_idl).unwrap_or_else(|error| {
+	let outputs = idls
+		.iter()
+		.map(|idl| {
+			crate_output_dir(&args.output, idl, single_idl).map(|directory| (idl, directory))
+		})
+		.collect::<Result<Vec<_>, _>>()
+		.unwrap_or_else(|error| {
 			eprintln!("{error}");
 			std::process::exit(1);
 		});
 
+	for (idl, crate_dir) in outputs {
 		let root = read_root_node(idl).unwrap_or_else(|error| {
 			eprintln!("failed to read `{}`: {error}", idl.display());
 			std::process::exit(1);
