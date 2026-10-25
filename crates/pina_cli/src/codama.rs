@@ -232,8 +232,8 @@ function sanitizeDocs(json) {
 
 // Cleanup is bounded by a tracked-files manifest (`.pina-generated.json`)
 // at each published root: regeneration removes only the paths a previous run
-// recorded, so files the developer added survive, and `overwrite` refuses a
-// directory Pina never generated instead of removing it. A committed
+// recorded, so files the developer added survive. Every mode refuses to
+// replace a nonempty directory without a tracking manifest. A committed
 // manifest is untrusted input: only plain relative entries are honored, and
 // a path whose lookup finds a symbolic link is skipped rather than followed.
 function loadTracked(root) {
@@ -304,7 +304,7 @@ function refuseUntrackedOverwrite(directory) {
 		return;
 	}
 	throw new Error(
-		`cannot overwrite ${directory}: it was not generated with tracked manifests; remove it by hand, or generate once without overwrite to record its files`,
+		`cannot overwrite ${directory}: it was not generated with tracked manifests; move it aside or choose an empty output directory`,
 	);
 }
 
@@ -407,10 +407,12 @@ function publishDart() {
 }
 
 function publishDirectory(root, staged, destination) {
-	if (!removeTrackedUnder(root, destination)) {
-		// A destination from before tracked manifests keeps the historical
-		// whole-directory replacement so stale files do not linger.
-		rmSync(destination, { force: true, recursive: true });
+	if (!removeTrackedUnder(root, destination)
+		&& existsSync(destination)
+		&& readdirSync(destination).length !== 0) {
+		throw new Error(
+			`cannot replace ${destination}: it has no tracked manifest; move it aside or choose an empty output directory`,
+		);
 	}
 
 	mkdirSync(destination, { recursive: true });
@@ -432,31 +434,38 @@ function copyTree(staged, destination, root) {
 }
 
 function publishDartCli() {
+	// The package is shared by every program. Check the selected entrypoints
+	// and shared helpers before changing any generated output.
+	const filePaths = [
+		...names.map((name) => join("bin", `${name}.dart`)),
+		...["endpoint_guard", "compute_budget"].flatMap((shared) => [
+			join("lib", "src", `${shared}.dart`),
+			join("test", `${shared}_test.dart`),
+		]),
+	];
+	const tracked = loadTracked(outputRoot);
+	for (const path of filePaths) {
+		const destination = join(outputRoot, path);
+		if (lstatSync(destination, { throwIfNoEntry: false })
+			&& !tracked?.has(path.split(sep).join("/"))) {
+			throw new Error(
+				`cannot replace untracked file ${destination}; move it aside or choose an empty output directory`,
+			);
+		}
+	}
+
 	for (const name of names) {
 		publishDirectory(
 			outputRoot,
 			join(stagingRoot, "lib", "src", name),
 			join(outputRoot, "lib", "src", name),
 		);
-		// The Dart CLI package is shared by every program, so publishing the
-		// whole staged bin directory would drop the entrypoints of programs
-		// that are not part of this invocation.
-		publishFile(
-			outputRoot,
-			join(stagingRoot, "bin", `${name}.dart`),
-			join(outputRoot, "bin", `${name}.dart`),
-		);
 	}
-	for (const shared of ["endpoint_guard", "compute_budget"]) {
+	for (const path of filePaths) {
 		publishFile(
 			outputRoot,
-			join(stagingRoot, "lib", "src", `${shared}.dart`),
-			join(outputRoot, "lib", "src", `${shared}.dart`),
-		);
-		publishFile(
-			outputRoot,
-			join(stagingRoot, "test", `${shared}_test.dart`),
-			join(outputRoot, "test", `${shared}_test.dart`),
+			join(stagingRoot, path),
+			join(outputRoot, path),
 		);
 	}
 

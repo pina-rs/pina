@@ -1604,6 +1604,209 @@ fn generate_real_typescript_and_dart_clients_preserves_scaffold_until_overwrite(
 	);
 }
 
+/// Refuse unmanaged output across every Node renderer and generation mode.
+#[test]
+fn generate_refuses_untracked_renderer_directories_in_every_mode() {
+	let temp = TempDir::new().unwrap();
+	let cargo = fake_cargo(temp.path());
+	let target = temp.path().join("custom-target");
+
+	for (renderer, directory) in [
+		("cli-ts", "cli-ts/custom_program"),
+		("typescript", "typescript/custom_program/src/generated"),
+		("dart", "dart/lib/src/generated/custom_program"),
+		("cli-dart", "cli-dart/lib/src/custom_program"),
+	] {
+		let project = temp.path().join(renderer);
+		write_project(&project);
+		fs::write(
+			project.join("pina.toml"),
+			format!("[clients]\nlanguages = [\"{renderer}\"]\n"),
+		)
+		.unwrap();
+		std::os::unix::fs::symlink(
+			workspace_root().join("node_modules"),
+			project.join("node_modules"),
+		)
+		.unwrap();
+		let destination = project.join("clients").join(directory);
+		fs::create_dir_all(destination.join("nested")).unwrap();
+
+		for path in ["keep.txt", "nested/keep.txt", "index.ts"] {
+			fs::write(destination.join(path), "user content\n").unwrap();
+		}
+
+		for mode in ["auto", "create", "update", "overwrite"] {
+			let output = project_command(&project, &cargo, &target)
+				.args(["generate", "--npx", "node", "--mode", mode])
+				.output()
+				.unwrap();
+			let stderr = String::from_utf8_lossy(&output.stderr);
+			assert!(
+				!output.status.success(),
+				"{renderer} {mode} must refuse unmanaged output: {stderr}"
+			);
+			assert!(
+				stderr.contains("no tracked manifest")
+					|| stderr.contains("cannot overwrite")
+					|| (mode == "create"
+						&& (stderr.contains("not empty") || stderr.contains("nonempty"))),
+				"{renderer} {mode} must fail on ownership: {stderr}"
+			);
+
+			for path in ["keep.txt", "nested/keep.txt", "index.ts"] {
+				assert_eq!(
+					fs::read_to_string(destination.join(path)).unwrap(),
+					"user content\n",
+					"{renderer} {mode} changed {path}"
+				);
+			}
+
+			assert!(!destination.join(".pina-generated.json").exists());
+		}
+	}
+}
+
+/// Managed regeneration preserves user files; removing its manifest revokes ownership.
+#[test]
+fn generate_cli_ts_requires_its_manifest_to_regenerate() {
+	let temp = TempDir::new().unwrap();
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"cli-ts\"]\n",
+	)
+	.unwrap();
+	std::os::unix::fs::symlink(
+		workspace_root().join("node_modules"),
+		project.join("node_modules"),
+	)
+	.unwrap();
+	let cargo = fake_cargo(temp.path());
+	let generate = |mode| {
+		project_command(&project, &cargo, &target)
+			.args(["generate", "--npx", "node", "--mode", mode])
+			.output()
+			.unwrap()
+	};
+	let destination = project.join("clients/cli-ts/custom_program");
+	// Start with an empty directory; the implied TypeScript client is absent.
+	fs::create_dir_all(&destination).unwrap();
+
+	for mode in ["auto", "update", "overwrite"] {
+		let output = generate(mode);
+		assert!(
+			output.status.success(),
+			"tracked {mode} must succeed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		);
+
+		if mode == "auto" {
+			fs::write(destination.join("keep.txt"), "user content\n").unwrap();
+		}
+
+		assert_eq!(
+			fs::read_to_string(destination.join("keep.txt")).unwrap(),
+			"user content\n"
+		);
+	}
+
+	fs::remove_file(destination.join(".pina-generated.json")).unwrap();
+	let package = fs::read(destination.join("package.json")).unwrap();
+
+	for mode in ["auto", "update"] {
+		let output = generate(mode);
+		assert!(!output.status.success());
+		assert!(String::from_utf8_lossy(&output.stderr).contains("no tracked manifest"));
+		assert_eq!(
+			fs::read_to_string(destination.join("keep.txt")).unwrap(),
+			"user content\n"
+		);
+		assert_eq!(fs::read(destination.join("package.json")).unwrap(), package);
+		assert!(!destination.join(".pina-generated.json").exists());
+	}
+}
+
+/// Ownership failures leave shared Dart CLI files and generated directories unchanged.
+#[test]
+fn generate_cli_dart_refuses_untracked_shared_files_before_publishing() {
+	let temp = TempDir::new().unwrap();
+	let cargo = fake_cargo(temp.path());
+	let target = temp.path().join("custom-target");
+
+	for (file_index, (path, empty_directory)) in [
+		("bin/custom_program.dart", true),
+		("lib/src/endpoint_guard.dart", false),
+		("lib/src/compute_budget.dart", false),
+		("test/endpoint_guard_test.dart", false),
+		("test/compute_budget_test.dart", false),
+	]
+	.into_iter()
+	.enumerate()
+	{
+		for (manifest_index, manifest) in [None, Some("{"), Some(r#"{"paths":["keep.txt"]}"#)]
+			.into_iter()
+			.enumerate()
+		{
+			let project = temp
+				.path()
+				.join(format!("project-{file_index}-{manifest_index}"));
+			write_project(&project);
+			fs::write(
+				project.join("pina.toml"),
+				"[clients]\nlanguages = [\"cli-dart\"]\n",
+			)
+			.unwrap();
+			std::os::unix::fs::symlink(
+				workspace_root().join("node_modules"),
+				project.join("node_modules"),
+			)
+			.unwrap();
+			let root = project.join("clients/cli-dart");
+			let collision = root.join(path);
+			fs::create_dir_all(collision.parent().unwrap()).unwrap();
+			fs::write(&collision, "user content\n").unwrap();
+			fs::write(root.join("keep.txt"), "keep\n").unwrap();
+			if let Some(contents) = manifest {
+				fs::write(root.join(".pina-generated.json"), contents).unwrap();
+			}
+			let generated = root.join("lib/src/custom_program");
+			if empty_directory {
+				fs::create_dir_all(&generated).unwrap();
+			}
+
+			for mode in ["auto", "update", "overwrite"] {
+				let output = project_command(&project, &cargo, &target)
+					.args(["generate", "--npx", "node", "--mode", mode])
+					.output()
+					.unwrap();
+				let stderr = String::from_utf8_lossy(&output.stderr);
+				assert!(
+					!output.status.success(),
+					"{mode} must preserve {path}: {stderr}"
+				);
+				assert!(stderr.contains("untracked file"), "{stderr}");
+				assert_eq!(fs::read_to_string(&collision).unwrap(), "user content\n");
+				assert_eq!(fs::read_to_string(root.join("keep.txt")).unwrap(), "keep\n");
+				assert_eq!(generated.exists(), empty_directory);
+				if empty_directory {
+					assert_eq!(fs::read_dir(&generated).unwrap().count(), 0);
+				}
+				if let Some(contents) = manifest {
+					assert_eq!(
+						fs::read_to_string(root.join(".pina-generated.json")).unwrap(),
+						contents
+					);
+				} else {
+					assert!(!root.join(".pina-generated.json").exists());
+				}
+			}
+		}
+	}
+}
+
 #[test]
 fn generate_refuses_to_remove_through_symbolic_links_in_committed_manifests() {
 	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
