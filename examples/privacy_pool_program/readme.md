@@ -47,7 +47,7 @@ Merkle path directions are constrained to Boolean values inside both spend circu
 
 This revision supports newly initialized pools under a new program address. Install both new verifying keys in their respective withdraw and transfer slots through `SetVerificationKey` before accepting deposits. Keys for the earlier transfer `(root, nullifier, successor_commitment)` statement and unconstrained Merkle circuits are incompatible with this revision. The instruction bytes, account layouts, and note commitments are unchanged.
 
-Do not upgrade an existing funded pool to this revision. `SetVerificationKey` creates fixed slot PDAs and rejects already initialized key accounts. Existing pools cannot replace their spend keys through this instruction, so an upgrade would prevent spending. Existing deployments need a separately audited migration before upgrading. This example does not provide that migration.
+Do not upgrade an existing funded pool to this revision. `SetVerificationKey` creates fixed slot PDAs and rejects already initialized key accounts. Existing pools cannot replace their spend keys through this instruction, and old verifying keys retain the vulnerable circuit. Existing deployments need a separately audited migration before upgrading. This example does not provide that migration.
 
 <br>
 
