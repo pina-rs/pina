@@ -6,10 +6,6 @@ use std::path::PathBuf;
 use std::process::Command;
 #[cfg(unix)]
 use std::process::Stdio;
-#[cfg(unix)]
-use std::time::Duration;
-#[cfg(unix)]
-use std::time::Instant;
 
 use ed25519_dalek::SigningKey;
 use tempfile::TempDir;
@@ -556,7 +552,8 @@ fn solana_child_receives_eof_while_pina_stdin_remains_open() {
 	fs::create_dir_all(&bin).unwrap_or_else(|error| panic!("create fake bin: {error}"));
 	support::write_executable(
 		&solana,
-		"#!/bin/sh\nset -eu\nif IFS= read -r value; then exit 41; fi\nprintf 'eof\\n' > \
+		"#!/usr/bin/env bash\nset -eu\nif IFS= read -r -t 5 value; then\n  exit 41\nelse\n  status=$?\n  \
+		 [ \"$status\" -eq 1 ] || exit \"$status\"\nfi\nprintf 'eof\\n' > \
 		 \"$PINA_DEPLOY_STDIN_MARKER\"\n",
 	)
 	.unwrap();
@@ -577,43 +574,15 @@ fn solana_child_receives_eof_while_pina_stdin_remains_open() {
 		.stderr(Stdio::piped())
 		.spawn()
 		.unwrap_or_else(|error| panic!("spawn deployment with held-open stdin: {error}"));
-	// The property under test is the marker the fake `solana` writes after
-	// reading EOF, so the loop waits for that rather than for the child to
-	// exit: Pina still has planning and receipt work to finish after the
-	// deployment child returns, and `cargo metadata` on a loaded machine takes
-	// over a second before the child is even spawned. The deadline is a hang
-	// bound only. Stdio stays held open for the whole test, so the child
-	// reads EOF solely because Pina redirected its stdin to the null device —
-	// a child that inherited Pina's stdin blocks forever and never writes the
-	// marker, which is what the deadline catches.
-	let deadline = Instant::now() + Duration::from_secs(30);
-
-	let timed_out = loop {
-		if marker.is_file() {
-			break false;
-		}
-
-		if Instant::now() >= deadline {
-			break true;
-		}
-
-		std::thread::sleep(Duration::from_millis(10));
-	};
-
-	if timed_out {
-		// Release the pipe so a blocked child can finish before the error
-		// message reads its stderr.
-		drop(child.stdin.take());
-	}
-
+	// Bound the fake child's read, independently of Cargo discovery and CLI
+	// startup. Keep stdin open outside wait_with_output, which closes the
+	// handle in child.stdin while draining stdout and stderr concurrently.
+	let held_stdin = child.stdin.take().unwrap();
 	let output = child
 		.wait_with_output()
 		.unwrap_or_else(|error| panic!("collect deployment: {error}"));
-	assert!(
-		!timed_out,
-		"Solana never read EOF, so it inherited Pina's open stdin; stderr: {}",
-		String::from_utf8_lossy(&output.stderr)
-	);
+	drop(held_stdin);
+
 	assert!(
 		output.status.success(),
 		"deployment failed: {}",

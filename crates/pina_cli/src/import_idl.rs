@@ -27,6 +27,9 @@ use crate::project::GenerationMode;
 /// before the renderer ever sees the document.
 const MAX_IDL_BYTES: u64 = 16 * 1024 * 1024;
 
+/// Bound redirect loops and chains before importing an IDL.
+const MAX_IDL_REDIRECTS: usize = 5;
+
 /// Where an import's IDL came from.
 #[derive(Clone, Debug)]
 pub enum ImportSource {
@@ -346,18 +349,72 @@ fn fetch_url(url: &str) -> Result<Vec<u8>, ImportError> {
 		});
 	}
 
-	let response = ureq::get(url)
-		.config()
-		.timeout_global(Some(std::time::Duration::from_secs(30)))
-		.build()
-		.call()
-		.map_err(|error| {
-			ImportError::Fetch {
-				reason: error.to_string(),
-			}
-		})?;
+	let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+	let mut current = parsed;
+	let mut redirects = 0;
 
-	read_bounded_reader(response.into_body().into_reader())
+	loop {
+		// Automatic redirects would bypass the authorization of the starting
+		// URL. Check each target before issuing another request instead.
+		let response = ureq::get(current.as_str())
+			.config()
+			.max_redirects(0)
+			.timeout_global(Some(
+				deadline.saturating_duration_since(std::time::Instant::now()),
+			))
+			.build()
+			.call()
+			.map_err(|error| {
+				ImportError::Fetch {
+					reason: error.to_string(),
+				}
+			})?;
+
+		if !response.status().is_redirection() {
+			return read_bounded_reader(response.into_body().into_reader());
+		}
+
+		if redirects == MAX_IDL_REDIRECTS {
+			return Err(ImportError::Fetch {
+				reason: format!("the IDL URL exceeds the {MAX_IDL_REDIRECTS}-redirect limit"),
+			});
+		}
+
+		let location = response
+			.headers()
+			.get(http::header::LOCATION)
+			.and_then(|value| value.to_str().ok())
+			.ok_or_else(|| {
+				ImportError::Fetch {
+					reason: "the IDL redirect is missing a valid Location header".to_string(),
+				}
+			})?;
+		current = resolve_idl_redirect(&current, location)?;
+		redirects += 1;
+	}
+}
+
+/// Authorizes a redirect without exposing its potentially secret URL in errors.
+fn resolve_idl_redirect(current: &url::Url, location: &str) -> Result<url::Url, ImportError> {
+	let next = current.join(location).map_err(|_| {
+		ImportError::Fetch {
+			reason: "the IDL redirect has an invalid Location URL".to_string(),
+		}
+	})?;
+
+	// Keeping the original origin preserves both HTTPS and the loopback-only
+	// HTTP exception without letting a remote server select another network.
+	if next.origin() != current.origin() || !next.username().is_empty() || next.password().is_some()
+	{
+		return Err(ImportError::Fetch {
+			reason:
+				"IDL redirects must stay on the original origin (scheme, host, and port) and must \
+			         not include credentials; pass a trusted destination URL explicitly"
+					.to_string(),
+		});
+	}
+
+	Ok(next)
 }
 
 fn fetch_cluster(cluster: &str, program_id: &str, npx: &str) -> Result<Vec<u8>, ImportError> {
@@ -796,28 +853,203 @@ mod coverage {
 	}
 
 	#[test]
-	fn reads_idl_bodies_from_http_sources() {
-		let body = br#"{"kind":"rootNode","standard":"codama"}"#;
-		let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-		let port = listener.local_addr().expect("addr").port();
+	fn rejects_redirects_to_nonloopback_http_before_connecting() {
+		let (result, requests) = fetch_http_responses(|port, _, _| {
+			format!(
+				"HTTP/1.1 302 Found\r\nLocation: http://0.0.0.0:{port}/idl.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+			)
+		});
+		assert!(result.is_err(), "redirect bypass returned {result:?}");
+		assert_eq!(
+			requests, 1,
+			"the forbidden destination must receive no request"
+		);
+	}
+
+	/// Serves real HTTP responses and counts every connection until the fetch ends.
+	fn fetch_http_responses(
+		response: impl Fn(u16, usize, &str) -> String + Send + 'static,
+	) -> (Result<Vec<u8>, ImportError>, usize) {
+		let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+		let port = listener.local_addr().unwrap().port();
+		let (stop, stopped) = std::sync::mpsc::channel();
+		listener.set_nonblocking(true).unwrap();
 		let server = std::thread::spawn(move || {
-			let (mut stream, _) = listener.accept().expect("accept");
-			let head = format!(
-				"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
-				 {}\r\nconnection: close\r\n\r\n",
-				body.len()
-			);
-			use std::io::Write as _;
-			stream.write_all(head.as_bytes()).expect("write head");
-			stream.write_all(body).expect("write body");
-			let _ = stream.shutdown(std::net::Shutdown::Write);
-			let mut sink = [0_u8; 512];
-			while matches!(stream.read(&mut sink), Ok(read) if read > 0) {}
+			let mut requests = 0;
+
+			while matches!(
+				stopped.try_recv(),
+				Err(std::sync::mpsc::TryRecvError::Empty)
+			) {
+				let (mut stream, _) = match listener.accept() {
+					Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+						std::thread::sleep(std::time::Duration::from_millis(1));
+						continue;
+					}
+					connection => connection.unwrap(),
+				};
+				stream.set_nonblocking(false).unwrap();
+				stream
+					.set_read_timeout(Some(std::time::Duration::from_secs(2)))
+					.unwrap();
+				let mut reader = std::io::BufReader::new(&stream);
+				let mut line = String::new();
+
+				loop {
+					use std::io::BufRead as _;
+					let read = reader.read_line(&mut line).unwrap();
+
+					if read == 0 || line.ends_with("\r\n\r\n") {
+						break;
+					}
+				}
+
+				let response = response(port, requests, &line);
+				use std::io::Write as _;
+				stream.write_all(response.as_bytes()).unwrap();
+				requests += 1;
+			}
+
+			requests
 		});
 
-		let bytes = fetch_url(&format!("http://127.0.0.1:{port}/idl.json")).expect("fetch");
-		server.join().expect("server");
-		assert_eq!(bytes, body.to_vec());
+		let result = fetch_url(&format!("http://127.0.0.1:{port}/start"));
+		stop.send(()).unwrap();
+		let requests = server.join().unwrap();
+
+		(result, requests)
+	}
+
+	#[test]
+	fn follows_same_origin_redirects_including_relative_locations() {
+		let (result, requests) = fetch_http_responses(|port, request, head| {
+			let statuses = [301, 302, 303, 307, 308];
+			let target = match request {
+				0 => "/start",
+				1 | 3 => "/idl.json",
+				2 => "/idl.json?next=2",
+				4 => "/idl.json?next=3",
+				_ => "/idl.json?next=4",
+			};
+			assert!(
+				head.starts_with(&format!("GET {target} HTTP/1.1\r\n")),
+				"{head}"
+			);
+
+			if let Some(status) = statuses.get(request) {
+				let location = match request {
+					0 => "../idl.json".to_string(),
+					1 => "?next=2".to_string(),
+					2 => format!("//127.0.0.1:{port}/idl.json"),
+					_ => format!("http://127.0.0.1:{port}/idl.json?next={request}"),
+				};
+
+				return format!(
+					"HTTP/1.1 {status} Redirect\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+				);
+			}
+
+			"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}".to_string()
+		});
+		assert_eq!(
+			result.unwrap_or_else(|error| panic!("fetch: {error}")),
+			b"{}"
+		);
+		assert_eq!(requests, MAX_IDL_REDIRECTS + 1);
+	}
+
+	#[test]
+	fn validates_later_redirect_hops_before_connecting() {
+		let (result, requests) = fetch_http_responses(|port, request, _| {
+			let location = if request == 0 {
+				"/next".to_string()
+			} else {
+				format!("http://0.0.0.0:{port}/idl.json")
+			};
+
+			format!(
+				"HTTP/1.1 307 Redirect\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+			)
+		});
+		assert!(result.is_err());
+		assert_eq!(requests, 2);
+	}
+
+	#[test]
+	fn rejects_redirect_loops_and_excessive_chains() {
+		for cycle in [true, false] {
+			let (result, requests) = fetch_http_responses(move |_, request, _| {
+				let next = if cycle { 0 } else { request + 1 };
+
+				format!(
+					"HTTP/1.1 302 Redirect\r\nLocation: /idl/{next}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+				)
+			});
+			let error = result.unwrap_err();
+			assert!(error.to_string().contains("5-redirect limit"));
+			assert_eq!(requests, MAX_IDL_REDIRECTS + 1);
+		}
+	}
+
+	#[test]
+	fn rejects_missing_and_malformed_redirect_locations() {
+		for header in [
+			"",
+			"Location: /idl/é\r\n",
+			"Location: http://[invalid/?secret=hidden\r\n",
+		] {
+			let (result, requests) = fetch_http_responses(move |_, _, _| {
+				format!(
+					"HTTP/1.1 302 Redirect\r\n{header}Content-Length: 0\r\nConnection: close\r\n\r\n"
+				)
+			});
+			let error = result.unwrap_err();
+			assert!(error.to_string().contains("Location"));
+			assert!(!error.to_string().contains("hidden"));
+			assert_eq!(requests, 1);
+		}
+	}
+
+	#[test]
+	fn rejects_redirect_origin_changes_and_credentials() {
+		for (source, location) in [
+			("https://example.com/idl", "http://example.com/idl"),
+			("https://example.com/idl", "https://127.0.0.1/idl"),
+			("https://example.com/idl", "https://localhost/idl"),
+			("https://example.com/idl", "https://[::1]/idl"),
+			("https://example.com/idl", "https://10.0.0.1/idl"),
+			("https://example.com/idl", "https://192.168.1.1/idl"),
+			("https://example.com/idl", "https://169.254.169.254/idl"),
+			("https://example.com/idl", "//other.example/idl"),
+			("https://example.com/idl", "https://example.com:444/idl"),
+			(
+				"https://example.com/idl",
+				"https://user:hidden@example.com/idl?secret=hidden",
+			),
+			("https://example.com/idl", "https://:hidden@example.com/idl"),
+			("http://localhost/idl", "https://example.com/idl"),
+			("http://localhost/idl", "http://127.0.0.1/idl"),
+			("https://127.0.0.1/idl", "https://example.com/idl"),
+			("https://example.com/idl", "file:///idl.json"),
+		] {
+			let current = url::Url::parse(source).unwrap_or_else(|error| panic!("source: {error}"));
+			let error = resolve_idl_redirect(&current, location).unwrap_err();
+			assert!(error.to_string().contains("original origin"));
+			assert!(!error.to_string().contains("hidden"));
+		}
+	}
+
+	#[test]
+	fn reads_idl_bodies_from_http_sources() {
+		let body = r#"{"kind":"rootNode","standard":"codama"}"#;
+		let (result, requests) = fetch_http_responses(move |_, _, _| {
+			format!(
+				"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+				body.len()
+			)
+		});
+		assert_eq!(result.unwrap(), body.as_bytes());
+		assert_eq!(requests, 1);
 	}
 
 	#[test]
