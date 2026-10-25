@@ -1006,6 +1006,17 @@ in
         # a hard failure in both local runs and CI.
         pnpm install --frozen-lockfile
         "$DEVENV_ROOT/scripts/build-surfpool-examples.sh"
+        # Reuse the built program to reject copied transfer proofs that alter
+        # successor disclosure metadata.
+        SBF_OUT_DIR="''${SBF_OUT_DIR:-$DEVENV_ROOT/target/surfpool/examples}" cargo test \
+          --locked \
+          -p privacy_pool_program \
+          --features prover \
+          --test e2e \
+          copied_transfer_cannot_replace_successor_disclosure_metadata \
+          -- \
+          --exact \
+          --ignored
         pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test:types
         pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test
         cargo test \

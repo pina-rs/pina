@@ -30,8 +30,9 @@ use pina::Program;
 /// incremental Merkle tree. [`PrivacyPoolInstruction::Withdraw`] and
 /// [`PrivacyPoolInstruction::Transfer`] spend a note by verifying a Groth16
 /// proof (public inputs: the tree root, the derived nullifier, and for
-/// transfers the successor commitment) and recording the nullifier. The
-/// pairing check runs entirely through the `sol_alt_bn128_group_op` syscall,
+/// transfers a binding of the successor commitment and disclosure metadata)
+/// and recording the nullifier. The pairing check runs entirely through the
+/// `sol_alt_bn128_group_op` syscall,
 /// so a spend fits in one transaction at a fraction of the compute budget
 /// instead of demanding the multi-transaction slicing a hand-written
 /// verifier used to need.

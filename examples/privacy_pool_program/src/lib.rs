@@ -17,8 +17,9 @@
 //! incremental Merkle tree. [`PrivacyPoolInstruction::Withdraw`] and
 //! [`PrivacyPoolInstruction::Transfer`] spend a note by verifying a Groth16
 //! proof (public inputs: the tree root, the derived nullifier, and for
-//! transfers the successor commitment) and recording the nullifier. The
-//! pairing check runs entirely through the `sol_alt_bn128_group_op` syscall,
+//! transfers a binding of the successor commitment and disclosure metadata)
+//! and recording the nullifier. The pairing check runs entirely through the
+//! `sol_alt_bn128_group_op` syscall,
 //! so a spend fits in one transaction at a fraction of the compute budget
 //! instead of demanding the multi-transaction slicing a hand-written
 //! verifier used to need.
@@ -162,7 +163,7 @@ pub const LOG_BYTES: usize = LOG_CAPACITY * LOG_ENTRY_BYTES;
 /// Verifying-key slot for withdraw proofs (public inputs: root, nullifier).
 pub const VK_SLOT_WITHDRAW: u8 = 0;
 
-/// Verifying-key slot for transfer proofs (root, nullifier, commitment).
+/// Verifying-key slot for transfer proofs (root, nullifier, output binding).
 pub const VK_SLOT_TRANSFER: u8 = 1;
 
 /// Largest IC array either circuit uses (transfer: four entries).
@@ -503,6 +504,40 @@ fn commitment_address(commitment: &[u8; 32]) -> Address {
 pub use crypto::Groth16Key;
 pub use crypto::verify_groth16;
 pub use crypto::zero_hashes;
+
+/// Canonical successor disclosure digest in little-endian scalar form.
+/// Only the stored envelope prefix is meaningful; its length is authenticated
+/// explicitly. Truncating SHA-256 to 248 bits keeps it below the BN254 modulus.
+pub fn transfer_metadata_digest(
+	view_pubkey: &[u8; 32],
+	envelope_len: u8,
+	envelope: &[u8; MAX_ENVELOPE_BYTES],
+	shares: &[u8; SHARE_BLOB_BYTES],
+) -> Result<[u8; 32], ProgramError> {
+	let envelope = envelope
+		.get(..usize::from(envelope_len))
+		.ok_or(PrivacyPoolError::BufferOverflow)?;
+	let mut digest = solana_sha256_hasher::hashv(&[
+		b"pina:privacy-pool:transfer-metadata:v1",
+		view_pubkey,
+		&[envelope_len],
+		envelope,
+		shares,
+	])
+	.to_bytes();
+	digest[31] = 0;
+	Ok(digest)
+}
+
+/// Third transfer public input, in little-endian tree byte order.
+/// The circuit constrains this to Poseidon(successor commitment, metadata
+/// digest), preserving the note commitment format and the four-entry IC layout.
+pub fn transfer_output_binding(
+	commitment: &[u8; 32],
+	metadata_digest: &[u8; 32],
+) -> Result<[u8; 32], ProgramError> {
+	poseidon2(commitment, metadata_digest)
+}
 
 /// Node offset for tree level `level` (0 = leaves).
 const fn level_offset(level: usize) -> usize {
@@ -1490,6 +1525,13 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 		if envelope_len > MAX_ENVELOPE_BYTES {
 			return Err(PrivacyPoolError::BufferOverflow.into());
 		}
+		let metadata = transfer_metadata_digest(
+			&args.new_view_pubkey,
+			args.envelope_len,
+			&args.envelope,
+			&args.shares,
+		)?;
+		let output_binding = transfer_output_binding(&args.new_commitment, &metadata)?;
 
 		let spend = SpendRequest {
 			slot: VK_SLOT_TRANSFER,
@@ -1500,7 +1542,7 @@ impl<'a> ProcessAccountInfos<'a> for TransferAccounts<'a> {
 				b: args.proof_b,
 				c: args.proof_c,
 			},
-			public_inputs: &[args.root, args.nullifier, args.new_commitment],
+			public_inputs: &[args.root, args.nullifier, output_binding],
 		};
 		spend_note(
 			self.merkle_tree,
@@ -2091,19 +2133,21 @@ pub mod prover {
 		pub path_indices: [bool; TREE_DEPTH],
 		/// Successor note; present for transfers.
 		pub successor: Option<NoteSecrets>,
+		/// Canonical disclosure digest for the successor; present for transfers.
+		pub successor_metadata_digest: Option<Fr>,
 	}
 
 	/// Shared join-split shape: knowledge of a committed note in the tree
 	/// that derives the public nullifier. Transfers additionally bind the
-	/// public successor commitment to fresh secrets.
+	/// public output binding to fresh secrets and a disclosure digest.
 	#[derive(Clone)]
 	pub struct SpendCircuit {
 		/// Merkle root the witness proves membership against (public).
 		pub root: Fr,
 		/// Derived nullifier (public).
 		pub nullifier: Fr,
-		/// Successor commitment (public, transfers only).
-		pub output_commitment: Option<Fr>,
+		/// Poseidon(successor commitment, disclosure digest), public for transfers.
+		pub output_binding: Option<Fr>,
 		/// Fixed denomination as a field element (constant in-circuit).
 		pub amount: Fr,
 		/// Private witness material, provided as closures so both setup
@@ -2117,7 +2161,7 @@ pub mod prover {
 
 			let root = FpVar::new_input(cs.clone(), || Ok(self.root))?;
 			let nullifier_pub = FpVar::new_input(cs.clone(), || Ok(self.nullifier))?;
-			let output = match self.output_commitment {
+			let output = match self.output_binding {
 				Some(value) => Some(FpVar::new_input(cs.clone(), || Ok(value))?),
 				None => None,
 			};
@@ -2168,7 +2212,7 @@ pub mod prover {
 			let nullifier = poseidon2_var(&params, &seed, &secret)?;
 			nullifier.enforce_equal(&nullifier_pub)?;
 
-			// transfer: bind the public successor commitment to fresh secrets
+			// Bind fresh spend secrets and disclosure metadata to the public output.
 			if let Some(output_var) = output {
 				let successor = FpVar::new_witness(cs.clone(), || {
 					witness
@@ -2187,7 +2231,13 @@ pub mod prover {
 					&poseidon2_var(&params, &successor, &successor_seed)?,
 					&amount,
 				)?;
-				next.enforce_equal(&output_var)?;
+				let metadata = FpVar::new_witness(cs.clone(), || {
+					witness
+						.as_ref()
+						.and_then(|w| w.successor_metadata_digest)
+						.ok_or(SynthesisError::AssignmentMissing)
+				})?;
+				poseidon2_var(&params, &next, &metadata)?.enforce_equal(&output_var)?;
 			}
 
 			Ok(())
@@ -2212,7 +2262,7 @@ pub mod prover {
 		let circuit = SpendCircuit {
 			root: Fr::zero(),
 			nullifier: Fr::zero(),
-			output_commitment: with_output.then(Fr::zero),
+			output_binding: with_output.then(Fr::zero),
 			amount: Fr::from(super::DEPOSIT_LAMPORTS),
 			witness: None,
 		};
@@ -2390,13 +2440,14 @@ pub mod prover {
 			let circuit = SpendCircuit {
 				root: fr_from_le(&root).unwrap(),
 				nullifier: fr_from_le(&nullifier).unwrap(),
-				output_commitment: None,
+				output_binding: None,
 				amount,
 				witness: Some(SpendWitness {
 					spent: secrets,
 					path_elements,
 					path_indices,
 					successor: None,
+					successor_metadata_digest: None,
 				}),
 			};
 			let proof = prove_spend(&pk, circuit, 0x8888);
@@ -2467,13 +2518,14 @@ pub mod prover {
 			let circuit = SpendCircuit {
 				root: fr_from_le(&root_bytes).unwrap(),
 				nullifier: fr_from_le(&nullifier_bytes).unwrap(),
-				output_commitment: None,
+				output_binding: None,
 				amount,
 				witness: Some(SpendWitness {
 					spent: secrets,
 					path_elements,
 					path_indices,
 					successor: None,
+					successor_metadata_digest: None,
 				}),
 			};
 
@@ -2502,6 +2554,32 @@ mod tests {
 		let mut nodes = alloc::vec![0_u8; TREE_NODES_BYTES];
 		prefill_zero_nodes(&mut nodes).unwrap_or_else(|e| panic!("prefill: {e:?}"));
 		nodes
+	}
+
+	#[test]
+	fn transfer_metadata_digest_authenticates_stored_bytes() {
+		let view = [0x11; 32];
+		let envelope = [0x22; MAX_ENVELOPE_BYTES];
+		let shares = [0x33; SHARE_BLOB_BYTES];
+		let digest = transfer_metadata_digest(&view, 96, &envelope, &shares).unwrap();
+		assert_eq!(digest[31], 0);
+
+		let mut padded = envelope;
+		padded[127] ^= 1;
+		assert_eq!(
+			transfer_metadata_digest(&view, 96, &padded, &shares).unwrap(),
+			digest
+		);
+		assert_ne!(
+			transfer_metadata_digest(&view, 95, &envelope, &shares).unwrap(),
+			digest
+		);
+		assert!(transfer_metadata_digest(&view, 0, &envelope, &shares).is_ok());
+		assert!(transfer_metadata_digest(&view, 128, &envelope, &shares).is_ok());
+		assert_eq!(
+			transfer_metadata_digest(&view, 129, &envelope, &shares),
+			Err(PrivacyPoolError::BufferOverflow.into())
+		);
 	}
 
 	#[test]

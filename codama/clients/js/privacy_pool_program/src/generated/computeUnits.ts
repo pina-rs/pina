@@ -94,14 +94,14 @@ export const WITHDRAW_COMPUTE_UNIT_LIMIT = 104700;
  * Compute units `transfer` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const TRANSFER_MEASURED_COMPUTE_UNITS = 104147;
+export const TRANSFER_MEASURED_COMPUTE_UNITS = 105282;
 
 /**
  * Compute unit limit to request for a transaction carrying `transfer`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const TRANSFER_COMPUTE_UNIT_LIMIT = 125300;
+export const TRANSFER_COMPUTE_UNIT_LIMIT = 126700;
 
 /**
  * Compute units `requestDisclosure` consumed in its most expensive recorded Surfpool

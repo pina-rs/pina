@@ -41,6 +41,12 @@ A tiered-disclosure privacy pool: a shielded-pool payments program whose disting
 
 A note is `(secret, nullifier_seed)`; the commitment is `Poseidon(Poseidon(secret, seed), amount)` and the nullifier is `Poseidon(seed, secret)`. The circuit proves knowledge of the note's preimage, membership against the tree root, and the nullifier derivation — without revealing which leaf. Deposits and withdrawals remain public edges by design (fixed denomination); the nullifier set is the only spent record — note accounts never carry a spent flag, because linking a nullifier to its commitment is exactly the leak the pool exists to prevent.
 
+Transfer public inputs are `(root, nullifier, output_binding)`, where `output_binding = Poseidon(successor_commitment, metadata_digest)`. The digest is SHA-256 over the concatenation of `pina:privacy-pool:transfer-metadata:v1`, the 32-byte view key, the one-byte envelope length, that many envelope bytes, and all 144 share bytes. Byte 31 of the digest is cleared, yielding a canonical 248-bit little-endian BN254 scalar. Envelope padding is discarded on storage and excluded from the digest. The circuit derives the successor commitment from fresh secrets and constrains its binding to the digest; the handler recomputes the same binding from the submitted metadata. A copied proof cannot authorize different disclosure material.
+
+This revision supports newly initialized pools under a new program address. Generate new transfer proving and verifying keys, and install the verifying key in the transfer slot before accepting deposits. Keys for the earlier `(root, nullifier, successor_commitment)` statement are incompatible. The instruction bytes, account layouts, note commitments, and withdrawal circuit are unchanged.
+
+Do not upgrade an existing funded pool to this revision. `SetVerificationKey` creates a fixed slot PDA and rejects an already initialized key account. Existing pools cannot replace their transfer key through this instruction, so an upgrade would prevent transfers. Existing deployments need a separately audited migration before upgrading. This example does not provide that migration.
+
 <br>
 
 ## The disclosure tiers

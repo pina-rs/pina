@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 1,
 	"measurement": "surfpool-simulation-max",
-	"artifactSha256": "785279354a82e4eb2daba7e8a9221df7908b167eb63102d3acfb66b3f3094140",
+	"artifactSha256": "ef82bbcbf37f91d402cb2215b94d88cdb263ce336602e5d7603356a4e4cb4410",
 	"instructions": {
 		"approveDisclosure": {
 			"computeUnits": 437,
@@ -48,7 +48,7 @@
 			"samples": 10
 		},
 		"transfer": {
-			"computeUnits": 104147,
+			"computeUnits": 105282,
 			"samples": 1
 		},
 		"withdraw": {

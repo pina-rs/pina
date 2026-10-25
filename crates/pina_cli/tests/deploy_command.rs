@@ -572,7 +572,8 @@ fn solana_child_receives_eof_while_pina_stdin_remains_open() {
 		.env("PATH", joined_path)
 		.env("PINA_DEPLOY_STDIN_MARKER", &marker)
 		.stdin(Stdio::piped())
-		.stdout(Stdio::piped())
+		// An unread plan-output pipe can fill before the Solana child starts.
+		.stdout(Stdio::null())
 		.stderr(Stdio::piped())
 		.spawn()
 		.unwrap_or_else(|error| panic!("spawn deployment with held-open stdin: {error}"));
