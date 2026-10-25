@@ -1307,6 +1307,95 @@ fn missing_ledger_with_advanced_versions_fails_closed() {
 }
 
 #[test]
+fn reconcile_preserves_publications_committed_before_it_acquires_the_lock() {
+	let fixture = publication_fixture();
+	let digest = hash_regular_file(&fixture.artifact)
+		.unwrap_or_else(|error| panic!("hash fixture artifact: {error:?}"));
+	begin_publication(
+		&fixture.root,
+		"devnet",
+		"https://api.devnet.solana.com",
+		fixture.program_id,
+		&fixture.artifact,
+		digest,
+	)
+	.unwrap_or_else(|error| panic!("begin publication: {error:?}"));
+
+	let lock = acquire_migration_lock(&fixture.root)
+		.unwrap_or_else(|error| panic!("lock publication transaction: {error:?}"));
+	let (sender, receiver) = std::sync::mpsc::channel();
+	let root = fixture.root.clone();
+	let reconciliation = std::thread::spawn(move || {
+		BEFORE_MIGRATION_LOCK.with(|notification| notification.set(Some(sender)));
+		reconcile_publication(&root, true)
+	});
+	receiver
+		.recv_timeout(std::time::Duration::from_secs(10))
+		.unwrap_or_else(|error| panic!("reconciliation must reach the held lock: {error}"));
+
+	// Commit the first deployment and stage a second while reconciliation is
+	// blocked. It must read this state only after our transaction releases the lock.
+	let path = fixture.root.join(PUBLICATIONS_PATH);
+	let mut ledger =
+		load_publication_ledger(&path).unwrap_or_else(|error| panic!("load ledger: {error:?}"));
+	let mut pending = ledger
+		.pending
+		.take()
+		.unwrap_or_else(|| panic!("pending deployment"));
+	let committed = pina_abi::PublicationReceipt {
+		rpc_url: pending.rpc_url.clone(),
+		executable_sha256: pending.executable_sha256.clone(),
+		versions: pending.versions.clone(),
+		abandoned: false,
+	};
+	ledger.receipts.push(committed.clone());
+	pending.cluster = "testnet".to_owned();
+	pending.rpc_url = "https://api.testnet.solana.com".to_owned();
+	let latest = pending.clone();
+	ledger.pending = Some(pending);
+	write_json_atomic(&path, &ledger)
+		.unwrap_or_else(|error| panic!("commit newer ledger: {error:?}"));
+	drop(lock);
+
+	let output = reconciliation
+		.join()
+		.unwrap_or_else(|error| panic!("reconciliation thread: {error:?}"))
+		.unwrap_or_else(|error| panic!("reconcile latest deployment: {error:?}"));
+	assert!(output.abandoned);
+	let ledger =
+		load_publication_ledger(&path).unwrap_or_else(|error| panic!("reload ledger: {error:?}"));
+	assert!(ledger.pending.is_none());
+	assert_eq!(
+		ledger.receipts,
+		vec![
+			committed,
+			pina_abi::PublicationReceipt {
+				rpc_url: latest.rpc_url,
+				executable_sha256: latest.executable_sha256,
+				versions: latest.versions,
+				abandoned: true,
+			},
+		]
+	);
+}
+
+#[test]
+fn reconcile_fails_before_reading_state_when_it_cannot_lock() {
+	let fixture = publication_fixture();
+	std::fs::create_dir(fixture.root.join("migrations/.lock"))
+		.unwrap_or_else(|error| panic!("block migration lock: {error}"));
+	std::fs::write(fixture.root.join(MANIFEST_PATH), b"invalid manifest")
+		.unwrap_or_else(|error| panic!("write incomplete transaction: {error}"));
+
+	for abandon in [false, true] {
+		assert!(matches!(
+			reconcile_publication(&fixture.root, abandon),
+			Err(MigrationError::Lock { .. })
+		));
+	}
+}
+
+#[test]
 fn reconcile_reports_and_abandons_pending_deployments() {
 	let fixture = publication_fixture();
 	let digest: [u8; 32] = Sha256::digest(

@@ -258,11 +258,15 @@ pub struct ReconcileOutput {
 /// deployment never went live or accepts the risk; the pending record becomes
 /// an abandoned receipt that still freezes its pinned versions because the
 /// remote outcome cannot be proven from the local ledger.
+///
+/// Hold the migration lock across inspection and abandonment so concurrent
+/// publication commands cannot invalidate the manifest and ledger snapshot.
 pub fn reconcile_publication(
 	start: &Path,
 	abandon: bool,
 ) -> Result<ReconcileOutput, MigrationError> {
 	let project = Project::discover(start)?;
+	let _lock = acquire_migration_lock(&project.program_dir)?;
 	let publication_path = project.program_dir.join(PUBLICATIONS_PATH);
 	let manifest_path = project.program_dir.join(MANIFEST_PATH);
 	let manifest = load_manifest(&manifest_path)?.ok_or_else(|| {
@@ -294,7 +298,6 @@ pub fn reconcile_publication(
 	}
 
 	let mut ledger = ledger;
-	let _lock = acquire_migration_lock(&project.program_dir)?;
 	let receipt = PublicationReceipt {
 		rpc_url: pending.rpc_url,
 		executable_sha256: pending.executable_sha256,
