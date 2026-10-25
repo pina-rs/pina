@@ -47,6 +47,8 @@ Merkle path directions are constrained to Boolean values inside both spend circu
 
 This revision supports newly initialized pools under a new program address. Install both new verifying keys in their respective withdraw and transfer slots through `SetVerificationKey` before accepting deposits. Keys for the earlier transfer `(root, nullifier, successor_commitment)` statement and unconstrained Merkle circuits are incompatible with this revision. The instruction bytes, account layouts, and note commitments are unchanged.
 
+For that new deployment, use a separate project identity and keep the existing deployment's keys and published migration history intact. Bind the new project's `declare_id!`, migration manifest, and generated ABI metadata to the new program ID through Pina's [key](../../docs/src/cli/keys.md) and [migration](../../docs/src/cli/migrations.md) workflows, then regenerate the IDL and clients. Confirm that generated client defaults and test helpers derive pool and verification-key PDAs from that same ID; the example's committed ID and generated clients remain reference fixtures, not a new deployment configuration.
+
 Do not upgrade an existing funded pool to this revision. `SetVerificationKey` creates fixed slot PDAs and rejects already initialized key accounts. Existing pools cannot replace their spend keys through this instruction, and old verifying keys retain the vulnerable circuit. Existing deployments need a separately audited migration before upgrading. This example does not provide that migration.
 
 <br>
