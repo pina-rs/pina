@@ -65,12 +65,12 @@ const int withdrawComputeUnitLimit = 104700;
 
 /// Compute units `transfer` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int transferMeasuredComputeUnits = 104147;
+const int transferMeasuredComputeUnits = 105282;
 
 /// Compute unit limit to request for a transaction carrying `transfer`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int transferComputeUnitLimit = 125300;
+const int transferComputeUnitLimit = 126700;
 
 /// Compute units `requestDisclosure` consumed in its most expensive recorded Surfpool
 /// simulation.

@@ -40,10 +40,10 @@
 	},
 	"staticCuApprovals": {
 		"privacy_pool_program": {
-			"baseRevision": "095ecdc573f63f0e054593ed4260f6f50263a6fa",
-			"base": 14133,
-			"head": 14305,
-			"reason": "Approved by @ifiokjr on 2026-10-24 in #655: authenticate the singleton pool's initializer against the loader-owned deployment authority instead of a disclosed signing key."
+			"baseRevision": "04a47964b3415b320c8d339072bc71cb7d5b9627",
+			"base": 14305,
+			"head": 14345,
+			"reason": "Approved by @ifiokjr on 2026-10-25: bind successor disclosure metadata to transfer proofs while retaining existing public-input and wire layouts."
 		}
 	},
 	"runtimeCuApprovals": {
@@ -124,6 +124,12 @@
 			"base": 46616,
 			"head": 48259,
 			"reason": "Approved by @ifiokjr on 2026-10-24 in #655: authenticate the singleton pool's initializer against the loader-owned deployment authority instead of a disclosed signing key."
+		},
+		"privacy_pool_program/transfer": {
+			"baseRevision": "04a47964b3415b320c8d339072bc71cb7d5b9627",
+			"base": 104147,
+			"head": 105282,
+			"reason": "Approved by @ifiokjr on 2026-10-25: accept 1135 CU for authenticating successor disclosure metadata in each transfer."
 		}
 	},
 	"binarySizeApprovals": {
@@ -134,10 +140,10 @@
 			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
 		},
 		"privacy_pool_program": {
-			"baseRevision": "095ecdc573f63f0e054593ed4260f6f50263a6fa",
-			"base": 120008,
-			"head": 121600,
-			"reason": "Approved by @ifiokjr on 2026-10-24 in #655: authenticate the singleton pool's initializer against the loader-owned deployment authority instead of a disclosed signing key."
+			"baseRevision": "04a47964b3415b320c8d339072bc71cb7d5b9627",
+			"base": 121600,
+			"head": 122008,
+			"reason": "Approved by @ifiokjr on 2026-10-25: accept 408 bytes for the metadata digest and proof binding that prevent copied-proof metadata substitution."
 		}
 	}
 }
