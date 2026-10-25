@@ -5,7 +5,7 @@ pina_cli: none
 
 # Bind privacy-pool transfer disclosure metadata
 
-The privacy-pool example now authenticates the successor view key, stored envelope length and content, and encrypted custodian shares in the transfer proof. Transfer proving and verifying keys must be regenerated; account and instruction layouts remain unchanged.
+The privacy-pool example now authenticates the successor view key, stored envelope length and content, and encrypted custodian shares in the transfer proof. This revision supports newly initialized pools under a new program address with regenerated transfer proving and verifying keys. Do not upgrade existing funded pools: installed transfer keys cannot be replaced, and an audited migration is not included. Account and instruction layouts remain unchanged.
 
 Run the compiled-program metadata-substitution regression in the existing runtime CI task so proof binding remains continuously checked.
 

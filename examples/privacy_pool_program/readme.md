@@ -43,7 +43,9 @@ A note is `(secret, nullifier_seed)`; the commitment is `Poseidon(Poseidon(secre
 
 Transfer public inputs are `(root, nullifier, output_binding)`, where `output_binding = Poseidon(successor_commitment, metadata_digest)`. The digest is SHA-256 over the concatenation of `pina:privacy-pool:transfer-metadata:v1`, the 32-byte view key, the one-byte envelope length, that many envelope bytes, and all 144 share bytes. Byte 31 of the digest is cleared, yielding a canonical 248-bit little-endian BN254 scalar. Envelope padding is discarded on storage and excluded from the digest. The circuit derives the successor commitment from fresh secrets and constrains its binding to the digest; the handler recomputes the same binding from the submitted metadata. A copied proof cannot authorize different disclosure material.
 
-This transfer circuit requires regenerated proving and verifying keys installed in the transfer slot. Keys for the earlier `(root, nullifier, successor_commitment)` statement are incompatible. The instruction bytes, account layouts, note commitments, and withdrawal circuit are unchanged.
+This revision supports newly initialized pools under a new program address. Generate new transfer proving and verifying keys, and install the verifying key in the transfer slot before accepting deposits. Keys for the earlier `(root, nullifier, successor_commitment)` statement are incompatible. The instruction bytes, account layouts, note commitments, and withdrawal circuit are unchanged.
+
+Do not upgrade an existing funded pool to this revision. `SetVerificationKey` creates a fixed slot PDA and rejects an already initialized key account. Existing pools cannot replace their transfer key through this instruction, so an upgrade would prevent transfers. Existing deployments need a separately audited migration before upgrading. This example does not provide that migration.
 
 <br>
 
