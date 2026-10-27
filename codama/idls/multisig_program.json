@@ -1109,6 +1109,16 @@
 							"kind": "publicKeyValueNode",
 							"publicKey": "11111111111111111111111111111111"
 						}
+					},
+					{
+						"kind": "instructionAccountNode",
+						"name": "programData",
+						"isWritable": false,
+						"isSigner": false,
+						"isOptional": false,
+						"docs": [
+							"Canonical loader-owned `ProgramData` authenticating the initial authority."
+						]
 					}
 				],
 				"arguments": [
@@ -1175,8 +1185,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 5800,
-							"measured": 4543
+							"limit": 7700,
+							"measured": 6152
 						}
 					}
 				]
@@ -1293,7 +1303,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 2400,
-							"measured": 1731
+							"measured": 1737
 						}
 					}
 				]

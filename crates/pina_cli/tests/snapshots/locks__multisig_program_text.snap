@@ -3,7 +3,7 @@ source: crates/pina_cli/tests/locks.rs
 expression: report.render_text()
 ---
 multisig_program (5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc)
-15 instructions; accounts: 3 fixed, 3 keyed, 54 caller-chosen; 1 hotspot (0 allowed)
+15 instructions; accounts: 3 fixed, 3 keyed, 55 caller-chosen; 1 hotspot (0 allowed)
 
 Hotspots
   A fixed account has one address for every caller, so every instruction that

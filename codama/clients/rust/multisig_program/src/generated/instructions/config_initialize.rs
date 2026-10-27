@@ -11,12 +11,12 @@
 pub const CONFIG_INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 /// Compute units `ConfigInitialize` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const CONFIG_INITIALIZE_MEASURED_COMPUTE_UNITS: u32 = 4543;
+pub const CONFIG_INITIALIZE_MEASURED_COMPUTE_UNITS: u32 = 6152;
 /// Compute unit limit to request for a transaction carrying `ConfigInitialize`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const CONFIG_INITIALIZE_COMPUTE_UNIT_LIMIT: u32 = 5800;
+pub const CONFIG_INITIALIZE_COMPUTE_UNIT_LIMIT: u32 = 7700;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -24,10 +24,12 @@ pub struct ConfigInitialize {
 	pub authority: solana_pubkey::Pubkey,
 	pub program_config: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
+	/// Canonical loader-owned `ProgramData` authenticating the initial authority.
+	pub program_data: solana_pubkey::Pubkey,
 }
 
 impl ConfigInitialize {
-	pub fn new(authority: solana_pubkey::Pubkey) -> Self {
+	pub fn new(authority: solana_pubkey::Pubkey, program_data: solana_pubkey::Pubkey) -> Self {
 		Self {
 			authority,
 			program_config: solana_pubkey::Pubkey::find_program_address(
@@ -36,6 +38,7 @@ impl ConfigInitialize {
 			)
 			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
+			program_data,
 		}
 	}
 
@@ -52,7 +55,7 @@ impl ConfigInitialize {
 		data: ConfigInitializeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(4 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
 		accounts.push(solana_instruction::AccountMeta::new(
 			self.program_config,
@@ -60,6 +63,10 @@ impl ConfigInitialize {
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.system_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.program_data,
 			false,
 		));
 		accounts.extend_from_slice(remaining_accounts);

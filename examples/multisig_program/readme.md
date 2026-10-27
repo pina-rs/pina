@@ -2,6 +2,10 @@
 
 An ambitious, production-shaped multisig wallet built with pina: permissioned members, threshold approvals, timelocked execution of arbitrary compiled messages, governed configuration, spending limits, and first-class migration support.
 
+Initialize the global `ProgramConfig` before making a deployment immutable. `ConfigInitialize` requires the current upgrade authority to sign and the canonical upgradeable-loader-owned `ProgramData` account after the system program. Derive that PDA using the program ID's bytes as its sole seed under `BPFLoaderUpgradeab1e11111111111111111111111`.
+
+That signer becomes the stored config authority; later deployment authority changes do not transfer an existing config. Upgrading an already initialized deployment does not repair a config previously captured by another signer.
+
 ## What it covers
 
 - **Consensus core**: sorted member rosters with permission masks (initiate / vote / execute), draft → active → approved / rejected / cancelled → executed proposal lifecycle, and stale-proposal invalidation whenever the consensus parameters move.
