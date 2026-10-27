@@ -48,7 +48,7 @@ pub enum ProgramInstruction {
 #[discriminator(entrypoint, migrations(State, State), migrations_max_lamports = 20_000)]
 ```
 
-The route calls the resize executor, so the program needs `pina`'s `account-resize` feature; `pina init` scaffolds it, and the generated code names it when missing. `migrations_max_lamports` is optional: declaring one caps the reserved instruction's total rent transfers, while omitting it enforces no ceiling — safe because a transfer never exceeds the rent deficit of a growth the runtime caps at `MAX_PERMITTED_DATA_INCREASE`.
+The route calls the resize executor, so the program needs `pina`'s `account-resize` feature; `pina init` scaffolds it, and the generated code names it when missing. `migrations_max_lamports` defaults to zero: declare an explicit cap to permit payer-funded growth. The cap covers the reserved instruction's total rent transfers across all slots. Without a cap, migrations can run only when they need no payer transfer. `MigrateAccount` and `MigrateContext` likewise treat `max_lamports: None` as zero. Allocation growth limits do not bound an existing account's rent deficit.
 
 Exactly one discriminator enum per program may carry `entrypoint`; `pina build` fails closed when two declare it.
 

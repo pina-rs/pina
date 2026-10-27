@@ -631,10 +631,7 @@ mod executor {
 		rent: Option<Rent>,
 		/// Caller-declared ceiling on the lamports this migration may transfer.
 		///
-		/// `None` means no declared ceiling: the transfer stays bounded by the
-		/// rent deficit of a size change the runtime already caps at
-		/// [`MAX_PERMITTED_DATA_INCREASE`], so an absent ceiling routes the
-		/// limit rather than removing it.
+		/// `None` permits no payer transfers, like `Some(0)`.
 		max_lamports: Option<u64>,
 		original_size: usize,
 		stored: u32,
@@ -703,12 +700,9 @@ mod executor {
 			0
 		};
 		let next_transferred = ctx.transferred.checked_add(funding);
-		// An absent ceiling enforces nothing: `funding` is already bounded by
-		// the rent deficit of a growth the runtime caps, so there is no
-		// unbounded spend to guard against.
-		if let Some(max_lamports) = ctx.max_lamports
-			&& next_transferred.is_none_or(|total| total > max_lamports)
-		{
+		// Growth limits bound new bytes, not the existing account's rent deficit.
+		// Funding therefore requires an explicit ceiling even for one-byte growth.
+		if next_transferred.is_none_or(|total| total > ctx.max_lamports.unwrap_or(0)) {
 			return Err(PinaProgramError::MigrationLamportBudgetExceeded.into());
 		}
 		// Account for the planned funding up front so the post-mutation tail
@@ -908,9 +902,8 @@ mod executor {
 
 		/// Ceiling on the lamports this invocation may transfer from `payer`.
 		///
-		/// `None` declares no ceiling: growth stays bounded by the rent deficit
-		/// of a size change the runtime already limits, so the transfer cannot
-		/// grow without bound.
+		/// `None` permits no payer transfers, like `Some(0)`. Migrations that
+		/// need no additional rent can still run without a declared budget.
 		pub max_lamports: Option<u64>,
 	}
 
@@ -1039,7 +1032,7 @@ mod executor {
 	/// `max_lamports` caps the rent transfers of the whole reserved
 	/// instruction: every slot this context migrates draws from the same
 	/// budget, so the payer can never be charged the cap once per account.
-	/// `None` declares no ceiling.
+	/// `None` permits no payer transfers, like `Some(0)`.
 	#[must_use]
 	pub struct MigrateContext<'account> {
 		program_id: &'account Address,
@@ -2672,47 +2665,84 @@ mod tests {
 		assert_ne!(growth, lamports);
 	}
 
-	/// An absent ceiling enforces nothing: the same step that fails under
-	/// `Some(0)` completes when no budget is declared, because the transfer is
-	/// already bounded by the rent deficit of a runtime-capped growth.
+	/// Even one byte of growth may charge the whole existing rent deficit.
+	/// An omitted or insufficient cap must reject it before any effect.
 	#[cfg(feature = "account-resize")]
 	#[test]
-	fn an_absent_lamport_ceiling_permits_funded_growth() {
+	fn funded_growth_requires_an_explicit_sufficient_lamport_budget() {
 		let owner = Address::new_from_array([9; 32]);
 		let mut payer =
 			TestAccount::<32>::new(Address::new_from_array([8; 32]), owner, 1_000_000, &[]);
+		let payer = payer.view();
+		let required = test_rent().try_minimum_balance(4).unwrap();
+		let incremental = required - test_rent().try_minimum_balance(3).unwrap();
+		assert!(required > incremental);
 
-		let mut unbounded_stored =
+		for max_lamports in [None, Some(0), Some(incremental), Some(required - 1)] {
+			let mut stored =
+				TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &[7, 0, 42]);
+			let mut account = stored.view();
+			let result = MigrateAccount {
+				account: &mut account,
+				payer: Some(&payer),
+				program_id: &owner,
+				max_lamports,
+			}
+			.invoke_with_rent::<GrowingAccount>(test_rent());
+
+			assert_eq!(
+				result,
+				Err(PinaProgramError::MigrationLamportBudgetExceeded.into())
+			);
+			assert_eq!(account.lamports(), 0);
+			assert_eq!(&*account.try_borrow().unwrap(), &[7, 0, 42]);
+			assert_eq!(payer.lamports(), 1_000_000);
+		}
+
+		let mut stored =
 			TestAccount::<8>::new(Address::new_from_array([1; 32]), owner, 0, &[7, 0, 42]);
-		let mut unbounded_account = unbounded_stored.view();
-		let mut unbounded_payer = payer.view();
+		let mut account = stored.view();
 		MigrateAccount {
-			account: &mut unbounded_account,
-			payer: Some(&mut unbounded_payer),
+			account: &mut account,
+			payer: Some(&payer),
 			program_id: &owner,
-			max_lamports: None,
+			max_lamports: Some(required),
 		}
 		.invoke_with_rent::<GrowingAccount>(test_rent())
-		.expect("a migration with no declared ceiling funds its rent deficit");
+		.expect("an explicit cap equal to the full deficit permits the migration");
+		assert_eq!(&*account.try_borrow().unwrap(), &[7, 1, 42, 99]);
+	}
 
-		// The identical starting bytes fail once a ceiling of zero is declared,
-		// which is what proves the ceiling is what rejected them above.
-		let mut bounded_stored =
-			TestAccount::<8>::new(Address::new_from_array([2; 32]), owner, 0, &[7, 0, 42]);
-		let mut bounded_account = bounded_stored.view();
-		let mut bounded_payer = payer.view();
-		let rejected = MigrateAccount {
-			account: &mut bounded_account,
-			payer: Some(&mut bounded_payer),
-			program_id: &owner,
-			max_lamports: Some(0),
-		}
-		.invoke_with_rent::<GrowingAccount>(test_rent())
-		.expect_err("a declared ceiling of zero still rejects the same growth");
-		assert_eq!(
-			rejected,
-			PinaProgramError::MigrationLamportBudgetExceeded.into()
+	/// No-funding migrations still work through the reserved route without a cap.
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn absent_route_budget_permits_only_rent_free_slots() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut payer =
+			TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1_000_000, &[]);
+		let mut system = TestAccount::<0>::new(crate::system::ID, owner, 0, &[]);
+		let prepaid = test_rent().try_minimum_balance(4).unwrap();
+		let mut funded = TestAccount::<8>::new(
+			Address::new_from_array([2; 32]),
+			owner,
+			prepaid,
+			&[7, 0, 42],
 		);
+		let mut poor =
+			TestAccount::<8>::new(Address::new_from_array([3; 32]), owner, 0, &[7, 0, 42]);
+		let mut views = [payer.view(), system.view(), funded.view(), poor.view()];
+		let mut context = MigrateContext::with_rent(&owner, &mut views, None, test_rent()).unwrap();
+
+		assert!(context.run::<GrowingAccount>(2).is_ok());
+		assert_eq!(
+			context.run::<GrowingAccount>(3),
+			Err(PinaProgramError::MigrationLamportBudgetExceeded.into())
+		);
+		assert_eq!(&*views[2].try_borrow().unwrap(), &[7, 1, 42, 99]);
+		assert_eq!(views[2].lamports(), prepaid);
+		assert_eq!(&*views[3].try_borrow().unwrap(), &[7, 0, 42]);
+		assert_eq!(views[3].lamports(), 0);
+		assert_eq!(views[0].lamports(), 1_000_000);
 	}
 
 	/// A stale account beyond the generated `MAX_INLINE_STEPS` reports
