@@ -291,18 +291,21 @@ That makes the client flow explicit: when an account is stale and the business i
 
 ### Reading without migrating
 
-Migration is a mutation, and the runtime forbids writes and resizes on a read-only account. A program that only reads a stale account therefore has no migration path in that instruction. Generated account code now offers a read-only alternative: `<Account>::try_from_bytes_versioned(bytes)` validates the exact representation named by the version envelope and borrows it immutably. It never rewrites, resizes, or clears anything, and it never requires a writable borrow; foreign discriminators, unknown versions, future versions, and malformed lengths all fail closed.
+Migration is a mutation, and the runtime forbids writes and resizes on a read-only account. A program that only reads a stale account therefore has no migration path in that instruction. Generated account code offers a read-only alternative: `<Account>::with_versioned_account(account, program_id, callback)` checks the runtime account owner, validates the exact representation named by the version envelope, and holds an immutable borrow through the callback. It never rewrites, resizes, or clears anything, and it never requires a writable borrow; foreign owners, foreign discriminators, unknown versions, future versions, and malformed lengths all fail closed.
 
 The generated `<Account>Versioned` enum has one variant per historical version plus `Current`, so the caller must handle every stored representation:
 
 ```rust,ignore
-let data = account.try_borrow()?;
-match State::try_from_bytes_versioned(&data)? {
+State::with_versioned_account(account, &ID, |state| match state {
     StateVersioned::V0(view) => read_v0(view),
     StateVersioned::V1(view) => read_v1(view),
     StateVersioned::Current(view) => read_current(view),
-}
+})?;
 ```
+
+Pass the trusted program ID that owns the account. Check any required account address, PDA derivation, or authority relationship separately before trusting its fields: ownership alone does not identify a particular account.
+
+`<Account>::try_from_bytes_versioned(bytes)` remains available for byte decoding. It cannot authenticate the source of those bytes. When using it with an `AccountView`, call `account.assert_owner(&ID)?` before `account.try_borrow()?`, and validate the required address or PDA. A matching discriminator and version do not prove ownership. Prefer `with_versioned_account` for on-chain reads so ownership validation and borrowing stay together.
 
 **This is a deliberate trade-off, not a replacement for migration.** A program that reads historical layouts must handle two (or more) representations in its business logic, which is exactly the branching the migration system exists to remove. Treat the view as the complement for read-heavy accounts whose one-time writable touch is genuinely hard to schedule; the reserved `Migrate` instruction remains the primary fix. The accessor is generated only for accounts declared with `migrations`.
 

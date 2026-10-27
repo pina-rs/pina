@@ -20,6 +20,157 @@ use pina::normalize_instruction_data;
 use pina::*;
 use program::*;
 
+#[repr(C)]
+struct ReadOnlyAccount {
+	header: pina::pinocchio::account::RuntimeAccount,
+	data: [u8; 44],
+}
+
+impl ReadOnlyAccount {
+	fn new(owner: Address, bytes: &[u8]) -> Self {
+		let mut data = [0; 44];
+		data[..bytes.len()].copy_from_slice(bytes);
+
+		Self {
+			header: pina::pinocchio::account::RuntimeAccount {
+				borrow_state: pina::pinocchio::account::NOT_BORROWED,
+				is_signer: 0,
+				is_writable: 0,
+				executable: 0,
+				padding: [0; 4],
+				address: Address::new_from_array([8; 32]),
+				owner,
+				lamports: 1,
+				data_len: bytes.len() as u64,
+			},
+			data,
+		}
+	}
+
+	fn state(owner: Address, version: u8) -> Self {
+		let mut data = [0; 44];
+		data[0] = MigrationAccount::State as u8;
+		data[1] = version;
+		data[2..34].fill(9);
+		data[34..42].copy_from_slice(&42_u64.to_le_bytes());
+
+		Self::new(owner, &data[..42 + usize::from(version)])
+	}
+
+	#[allow(unsafe_code)]
+	fn view(&mut self) -> AccountView {
+		// SAFETY: the header is followed by enough initialized data for every
+		// tested version, and the backing account outlives each view.
+		unsafe { AccountView::new_unchecked(core::ptr::addr_of_mut!(self.header)) }
+	}
+}
+
+#[test]
+fn checked_versioned_reader_rejects_foreign_owned_historical_and_current_accounts() {
+	for version in 0..=2 {
+		let mut backing = ReadOnlyAccount::state(Address::new_from_array([7; 32]), version);
+		let account = backing.view();
+		let data = account.try_borrow().expect("borrow foreign-owned data");
+		let state = State::try_from_bytes_versioned(&data).expect("valid attacker-owned bytes");
+		assert_eq!(state.version(), version);
+		drop(data);
+
+		let mut alias = backing.view();
+		let _guard = alias.try_borrow_mut().expect("hold a conflicting borrow");
+		let result: ProgramResult = State::with_versioned_account(&account, &ID, |_| {
+			panic!("foreign owners must reject before exposing fields")
+		});
+
+		assert_eq!(result, Err(ProgramError::InvalidAccountOwner));
+	}
+}
+
+#[test]
+fn checked_versioned_reader_holds_and_releases_the_read_only_borrow() {
+	for version in 0..=2 {
+		let mut backing = ReadOnlyAccount::state(ID, version);
+		let mut alias = backing.view();
+		let account = backing.view();
+		let before = backing.data;
+		let result = State::with_versioned_account(&account, &ID, |state| {
+			assert_eq!(state.version(), version);
+			assert_eq!(
+				alias.try_borrow_mut().map(|_| ()),
+				Err(ProgramError::AccountBorrowFailed),
+			);
+			let (authority, value) = match state {
+				StateVersioned::V0(view) => (view.authority, view.value.get()),
+				StateVersioned::V1(view) => (view.authority, view.value.get()),
+				StateVersioned::Current(view) => (view.authority, view.value.get()),
+			};
+
+			Ok((authority, value))
+		});
+
+		assert_eq!(result, Ok((Address::new_from_array([9; 32]), 42)));
+		assert_eq!(backing.data, before);
+		assert!(
+			alias.try_borrow_mut().is_ok(),
+			"callback released the borrow"
+		);
+	}
+}
+
+#[test]
+fn checked_versioned_reader_propagates_failures_without_calling_the_callback() {
+	let mut backing = ReadOnlyAccount::state(ID, 0);
+	let mut alias = backing.view();
+	let account = backing.view();
+	let guard = alias.try_borrow_mut().expect("hold an exclusive borrow");
+	let result: ProgramResult = State::with_versioned_account(&account, &ID, |_| {
+		panic!("borrow conflicts must reject before the callback")
+	});
+	assert_eq!(result, Err(ProgramError::AccountBorrowFailed));
+	drop(guard);
+
+	backing.data[0] = MigrationAccount::ManualState as u8;
+	let result: ProgramResult = State::with_versioned_account(&account, &ID, |_| {
+		panic!("malformed data must reject before the callback")
+	});
+	assert_eq!(result, Err(ProgramError::InvalidAccountData));
+
+	backing.data[0] = MigrationAccount::State as u8;
+	let result: ProgramResult =
+		State::with_versioned_account(&account, &ID, |_| Err(ProgramError::Custom(42)));
+	assert_eq!(result, Err(ProgramError::Custom(42)));
+	assert!(alias.try_borrow_mut().is_ok(), "errors release the borrow");
+}
+
+#[test]
+fn checked_versioned_reader_validates_ownership_for_compact_histories() {
+	for owner in [ID, Address::new_from_array([7; 32])] {
+		for bytes in [
+			&[MigrationAccount::ManualState as u8, 0, 42][..],
+			&[MigrationAccount::ManualState as u8, 2, 2, b'4', b'2'][..],
+		] {
+			let mut backing = ReadOnlyAccount::new(owner, bytes);
+			let account = backing.view();
+			let result = ManualState::with_versioned_account(&account, &ID, |state| {
+				match state {
+					ManualStateVersioned::V0(view) => assert_eq!(view.amount, 42),
+					ManualStateVersioned::Current(view) => assert_eq!(view.code(), "42"),
+					ManualStateVersioned::V1(_) => panic!("unexpected intermediate version"),
+				}
+
+				Ok(())
+			});
+			let expected = if owner == ID {
+				Ok(())
+			} else {
+				Err(ProgramError::InvalidAccountOwner)
+			};
+
+			assert_eq!(result, expected);
+			assert_eq!(&backing.data[..bytes.len()], bytes);
+		}
+	}
+}
+
 /// The reserved `Migrate` path must reject a mismatched executing program id
 /// before any account is migrated, exactly as ordinary instructions do.
 #[test]
