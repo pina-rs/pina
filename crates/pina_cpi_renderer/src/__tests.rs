@@ -764,6 +764,158 @@ fn renders_anchor_field_discriminators() {
 	assert!(!page.contains("pub discriminator:"));
 }
 
+fn omitted_selector(name: &str, value: u8) -> InstructionArgumentNode {
+	let mut argument = InstructionArgumentNode::new(name, NumberTypeNode::le(U8));
+	argument.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
+	*argument.default_value = Some(NumberValueNode::new(value).into());
+	argument
+}
+
+#[test]
+fn rejects_omitted_arguments_outside_the_discriminator_prefix() {
+	for arguments in [
+		vec![omitted_selector("inner", 0x10)],
+		vec![
+			InstructionArgumentNode::new("value", NumberTypeNode::le(U8)),
+			omitted_selector("inner", 0x10),
+		],
+	] {
+		let instruction =
+			instruction_node("nested", numeric_discriminator(0xa0), vec![], arguments);
+		let root = RootNode::new(program_node(
+			"nested",
+			"11111111111111111111111111111111",
+			vec![instruction],
+		));
+		let error = render_program_to_files(&root, &RenderConfig::default())
+			.expect_err("an omitted constant must never disappear from the wire");
+		assert!(error.to_string().contains("omitted arguments"));
+
+		let files = render_program_to_files(
+			&root,
+			&RenderConfig {
+				skip_unsupported_instructions: true,
+				..RenderConfig::default()
+			},
+		)
+		.unwrap_or_else(|error| panic!("explicit skipping should succeed: {error}"));
+		assert!(!files.contains_key(Path::new("instructions/nested.rs")));
+		assert!(files[Path::new("instructions/mod.rs")].contains("omitted arguments"));
+	}
+}
+
+#[test]
+fn preserves_secondary_field_discriminators_before_caller_arguments() {
+	let mut instruction = instruction_node(
+		"nested",
+		numeric_discriminator(0xa0),
+		vec![],
+		vec![
+			omitted_selector("inner", 0x10),
+			InstructionArgumentNode::new("value", NumberTypeNode::le(U8)),
+		],
+	);
+	instruction.discriminators.insert(
+		0,
+		DiscriminatorNode::Field(codama_nodes::FieldDiscriminatorNode::new("inner", 1)),
+	);
+	let page = render_instruction_page(&instruction, &mut TypeIndex::default())
+		.unwrap_or_else(|error| panic!("adjacent selectors should render: {error}"));
+	assert!(page.contains("const NESTED_DISCRIMINATOR: [u8; 2] = [160, 16];"));
+	assert!(page.contains("data[2..3].copy_from_slice(&self.value.to_le_bytes());"));
+	assert!(page.contains("[0u8; 3]"));
+	assert!(!page.contains("pub inner:"));
+
+	instruction
+		.arguments
+		.insert(1, omitted_selector("version", 3));
+	instruction.discriminators.push(DiscriminatorNode::Field(
+		codama_nodes::FieldDiscriminatorNode::new("version", 2),
+	));
+	let page = render_instruction_page(&instruction, &mut TypeIndex::default())
+		.unwrap_or_else(|error| panic!("several field selectors should render: {error}"));
+	assert!(page.contains("const NESTED_DISCRIMINATOR: [u8; 3] = [160, 16, 3];"));
+	assert!(page.contains("data[3..4].copy_from_slice(&self.value.to_le_bytes());"));
+}
+
+#[test]
+fn rejects_reordered_displaced_and_repeated_discriminator_fields() {
+	let field = |name, offset| {
+		DiscriminatorNode::Field(codama_nodes::FieldDiscriminatorNode::new(name, offset))
+	};
+	for (arguments, discriminators) in [
+		(
+			vec![
+				omitted_selector("outer", 0xa0),
+				omitted_selector("inner", 0x10),
+			],
+			vec![field("inner", 0), field("outer", 1)],
+		),
+		(
+			vec![
+				InstructionArgumentNode::new("value", NumberTypeNode::le(U8)),
+				omitted_selector("inner", 0x10),
+			],
+			vec![numeric_discriminator(0xa0), field("inner", 1)],
+		),
+		(
+			vec![omitted_selector("inner", 0x10)],
+			vec![field("inner", 0), field("inner", 1)],
+		),
+		(
+			vec![
+				omitted_selector("inner", 0x10),
+				omitted_selector("inner", 0x20),
+			],
+			vec![field("inner", 0), field("inner", 1)],
+		),
+	] {
+		let mut instruction =
+			instruction_node("nested", numeric_discriminator(0xa0), vec![], arguments);
+		instruction.discriminators = discriminators;
+		assert!(matches!(
+			render_instruction_page(&instruction, &mut TypeIndex::default()),
+			Err(RenderError::UnsupportedDiscriminator { .. })
+		));
+	}
+}
+
+#[test]
+fn rejects_byte_discriminators_with_a_mismatched_or_variable_width() {
+	for r#type in [
+		TypeNode::from(codama_nodes::FixedSizeTypeNode::new(
+			codama_nodes::BytesTypeNode {},
+			2,
+		)),
+		TypeNode::from(ArrayTypeNode::fixed(NumberTypeNode::le(U8), 2)),
+		TypeNode::from(codama_nodes::BytesTypeNode {}),
+	] {
+		let value = BytesValueNode::new(BytesEncoding::Base16, "a0");
+		let mut argument = InstructionArgumentNode::new("tag", r#type.clone());
+		argument.default_value_strategy = Some(codama_nodes::DefaultValueStrategy::Omitted);
+		*argument.default_value = Some(value.clone().into());
+		for (discriminator, arguments) in [
+			(
+				DiscriminatorNode::Field(codama_nodes::FieldDiscriminatorNode::new("tag", 0)),
+				vec![argument],
+			),
+			(
+				DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+					ConstantValueNode::new(r#type.clone(), value.clone()),
+					0,
+				)),
+				vec![],
+			),
+		] {
+			let instruction = instruction_node("nested", discriminator, vec![], arguments);
+			assert!(matches!(
+				render_instruction_page(&instruction, &mut TypeIndex::default()),
+				Err(RenderError::UnsupportedDiscriminator { .. })
+			));
+		}
+	}
+}
+
 #[test]
 fn renders_byte_array_arguments() {
 	let program = program_node(

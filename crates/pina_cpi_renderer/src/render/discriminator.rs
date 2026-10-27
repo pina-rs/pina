@@ -12,6 +12,7 @@ use codama_nodes::TypeNode;
 use codama_nodes::ValueNode;
 use heck::ToShoutySnakeCase;
 
+use super::args::render_argument;
 use super::helpers::cast_unsigned;
 use super::helpers::decode_base16;
 use crate::error::RenderError;
@@ -66,6 +67,7 @@ pub(crate) fn render_constant_discriminator(
 			}
 		})
 		.collect::<Result<Vec<_>>>()?;
+	validate_omitted_arguments(discriminators, arguments, context)?;
 	parts.sort_unstable_by_key(|(offset, _)| *offset);
 
 	if parts.first().map(|(offset, _)| *offset) != Some(0) {
@@ -95,6 +97,51 @@ pub(crate) fn render_constant_discriminator(
 	})
 }
 
+/// Only discriminator fields are encoded independently of the argument list.
+/// Reject other omitted fields rather than silently moving caller data into them.
+fn validate_omitted_arguments(
+	discriminators: &[DiscriminatorNode],
+	arguments: &[InstructionArgumentNode],
+	context: &str,
+) -> Result<()> {
+	let mut fields = discriminators
+		.iter()
+		.filter_map(|discriminator| {
+			match discriminator {
+				DiscriminatorNode::Field(field) => Some(field),
+				_ => None,
+			}
+		})
+		.collect::<Vec<_>>();
+	fields.sort_unstable_by_key(|field| field.offset);
+	let omitted_count = arguments
+		.iter()
+		.filter(|argument| {
+			argument.default_value_strategy == Some(codama_nodes::DefaultValueStrategy::Omitted)
+		})
+		.count();
+
+	if omitted_count != fields.len()
+		|| fields.iter().enumerate().any(|(index, field)| {
+			arguments.get(index).is_none_or(|argument| {
+				argument.name != field.name
+					|| arguments[..index]
+						.iter()
+						.any(|prior| prior.name == field.name)
+					|| argument.default_value_strategy
+						!= Some(codama_nodes::DefaultValueStrategy::Omitted)
+			})
+		}) {
+		return Err(unsupported_discriminator(
+			context,
+			"omitted arguments must exactly match the leading discriminator fields in wire order"
+				.to_string(),
+		));
+	}
+
+	Ok(())
+}
+
 fn field_discriminator_bytes(argument: &InstructionArgumentNode, context: &str) -> Result<Vec<u8>> {
 	if !matches!(
 		argument.default_value_strategy,
@@ -116,7 +163,7 @@ fn field_discriminator_bytes(argument: &InstructionArgumentNode, context: &str) 
 		(
 			TypeNode::Array(_) | TypeNode::Bytes(_) | TypeNode::FixedSize(_),
 			Some(InstructionInputValueNode::BytesValue(value)),
-		) => bytes_discriminator_bytes(value, context),
+		) => typed_bytes_discriminator(&argument.r#type, value, context),
 		(r#type, Some(value)) => {
 			Err(unsupported_discriminator(
 				context,
@@ -161,7 +208,7 @@ fn discriminator_bytes(
 		(
 			TypeNode::Array(_) | TypeNode::Bytes(_) | TypeNode::FixedSize(_),
 			ValueNode::Bytes(bytes_value),
-		) => bytes_discriminator_bytes(bytes_value, context),
+		) => typed_bytes_discriminator(&discriminator.constant.r#type, bytes_value, context),
 		(other_type, other_value) => {
 			Err(RenderError::UnsupportedDiscriminator {
 				context: context.to_string(),
@@ -174,6 +221,31 @@ fn discriminator_bytes(
 			})
 		}
 	}
+}
+
+/// Literal bytes must fill their declared wire type before following fields are placed.
+fn typed_bytes_discriminator(
+	r#type: &TypeNode,
+	value: &codama_nodes::BytesValueNode,
+	context: &str,
+) -> Result<Vec<u8>> {
+	let bytes = bytes_discriminator_bytes(value, context)?;
+	let layout = render_argument("discriminator", r#type, context).map_err(|error| {
+		unsupported_discriminator(context, format!("constant byte layout: {error}"))
+	})?;
+
+	if layout.variable || bytes.len() != layout.wire_size {
+		return Err(unsupported_discriminator(
+			context,
+			format!(
+				"constant has {} bytes but its declared wire width is {}",
+				bytes.len(),
+				layout.wire_size
+			),
+		));
+	}
+
+	Ok(bytes)
 }
 
 fn number_discriminator_bytes(
