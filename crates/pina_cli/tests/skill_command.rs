@@ -265,6 +265,7 @@ fn partial_install_requires_force_and_preserves_external_hard_links() {
 
 	let refused = pina(&["skill", "install", "--dir", target]);
 	assert_eq!(refused.status.code(), Some(1), "{}", stderr(&refused));
+	assert!(stderr(&refused).contains("--force"), "{}", stderr(&refused));
 	assert_eq!(fs::read_to_string(&reference).unwrap(), "external sentinel");
 	assert!(!destination.join("SKILL.md").exists());
 	assert!(!destination.join("references/cli-and-codegen.md").exists());

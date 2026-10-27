@@ -502,8 +502,17 @@ mod tests {
 	fn install_directory_accepts_existing_directories_under_system_aliases() {
 		use std::os::unix::fs::MetadataExt as _;
 
+		let root = tempfile::tempdir().unwrap();
+		let missing = root.path().join("unavailable-system-alias");
+
 		// macOS traverses /var; merged-/usr Linux distributions traverse /lib.
-		for path in ["/var/tmp", "/lib/systemd", "/var/..", "/lib/.."].map(Path::new) {
+		for path in [
+			Path::new("/var/tmp"),
+			Path::new("/lib/systemd"),
+			Path::new("/var/.."),
+			Path::new("/lib/.."),
+			missing.as_path(),
+		] {
 			if path.is_dir() && !crate::path_security::has_untrusted_link_component(path).unwrap() {
 				let opened = open_install_directory(path)
 					.unwrap()
@@ -519,6 +528,8 @@ mod tests {
 				);
 			}
 		}
+
+		assert!(!missing.exists());
 	}
 
 	#[cfg(unix)]
