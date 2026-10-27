@@ -2,7 +2,7 @@
 //!
 //! This example demonstrates the account and validation shape of a staking
 //! lifecycle:
-//! - initialize a rewards pool under the reward mint authority, with stake and reward vaults
+//! - initialize a rewards pool with a stake vault and a reward vault
 //! - open per-user positions
 //! - deposit stake tokens into the stake vault and withdraw them back out
 //! - update reward bookkeeping against a position account and release
