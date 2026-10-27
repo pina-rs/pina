@@ -389,14 +389,83 @@ fn token_amount(account: &Account) -> u64 {
 }
 
 // ---------------------------------------------------------------------------
-// OpenPosition Tests
+// Initialization Tests
 // ---------------------------------------------------------------------------
 
-/// Verify that `OpenPosition` creates a properly initialised `PositionState`
-/// account via a CPI to the system program.
-///
-/// The test pre-builds a `PoolState` account so that no `InitializePool`
-/// instruction (which requires token CPIs) is needed.
+/// Neither an unrelated signer nor a revoked authority can capture a pool,
+/// including when the reward mint uses Token-2022's extension-free layout.
+#[test]
+fn initialize_pool_requires_the_reward_mint_authority() {
+	let Some(mollusk) = try_create_mollusk() else {
+		eprintln!("{SKIP_MSG}");
+		return;
+	};
+	let admin = Pubkey::new_from_array([31; 32]);
+	let other = Pubkey::new_from_array([32; 32]);
+	let stake_mint = Pubkey::new_from_array([33; 32]);
+	let reward_mint = Pubkey::new_from_array([34; 32]);
+	let (pool, bump) = derive_pool_pda(&stake_mint, &reward_mint);
+	let stake_vault = derive_ata(&pool, &stake_mint);
+	let reward_vault = derive_ata(&pool, &reward_mint);
+
+	for token_program in [spl_token_program_id(), pina::token_2022::ID] {
+		for authority in [Some(other), None] {
+			let mut stake = initialized_mint_account(6, 0);
+			stake.owner = token_program;
+			stake.data[..4].copy_from_slice(&1u32.to_le_bytes());
+			stake.data[4..36].copy_from_slice(admin.as_ref());
+			let mut reward = initialized_mint_account(6, 0);
+			reward.owner = token_program;
+
+			if let Some(authority) = authority {
+				reward.data[..4].copy_from_slice(&1u32.to_le_bytes());
+				reward.data[4..36].copy_from_slice(authority.as_ref());
+			}
+
+			let instruction = Instruction::new_with_bytes(
+				program_id(),
+				&[program::StakingInstruction::InitializePool as u8, bump],
+				vec![
+					AccountMeta::new(admin, true),
+					AccountMeta::new_readonly(stake_mint, false),
+					AccountMeta::new_readonly(reward_mint, false),
+					AccountMeta::new(pool, false),
+					AccountMeta::new(stake_vault, false),
+					AccountMeta::new(reward_vault, false),
+					AccountMeta::new_readonly(spl_ata_program_id(), false),
+					AccountMeta::new_readonly(solana_sdk_ids::system_program::ID, false),
+					AccountMeta::new_readonly(token_program, false),
+				],
+			);
+			let accounts = vec![
+				(
+					admin,
+					Account::new(1_000_000_000, 0, &solana_sdk_ids::system_program::ID),
+				),
+				(stake_mint, stake),
+				(reward_mint, reward),
+				(pool, Account::default()),
+				(stake_vault, Account::default()),
+				(reward_vault, Account::default()),
+				associated_token_program_account(),
+				keyed_account_for_system_program(),
+				(token_program, token_program_account().1),
+			];
+			let result = mollusk.process_and_validate_instruction(
+				&instruction,
+				&accounts,
+				&[Check::err(StakingError::Unauthorized.into())],
+			);
+			assert_eq!(
+				result.resulting_accounts, accounts,
+				"rejection must leave every account unchanged"
+			);
+		}
+	}
+}
+
+/// Verify that `OpenPosition` creates a position via a system-program CPI.
+/// The pre-built pool avoids initialization's token CPIs in this fixture.
 #[test]
 fn open_position_creates_position_state() {
 	let Some(mollusk) = try_create_mollusk() else {

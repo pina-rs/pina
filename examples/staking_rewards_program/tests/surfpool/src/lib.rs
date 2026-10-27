@@ -115,7 +115,7 @@ fn create_account_instruction(
 fn provision_mint(
 	program: &ProgramTest,
 	payer: &Pubkey,
-	authority: &Keypair,
+	authority: &Pubkey,
 	seed: u8,
 ) -> Result<Pubkey, TestError> {
 	let mint = Keypair::new_from_array([seed; 32]);
@@ -132,7 +132,7 @@ fn provision_mint(
 	// InitializeMint2 = tag 20.
 	let mut data = vec![20u8];
 	data.push(DECIMALS);
-	data.extend_from_slice(authority.pubkey().as_ref());
+	data.extend_from_slice(authority.as_ref());
 	data.extend_from_slice(&0u32.to_le_bytes());
 	let initialize = Instruction::new_with_bytes(
 		token_program_id(),
@@ -305,7 +305,7 @@ fn mint_into(
 	program: &ProgramTest,
 	mint: &Pubkey,
 	destination: &Pubkey,
-	authority: &Keypair,
+	authority: &Pubkey,
 	amount: u64,
 ) -> Result<(), TestError> {
 	let mut data = vec![7u8];
@@ -316,13 +316,11 @@ fn mint_into(
 		vec![
 			AccountMeta::new(*mint, false),
 			AccountMeta::new(*destination, false),
-			AccountMeta::new_readonly(authority.pubkey(), true),
+			AccountMeta::new_readonly(*authority, true),
 		],
 	);
 
-	program
-		.send_with_signers(instruction, &[authority])
-		.map(|_| ())
+	program.send_instruction(instruction).map(|_| ())
 }
 
 /// Create a wallet's associated token account directly through the associated
@@ -359,7 +357,7 @@ fn fund_stake_ata(
 	payer: &Pubkey,
 	wallet: &Pubkey,
 	stake_mint: &Pubkey,
-	mint_authority: &Keypair,
+	mint_authority: &Pubkey,
 	amount: u64,
 ) -> Result<(), TestError> {
 	create_ata(program, payer, wallet, stake_mint)?;
@@ -456,16 +454,10 @@ fn rejects_a_non_canonical_stake_ata_on_deposit() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -535,16 +527,10 @@ fn pool_positions_and_stake_accounting() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -602,15 +588,8 @@ fn pool_positions_and_stake_accounting() {
 		// A deposit now moves tokens, so the depositor funds their stake ATA
 		// first; the instruction transfers the deposit into the stake vault
 		// before crediting the position.
-		fund_stake_ata(
-			&program,
-			&admin,
-			&admin,
-			&stake_mint,
-			&mint_authority,
-			DEPOSIT,
-		)
-		.expect("fund depositor's stake ATA");
+		fund_stake_ata(&program, &admin, &admin, &stake_mint, &admin, DEPOSIT)
+			.expect("fund depositor's stake ATA");
 
 		program
 			.send_instruction(deposit_instruction(
@@ -756,16 +735,10 @@ fn rejects_a_shadow_pool_at_a_noncanonical_bump() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		program
@@ -837,16 +810,10 @@ fn rejects_a_duplicate_position_at_a_noncanonical_bump() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		program
@@ -917,16 +884,10 @@ fn rewards_accrue_once_per_index_and_release() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -960,15 +921,8 @@ fn rewards_accrue_once_per_index_and_release() {
 		// Fund the depositor's stake ATA, then deposit: the instruction moves
 		// the stake into the vault, so the tokens must exist before it runs.
 		let staked = 1_000u64;
-		fund_stake_ata(
-			&program,
-			&admin,
-			&admin,
-			&stake_mint,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund stake ATA");
+		fund_stake_ata(&program, &admin, &admin, &stake_mint, &admin, staked)
+			.expect("fund stake ATA");
 		program
 			.send_instruction(deposit_instruction(
 				&program,
@@ -998,8 +952,7 @@ fn rewards_accrue_once_per_index_and_release() {
 		assert_stake_backing(&program, &stake_vault, &pool);
 
 		// Fund the reward vault so a payout has something to release.
-		mint_into(&program, &reward_mint, &reward_vault, &mint_authority, FUND)
-			.expect("fund reward vault");
+		mint_into(&program, &reward_mint, &reward_vault, &admin, FUND).expect("fund reward vault");
 		let vault_before =
 			vault_amount(&program.account(&reward_vault).expect("fetch reward vault"));
 
@@ -1134,16 +1087,10 @@ fn rejects_a_deposit_without_stake_tokens() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -1163,8 +1110,7 @@ fn rejects_a_deposit_without_stake_tokens() {
 			.expect("execute InitializePool");
 
 		// Fill the reward vault: the payout the attacker is about to chase.
-		mint_into(&program, &reward_mint, &reward_vault, &mint_authority, FUND)
-			.expect("fund reward vault");
+		mint_into(&program, &reward_mint, &reward_vault, &admin, FUND).expect("fund reward vault");
 
 		// The attacker funds a wallet and opens a canonical position. Every step
 		// of the original exploit up to the deposit is still available.
@@ -1285,16 +1231,10 @@ fn stake_vault_backs_total_staked() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -1336,15 +1276,8 @@ fn stake_vault_backs_total_staked() {
 					&[depositor],
 				)
 				.expect("execute OpenPosition");
-			fund_stake_ata(
-				&program,
-				&admin,
-				&wallet,
-				&stake_mint,
-				&mint_authority,
-				amount,
-			)
-			.expect("fund depositor's stake ATA");
+			fund_stake_ata(&program, &admin, &wallet, &stake_mint, &admin, amount)
+				.expect("fund depositor's stake ATA");
 
 			program
 				.send_with_signers(
@@ -1425,82 +1358,123 @@ fn stake_vault_backs_total_staked() {
 // ---------------------------------------------------------------------------
 // Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
 //
-// Each test below asserts the *secure* behavior from the audit report. It
-// fails on the current tree because the exploit is still live, and must pass
-// once the corresponding fix lands. They are the acceptance tests for those
-// fixes: run them with `pina test --project examples/staking_rewards_program
+// These acceptance tests assert the secure behavior from the audit report.
+// Run them with `pina test --project examples/staking_rewards_program
 // --filter audit_sec_`.
 // ---------------------------------------------------------------------------
 
-/// SEC-26: the canonical pool PDA for a mint pair is a singleton, and
-/// `InitializePool` stores whichever signer arrives first as the permanent
-/// administrator. An unapproved first caller must not be able to occupy it.
-///
-/// Current behavior: any funded signer initializes the canonical pool and
-/// becomes the stored administrator, so the first `expect_err` below fails
-/// and the test proves the capture is live.
-/// Dormant acceptance test for issue #502: the exploit this test proves is
-/// deferred pending the initialization trust-model decision. Enable the
-/// `audit-deferred` feature and run this test explicitly once the fix lands.
-#[cfg(feature = "audit-deferred")]
+/// Only the reward mint authority may initialize the singleton pool (SEC-26).
 #[test]
-#[ignore = "deferred: issue #502"]
+#[ignore = "run with pina test"]
 fn audit_sec_26_unapproved_first_initializer_cannot_capture_the_singleton_pool() {
 	pina_test::run(async {
 		let program_id = Pubkey::new_from_array(ID.to_bytes());
 		let mut program = ProgramTest::start(program_id)
 			.await
-			.expect("start isolated program test");
-
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
-		let intended_admin = program.payer();
+			.unwrap_or_else(|error| panic!("start isolated program test: {error}"));
+		let payer = program.payer();
+		let authority = Keypair::new_from_array([2; 32]);
+		let admin = authority.pubkey();
 		let attacker = Keypair::new_from_array([0xAD; 32]);
 		program
+			.fund(&admin, FUND)
+			.unwrap_or_else(|error| panic!("fund authority: {error}"));
+		program
 			.fund(&attacker.pubkey(), FUND)
-			.expect("fund attacker");
+			.unwrap_or_else(|error| panic!("fund attacker: {error}"));
 
-		let stake_mint = provision_mint(&program, &intended_admin, &mint_authority, 3)
-			.expect("provision stake mint");
-		let reward_mint = provision_mint(&program, &intended_admin, &mint_authority, 4)
-			.expect("provision reward mint");
-
-		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
+		// Controlling the stake mint does not authorize the reward schedule.
+		let stake_mint = provision_mint(&program, &payer, &attacker.pubkey(), 3)
+			.unwrap_or_else(|error| panic!("provision stake mint: {error}"));
+		let reward_mint = provision_mint(&program, &payer, &admin, 4)
+			.unwrap_or_else(|error| panic!("provision reward mint: {error}"));
+		let (pool, bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
 		let reward_vault = ata_of(&pool, &reward_mint);
-
-		// The attacker races the intended administrator to the canonical pool.
-		let error = program
-			.send_with_signers(
-				initialize_pool_instruction(
-					&program,
-					&attacker.pubkey(),
-					&stake_mint,
-					&reward_mint,
-					&pool,
-					&stake_vault,
-					&reward_vault,
-					pool_bump,
-				),
-				&[&attacker],
+		let initialize = |admin| {
+			initialize_pool_instruction(
+				&program,
+				&admin,
+				&stake_mint,
+				&reward_mint,
+				&pool,
+				&stake_vault,
+				&reward_vault,
+				bump,
 			)
+		};
+
+		let error = program
+			.send_with_signers(initialize(attacker.pubkey()), &[&attacker])
 			.expect_err("an unapproved signer must not capture the canonical pool");
+		pina_test::assert_custom_error(&error, StakingError::Unauthorized as u32);
+		for address in [pool, stake_vault, reward_vault] {
+			assert!(
+				program.account(&address).is_err(),
+				"authorization failure must not create {address}"
+			);
+		}
 
-		// The rejection must not leave any state behind: no pool, no vaults.
-		assert!(
-			program.account(&pool).is_err(),
-			"authorization failure must not create pool state"
-		);
-		let message = error.message();
-		assert!(
-			message.contains("Unauthorized") || message.contains("custom program error"),
-			"expected an authorization rejection, got: {message}"
-		);
+		// Naming the authority without its signature also fails on-chain.
+		let mut unsigned = initialize(admin);
+		unsigned.accounts[0].is_signer = false;
+		let error = program
+			.send_instruction(unsigned)
+			.expect_err("require authority signature");
+		assert!(matches!(
+			error.transaction_error(),
+			Some(pina_test::TransactionError::InstructionError(
+				_,
+				pina_test::InstructionError::MissingRequiredSignature,
+			))
+		));
+		for address in [pool, stake_vault, reward_vault] {
+			assert!(
+				program.account(&address).is_err(),
+				"missing signature must not create {address}"
+			);
+		}
 
-		program.stop().expect("stop isolated program test");
+		let initialize = initialize(admin);
+		program
+			.send_with_signers(initialize.clone(), &[&authority])
+			.unwrap_or_else(|error| panic!("reward mint authority initializes pool: {error}"));
+		let state = program
+			.account(&pool)
+			.unwrap_or_else(|error| panic!("fetch pool: {error}"));
+		assert_pool(&state, &admin, &stake_mint, &reward_mint, 0, bump);
+		for vault in [stake_vault, reward_vault] {
+			assert_eq!(
+				vault_amount(
+					&program
+						.account(&vault)
+						.unwrap_or_else(|error| panic!("fetch vault: {error}"))
+				),
+				0
+			);
+		}
+		// Give the retry a distinct message so it cannot replay the successful
+		// transaction's signature while the recent blockhash is unchanged.
+		let mut budget = vec![2];
+		budget.extend_from_slice(&200_000u32.to_le_bytes());
+		let budget = Instruction::new_with_bytes(
+			Pubkey::from_str_const("ComputeBudget111111111111111111111111111111"),
+			&budget,
+			vec![],
+		);
+		program
+			.send_instructions(&[budget, initialize], &[&authority])
+			.expect_err("reject reinitialization");
+		assert_eq!(
+			program
+				.account(&pool)
+				.unwrap_or_else(|error| panic!("fetch pool: {error}"))
+				.data,
+			state.data
+		);
+		program
+			.stop()
+			.unwrap_or_else(|error| panic!("stop isolated program test: {error}"));
 	});
 }
 
@@ -1520,16 +1494,10 @@ fn audit_sec_27_set_reward_index_rejects_liabilities_beyond_reward_vault_reserve
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -1573,7 +1541,7 @@ fn audit_sec_27_set_reward_index_rejects_liabilities_beyond_reward_vault_reserve
 				&admin,
 				&depositor.pubkey(),
 				&stake_mint,
-				&mint_authority,
+				&admin,
 				staked,
 			)
 			.expect("fund stake ATA");
@@ -1596,14 +1564,8 @@ fn audit_sec_27_set_reward_index_rejects_liabilities_beyond_reward_vault_reserve
 		assert_stake_backing(&program, &stake_vault, &pool);
 
 		// Fund the reward vault with exactly ONE of the two promised payouts.
-		mint_into(
-			&program,
-			&reward_mint,
-			&reward_vault,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund reward vault with half the liability");
+		mint_into(&program, &reward_mint, &reward_vault, &admin, staked)
+			.expect("fund reward vault with half the liability");
 
 		// One full index unit promises one reward token per staked token:
 		// 20 owed against a 10-token vault. The update must be rejected.
@@ -1654,16 +1616,10 @@ fn audit_sec_27_equal_entitlements_do_not_depend_on_claim_order() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -1707,7 +1663,7 @@ fn audit_sec_27_equal_entitlements_do_not_depend_on_claim_order() {
 				&admin,
 				&depositor.pubkey(),
 				&stake_mint,
-				&mint_authority,
+				&admin,
 				staked,
 			)
 			.expect("fund stake ATA");
@@ -1729,14 +1685,8 @@ fn audit_sec_27_equal_entitlements_do_not_depend_on_claim_order() {
 			positions.push((depositor, position));
 		}
 
-		mint_into(
-			&program,
-			&reward_mint,
-			&reward_vault,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund reward vault with half the liability");
+		mint_into(&program, &reward_mint, &reward_vault, &admin, staked)
+			.expect("fund reward vault with half the liability");
 
 		// If the underfunded update is rejected — the SEC-27 fix — equal
 		// treatment is upheld and this test has nothing left to prove.
@@ -1812,16 +1762,10 @@ fn audit_sec_27_an_unrepresentable_index_must_not_freeze_existing_positions() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -1853,15 +1797,8 @@ fn audit_sec_27_an_unrepresentable_index_must_not_freeze_existing_positions() {
 		// Two trillion base units (two million tokens at six decimals): large
 		// enough that `staked * u64::MAX / SCALE` no longer fits a `u64` payout.
 		let staked = 2_000_000_000_000u64;
-		fund_stake_ata(
-			&program,
-			&admin,
-			&admin,
-			&stake_mint,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund stake ATA");
+		fund_stake_ata(&program, &admin, &admin, &stake_mint, &admin, staked)
+			.expect("fund stake ATA");
 		program
 			.send_instruction(deposit_instruction(
 				&program,
@@ -1933,16 +1870,10 @@ fn claims_reduce_the_liability_the_vault_must_back() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -1974,15 +1905,8 @@ fn claims_reduce_the_liability_the_vault_must_back() {
 			.expect("execute OpenPosition");
 
 		let staked = 1_000u64;
-		fund_stake_ata(
-			&program,
-			&admin,
-			&admin,
-			&stake_mint,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund stake ATA");
+		fund_stake_ata(&program, &admin, &admin, &stake_mint, &admin, staked)
+			.expect("fund stake ATA");
 		program
 			.send_instruction(deposit_instruction(
 				&program,
@@ -1998,14 +1922,8 @@ fn claims_reduce_the_liability_the_vault_must_back() {
 
 		// One full drip is owed on the staked balance, so fund the vault with
 		// exactly that payout.
-		mint_into(
-			&program,
-			&reward_mint,
-			&reward_vault,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund the first drip");
+		mint_into(&program, &reward_mint, &reward_vault, &admin, staked)
+			.expect("fund the first drip");
 		program
 			.send_instruction(set_reward_index_instruction(
 				&program,
@@ -2044,14 +1962,8 @@ fn claims_reduce_the_liability_the_vault_must_back() {
 		// A second drip needs only the new increment covered. Before the fix,
 		// this was rejected: the gate re-derived `staked * new_index / SCALE`
 		// from genesis against an emptied vault.
-		mint_into(
-			&program,
-			&reward_mint,
-			&reward_vault,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund the second drip");
+		mint_into(&program, &reward_mint, &reward_vault, &admin, staked)
+			.expect("fund the second drip");
 		program
 			.send_instruction(set_reward_index_instruction(
 				&program,
@@ -2083,16 +1995,10 @@ fn banked_pending_rewards_stay_reserved_until_claimed() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -2124,15 +2030,8 @@ fn banked_pending_rewards_stay_reserved_until_claimed() {
 			.expect("execute OpenPosition");
 
 		let staked = 1_000u64;
-		fund_stake_ata(
-			&program,
-			&admin,
-			&admin,
-			&stake_mint,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund stake ATA");
+		fund_stake_ata(&program, &admin, &admin, &stake_mint, &admin, staked)
+			.expect("fund stake ATA");
 		program
 			.send_instruction(deposit_instruction(
 				&program,
@@ -2147,14 +2046,7 @@ fn banked_pending_rewards_stay_reserved_until_claimed() {
 			.expect("execute Deposit");
 
 		// One full drip over the staked balance, fully funded.
-		mint_into(
-			&program,
-			&reward_mint,
-			&reward_vault,
-			&mint_authority,
-			staked,
-		)
-		.expect("fund the drip");
+		mint_into(&program, &reward_mint, &reward_vault, &admin, staked).expect("fund the drip");
 		program
 			.send_instruction(set_reward_index_instruction(
 				&program,
@@ -2235,16 +2127,10 @@ fn set_reward_index_rejects_a_foreign_reward_mint() {
 			.await
 			.expect("start isolated program test");
 
-		let mint_authority = Keypair::new_from_array([2; 32]);
-		program
-			.fund(&mint_authority.pubkey(), FUND)
-			.expect("fund mint authority");
-
 		let admin = program.payer();
-		let stake_mint =
-			provision_mint(&program, &admin, &mint_authority, 3).expect("provision stake mint");
+		let stake_mint = provision_mint(&program, &admin, &admin, 3).expect("provision stake mint");
 		let reward_mint =
-			provision_mint(&program, &admin, &mint_authority, 4).expect("provision reward mint");
+			provision_mint(&program, &admin, &admin, 4).expect("provision reward mint");
 
 		let (pool, pool_bump) = pool_pda(&program_id, &stake_mint, &reward_mint);
 		let stake_vault = ata_of(&pool, &stake_mint);
@@ -2267,17 +2153,10 @@ fn set_reward_index_rejects_a_foreign_reward_mint() {
 		// the real reward vault: without the stored-mint binding this balance
 		// would satisfy the reserve gate.
 		let foreign_mint =
-			provision_mint(&program, &admin, &mint_authority, 7).expect("provision foreign mint");
+			provision_mint(&program, &admin, &admin, 7).expect("provision foreign mint");
 		let foreign_vault = ata_of(&pool, &foreign_mint);
-		fund_stake_ata(
-			&program,
-			&admin,
-			&pool,
-			&foreign_mint,
-			&mint_authority,
-			1_000_000,
-		)
-		.expect("fund the foreign mint's pool ATA");
+		fund_stake_ata(&program, &admin, &pool, &foreign_mint, &admin, 1_000_000)
+			.expect("fund the foreign mint's pool ATA");
 
 		let error = program
 			.send_instruction(set_reward_index_instruction(
