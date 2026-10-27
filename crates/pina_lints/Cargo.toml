@@ -22,6 +22,8 @@ paste = { workspace = true }
 regex = { default-features = false, version = "^1", features = ["std", "perf"] }
 serde = { workspace = true, default-features = true, features = ["derive"] }
 serde_json = { workspace = true, default-features = true }
+solana-account-view = { default-features = false, version = "^2" }
+solana-program-error = { workspace = true }
 
 [package.metadata.rust-analyzer]
 rustc_private = true

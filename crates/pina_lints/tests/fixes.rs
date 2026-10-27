@@ -175,7 +175,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-solana-account-view = "=2.0.0"
+solana-account-view = "2"
 solana-program-error = "3"
 
 [workspace]
