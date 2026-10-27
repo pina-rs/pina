@@ -247,4 +247,5 @@ fn log_tails_are_bounded_and_tolerate_missing_logs() {
 	);
 	assert_eq!(clean_log_line("\u{1b}[1;32mok\u{1b}[0m\t"), "ok\\t");
 	assert_eq!(clean_log_line("\u{1b}x"), "\\u{1b}x");
+	assert_eq!(clean_log_line("\u{202e}ok\n"), "\\u{202e}ok\\n");
 }

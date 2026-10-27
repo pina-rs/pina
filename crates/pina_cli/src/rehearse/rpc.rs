@@ -30,17 +30,17 @@ pub(crate) struct JsonRpc {
 /// Why one JSON-RPC request failed.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub(crate) enum RpcError {
-	#[error("request failed: {0}")]
+	#[error("request failed: {}", super::report::terminal_text(.0))]
 	Transport(String),
 	#[error("the endpoint redirected with HTTP {0}; redirects are not followed")]
 	Redirect(u16),
 	#[error("the endpoint answered HTTP {0}")]
 	Http(u16),
-	#[error("the response could not be read: {0}")]
+	#[error("the response could not be read: {}", super::report::terminal_text(.0))]
 	Body(String),
-	#[error("JSON-RPC error {code}: {message}")]
+	#[error("JSON-RPC error {code}: {}", super::report::terminal_text(.message))]
 	Rpc { code: i64, message: String },
-	#[error("unexpected response: {0}")]
+	#[error("unexpected response: {}", super::report::terminal_text(.0))]
 	Shape(String),
 }
 

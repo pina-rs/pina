@@ -293,14 +293,10 @@ fn clean_log_line(line: &str) -> String {
 			continue;
 		}
 
-		if character.is_control() {
-			cleaned.extend(character.escape_default());
-		} else {
-			cleaned.push(character);
-		}
+		cleaned.push(character);
 	}
 
-	cleaned
+	super::report::terminal_text(&cleaned)
 }
 
 #[cfg(test)]
