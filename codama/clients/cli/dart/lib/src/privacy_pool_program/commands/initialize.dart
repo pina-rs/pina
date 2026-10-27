@@ -7,7 +7,6 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class InitializeCommand extends Command<void> {
@@ -64,7 +63,8 @@ final class InitializeCommand extends Command<void> {
       ..addOption(
         'program_data',
         mandatory: true,
-        help: "Canonical `ProgramData` for this program, owned by the upgradeable loader",
+        help:
+            "Canonical `ProgramData` for this program, owned by the upgradeable loader",
       );
   }
 
@@ -90,8 +90,9 @@ final class InitializeCommand extends Command<void> {
         : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
     final nullifierSet = (results['nullifier_set'] as String?) != null
         ? pubkey('--nullifier-set', results['nullifier_set']! as String)
-        : (await findNullifierSetPda(programAddress: context.programAddress))
-              .$1;
+        : (await findNullifierSetPda(
+            programAddress: context.programAddress,
+          )).$1;
     final custodianRegistry = (results['custodian_registry'] as String?) != null
         ? pubkey(
             '--custodian-registry',
@@ -110,8 +111,9 @@ final class InitializeCommand extends Command<void> {
           )).$1;
     final disclosureLog = (results['disclosure_log'] as String?) != null
         ? pubkey('--disclosure-log', results['disclosure_log']! as String)
-        : (await findDisclosureLogPda(programAddress: context.programAddress))
-              .$1;
+        : (await findDisclosureLogPda(
+            programAddress: context.programAddress,
+          )).$1;
     final programData = pubkey(
       '--program-data',
       results['program_data']! as String,

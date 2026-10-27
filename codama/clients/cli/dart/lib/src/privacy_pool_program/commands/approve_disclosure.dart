@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class ApproveDisclosureCommand extends Command<void> {
@@ -63,8 +62,9 @@ final class ApproveDisclosureCommand extends Command<void> {
     );
     final disclosureLog = (results['disclosure_log'] as String?) != null
         ? pubkey('--disclosure-log', results['disclosure_log']! as String)
-        : (await findDisclosureLogPda(programAddress: context.programAddress))
-              .$1;
+        : (await findDisclosureLogPda(
+            programAddress: context.programAddress,
+          )).$1;
     final clock = pubkey('--clock', results['clock']! as String);
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getApproveDisclosureInstruction(

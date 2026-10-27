@@ -10,7 +10,6 @@ import 'package:solana_kit_rpc_types/solana_kit_rpc_types.dart'
     hide TransactionVersion;
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class FetchPoolConfigCommand extends Command<void> {
@@ -155,8 +154,9 @@ final class FetchNullifierSetCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
-        : (await findNullifierSetPda(programAddress: context.programAddress))
-              .$1;
+        : (await findNullifierSetPda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
@@ -393,8 +393,9 @@ final class FetchDisclosureLogCommand extends Command<void> {
     final context = await createContext(globalResults!);
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
-        : (await findDisclosureLogPda(programAddress: context.programAddress))
-              .$1;
+        : (await findDisclosureLogPda(
+            programAddress: context.programAddress,
+          )).$1;
     final data = await context.fetchAccount(address);
     final encoded = Account<Uint8List>(
       address: address,
