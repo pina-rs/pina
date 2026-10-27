@@ -1,20 +1,20 @@
-//! Integration tests for machine-applicable lint fixes.
+//! Integration tests for lint fix applicability.
 //!
 //! Each fixable lint is exercised through the same flow `pina lint --fix`
 //! uses: `cargo fix` with the bundled `pina_lint_driver` as the workspace
-//! rustc wrapper. The rewritten source must match the expectation exactly —
-//! proving the suggestion did not mangle the code — and must recompile
-//! without triggering the lint again.
+//! rustc wrapper. Suggestions that shorten account lock lifetimes must leave
+//! both the source and its runtime borrow behavior unchanged.
 
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-/// Unfixed fixture source: every construct the unused-guard fix handles.
+/// Fixture source whose named guards require manual review before removal.
 const UNFIXED_SOURCE: &str = r#"#![allow(dead_code, unused_variables, private_interfaces)]
 
 use solana_account_view::AccountView;
+use solana_program_error::ProgramError;
 
 pub fn dropped_after_binding(account: &mut AccountView) -> u8 {
 	let guard = account.try_borrow_mut().unwrap();
@@ -30,33 +30,64 @@ pub fn read_guard(account: &AccountView) -> usize {
 	let guard = account.try_borrow().unwrap();
 	guard.len()
 }
-"#;
 
-/// The exact source expected after `cargo fix`.
-///
-/// The underscore binding is rewritten into its initializer expression — the
-/// only machine-applicable suggestion for this fixture. The drop-removal
-/// suggestion is `MaybeIncorrect` (removing a later `drop(local);` releases
-/// the borrow earlier than the user wrote it, and intervening code can observe
-/// the held borrow), so cargo fix leaves `dropped_after_binding` untouched and
-/// its warning remains for manual review. The read guard is untouched.
-const FIXED_SOURCE: &str = r#"#![allow(dead_code, unused_variables, private_interfaces)]
+fn write_alias(alias: &mut AccountView) -> Result<(), ProgramError> {
+	alias.try_borrow_mut()?[0] = 42;
 
-use solana_account_view::AccountView;
+	Ok(())
+}
 
-pub fn dropped_after_binding(account: &mut AccountView) -> u8 {
-	let guard = account.try_borrow_mut().unwrap();
+fn shared_lock(account: &mut AccountView, alias: &mut AccountView) -> Result<(), ProgramError> {
+	let _guard = account.try_borrow()?;
+	write_alias(alias)
+}
+
+fn exclusive_lock(account: &mut AccountView, alias: &mut AccountView) -> Result<(), ProgramError> {
+	let _guard = account.try_borrow_mut()?;
+	write_alias(alias)
+}
+
+fn explicit_drop(account: &mut AccountView, alias: &mut AccountView) -> Result<(), ProgramError> {
+	let guard = account.try_borrow_mut()?;
+	let result = write_alias(alias);
 	drop(guard);
-	0
+	result
 }
 
-pub fn underscore_binding(account: &AccountView) {
-	account.try_borrow().unwrap();
-}
+#[test]
+fn named_guards_block_alias_mutation() {
+	use solana_account_view::RuntimeAccount;
 
-pub fn read_guard(account: &AccountView) -> usize {
-	let guard = account.try_borrow().unwrap();
-	guard.len()
+	#[repr(C)]
+	struct Account {
+		header: RuntimeAccount,
+		data: [u8; 1],
+	}
+
+	for lock in [shared_lock, exclusive_lock, explicit_drop] {
+		let mut backing = Box::new(Account {
+			header: RuntimeAccount {
+				borrow_state: solana_account_view::NOT_BORROWED,
+				is_writable: 1,
+				data_len: 1,
+				..RuntimeAccount::default()
+			},
+			data: [7],
+		});
+
+		// SAFETY: The stable allocation has a RuntimeAccount immediately
+		// followed by data_len bytes and outlives both views and all guards.
+		let mut account = unsafe { AccountView::new_unchecked((&raw mut *backing).cast()) };
+		let mut alias = account.clone();
+
+		assert_eq!(
+			lock(&mut account, &mut alias),
+			Err(ProgramError::AccountBorrowFailed),
+		);
+		assert_eq!(account.try_borrow().unwrap()[0], 7);
+		write_alias(&mut alias).unwrap();
+		assert_eq!(account.try_borrow().unwrap()[0], 42);
+	}
 }
 "#;
 
@@ -145,6 +176,7 @@ publish = false
 
 [dependencies]
 solana-account-view = "=2.0.0"
+solana-program-error = "3"
 
 [workspace]
 "#,
@@ -220,8 +252,10 @@ impl Drop for ScratchCrate {
 }
 
 #[test]
-fn machine_applicable_fixes_recompile_without_mangling() {
+fn cargo_fix_preserves_named_guard_locks() {
 	let scratch = ScratchCrate::new("unused-guards", UNFIXED_SOURCE);
+
+	scratch.cargo(&["test", "--lib", "--offline", "--", "--nocapture"]);
 
 	scratch.cargo(&[
 		"fix",
@@ -231,21 +265,17 @@ fn machine_applicable_fixes_recompile_without_mangling() {
 		"--allow-staged",
 		"--allow-no-vcs",
 	]);
+	scratch.cargo(&["test", "--lib", "--offline", "--", "--nocapture"]);
 
-	// The rewritten source must match the expectation exactly: every applied
-	// suggestion is byte-for-byte what the lint advertised.
 	assert_eq!(
 		scratch.source(),
-		FIXED_SOURCE,
-		"the applied fix mangled the scratch crate"
+		UNFIXED_SOURCE,
+		"cargo fix must not shorten a named guard's lifetime"
 	);
 
-	// The fixed source still compiles. The machine-applicable fix is gone;
-	// the MaybeIncorrect drop-removal warning intentionally remains for the
-	// user to review by hand.
 	assert_eq!(
 		scratch.lint_warnings(),
-		1,
-		"only the MaybeIncorrect drop-removal warning should remain"
+		5,
+		"all unread guard warnings should remain for manual review"
 	);
 }

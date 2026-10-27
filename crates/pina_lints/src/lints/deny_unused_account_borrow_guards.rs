@@ -29,6 +29,9 @@ crate::declare_late_lint! {
 	/// guard and never reads it holds that borrow open for nothing, obscures
 	/// the borrow boundary, and can turn a later borrow of the same account
 	/// data into a runtime panic.
+	///
+	/// An unread guard may intentionally hold a scope-based lock. Allow this
+	/// lint locally for that pattern; shortening its lifetime requires review.
 	pub DENY_UNUSED_ACCOUNT_BORROW_GUARDS,
 	Warn,
 	"account borrow guards bound to locals must be read or discarded immediately"
@@ -302,13 +305,14 @@ impl<'tcx> LateLintPass<'tcx> for DenyUnusedAccountBorrowGuards {
 	}
 }
 
-/// Machine-applicable rewrites for flagged guards.
+/// Manual-review suggestions for flagged guards.
 ///
 /// Rewriting a guard binding into its initializer expression preserves the
 /// validation and releases the borrow at the end of the statement. When the
 /// only other occurrence of the binding is a `drop(local);` statement, that
 /// statement is removed in the same suggestion so the rewritten source still
-/// compiles.
+/// compiles. Both forms shorten the guard's lifetime and may release an
+/// intentional account lock, so neither is safe to apply automatically.
 mod suggestion {
 	extern crate rustc_errors;
 	extern crate rustc_span;
@@ -342,13 +346,13 @@ mod suggestion {
 		let initializer_span = guard.initializer_span?;
 		let initializer = source_map.span_to_snippet(initializer_span).ok()? + ";";
 
-		// No `drop(local)` calls: replacing the binding with the initializer
-		// expression only releases the never-read borrow sooner, so the
-		// rewrite is exact.
+		// A named guard may intentionally lock the account until scope exit,
+		// even if its value is never read. Releasing it at statement end can
+		// let an incompatible borrow through an alias succeed.
 		if all_drops == 0 {
 			return Some(Fix {
 				replacement: Replacement::Single(guard.statement_span, initializer),
-				applicability: rustc_errors::Applicability::MachineApplicable,
+				applicability: rustc_errors::Applicability::MaybeIncorrect,
 			});
 		}
 
