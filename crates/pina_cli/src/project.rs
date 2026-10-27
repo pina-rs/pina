@@ -966,24 +966,11 @@ fn extract_anchors(raw: &str) -> Result<Vec<&str>, &'static str> {
 
 /// Find the git repository root for `start`.
 ///
-/// Prefers `git rev-parse --show-toplevel`, which resolves linked worktrees
-/// to the worktree itself, and falls back to the nearest ancestor containing
-/// a `.git` entry (a directory for repositories, a file for worktrees).
+/// The nearest ancestor containing a `.git` entry owns the working tree:
+/// a directory for repositories, a file for linked worktrees and submodules.
+/// Discovery must not launch Git: this root is also used to remove untrusted
+/// workspace executables from `PATH` before spawning package runners.
 fn discover_git_root(start: &Path) -> Option<PathBuf> {
-	let mut command = Command::new("git");
-	sanitize_git_environment(&mut command);
-
-	if let Ok(output) = command
-		.arg("-C")
-		.arg(start)
-		.args(["rev-parse", "--show-toplevel"])
-		.output()
-		&& output.status.success()
-	{
-		let text = String::from_utf8_lossy(&output.stdout);
-		return Some(PathBuf::from(text.trim()));
-	}
-
 	let mut current = Some(start);
 	while let Some(directory) = current {
 		if directory.join(".git").symlink_metadata().is_ok() {
@@ -2161,12 +2148,28 @@ mode = "overwrite"
 	}
 
 	#[test]
-	fn git_root_discovery_prefers_git_for_the_current_worktree() {
+	fn git_root_discovery_finds_the_current_worktree() {
 		let root = discover_git_root(Path::new(env!("CARGO_MANIFEST_DIR")))
 			.expect("current crate belongs to a git worktree");
 
 		assert!(root.join(".git").exists());
 		assert!(root.join("Cargo.toml").is_file());
+	}
+
+	#[test]
+	fn git_root_discovery_uses_the_nearest_repository_or_worktree_marker() {
+		let temp = TempDir::new().expect("create temp dir");
+		let repository = temp.path().join("repository");
+		let worktree = repository.join("nested-worktree");
+		let project = worktree.join("crates/program");
+		std::fs::create_dir_all(repository.join(".git")).expect("create repository marker");
+		std::fs::create_dir_all(&project).expect("create nested project");
+		assert_eq!(discover_git_root(&project), Some(repository));
+
+		std::fs::write(worktree.join(".git"), "gitdir: /unused/worktrees/nested\n")
+			.expect("write worktree marker");
+		assert_eq!(discover_git_root(&project), Some(worktree));
+		assert_eq!(discover_git_root(temp.path()), None);
 	}
 
 	#[test]
