@@ -166,6 +166,7 @@ pub fn import_idl(options: &ImportOptions) -> Result<ImportOutcome, ImportError>
 	let digest = sha256_hex(&idl_bytes);
 
 	let crate_dir = options.output.join(&options.name);
+	crate::codama::validate_render_target(&crate_dir)?;
 	let normalized = normalize_to_codama(&idl_bytes, &options.npx)?;
 	let root = apply_program_id(&normalized, &program_id)?;
 
@@ -180,18 +181,19 @@ pub fn import_idl(options: &ImportOptions) -> Result<ImportOutcome, ImportError>
 		..RenderConfig::default()
 	};
 
-	// The renderer validates every page before writing, so a failure here leaves
-	// any existing crate untouched.
-	pina_cpi_renderer::render_root_node(&root, &crate_dir, &config)
-		.map_err(|source| ImportError::Render { source })?;
-
 	let provenance = Provenance {
 		name: &options.name,
 		program_id: &program_id,
 		source: options.source.describe(),
 		sha256: &digest,
 	};
-	let changed = write_provenance(&crate_dir, &provenance)?;
+	let changed = pina_cpi_renderer::render_root_node_with_readme(
+		&root,
+		&crate_dir,
+		&config,
+		&provenance.render(),
+	)
+	.map_err(|source| ImportError::Render { source })?;
 
 	Ok(ImportOutcome {
 		crate_dir,
@@ -514,32 +516,6 @@ fn redact_url_credentials(url: &str) -> String {
 	parsed.to_string()
 }
 
-/// Writes the provenance README into a rendered crate.
-///
-/// Returns whether the file changed, so a re-import of an unchanged IDL reports
-/// a no-op instead of a rewrite.
-fn write_provenance(crate_dir: &Path, provenance: &Provenance<'_>) -> Result<bool, ImportError> {
-	let readme_path = crate_dir.join("README.md");
-	let readme = provenance.render();
-	let changed = std::fs::read_to_string(&readme_path).ok().as_deref() != Some(readme.as_str());
-	write_if_changed(&readme_path, &readme)?;
-
-	Ok(changed)
-}
-
-fn write_if_changed(path: &Path, contents: &str) -> Result<(), ImportError> {
-	if std::fs::read_to_string(path).ok().as_deref() == Some(contents) {
-		return Ok(());
-	}
-
-	std::fs::write(path, contents).map_err(|source| {
-		ImportError::WriteFile {
-			path: path.to_path_buf(),
-			source,
-		}
-	})
-}
-
 /// Hex-encoded SHA-256 of `bytes`.
 fn sha256_hex(bytes: &[u8]) -> String {
 	use sha2::Digest;
@@ -686,14 +662,86 @@ mod tests {
 	#[test]
 	fn reports_render_failures_from_the_renderer() {
 		let temp = tempfile::TempDir::new().expect("temp");
-		// The output path is a file, so the crate directory cannot be created.
-		let blocker = temp.path().join("blocker");
-		std::fs::write(&blocker, b"occupied").expect("write blocker");
+		let crate_dir = temp.path().join("switchboard");
+		std::fs::create_dir_all(crate_dir.join("README.md")).expect("readme directory");
 
-		let error = import_idl(&options(blocker, ImportSource::File(fixture_path())))
-			.err()
-			.expect("an unusable output path must fail the render");
+		let error = import_idl(&options(
+			temp.path().to_path_buf(),
+			ImportSource::File(fixture_path()),
+		))
+		.err()
+		.expect("an unusable output path must fail the render");
 		assert!(matches!(error, ImportError::Render { .. }));
+		assert!(!crate_dir.join("src").exists());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn rejects_provenance_links_before_rendering_in_every_mode() {
+		use std::os::unix::fs::symlink;
+
+		for mode in [
+			GenerationMode::Auto,
+			GenerationMode::Update,
+			GenerationMode::Create,
+			GenerationMode::Overwrite,
+		] {
+			for dangling in [false, true] {
+				let temp = tempfile::TempDir::new().expect("temp");
+				let crate_dir = temp.path().join("switchboard");
+				let sentinel = temp.path().join("external.md");
+				std::fs::create_dir(&crate_dir).expect("crate directory");
+
+				if !dangling {
+					std::fs::write(&sentinel, "external sentinel").expect("sentinel");
+				}
+
+				symlink(&sentinel, crate_dir.join("README.md")).expect("readme link");
+				let mut options = options(
+					temp.path().to_path_buf(),
+					ImportSource::File(fixture_path()),
+				);
+				options.mode = mode;
+				assert!(matches!(
+					import_idl(&options),
+					Err(ImportError::UnsafeOutput(_))
+				));
+				assert!(
+					std::fs::symlink_metadata(crate_dir.join("README.md"))
+						.expect("link")
+						.file_type()
+						.is_symlink()
+				);
+				assert!(!crate_dir.join("src").exists());
+
+				if dangling {
+					assert!(!sentinel.exists());
+				} else {
+					assert_eq!(
+						std::fs::read_to_string(&sentinel).expect("sentinel"),
+						"external sentinel"
+					);
+				}
+			}
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn rejects_symlinked_import_ancestors() {
+		use std::os::unix::fs::symlink;
+
+		let temp = tempfile::TempDir::new().expect("temp");
+		let outside = temp.path().join("outside");
+		let output = temp.path().join("output");
+		std::fs::create_dir(&outside).expect("outside");
+		std::fs::write(outside.join("sentinel"), "unchanged").expect("sentinel");
+		symlink(&outside, &output).expect("output link");
+
+		let error = import_idl(&options(output, ImportSource::File(fixture_path())))
+			.expect_err("linked ancestor");
+		assert!(matches!(error, ImportError::UnsafeOutput(_)));
+		assert_eq!(std::fs::read_dir(outside).expect("outside").count(), 1);
 	}
 }
 
@@ -1118,17 +1166,6 @@ mod coverage {
 		.err()
 		.expect("naming two sources must be rejected");
 		assert!(error.to_string().contains("cannot be used together"));
-	}
-
-	#[test]
-	fn reports_provenance_write_failures() {
-		let temp = tempfile::TempDir::new().expect("temp");
-		// The parent directory does not exist, so the write fails.
-		let readme = temp.path().join("missing").join("README.md");
-		let error = write_if_changed(&readme, "provenance")
-			.err()
-			.expect("a failed write must be reported");
-		assert!(error.to_string().contains("could not write"));
 	}
 
 	#[test]

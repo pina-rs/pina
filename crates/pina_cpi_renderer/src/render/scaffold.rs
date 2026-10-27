@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -10,6 +11,7 @@ use cap_std::ambient_authority;
 use cap_std::fs::Dir;
 use cap_std::fs::Metadata;
 use cap_std::fs::OpenOptions;
+use cap_tempfile::TempFile;
 
 use super::helpers::rust_string_literal;
 use super::helpers::snake;
@@ -22,6 +24,56 @@ pub(crate) fn open_crate_dir(crate_dir: &Path) -> Result<Dir> {
 	fs::create_dir_all(crate_dir).map_err(|source| write_file_error(crate_dir, source))?;
 	Dir::open_ambient_dir(crate_dir, ambient_authority())
 		.map_err(|source| write_file_error(crate_dir, source))
+}
+
+pub(crate) fn readme_changed(crate_dir: &Dir, crate_path: &Path, content: &str) -> Result<bool> {
+	let path = crate_path.join("README.md");
+	let metadata = optional_metadata(&path, crate_dir.symlink_metadata("README.md"))?;
+
+	if metadata.is_some_and(|metadata| !is_regular_readme(&metadata)) {
+		return Err(unsafe_output(
+			path,
+			"the provenance README must be a regular file",
+		));
+	}
+
+	let mut options = OpenOptions::new();
+	options.read(true).follow(FollowSymlinks::No);
+	let mut file = match crate_dir.open_with("README.md", &options) {
+		Ok(file) => file,
+		Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+		Err(source) => return Err(read_file_error(&path, source)),
+	};
+
+	let mut previous = Vec::new();
+	file.read_to_end(&mut previous)
+		.map_err(|source| read_file_error(&path, source))?;
+
+	Ok(previous != content.as_bytes())
+}
+
+fn is_regular_readme(metadata: &Metadata) -> bool {
+	#[cfg(windows)]
+	{
+		use cap_std::fs::MetadataExt as _;
+
+		if metadata.file_attributes() & 0x400 != 0 {
+			return false;
+		}
+	}
+
+	metadata.is_file()
+}
+
+pub(crate) fn write_readme(crate_dir: &Dir, crate_path: &Path, content: &str) -> Result<()> {
+	let path = crate_path.join("README.md");
+	// Atomic replacement also leaves an external hard-link target untouched and
+	// cannot follow a link installed after the no-follow read above.
+	let mut file = TempFile::new(crate_dir).map_err(|source| write_file_error(&path, source))?;
+	file.write_all(content.as_bytes())
+		.map_err(|source| write_file_error(&path, source))?;
+	file.replace("README.md")
+		.map_err(|source| write_file_error(&path, source))
 }
 
 /// Scaffolds a standalone CPI crate for the rendered program.
@@ -243,6 +295,123 @@ mod tests {
 	use std::time::UNIX_EPOCH;
 
 	use super::*;
+
+	#[test]
+	fn provenance_replacement_preserves_external_hard_links_and_unchanged_files() {
+		let temp = tempfile::tempdir().unwrap();
+		let root = temp.path().join("crate");
+		let handle = open_crate_dir(&root).unwrap();
+		let sentinel = temp.path().join("sentinel");
+		fs::write(&sentinel, b"external sentinel").unwrap();
+		fs::hard_link(&sentinel, root.join("README.md")).unwrap();
+
+		assert!(readme_changed(&handle, &root, "provenance").unwrap());
+		write_readme(&handle, &root, "provenance").unwrap();
+		assert_eq!(fs::read(&sentinel).unwrap(), b"external sentinel");
+		assert_eq!(fs::read(root.join("README.md")).unwrap(), b"provenance");
+		assert!(!readme_changed(&handle, &root, "provenance").unwrap());
+		assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+	}
+
+	#[test]
+	fn provenance_refuses_directories_and_reports_replacement_failures() {
+		let temp = tempfile::tempdir().unwrap();
+		let root = temp.path().join("crate");
+		let handle = open_crate_dir(&root).unwrap();
+		fs::create_dir(root.join("README.md")).unwrap();
+
+		assert!(matches!(
+			readme_changed(&handle, &root, "provenance"),
+			Err(RenderError::UnsafeOutputPath { .. })
+		));
+		assert!(matches!(
+			write_readme(&handle, &root, "provenance"),
+			Err(RenderError::WriteFile { .. })
+		));
+		assert_eq!(
+			fs::read_dir(&root).unwrap().count(),
+			1,
+			"temporary files must be cleaned up"
+		);
+		fs::remove_dir(root.join("README.md")).unwrap();
+		fs::remove_dir(&root).unwrap();
+		assert!(write_readme(&handle, &root, "provenance").is_err());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn provenance_uses_the_pinned_directory_after_path_and_readme_replacement() {
+		use std::os::unix::fs::symlink;
+
+		let temp = tempfile::tempdir().unwrap();
+		let root = temp.path().join("crate");
+		let moved = temp.path().join("moved");
+		let outside = temp.path().join("outside");
+		let sentinel = outside.join("README.md");
+		let handle = open_crate_dir(&root).unwrap();
+		fs::create_dir(&outside).unwrap();
+		fs::write(&sentinel, b"external sentinel").unwrap();
+		assert!(readme_changed(&handle, &root, "provenance").unwrap());
+		fs::rename(&root, &moved).unwrap();
+		symlink(&outside, &root).unwrap();
+		symlink(&sentinel, moved.join("README.md")).unwrap();
+
+		write_readme(&handle, &root, "provenance").unwrap();
+		assert_eq!(fs::read(&sentinel).unwrap(), b"external sentinel");
+		assert_eq!(fs::read(moved.join("README.md")).unwrap(), b"provenance");
+		assert!(
+			!fs::symlink_metadata(moved.join("README.md"))
+				.unwrap()
+				.file_type()
+				.is_symlink()
+		);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn provenance_refuses_existing_and_dangling_readme_links() {
+		use std::os::unix::fs::symlink;
+
+		let temp = tempfile::tempdir().unwrap();
+		let root = temp.path().join("crate");
+		let handle = open_crate_dir(&root).unwrap();
+		let sentinel = temp.path().join("sentinel");
+
+		for existing in [false, true] {
+			if existing {
+				fs::write(&sentinel, "provenance").unwrap();
+			}
+
+			symlink(&sentinel, root.join("README.md")).unwrap();
+			assert!(matches!(
+				readme_changed(&handle, &root, "provenance"),
+				Err(RenderError::UnsafeOutputPath { .. })
+			));
+			fs::remove_file(root.join("README.md")).unwrap();
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn provenance_reports_read_and_temporary_file_permission_failures() {
+		use std::os::unix::fs::PermissionsExt as _;
+
+		let temp = tempfile::tempdir().unwrap();
+		let root = temp.path().join("crate");
+		let handle = open_crate_dir(&root).unwrap();
+		let readme = root.join("README.md");
+		fs::write(&readme, "original").unwrap();
+		fs::set_permissions(&readme, fs::Permissions::from_mode(0o000)).unwrap();
+		let read = readme_changed(&handle, &root, "provenance");
+		fs::set_permissions(&readme, fs::Permissions::from_mode(0o644)).unwrap();
+		assert!(matches!(read, Err(RenderError::ReadFile { .. })));
+
+		fs::set_permissions(&root, fs::Permissions::from_mode(0o555)).unwrap();
+		let write = write_readme(&handle, &root, "provenance");
+		fs::set_permissions(&root, fs::Permissions::from_mode(0o755)).unwrap();
+		assert!(matches!(write, Err(RenderError::WriteFile { .. })));
+		assert_eq!(fs::read_to_string(readme).unwrap(), "original");
+	}
 
 	#[cfg(unix)]
 	#[test]
