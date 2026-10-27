@@ -5,6 +5,14 @@
 //! verbatim, and the exit status a script reads.
 
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::symlink as symlink_file;
+#[cfg(unix)]
+use std::os::unix::fs::symlink as symlink_dir;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_dir;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_file;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -146,6 +154,152 @@ fn install_refuses_to_overwrite_and_force_replaces() {
 
 	let forced = pina(&["skill", "install", "--dir", target, "--force"]);
 	assert!(forced.status.success(), "stderr: {}", stderr(&forced));
+}
+
+#[cfg(any(unix, windows))]
+#[test]
+fn install_rejects_linked_documents_including_dangling_links_even_with_force() {
+	let root = scratch("linked-documents");
+
+	for force in [false, true] {
+		for dangling in [false, true] {
+			for document in ["SKILL.md", "references/migrations.md"] {
+				let case = tempfile::tempdir_in(&root).unwrap_or_else(|e| panic!("case: {e}"));
+				let destination = case.path().join("pina");
+				let external = case.path().join("external.json");
+				fs::create_dir_all(destination.join("references")).unwrap();
+				let earlier = destination.join("references/cli-and-codegen.md");
+
+				if force {
+					fs::write(&earlier, "curated reference").unwrap();
+				}
+
+				if !dangling {
+					fs::write(&external, "external sentinel").unwrap();
+				}
+
+				symlink_file(&external, destination.join(document)).unwrap();
+				let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+				command
+					.args(["skill", "install", "--dir"])
+					.arg(&destination);
+
+				if force {
+					command.arg("--force");
+				}
+
+				let output = command.output().unwrap();
+				assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+				assert!(
+					fs::symlink_metadata(destination.join(document))
+						.unwrap()
+						.is_symlink()
+				);
+
+				if force {
+					assert_eq!(fs::read_to_string(&earlier).unwrap(), "curated reference");
+				} else {
+					assert!(!earlier.exists());
+				}
+
+				if dangling {
+					assert!(!external.exists());
+				} else {
+					assert_eq!(fs::read_to_string(&external).unwrap(), "external sentinel");
+				}
+			}
+		}
+	}
+}
+
+#[cfg(any(unix, windows))]
+#[test]
+fn install_rejects_linked_directories_and_ancestors_even_with_force() {
+	let root = scratch("linked-directories");
+
+	for force in [false, true] {
+		for linked in ["pina", "ancestor", "pina/references"] {
+			let case = tempfile::tempdir_in(&root).unwrap();
+			let external = case.path().join("external");
+			let link = case.path().join(linked);
+			fs::create_dir(&external).unwrap();
+			fs::write(external.join("sentinel"), "external sentinel").unwrap();
+			fs::create_dir_all(link.parent().unwrap()).unwrap();
+			symlink_dir(&external, &link).unwrap();
+			let destination = if linked == "ancestor" {
+				link.join("pina")
+			} else {
+				case.path().join("pina")
+			};
+			let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+			command
+				.args(["skill", "install", "--dir"])
+				.arg(&destination);
+
+			if force {
+				command.arg("--force");
+			}
+
+			let output = command.output().unwrap();
+			assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+			assert!(fs::symlink_metadata(&link).unwrap().is_symlink());
+			assert_eq!(fs::read_dir(&external).unwrap().count(), 1);
+			assert_eq!(
+				fs::read_to_string(external.join("sentinel")).unwrap(),
+				"external sentinel"
+			);
+		}
+	}
+}
+
+#[test]
+fn partial_install_requires_force_and_preserves_external_hard_links() {
+	let root = scratch("hard-linked-document");
+	let destination = root.join("pina");
+	let external = root.join("external.json");
+	let reference = destination.join("references/migrations.md");
+	fs::create_dir_all(reference.parent().unwrap()).unwrap();
+	fs::write(&external, "external sentinel").unwrap();
+	fs::hard_link(&external, &reference).unwrap();
+	let target = destination.to_str().unwrap();
+
+	let refused = pina(&["skill", "install", "--dir", target]);
+	assert_eq!(refused.status.code(), Some(1), "{}", stderr(&refused));
+	assert_eq!(fs::read_to_string(&reference).unwrap(), "external sentinel");
+	assert!(!destination.join("SKILL.md").exists());
+	assert!(!destination.join("references/cli-and-codegen.md").exists());
+
+	let forced = pina(&["skill", "install", "--dir", target, "--force"]);
+	assert!(forced.status.success(), "{}", stderr(&forced));
+	assert_eq!(fs::read_to_string(&external).unwrap(), "external sentinel");
+	assert!(
+		fs::read_to_string(&reference)
+			.unwrap()
+			.contains("abiVersion")
+	);
+}
+
+#[test]
+fn install_rejects_unexpected_output_types_before_replacing_documents() {
+	let root = scratch("unexpected-output-types");
+
+	for blocked in ["references", "references/migrations.md", "SKILL.md"] {
+		let case = tempfile::tempdir_in(&root).unwrap();
+		let destination = case.path().join("pina");
+		fs::create_dir_all(destination.join("references")).unwrap();
+
+		if blocked == "references" {
+			fs::remove_dir(destination.join("references")).unwrap();
+			fs::write(destination.join(blocked), "not a directory").unwrap();
+		} else {
+			fs::create_dir(destination.join(blocked)).unwrap();
+		}
+
+		let target = destination.to_str().unwrap();
+		let output = pina(&["skill", "install", "--dir", target, "--force"]);
+		assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+		assert!(!destination.join("references/cli-and-codegen.md").exists());
+	}
 }
 
 #[test]

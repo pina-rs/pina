@@ -10,9 +10,16 @@
 //! step by `scripts/docs/sync-skill.mjs`; `verify:docs` fails when the copy
 //! drifts.
 
+use std::io;
+use std::io::Write as _;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
+use cap_fs_ext::DirExt as _;
+use cap_std::ambient_authority;
+use cap_std::fs::Dir;
+use cap_std::fs::OpenOptions;
 use owo_colors::OwoColorize;
 
 /// The entrypoint document agents load first.
@@ -102,7 +109,7 @@ pub enum SkillError {
 	MissingDestination,
 	/// The destination already holds a skill and `--force` was not passed.
 	DestinationExists {
-		/// The directory that already holds a `SKILL.md`.
+		/// The directory that already holds a bundled skill document.
 		destination: PathBuf,
 	},
 	/// Writing the tree failed.
@@ -110,7 +117,7 @@ pub enum SkillError {
 		/// The directory that was being written.
 		destination: PathBuf,
 		/// The underlying I/O error.
-		source: std::io::Error,
+		source: io::Error,
 	},
 }
 
@@ -221,27 +228,154 @@ fn install(destination: Option<PathBuf>, force: bool) -> Result<SkillOutcome, Sk
 	if destination.join("SKILL.md").exists() && !force {
 		return Err(SkillError::DestinationExists { destination });
 	}
-	let files = write_tree(&destination).map_err(|source| {
-		SkillError::Write {
-			destination: destination.clone(),
-			source,
+	let files = write_tree(&destination, force).map_err(|source| {
+		if source.kind() == io::ErrorKind::AlreadyExists {
+			SkillError::DestinationExists {
+				destination: destination.clone(),
+			}
+		} else {
+			SkillError::Write {
+				destination: destination.clone(),
+				source,
+			}
 		}
 	})?;
 	Ok(SkillOutcome::Installed { destination, files })
 }
 
 /// Write every bundled document under `directory`, returning the file count.
-fn write_tree(directory: &Path) -> std::io::Result<usize> {
-	// The install paths come from the static table, never from input, so these
-	// joins cannot escape the destination. The entrypoint goes last: a failed
-	// partial install leaves no `SKILL.md`, so the next install is not mistaken
-	// for a clobber of an existing skill.
-	std::fs::create_dir_all(directory.join("references"))?;
-	for topic in TOPICS.iter().skip(1) {
-		std::fs::write(directory.join(topic.file), topic.content)?;
+fn write_tree(directory: &Path, force: bool) -> io::Result<usize> {
+	let directory = open_install_directory(directory)?;
+	let references = open_child_directory(&directory, Path::new("references"))?;
+	let documents = TOPICS.iter().skip(1).chain(TOPICS.iter().take(1));
+	let mut outputs = Vec::with_capacity(TOPICS.len());
+
+	// Inspect every output before changing any document, including dangling
+	// links and special files. The pinned handles and create_new below enforce
+	// safety even if an entry changes after this preflight.
+	for topic in documents {
+		let parent = if topic.file == "SKILL.md" {
+			&directory
+		} else {
+			&references
+		};
+		let name = topic.file.strip_prefix("references/").unwrap_or(topic.file);
+
+		match parent.symlink_metadata(name) {
+			Ok(metadata) if !is_regular_document(&metadata) => {
+				return Err(io::Error::other(format!(
+					"refusing to replace non-regular skill document {}",
+					topic.file
+				)));
+			}
+			Ok(_) if !force => return Err(io::ErrorKind::AlreadyExists.into()),
+			Ok(_) => {}
+			Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+			Err(error) => return Err(error),
+		}
+
+		outputs.push((parent, name, topic.content));
 	}
-	std::fs::write(directory.join("SKILL.md"), SKILL_ENTRY)?;
+
+	// SKILL.md goes last so a failed fresh install can be retried. Replace
+	// directory entries rather than truncating existing (possibly hard-linked)
+	// files; exclusive creation refuses any link introduced concurrently.
+	for (parent, name, content) in outputs {
+		write_document(parent, Path::new(name), content, force)?;
+	}
+
 	Ok(TOPICS.len())
+}
+
+/// Special files and Windows reparse points are never replacement candidates.
+fn is_regular_document(metadata: &cap_std::fs::Metadata) -> bool {
+	#[cfg(windows)]
+	{
+		use cap_std::fs::MetadataExt as _;
+
+		if metadata.file_attributes() & 0x400 != 0 {
+			return false;
+		}
+	}
+
+	metadata.is_file()
+}
+
+/// Pin each destination ancestor without following repository-controlled links.
+fn open_install_directory(path: &Path) -> io::Result<Dir> {
+	if crate::path_security::has_untrusted_link_component(path)? {
+		return Err(io::Error::other(
+			"skill destination contains a symbolic link or reparse point",
+		));
+	}
+
+	// Resolve lexical parents before opening handles: traversing `..` from a
+	// directory that was moved concurrently could escape the selected ancestry.
+	let mut absolute = PathBuf::new();
+	let mut first = true;
+
+	for component in std::path::absolute(path)?.components() {
+		if component == Component::ParentDir {
+			absolute.pop();
+		} else {
+			absolute.push(component);
+
+			// Expand trusted system aliases before resolving parents so /var/..
+			// keeps its filesystem meaning on macOS. Only root can swap these.
+			if first
+				&& matches!(component, Component::Normal(_))
+				&& std::fs::symlink_metadata(&absolute).is_ok_and(|meta| meta.is_symlink())
+			{
+				absolute = std::fs::canonicalize(&absolute)?;
+			}
+		}
+
+		if !matches!(component, Component::Prefix(_) | Component::RootDir) {
+			first = false;
+		}
+	}
+
+	let mut components = absolute.components().peekable();
+	let mut root = PathBuf::new();
+
+	while let Some(component) = components
+		.next_if(|component| matches!(component, Component::Prefix(_) | Component::RootDir))
+	{
+		root.push(component);
+	}
+
+	let mut directory = Dir::open_ambient_dir(&root, ambient_authority())?;
+
+	for component in components {
+		directory = open_child_directory(&directory, Path::new(component.as_os_str()))?;
+	}
+
+	Ok(directory)
+}
+
+/// Create or pin one child, refusing links even if creation races another writer.
+fn open_child_directory(parent: &Dir, name: &Path) -> io::Result<Dir> {
+	match parent.create_dir(name) {
+		Ok(()) => {}
+		Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+		Err(error) => return Err(error),
+	}
+
+	parent.open_dir_nofollow(name)
+}
+
+/// Replace a document entry without ever opening a pre-existing file for writing.
+fn write_document(parent: &Dir, name: &Path, content: &str, force: bool) -> io::Result<()> {
+	if force {
+		match parent.remove_file(name) {
+			Ok(()) => {}
+			Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+			Err(error) => return Err(error),
+		}
+	}
+
+	let mut file = parent.open_with(name, OpenOptions::new().write(true).create_new(true))?;
+	file.write_all(content.as_bytes())
 }
 
 /// The agent runtimes this machine is known to use, in the order to print them.
@@ -307,6 +441,130 @@ pub fn report(outcome: Result<SkillOutcome, SkillError>) {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn install_supports_parent_components_and_missing_directories() {
+		let root = tempfile::tempdir().unwrap();
+		let destination = root.path().join("child/../pina");
+		let outcome = install(Some(destination), false);
+
+		assert!(
+			matches!(outcome, Ok(SkillOutcome::Installed { .. })),
+			"{outcome:?}"
+		);
+		assert_eq!(
+			std::fs::read_to_string(root.path().join("pina/SKILL.md")).unwrap(),
+			SKILL_ENTRY
+		);
+	}
+
+	#[test]
+	fn exclusive_document_writes_preserve_existing_files_and_report_failures() {
+		let root = tempfile::tempdir().unwrap();
+		let directory = open_install_directory(root.path()).unwrap();
+		let document = Path::new("SKILL.md");
+		write_document(&directory, document, "curated", false).unwrap();
+
+		assert!(write_document(&directory, document, "replacement", false).is_err());
+		assert_eq!(
+			std::fs::read_to_string(root.path().join(document)).unwrap(),
+			"curated"
+		);
+		assert!(write_document(&directory, Path::new("absent/file"), "content", true).is_err());
+		assert!(open_child_directory(&directory, Path::new("absent/child")).is_err());
+
+		std::fs::create_dir(root.path().join("blocked")).unwrap();
+		assert!(write_document(&directory, Path::new("blocked"), "content", true).is_err());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn install_reports_unsearchable_reference_directories_without_changing_documents() {
+		use std::os::unix::fs::PermissionsExt as _;
+
+		let root = tempfile::tempdir().unwrap();
+		let references = root.path().join("references");
+		std::fs::create_dir(&references).unwrap();
+		std::fs::set_permissions(&references, std::fs::Permissions::from_mode(0o400)).unwrap();
+		let outcome = install(Some(root.path().to_path_buf()), false);
+		std::fs::set_permissions(&references, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+		assert!(
+			matches!(outcome, Err(SkillError::Write { .. })),
+			"{outcome:?}"
+		);
+		assert!(!root.path().join("SKILL.md").exists());
+		assert_eq!(std::fs::read_dir(references).unwrap().count(), 0);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn install_directory_accepts_existing_directories_under_system_aliases() {
+		use std::os::unix::fs::MetadataExt as _;
+
+		// macOS traverses /var; merged-/usr Linux distributions traverse /lib.
+		for path in ["/var/tmp", "/lib/systemd", "/var/..", "/lib/.."].map(Path::new) {
+			if path.is_dir() && !crate::path_security::has_untrusted_link_component(path).unwrap() {
+				let opened = open_install_directory(path)
+					.unwrap()
+					.into_std_file()
+					.metadata()
+					.unwrap();
+				let expected = std::fs::metadata(path).unwrap();
+				assert_eq!(
+					(opened.dev(), opened.ino()),
+					(expected.dev(), expected.ino()),
+					"{}",
+					path.display()
+				);
+			}
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn pinned_directories_and_exclusive_creation_defeat_late_link_replacement() {
+		use std::os::unix::fs::symlink;
+
+		let root = tempfile::tempdir().unwrap();
+		let destination = root.path().join("pina");
+		let directory = open_install_directory(&destination).unwrap();
+		let references = open_child_directory(&directory, Path::new("references")).unwrap();
+		let external = root.path().join("external");
+		std::fs::create_dir(&external).unwrap();
+		std::fs::write(external.join("migrations.md"), "external sentinel").unwrap();
+
+		std::fs::rename(&destination, root.path().join("pinned")).unwrap();
+		symlink(&external, &destination).unwrap();
+		let pinned = root.path().join("pinned");
+		std::fs::rename(pinned.join("references"), pinned.join("saved-references")).unwrap();
+		symlink(&external, pinned.join("references")).unwrap();
+
+		write_document(&directory, Path::new("SKILL.md"), "entrypoint", true).unwrap();
+		write_document(&references, Path::new("migrations.md"), "reference", true).unwrap();
+		assert_eq!(
+			std::fs::read_to_string(pinned.join("SKILL.md")).unwrap(),
+			"entrypoint"
+		);
+		assert_eq!(
+			std::fs::read_to_string(pinned.join("saved-references/migrations.md")).unwrap(),
+			"reference"
+		);
+		assert!(!external.join("SKILL.md").exists());
+
+		let late_link = Path::new("late.md");
+		symlink(
+			external.join("migrations.md"),
+			pinned.join("saved-references").join(late_link),
+		)
+		.unwrap();
+		assert!(write_document(&references, late_link, "content", false).is_err());
+		write_document(&references, late_link, "content", true).unwrap();
+		assert_eq!(
+			std::fs::read_to_string(external.join("migrations.md")).unwrap(),
+			"external sentinel"
+		);
+	}
 
 	#[test]
 	fn every_topic_is_bundled_with_substantive_content() {
@@ -500,8 +758,8 @@ mod tests {
 	#[test]
 	fn install_reports_a_write_failure_with_the_destination() {
 		let root = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-		// A regular file where the skill directory must go fails the first
-		// `create_dir_all`, so the error path carries the destination.
+		// A regular file where the skill directory must go fails destination
+		// traversal, so the error path carries the destination.
 		let destination = root.path().join("blocked");
 		std::fs::write(&destination, "not a directory").unwrap_or_else(|e| panic!("block: {e}"));
 
@@ -526,7 +784,7 @@ mod tests {
 		};
 		let error = run(action).err().unwrap_or(SkillError::Write {
 			destination: PathBuf::new(),
-			source: std::io::Error::other("unreachable"),
+			source: io::Error::other("unreachable"),
 		});
 		assert!(matches!(error, SkillError::MissingDestination));
 		let message = error.message();

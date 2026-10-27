@@ -6405,6 +6405,8 @@ dependencies = [
  "atomic-write-file",
  "base64 0.23.1",
  "bs58",
+ "cap-fs-ext",
+ "cap-std",
  "cargo_metadata",
  "clap",
  "clap_complete",
