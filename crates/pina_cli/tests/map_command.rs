@@ -104,3 +104,65 @@ fn reports_failures_without_writing() {
 	let conflicting = pina(&["map", "--json", "--output", "map.html"]);
 	assert_eq!(conflicting.status.code(), Some(2));
 }
+
+#[cfg(unix)]
+#[test]
+fn refuses_default_and_explicit_symlink_outputs_without_touching_victims() {
+	use std::os::unix::fs::symlink;
+
+	for explicit in [false, true] {
+		for linked_parent in [false, true] {
+			let temp = tempfile::tempdir().unwrap();
+			let target = temp.path().join("target");
+			let parent = target.join("pina");
+			let victim = temp.path().join("victim");
+			fs::create_dir_all(&target).unwrap();
+			fs::create_dir(&victim).unwrap();
+			let sentinel = victim.join("map.html");
+			fs::write(&sentinel, b"deployment keypair sentinel").unwrap();
+
+			if linked_parent {
+				symlink(&victim, &parent).unwrap();
+			} else {
+				fs::create_dir(&parent).unwrap();
+				symlink(&sentinel, parent.join("map.html")).unwrap();
+			}
+
+			let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+			command
+				.current_dir(workspace_root())
+				.env("CARGO_TARGET_DIR", &target)
+				.args(["map", "--project", "examples/counter_program"]);
+
+			if explicit {
+				command.arg("--output").arg(parent.join("map.html"));
+			}
+
+			let output = command.output().unwrap();
+
+			assert_eq!(output.status.code(), Some(1), "{output:?}");
+			assert!(output.stdout.is_empty());
+			assert!(
+				String::from_utf8_lossy(&output.stderr).contains("symbolic link or reparse point")
+			);
+			assert_eq!(fs::read(&sentinel).unwrap(), b"deployment keypair sentinel");
+			assert!(
+				fs::symlink_metadata(if linked_parent {
+					parent
+				} else {
+					parent.join("map.html")
+				})
+				.unwrap()
+				.is_symlink()
+			);
+
+			// JSON mode never publishes HTML, even when the default is hostile.
+			if !explicit {
+				let output = command.arg("--json").output().unwrap();
+				assert!(output.status.success(), "{output:?}");
+				assert!(serde_json::from_slice::<serde_json::Value>(&output.stdout).is_ok());
+				assert_eq!(fs::read(&sentinel).unwrap(), b"deployment keypair sentinel");
+			}
+		}
+	}
+}

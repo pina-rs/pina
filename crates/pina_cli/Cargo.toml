@@ -19,6 +19,9 @@ doc = false
 atomic-write-file = { workspace = true, default-features = true }
 base64 = { workspace = true, default-features = true }
 bs58 = { workspace = true, default-features = true }
+cap-fs-ext = { workspace = true, default-features = true }
+cap-std = { workspace = true, default-features = true }
+cap-tempfile = { workspace = true, default-features = true }
 cargo_metadata = { workspace = true, default-features = true }
 clap = { workspace = true, default-features = true }
 clap_complete = { workspace = true, default-features = true }

@@ -9,9 +9,16 @@
 
 use std::collections::HashMap;
 use std::fs;
+use std::io;
+use std::io::Write;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
+use cap_fs_ext::DirExt;
+use cap_std::ambient_authority;
+use cap_std::fs::Dir;
+use cap_tempfile::TempFile;
 use serde::Serialize;
 
 use crate::ir::FieldIr;
@@ -221,29 +228,112 @@ pub fn render_html(map: &ProgramMap) -> Result<String, serde_json::Error> {
 		.replacen(DATA_PLACEHOLDER, &escape_script_json(&json), 1))
 }
 
-/// Render `map` and write it to `path`, creating missing parent directories.
+/// Render `map` and atomically replace `path`, creating missing directories.
+/// Symbolic links and reparse points in the output path are refused.
 ///
 /// # Errors
 ///
-/// Returns an error when the map cannot be serialized or the file cannot be
-/// written.
+/// Returns an error when serialization, safe path traversal, or publication fails.
 pub fn write_html(map: &ProgramMap, path: &Path) -> Result<(), MapError> {
 	let html = render_html(map)?;
-	// `create_dir_all` accepts the empty parent of a bare file name.
-	let parent = path.parent().unwrap_or_else(|| Path::new(""));
-
-	fs::create_dir_all(parent).map_err(|source| {
-		MapError::Write {
-			path: parent.to_path_buf(),
-			source,
+	let publish = || -> io::Result<()> {
+		if crate::path_security::has_untrusted_link_component(path)? {
+			return Err(io::Error::other(
+				"output path contains a symbolic link or reparse point",
+			));
 		}
-	})?;
-	fs::write(path, html).map_err(|source| {
+
+		let name = path.file_name().ok_or_else(|| {
+			io::Error::new(io::ErrorKind::InvalidInput, "output path must name a file")
+		})?;
+		let parent = open_map_parent(path)?;
+
+		publish_html(&parent, name, html.as_bytes())
+	};
+
+	publish().map_err(|source| {
 		MapError::Write {
 			path: path.to_path_buf(),
 			source,
 		}
 	})
+}
+
+fn open_map_parent(path: &Path) -> io::Result<Dir> {
+	let absolute = std::path::absolute(path)?;
+	let parent = absolute.parent().ok_or_else(|| {
+		io::Error::new(
+			io::ErrorKind::InvalidInput,
+			"output path must have a parent",
+		)
+	})?;
+	let root: PathBuf = parent
+		.components()
+		.take_while(|component| matches!(component, Component::Prefix(_) | Component::RootDir))
+		.collect();
+	let mut directory = Dir::open_ambient_dir(&root, ambient_authority())?;
+	let mut first = true;
+
+	// Pin each component before looking up the next; checking a path and then
+	// opening it normally would let a swapped ancestor redirect publication.
+	for component in parent.components() {
+		match component {
+			Component::Prefix(_) | Component::RootDir | Component::CurDir => continue,
+			Component::ParentDir => directory = directory.open_parent_dir(ambient_authority())?,
+			Component::Normal(name) => {
+				// Only root can replace these system aliases (e.g. macOS /tmp).
+				// Everything else, including a missing entry, takes the no-follow path.
+				if first
+					&& let Ok(metadata) = fs::symlink_metadata(root.join(name))
+					&& crate::path_security::is_link_like(&metadata)
+					&& !crate::path_security::is_untrusted_link(&metadata, true)
+				{
+					directory = Dir::open_ambient_dir(root.join(name), ambient_authority())?;
+					first = false;
+					continue;
+				}
+
+				directory = match directory.open_dir_nofollow(name) {
+					Ok(child) => child,
+					Err(error) if error.kind() == io::ErrorKind::NotFound => {
+						directory.create_dir(name)?;
+
+						directory.open_dir_nofollow(name)?
+					}
+					Err(error) => return Err(error),
+				};
+			}
+		}
+
+		first = false;
+	}
+
+	Ok(directory)
+}
+
+fn publish_html(parent: &Dir, name: &std::ffi::OsStr, html: &[u8]) -> io::Result<()> {
+	let permissions = match parent.symlink_metadata(name) {
+		Ok(metadata) if !metadata.is_file() => {
+			return Err(io::Error::other(
+				"output must be a regular file, not a link or directory",
+			));
+		}
+		Ok(metadata) => Some(metadata.permissions()),
+		Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+		Err(error) => return Err(error),
+	};
+
+	let mut file = TempFile::new(parent)?;
+
+	if let Some(permissions) = permissions {
+		file.as_file().set_permissions(permissions)?;
+	}
+
+	file.write_all(html)?;
+	file.as_file().sync_all()?;
+	// Rename replaces the directory entry, so even a newly planted symlink or
+	// hard link cannot cause the old inode's contents to be truncated.
+	file.replace(name)
 }
 
 /// Escape JSON for an HTML `<script>` element.
@@ -477,13 +567,15 @@ mod tests {
 		let written =
 			fs::read_to_string(&path).unwrap_or_else(|error| panic!("read failed: {error}"));
 		assert!(written.contains("id=\"pina-map-data\""));
+		write_html(&map, &path).unwrap_or_else(|error| panic!("replacement failed: {error}"));
+		assert_eq!(fs::read_to_string(&path).unwrap(), written);
 
 		let blocker = temp.path().join("blocker");
 		fs::write(&blocker, "").unwrap_or_else(|error| panic!("write failed: {error}"));
 		let error = write_html(&map, &blocker.join("map.html"))
 			.expect_err("a file cannot be a parent directory");
 		assert!(
-			matches!(&error, MapError::Write { path, .. } if *path == blocker),
+			matches!(&error, MapError::Write { path, .. } if *path == blocker.join("map.html")),
 			"{error}"
 		);
 
@@ -494,5 +586,132 @@ mod tests {
 				.contains("Could not write the program map"),
 			"{error}"
 		);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn refuses_linked_outputs_without_modifying_their_targets() {
+		use std::os::unix::fs::symlink;
+
+		let temp = tempfile::tempdir().unwrap();
+		let victim = temp.path().join("keypair.json");
+		fs::write(&victim, b"keypair sentinel").unwrap();
+		let link = temp.path().join("map.html");
+		symlink(&victim, &link).unwrap();
+
+		let error = write_html(&map(), &link).unwrap_err();
+		assert!(error.to_string().contains("symbolic link or reparse point"));
+		assert_eq!(fs::read(&victim).unwrap(), b"keypair sentinel");
+		assert!(fs::symlink_metadata(&link).unwrap().is_symlink());
+
+		let missing = temp.path().join("missing");
+		let dangling = temp.path().join("dangling.html");
+		symlink(&missing, &dangling).unwrap();
+		assert!(write_html(&map(), &dangling).is_err());
+		assert!(!missing.exists());
+
+		let directory_link = temp.path().join("linked");
+		symlink(temp.path(), &directory_link).unwrap();
+		assert!(write_html(&map(), &directory_link.join("nested/map.html")).is_err());
+		assert!(!temp.path().join("nested").exists());
+		assert!(open_map_parent(&directory_link.join("map.html")).is_err());
+	}
+
+	#[test]
+	fn atomic_replacement_preserves_hard_linked_files() {
+		let temp = tempfile::tempdir().unwrap();
+		let victim = temp.path().join("keypair.json");
+		let output = temp.path().join("map.html");
+		fs::write(&victim, b"keypair sentinel").unwrap();
+		fs::hard_link(&victim, &output).unwrap();
+
+		write_html(&map(), &output).unwrap();
+
+		assert_eq!(fs::read(&victim).unwrap(), b"keypair sentinel");
+		assert!(
+			fs::read_to_string(output)
+				.unwrap()
+				.starts_with("<!doctype html>")
+		);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn replacing_a_private_report_preserves_its_permissions() {
+		use std::os::unix::fs::PermissionsExt;
+
+		let temp = tempfile::tempdir().unwrap();
+		let output = temp.path().join("map.html");
+		fs::write(&output, b"previous report").unwrap();
+		fs::set_permissions(&output, fs::Permissions::from_mode(0o600)).unwrap();
+
+		write_html(&map(), &output).unwrap();
+
+		assert_eq!(
+			fs::metadata(&output).unwrap().permissions().mode() & 0o777,
+			0o600
+		);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn pins_the_parent_directory_before_publication() {
+		use std::os::unix::fs::symlink;
+
+		let temp = tempfile::tempdir().unwrap();
+		let output = temp.path().join("output");
+		fs::create_dir(&output).unwrap();
+		let parent = open_map_parent(&output.join("map.html")).unwrap();
+		let original = temp.path().join("original");
+		fs::rename(&output, &original).unwrap();
+		let victim = temp.path().join("victim");
+		fs::create_dir(&victim).unwrap();
+		fs::write(victim.join("map.html"), b"sentinel").unwrap();
+		symlink(&victim, &output).unwrap();
+
+		publish_html(&parent, std::ffi::OsStr::new("map.html"), b"safe report").unwrap();
+
+		assert_eq!(fs::read(victim.join("map.html")).unwrap(), b"sentinel");
+		assert_eq!(fs::read(original.join("map.html")).unwrap(), b"safe report");
+
+		let late = original.join("late.html");
+		symlink(victim.join("map.html"), &late).unwrap();
+		assert!(publish_html(&parent, std::ffi::OsStr::new("late.html"), b"report").is_err());
+		assert_eq!(fs::read(victim.join("map.html")).unwrap(), b"sentinel");
+	}
+
+	#[test]
+	fn rejects_invalid_names_and_directory_outputs() {
+		let temp = tempfile::tempdir().unwrap();
+		let directory = temp.path().join("map.html");
+		fs::create_dir(&directory).unwrap();
+		let parent = open_map_parent(&directory).unwrap();
+
+		assert!(write_html(&map(), Path::new(".")).is_err());
+		assert!(open_map_parent(Path::new("/")).is_err());
+		assert!(publish_html(&parent, std::ffi::OsStr::new("invalid\0name"), b"report").is_err());
+		assert!(publish_html(&parent, std::ffi::OsStr::new("map.html"), b"report").is_err());
+		assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 1);
+
+		// Parent components remain relative to the directory handles, including
+		// `..`; a caller's working directory never needs to be changed.
+		write_html(&map(), &directory.join("../report.html")).unwrap();
+		assert!(temp.path().join("report.html").is_file());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn opens_trusted_system_aliases_without_following_project_links() {
+		for entry in fs::read_dir("/").unwrap() {
+			let path = entry.unwrap().path();
+			let metadata = fs::symlink_metadata(&path).unwrap();
+
+			if crate::path_security::is_link_like(&metadata)
+				&& !crate::path_security::is_untrusted_link(&metadata, true)
+				&& path.is_dir()
+			{
+				assert!(open_map_parent(&path.join("map.html")).is_ok());
+			}
+		}
 	}
 }

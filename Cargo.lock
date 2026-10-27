@@ -1520,6 +1520,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cap-tempfile"
+version = "4.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "038b3f6a5d4b5641b1bb99d638eb7a22013de84f81c528d8930de06d7383fbd5"
+dependencies = [
+ "cap-std",
+ "rand 0.9.5",
+ "rustix",
+ "rustix-linux-procfs",
+ "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "caps"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6405,6 +6419,9 @@ dependencies = [
  "atomic-write-file",
  "base64 0.23.1",
  "bs58",
+ "cap-fs-ext",
+ "cap-std",
+ "cap-tempfile",
  "cargo_metadata",
  "clap",
  "clap_complete",
