@@ -631,8 +631,9 @@ mod executor {
 		rent: Option<Rent>,
 		/// Caller-declared ceiling on the lamports this migration may transfer.
 		///
-		/// `None` permits no payer transfers, like `Some(0)`.
-		max_lamports: Option<u64>,
+		/// Zero permits no payer transfers. Normalize the public optional budget
+		/// before entering the migration loop.
+		max_lamports: u64,
 		original_size: usize,
 		stored: u32,
 		transferred: u64,
@@ -702,7 +703,7 @@ mod executor {
 		let next_transferred = ctx.transferred.checked_add(funding);
 		// Growth limits bound new bytes, not the existing account's rent deficit.
 		// Funding therefore requires an explicit ceiling even for one-byte growth.
-		if next_transferred.is_none_or(|total| total > ctx.max_lamports.unwrap_or(0)) {
+		if next_transferred.is_none_or(|total| total > ctx.max_lamports) {
 			return Err(PinaProgramError::MigrationLamportBudgetExceeded.into());
 		}
 		// Account for the planned funding up front so the post-mutation tail
@@ -989,7 +990,7 @@ mod executor {
 					payer: self.payer,
 					signers,
 					rent,
-					max_lamports: self.max_lamports,
+					max_lamports: self.max_lamports.unwrap_or(0),
 					original_size,
 					stored: stored.into_u32(),
 					transferred: 0,
@@ -1037,7 +1038,7 @@ mod executor {
 	pub struct MigrateContext<'account> {
 		program_id: &'account Address,
 		accounts: &'account mut [AccountView],
-		max_lamports: Option<u64>,
+		max_lamports: u64,
 		migrated: u64,
 		spent_lamports: u64,
 		rent: Option<Rent>,
@@ -1092,7 +1093,7 @@ mod executor {
 			Ok(Self {
 				program_id,
 				accounts,
-				max_lamports,
+				max_lamports: max_lamports.unwrap_or(0),
 				migrated: 0,
 				spent_lamports: 0,
 				rent: None,
@@ -1172,9 +1173,7 @@ mod executor {
 				// Spend from the instruction-wide budget, not a per-account
 				// copy of the cap: the payer may fund several slots in one
 				// reserved invocation.
-				max_lamports: self
-					.max_lamports
-					.map(|cap| cap.saturating_sub(self.spent_lamports)),
+				max_lamports: Some(self.max_lamports.saturating_sub(self.spent_lamports)),
 			};
 			let outcome = executor.invoke_signed_inner::<T>(&[], self.rent)?;
 			self.migrated |= bit;
