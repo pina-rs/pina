@@ -183,6 +183,38 @@ fn dry_run_json_is_machine_readable_and_starts_no_child() {
 }
 
 #[test]
+fn upgrade_only_rejects_a_declared_keypair_path_before_planning_or_execution() {
+	let fixture = ProjectFixture::new();
+	fs::write(
+		fixture.root.join("src/lib.rs"),
+		r#"declare_id!("payer.json");"#,
+	)
+	.unwrap();
+	let marker = fixture.root.join("unexpected-deploy.txt");
+
+	for dry_run in [true, false] {
+		let mut command = fixture.command();
+		command.args(["--cluster", "localnet", "--upgrade-only"]);
+
+		if dry_run {
+			command.args(["--dry-run", "--json"]);
+		} else {
+			command.args(["--remote-command", "touch unexpected-deploy.txt"]);
+		}
+
+		let output = command.output().unwrap();
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		assert!(!output.status.success());
+		assert!(
+			stderr.contains("base58-encoded 32-byte Solana address"),
+			"{stderr}"
+		);
+		assert!(output.stdout.is_empty());
+		assert!(!marker.exists(), "deployment child must not run");
+	}
+}
+
+#[test]
 fn upgrade_only_plans_by_declared_id_and_conflicts_with_a_program_keypair() {
 	let fixture = ProjectFixture::new();
 	fs::remove_file(&fixture.program_keypair)

@@ -203,7 +203,7 @@ pub fn assemble_program_ir_multi_with_auto(
 
 	for file in files {
 		if public_key.is_none() {
-			public_key = program_id::extract_program_id(file);
+			public_key = program_id::try_extract_program_id(file)?;
 		}
 
 		all_disc_enums.extend(discriminator::extract_discriminator_enums(file)?);
