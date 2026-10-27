@@ -1,7 +1,15 @@
 use std::fs;
+use std::io::Write;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
+use cap_fs_ext::DirExt;
+use cap_fs_ext::FollowSymlinks;
+use cap_fs_ext::OpenOptionsFollowExt;
+use cap_std::ambient_authority;
+use cap_std::fs::Dir;
+use cap_std::fs::OpenOptions;
 use heck::ToUpperCamelCase;
 
 // A non-system placeholder keeps the generated Surfpool deployment executable.
@@ -47,7 +55,7 @@ const SCAFFOLD_FILES: &[&str] = &[
 /// Options that vary how `pina init` scaffolds a project.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct InitOptions {
-	/// Overwrite scaffold files that already exist.
+	/// Overwrite existing regular scaffold files; symbolic links and reparse points are rejected.
 	pub force: bool,
 	/// Scaffold for the experimental upstream sbpf-linker toolchain.
 	pub sbpf_linker: bool,
@@ -56,7 +64,8 @@ pub struct InitOptions {
 /// Initialize a new Pina program project in `project_dir`.
 ///
 /// When `force` is `false`, this function fails if any scaffold file already
-/// exists. When `true`, scaffold files are overwritten.
+/// exists. When `true`, regular scaffold files are overwritten. Symbolic links,
+/// reparse points, and non-regular destinations are rejected in either mode.
 pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Result<(), InitError> {
 	init_project_with_options(
 		project_dir,
@@ -72,7 +81,8 @@ pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Resu
 ///
 /// # Errors
 ///
-/// Returns the same name-validation and IO errors as [`init_project`].
+/// Returns an error for invalid names, linked or non-regular destinations,
+/// existing files without `force`, or IO failures.
 pub fn init_project_with_options(
 	project_dir: &Path,
 	package_name: &str,
@@ -84,52 +94,60 @@ pub fn init_project_with_options(
 		});
 	}
 
-	// Resolve all destination paths up-front.
-	let paths: Vec<PathBuf> = SCAFFOLD_FILES
-		.iter()
-		.map(|rel| project_dir.join(rel))
-		.collect();
+	// Preflight every path before writing anything, including dangling links.
+	for relative in SCAFFOLD_FILES {
+		let path = project_dir.join(relative);
 
-	// Check for existing files before writing anything.
-	if !options.force {
-		for path in &paths {
-			if path.exists() {
-				return Err(InitError::DestinationExists { path: path.clone() });
+		if init_io(
+			&path,
+			crate::path_security::has_untrusted_link_component(&path),
+		)? {
+			return Err(unsafe_scaffold_path(path));
+		}
+
+		match fs::symlink_metadata(&path) {
+			Ok(metadata) if !metadata.is_file() => {
+				return Err(unsafe_scaffold_path(path));
 			}
+			Ok(_) if !options.force => {
+				return Err(InitError::DestinationExists { path });
+			}
+			Ok(_) => {}
+			Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
+			Err(source) => return init_io(&path, Err(source)),
 		}
 	}
 
-	// Ensure all required directories exist.
-	for dir in [
-		project_dir.to_path_buf(),
-		project_dir.join("src"),
-		project_dir.join("tests"),
-		project_dir.join("tests/surfpool/src"),
-		project_dir.join(".cargo"),
-	] {
-		fs::create_dir_all(&dir).map_err(|source| InitError::Io { path: dir, source })?;
+	let project = open_project_directory(project_dir)?;
+
+	// Capability-relative creation cannot escape if an ancestor is replaced after preflight.
+	for relative in ["src", "tests/surfpool/src", ".cargo"] {
+		open_scaffold_directory(&project, project_dir, relative)?;
 	}
 
 	let program_title = package_name.replace(['-', '_'], " ").to_upper_camel_case();
+	let write = |index: usize, contents: &str| {
+		write_file(
+			&project,
+			project_dir,
+			SCAFFOLD_FILES[index],
+			contents,
+			options.force,
+		)
+	};
 
-	write_file(&paths[0], &cargo_toml_template(package_name))?;
-	write_file(&paths[1], &pina_toml_template(options.sbpf_linker))?;
-	write_file(
-		&paths[2],
-		&readme_template(package_name, options.sbpf_linker),
-	)?;
-	write_file(&paths[3], &gitignore_template())?;
-	write_file(&paths[4], &cargo_config_template(options.sbpf_linker))?;
-	write_file(&paths[5], &build_script_template())?;
-	write_file(&paths[6], &lib_template(package_name, &program_title))?;
-	write_file(&paths[7], &entrypoint_template())?;
-	write_file(
-		&paths[8],
-		&integration_test_template(package_name, &program_title),
-	)?;
-	write_file(&paths[9], &rust_toolchain_template())?;
-	write_file(&paths[10], &surfpool_cargo_toml_template(package_name))?;
-	write_file(&paths[11], &surfpool_test_template())?;
+	write(0, &cargo_toml_template(package_name))?;
+	write(1, &pina_toml_template(options.sbpf_linker))?;
+	write(2, &readme_template(package_name, options.sbpf_linker))?;
+	write(3, &gitignore_template())?;
+	write(4, &cargo_config_template(options.sbpf_linker))?;
+	write(5, &build_script_template())?;
+	write(6, &lib_template(package_name, &program_title))?;
+	write(7, &entrypoint_template())?;
+	write(8, &integration_test_template(package_name, &program_title))?;
+	write(9, &rust_toolchain_template())?;
+	write(10, &surfpool_cargo_toml_template(package_name))?;
+	write(11, &surfpool_test_template())?;
 
 	Ok(())
 }
@@ -301,13 +319,123 @@ fn enclosing_workspace(project_dir: &Path) -> Option<PathBuf> {
 	})
 }
 
-fn write_file(path: &Path, contents: &str) -> Result<(), InitError> {
-	fs::write(path, contents).map_err(|source| {
+/// Pin each component without following links, including newly created directories.
+/// The caller must preflight the path first, which permits only trusted system aliases.
+fn open_project_directory(path: &Path) -> Result<Dir, InitError> {
+	let absolute = init_io(path, std::path::absolute(path))?;
+	let root = absolute.ancestors().last().unwrap_or(&absolute);
+	let mut directory = init_io(root, Dir::open_ambient_dir(root, ambient_authority()))?;
+	let mut current = root.to_path_buf();
+
+	for component in absolute.components() {
+		match component {
+			Component::RootDir | Component::Prefix(_) | Component::CurDir => continue,
+			Component::ParentDir => {
+				directory = init_io(&current, directory.open_parent_dir(ambient_authority()))?;
+				current.pop();
+			}
+			Component::Normal(name) => {
+				let top_level = current == root;
+				current.push(name);
+
+				// Preflight permits only root-owned system aliases at this depth (/tmp, /var).
+				// Their replacement is outside the untrusted project tree's authority.
+				if top_level
+					&& fs::symlink_metadata(&current)
+						.is_ok_and(|metadata| crate::path_security::is_link_like(&metadata))
+				{
+					let resolved = init_io(&current, fs::canonicalize(&current))?;
+					directory = init_io(
+						&current,
+						Dir::open_ambient_dir(&resolved, ambient_authority()),
+					)?;
+					current = resolved;
+					continue;
+				}
+
+				match directory.create_dir(name) {
+					Ok(()) => {}
+					Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => {}
+					Err(source) => return init_io(&current, Err(source)),
+				}
+
+				directory = init_io(&current, directory.open_dir_nofollow(name))?;
+			}
+		}
+	}
+
+	Ok(directory)
+}
+
+/// Pin every scaffold parent so links cannot be followed between validation and creation.
+fn open_scaffold_directory(project: &Dir, root: &Path, relative: &str) -> Result<Dir, InitError> {
+	let mut directory = init_io(root, project.try_clone())?;
+	let mut path = root.to_path_buf();
+
+	for component in Path::new(relative) {
+		path.push(component);
+
+		match directory.create_dir(component) {
+			Ok(()) => {}
+			Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => {}
+			Err(source) => return init_io(&path, Err(source)),
+		}
+
+		directory = init_io(&path, directory.open_dir_nofollow(component))?;
+	}
+
+	Ok(directory)
+}
+
+/// No-follow opens and exclusive creation protect against links inserted after preflight.
+fn write_file(
+	project: &Dir,
+	root: &Path,
+	relative: &str,
+	contents: &str,
+	force: bool,
+) -> Result<(), InitError> {
+	let path = root.join(relative);
+	let (parent, name) = relative.rsplit_once('/').unwrap_or(("", relative));
+	let directory = open_scaffold_directory(project, root, parent)?;
+	let mut options = OpenOptions::new();
+	options.write(true).follow(FollowSymlinks::No);
+
+	if force {
+		options.create(true);
+	} else {
+		options.create_new(true);
+	}
+
+	let mut file = init_io(&path, directory.open_with(name, &options))?.into_std();
+	let metadata = init_io(&path, file.metadata())?;
+
+	if !metadata.is_file() || crate::path_security::is_link_like(&metadata) {
+		return Err(unsafe_scaffold_path(path));
+	}
+
+	// Do not truncate until the opened object, rather than an earlier path lookup, is validated.
+	init_io(&path, file.set_len(0))?;
+	init_io(&path, file.write_all(contents.as_bytes()))
+}
+
+fn init_io<T>(path: &Path, result: std::io::Result<T>) -> Result<T, InitError> {
+	result.map_err(|source| {
 		InitError::Io {
 			path: path.to_path_buf(),
 			source,
 		}
 	})
+}
+
+fn unsafe_scaffold_path(path: PathBuf) -> InitError {
+	InitError::Io {
+		path,
+		source: std::io::Error::new(
+			std::io::ErrorKind::InvalidInput,
+			"refusing unsafe scaffold path; expected ordinary directories and regular files",
+		),
+	}
 }
 
 fn cargo_toml_template(package_name: &str) -> String {
@@ -941,8 +1069,245 @@ mod tests {
 		assert!(!cargo.contains("invalid"));
 	}
 
+	#[cfg(any(unix, windows))]
 	#[test]
-	fn init_project_reports_final_surfpool_test_write_failure() {
+	fn init_project_rejects_scaffold_links_without_changing_external_files() {
+		#[cfg(unix)]
+		use std::os::unix::fs::symlink as symlink_file;
+		#[cfg(windows)]
+		use std::os::windows::fs::symlink_file;
+
+		for force in [false, true] {
+			for relative in SCAFFOLD_FILES {
+				for existing in [false, true] {
+					let temp = tempfile::tempdir().unwrap();
+					let project = temp.path().join("project");
+					let external = temp.path().join("external");
+					let link = project.join(relative);
+					fs::create_dir_all(link.parent().unwrap()).unwrap();
+
+					if existing {
+						fs::write(&external, "sentinel").unwrap();
+					}
+
+					symlink_file(&external, &link).unwrap();
+					let result = init_project(&project, "my_program", force);
+
+					assert!(
+						result.is_err(),
+						"accepted {relative}, force={force}, existing={existing}"
+					);
+					for other in SCAFFOLD_FILES.iter().filter(|other| *other != relative) {
+						assert!(
+							!project.join(other).exists(),
+							"created {other} before rejecting {relative}"
+						);
+					}
+					assert_eq!(
+						fs::read_to_string(&external).ok(),
+						existing.then(|| "sentinel".to_owned())
+					);
+				}
+			}
+		}
+	}
+
+	#[cfg(any(unix, windows))]
+	#[test]
+	fn init_project_rejects_linked_directories_before_creating_any_files() {
+		#[cfg(unix)]
+		use std::os::unix::fs::symlink as symlink_dir;
+		#[cfg(windows)]
+		use std::os::windows::fs::symlink_dir;
+
+		for force in [false, true] {
+			for relative in [
+				".",
+				"src",
+				".cargo",
+				"tests",
+				"tests/surfpool",
+				"tests/surfpool/src",
+			] {
+				let temp = tempfile::tempdir().unwrap();
+				let project = temp.path().join("project");
+				let external = temp.path().join("external");
+				fs::create_dir(&external).unwrap();
+				fs::write(external.join("sentinel"), "unchanged").unwrap();
+				let link = if relative == "." {
+					project.clone()
+				} else {
+					project.join(relative)
+				};
+				fs::create_dir_all(link.parent().unwrap()).unwrap();
+				symlink_dir(&external, &link).unwrap();
+
+				assert!(
+					init_project(&project, "my_program", force).is_err(),
+					"accepted {relative}"
+				);
+				assert!(!project.join("Cargo.toml").exists());
+				assert_eq!(fs::read_dir(&external).unwrap().count(), 1);
+				assert_eq!(
+					fs::read_to_string(external.join("sentinel")).unwrap(),
+					"unchanged"
+				);
+			}
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn init_project_rejects_linked_project_ancestors() {
+		use std::os::unix::fs::symlink;
+
+		for force in [false, true] {
+			let temp = tempfile::tempdir().unwrap();
+			let external = temp.path().join("external");
+			let link = temp.path().join("link");
+			fs::create_dir(&external).unwrap();
+			symlink(&external, &link).unwrap();
+
+			assert!(init_project(&link.join("missing/project"), "my_program", force).is_err());
+			assert_eq!(fs::read_dir(&external).unwrap().count(), 0);
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn descriptor_writes_reject_links_inserted_after_preflight() {
+		use std::os::unix::fs::symlink;
+
+		for force in [false, true] {
+			let temp = tempfile::tempdir().unwrap();
+			let root = temp.path().join("project");
+			let external = temp.path().join("external");
+			let project = open_project_directory(&root).unwrap();
+			fs::create_dir(&external).unwrap();
+			let sentinel = external.join("sentinel");
+			fs::write(&sentinel, "unchanged").unwrap();
+			symlink(&sentinel, root.join("Cargo.toml")).unwrap();
+			symlink(&external, root.join("src")).unwrap();
+
+			assert!(write_file(&project, &root, "Cargo.toml", "replacement", force).is_err());
+			assert!(write_file(&project, &root, "src/lib.rs", "replacement", force).is_err());
+			assert_eq!(fs::read_to_string(&sentinel).unwrap(), "unchanged");
+			assert_eq!(fs::read_dir(&external).unwrap().count(), 1);
+		}
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn descriptor_writes_stay_with_the_original_project_after_path_replacement() {
+		use std::os::unix::fs::symlink;
+
+		let temp = tempfile::tempdir().unwrap();
+		let root = temp.path().join("project");
+		let original = temp.path().join("original");
+		let external = temp.path().join("external");
+		let project = open_project_directory(&root).unwrap();
+		fs::create_dir(&external).unwrap();
+		fs::rename(&root, &original).unwrap();
+		symlink(&external, &root).unwrap();
+
+		write_file(&project, &root, "src/lib.rs", "scaffold", false).unwrap();
+
+		assert_eq!(
+			fs::read_to_string(original.join("src/lib.rs")).unwrap(),
+			"scaffold"
+		);
+		assert_eq!(fs::read_dir(&external).unwrap().count(), 0);
+	}
+
+	#[test]
+	fn descriptor_writes_do_not_overwrite_files_created_after_preflight() {
+		let temp = tempfile::tempdir().unwrap();
+		let project = open_project_directory(temp.path()).unwrap();
+		let file = temp.path().join("Cargo.toml");
+		fs::write(&file, "sentinel").unwrap();
+
+		assert!(write_file(&project, temp.path(), "Cargo.toml", "replacement", false).is_err());
+		assert_eq!(fs::read_to_string(&file).unwrap(), "sentinel");
+	}
+
+	#[test]
+	fn initialization_reports_filesystem_failures_without_writing_scaffolds() {
+		let temp = tempfile::tempdir().unwrap();
+		let blocked = temp.path().join("file");
+		fs::write(&blocked, "sentinel").unwrap();
+		assert!(matches!(
+			init_project(&blocked.join("project"), "my_program", true),
+			Err(InitError::Io { .. })
+		));
+
+		let long = "x".repeat(16 * 1024);
+		let missing = temp.path().join("missing").join(&long);
+		assert!(matches!(
+			init_project(&missing, "my_program", false),
+			Err(InitError::Io { .. })
+		));
+		assert!(matches!(
+			open_project_directory(&temp.path().join(&long)),
+			Err(InitError::Io { .. })
+		));
+		let project = open_project_directory(temp.path()).unwrap();
+		assert!(matches!(
+			open_scaffold_directory(&project, temp.path(), &long),
+			Err(InitError::Io { .. })
+		));
+		assert_eq!(fs::read_to_string(&blocked).unwrap(), "sentinel");
+		assert!(!temp.path().join("Cargo.toml").exists());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn forced_descriptor_writes_refuse_a_fifo_inserted_after_preflight() {
+		let temp = tempfile::tempdir().unwrap();
+		let fifo = temp.path().join("Cargo.toml");
+		let project = open_project_directory(temp.path()).unwrap();
+		let status = std::process::Command::new("mkfifo")
+			.arg(&fifo)
+			.status()
+			.unwrap();
+		assert!(status.success());
+		let reader = std::thread::spawn(move || fs::File::open(fifo).unwrap());
+
+		assert!(matches!(
+			write_file(&project, temp.path(), "Cargo.toml", "replacement", true),
+			Err(InitError::Io { source, .. }) if source.kind() == std::io::ErrorKind::InvalidInput
+		));
+		drop(reader.join().unwrap());
+	}
+
+	#[test]
+	fn initialization_accepts_parent_components_without_following_project_links() {
+		let temp = tempfile::tempdir().unwrap();
+		fs::create_dir(temp.path().join("existing")).unwrap();
+		let project = temp.path().join("existing/../project");
+		init_project(&project, "my_program", false).unwrap();
+		assert!(temp.path().join("project/src/lib.rs").is_file());
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn directory_handles_accept_preflighted_system_aliases() {
+		for entry in fs::read_dir("/").unwrap() {
+			let path = entry.unwrap().path();
+
+			if fs::symlink_metadata(&path)
+				.unwrap()
+				.file_type()
+				.is_symlink()
+				&& path.is_dir()
+				&& !crate::path_security::has_untrusted_link_component(&path.join("..")).unwrap()
+			{
+				assert!(open_project_directory(&path.join("..")).is_ok());
+			}
+		}
+	}
+
+	#[test]
+	fn init_project_refuses_nonregular_scaffold_destinations_before_writing() {
 		let dir = TempDir::new("surfpool_write_failure");
 		let blocked_file = dir.path.join("tests/surfpool/src/lib.rs");
 		fs::create_dir_all(&blocked_file)
@@ -952,8 +1317,9 @@ mod tests {
 
 		assert!(matches!(
 			result,
-			Err(InitError::Io { path, .. }) if path == blocked_file
+			Err(InitError::Io { path, source }) if path == blocked_file && source.kind() == std::io::ErrorKind::InvalidInput
 		));
+		assert!(!dir.path.join("Cargo.toml").exists());
 	}
 
 	#[test]
