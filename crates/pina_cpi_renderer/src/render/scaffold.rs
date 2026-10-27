@@ -367,10 +367,13 @@ mod tests {
 		);
 	}
 
-	#[cfg(unix)]
+	#[cfg(any(unix, windows))]
 	#[test]
 	fn provenance_refuses_existing_and_dangling_readme_links() {
+		#[cfg(unix)]
 		use std::os::unix::fs::symlink;
+		#[cfg(windows)]
+		use std::os::windows::fs::symlink_file as symlink;
 
 		let temp = tempfile::tempdir().unwrap();
 		let root = temp.path().join("crate");

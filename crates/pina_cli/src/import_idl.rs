@@ -631,6 +631,8 @@ mod tests {
 
 		let first = import_idl(&options).expect("first");
 		assert!(first.changed);
+		let readme_path = first.crate_dir.join("README.md");
+		let modified = std::fs::metadata(&readme_path).unwrap().modified().unwrap();
 
 		let second = import_idl(&options).expect("second");
 		assert!(
@@ -638,6 +640,10 @@ mod tests {
 			"an unchanged IDL must not rewrite the crate"
 		);
 		assert_eq!(first.idl_sha256, second.idl_sha256);
+		assert_eq!(
+			std::fs::metadata(readme_path).unwrap().modified().unwrap(),
+			modified
+		);
 	}
 
 	#[test]
@@ -675,10 +681,13 @@ mod tests {
 		assert!(!crate_dir.join("src").exists());
 	}
 
-	#[cfg(unix)]
+	#[cfg(any(unix, windows))]
 	#[test]
 	fn rejects_provenance_links_before_rendering_in_every_mode() {
+		#[cfg(unix)]
 		use std::os::unix::fs::symlink;
+		#[cfg(windows)]
+		use std::os::windows::fs::symlink_file as symlink;
 
 		for mode in [
 			GenerationMode::Auto,
@@ -726,10 +735,13 @@ mod tests {
 		}
 	}
 
-	#[cfg(unix)]
+	#[cfg(any(unix, windows))]
 	#[test]
 	fn rejects_symlinked_import_ancestors() {
+		#[cfg(unix)]
 		use std::os::unix::fs::symlink;
+		#[cfg(windows)]
+		use std::os::windows::fs::symlink_dir as symlink;
 
 		let temp = tempfile::TempDir::new().expect("temp");
 		let outside = temp.path().join("outside");
