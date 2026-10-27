@@ -11,16 +11,16 @@ import 'programs/programs.dart';
 
 /// Compute units `configInitialize` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int configInitializeMeasuredComputeUnits = 4543;
+const int configInitializeMeasuredComputeUnits = 6152;
 
 /// Compute unit limit to request for a transaction carrying `configInitialize`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int configInitializeComputeUnitLimit = 5800;
+const int configInitializeComputeUnitLimit = 7700;
 
 /// Compute units `configUpdate` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int configUpdateMeasuredComputeUnits = 1731;
+const int configUpdateMeasuredComputeUnits = 1737;
 
 /// Compute unit limit to request for a transaction carrying `configUpdate`: the
 /// measurement plus the project's margin and the cost of the compute budget

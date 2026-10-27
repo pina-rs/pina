@@ -34,6 +34,11 @@ pub struct ConfigInitialize<'account, 'argument> {
 	/// Required privileges: read-only.
 	pub system_program: &'account AccountView,
 
+	/// CPI account `programData`.
+	/// Canonical loader-owned `ProgramData` authenticating the initial authority.
+	/// Required privileges: read-only.
+	pub program_data: &'account AccountView,
+
 	/// Instruction arguments encoded and sent as CPI data for `config_initialize`.
 	pub ix: ConfigInitializeIx<'argument>,
 }
@@ -82,10 +87,11 @@ impl<'account, 'argument> ConfigInitialize<'account, 'argument> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 3] = [
+		let accounts: [CpiHandle<'_>; 4] = [
 			CpiHandle::writable_signer(self.authority)?,
 			CpiHandle::writable(self.program_config)?,
 			CpiHandle::readonly(self.system_program),
+			CpiHandle::readonly(self.program_data),
 		];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);

@@ -28,6 +28,9 @@ pub struct ConfigInitializeArgs {
 	/// The `program_config` account [default: derived]
 	#[arg(long)]
 	program_config: Option<String>,
+	/// Canonical loader-owned `ProgramData` authenticating the initial authority
+	#[arg(long)]
+	program_data: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: ConfigInitializeArgs) -> Result<(), CliError> {
@@ -43,6 +46,7 @@ pub(crate) fn run(context: &CliContext, args: ConfigInitializeArgs) -> Result<()
 			.0
 		}
 	};
+	let program_data = CliContext::pubkey("--program_data", &args.program_data)?;
 	let data = ConfigInitializeInstructionData::new(|data| {
 		data.bump = args.bump;
 		data.treasury = treasury;
@@ -58,6 +62,7 @@ pub(crate) fn run(context: &CliContext, args: ConfigInitializeArgs) -> Result<()
 		authority,
 		program_config,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
+		program_data,
 	};
 
 	context.send(
