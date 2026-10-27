@@ -23,7 +23,7 @@
 
 mod catalog;
 pub mod report;
-mod rpc;
+pub(crate) mod rpc;
 mod surfnet;
 mod wire;
 

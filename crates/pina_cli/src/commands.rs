@@ -1630,6 +1630,7 @@ fn run_deploy(
 			);
 			std::process::exit(1);
 		}
+		unwrap_or_exit(plan.verify_publication());
 		unwrap_or_exit(
 			pina_cli::migrations::record_publication(
 				Path::new(plan.project_root()),
