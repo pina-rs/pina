@@ -1513,7 +1513,18 @@ in
         export DYLD_LIBRARY_PATH="$sysroot/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
         export LD_LIBRARY_PATH="$sysroot/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-        cargo check --locked "''${package_args[@]}"
+        # Command-line config outranks project [env], even force=true entries.
+        # Pin relative=false as well: expanding "0" into a path enables list mode.
+        cargo check --locked "''${package_args[@]}" \
+          --config 'env.PINA_LINT_LIST.value="0"' \
+          --config env.PINA_LINT_LIST.force=true \
+          --config env.PINA_LINT_LIST.relative=false \
+          --config 'env.PINA_LINT_ONLY.value=""' \
+          --config env.PINA_LINT_ONLY.force=true \
+          --config env.PINA_LINT_ONLY.relative=false \
+          --config 'env.PINA_LINT_LEVELS.value=""' \
+          --config env.PINA_LINT_LEVELS.force=true \
+          --config env.PINA_LINT_LEVELS.relative=false
       '';
       description = "Run Pina's security lints (pina_lint_driver) against the example and security program crates.";
       binary = "bash";

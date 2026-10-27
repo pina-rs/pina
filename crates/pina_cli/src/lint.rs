@@ -64,7 +64,9 @@ pub enum LintError {
 /// project's *active* toolchain (see [`crate::lint_driver`]), then runs `cargo
 /// check` — or `cargo fix` with `--fix` — with the driver as
 /// `RUSTC_WORKSPACE_WRAPPER`. Level overrides from the project's `pina.toml`
-/// `[lints]` table are forwarded through `PINA_LINT_LEVELS`.
+/// `[lints]` table are forwarded through `PINA_LINT_LEVELS`. Cargo command-line
+/// configuration pins these levels and disables driver test/catalog modes,
+/// taking precedence over inherited and project-forced environment values.
 ///
 /// # Errors
 ///
@@ -110,9 +112,6 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 	for (name, value) in driver_library_environment(&driver.sysroot) {
 		command.env(name, value);
 	}
-	if !levels.is_empty() {
-		command.env("PINA_LINT_LEVELS", format_lint_levels(levels));
-	}
 	if options.fix {
 		command
 			.arg("fix")
@@ -128,6 +127,26 @@ pub fn lint_project(options: &LintOptions) -> Result<LintOutput, LintError> {
 		.arg(manifest)
 		.arg("--package")
 		.arg(&project.package_name);
+
+	// Cargo's project [env] entries with force=true override parent environment
+	// values. Command-line config wins over those entries, including relative
+	// path expansion, so a project cannot select the driver's test/catalog modes
+	// or replace the levels validated from pina.toml.
+	for (name, value) in [
+		("PINA_LINT_LIST", "0".to_owned()),
+		("PINA_LINT_ONLY", String::new()),
+		("PINA_LINT_LEVELS", format_lint_levels(levels)),
+	] {
+		command.env(name, &value);
+		command.args([
+			"--config".to_owned(),
+			format!("env.{name}.value={}", toml::Value::String(value)),
+			"--config".to_owned(),
+			format!("env.{name}.force=true"),
+			"--config".to_owned(),
+			format!("env.{name}.relative=false"),
+		]);
+	}
 
 	let status = command
 		.status()

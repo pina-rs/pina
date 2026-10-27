@@ -22,6 +22,12 @@
 //!
 //! `PINA_LINT_NO_DEPS` and `PINA_LINT_LEVELS` are recorded in dep-info, so
 //! changing them invalidates cargo's cached check results.
+//!
+//! These variables are low-level driver controls. Security gates must pin
+//! `PINA_LINT_LIST=0`, `PINA_LINT_ONLY=""`, and their effective `PINA_LINT_LEVELS`
+//! through Cargo's `--config env.<name>.value`, `.force=true`, and
+//! `.relative=false` settings, as `pina lint` and `security:pina-lint` do.
+//! Setting the parent environment alone cannot override project `[env]` entries.
 
 // Linking against `rustc_private` requires nightly features; the
 // workspace-wide `unstable_features = "deny"` lint is waived for this binary.
