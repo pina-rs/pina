@@ -327,9 +327,8 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			)
 		};
 
-		// Verify the escrow is the PDA for the maker and seed. The parse above
-		// already captured `bump`, so this performs the identical
-		// single-derivation check without re-parsing the account.
+		// Verify the escrow address and compare the captured bump with the
+		// account's declared stored field at runtime.
 		EscrowState::assert_stored_bump(self.escrow, bump, &maker, u64::from(seed), &ID)?;
 
 		// Validate maker and mint accounts

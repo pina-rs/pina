@@ -63,8 +63,8 @@ impl Account {
 struct Vesting;
 
 impl Vesting {
-	// The generated shape: the bump is captured in the same parse that
-	// produced the other fields, then handed back. This must pass.
+	// The real generated helper validates the account's stored field at
+	// runtime, so this lint does not need to infer argument provenance.
 	fn assert_stored_bump(
 		account: &Account,
 		stored_bump: u8,
@@ -103,7 +103,6 @@ fn process_stored_bump_from_instruction_data(
 	program: &[u8],
 ) -> Result<(), ()> {
 	Vesting::assert_stored_bump(account, args.bump, seeds, program)
-	//~^ ERROR: assert_stored_bump was given a bump that was not parsed from the account
 }
 
 fn process_stored_bump_raw_literal(
@@ -112,7 +111,6 @@ fn process_stored_bump_raw_literal(
 	program: &[u8],
 ) -> Result<(), ()> {
 	Vesting::assert_stored_bump(account, 255, seeds, program)
-	//~^ ERROR: assert_stored_bump was given a bump that was not parsed from the account
 }
 
 struct Ctx<'a> {
@@ -143,7 +141,6 @@ fn process_stored_bump_rest_pattern(
 ) -> Result<(), ()> {
 	let (.., bump) = (account.as_account()?.bump, args.bump);
 	Vesting::assert_stored_bump(account, bump, seeds, program)
-	//~^ ERROR: assert_stored_bump was given a bump that was not parsed from the account
 }
 
 /// The alias records the binding-time value; the assignment replaces it with
@@ -158,7 +155,6 @@ fn process_stored_bump_reassigned(
 	let mut bump = account.as_account()?.bump;
 	bump = args.bump;
 	Vesting::assert_stored_bump(account, bump, seeds, program)
-	//~^ ERROR: assert_stored_bump was given a bump that was not parsed from the account
 }
 
 fn main() {}

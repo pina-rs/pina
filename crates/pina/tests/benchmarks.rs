@@ -14,12 +14,15 @@
 use std::hint::black_box;
 use std::time::Instant;
 
+use pina::AccountView;
 use pina::Address;
 use pina::HasDiscriminator;
 use pina::IntoDiscriminator;
 use pina::PodU64;
 use pina::create_program_address;
 use pina::try_find_program_address;
+use pinocchio::account::NOT_BORROWED;
+use pinocchio::account::RuntimeAccount;
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -80,6 +83,7 @@ pub enum BenchAccountType {
 }
 
 #[pina::account(crate = ::pina, discriminator = BenchAccountType)]
+#[pina::pda(crate = ::pina, seeds = [b"bench-state", authority: Address], bump = bump)]
 pub struct TestState {
 	pub bump: u8,
 	pub count: u64,
@@ -271,6 +275,56 @@ fn benchmark_pda_creation_validation_paths() {
 		));
 		let valid = derived.is_ok_and(|address| address == expected_address);
 		black_box(valid);
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Stored-bump validation benchmarks
+// ---------------------------------------------------------------------------
+
+#[test]
+#[allow(unsafe_code)]
+fn benchmark_pda_assert_stored_bump() {
+	#[repr(C)]
+	struct StoredAccount {
+		header: RuntimeAccount,
+		data: [u8; TestState::SIZE],
+	}
+
+	let authority = Address::new_from_array([42; 32]);
+	let (address, bump) = TestState::find_pda(&authority, &SYSTEM_ID);
+	let mut stored = StoredAccount {
+		header: RuntimeAccount {
+			borrow_state: NOT_BORROWED,
+			is_signer: 0,
+			is_writable: 1,
+			executable: 0,
+			padding: [0; 4],
+			address,
+			owner: SYSTEM_ID,
+			lamports: 1,
+			data_len: TestState::SIZE as u64,
+		},
+		data: [0; TestState::SIZE],
+	};
+	TestState::initialize(&mut stored.data, |state| {
+		state.bump = bump;
+		state.authority = authority;
+		Ok(())
+	})
+	.expect("valid benchmark account");
+	// SAFETY: the C layout places the complete data buffer immediately after
+	// its initialized header, and `stored` stays in place while the view is used.
+	let account = unsafe { AccountView::new_unchecked(core::ptr::addr_of_mut!(stored.header)) };
+
+	bench("PDA assert_stored_bump (typed account)", || {
+		black_box(TestState::assert_stored_bump(
+			black_box(&account),
+			black_box(bump),
+			black_box(&authority),
+			black_box(&SYSTEM_ID),
+		))
+		.expect("stored bump and address must validate");
 	});
 }
 

@@ -343,8 +343,8 @@ impl CounterState {
         authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
-        let bump = pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
-        let seeds = Self::seeds(authority).with_bump(bump);
+        let seeds = Self::seeds(authority)
+            .with_bump(pina::AsAccount::as_account::<Self>(account, program_id)?.bump);
         <&pina::AccountView as pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
                 &seeds.as_slices(),
@@ -352,15 +352,20 @@ impl CounterState {
             )
             .map(|_| ())
     }
-    /**Assert that `account` is the PDA for the given seeds, using `stored_bump`: a `bump` value the caller already read from `account` in this instruction.
+    /**Assert that `account` is the PDA for the given seeds and that `stored_bump` equals its declared `bump` field.
 
-This performs the identical single-derivation check as [`Self::assert_seeds`], without re-parsing `account` to read `bump` again. The caller must have obtained `stored_bump` from `account`'s own `bump` field — for example from the same `as_account`/`with_compact_account` parse that produced the other fields it is validating against. Passing a bump from any other source (instruction data, a different account) forfeits the stored-bump guarantee this method exists to name, and the `require_canonical_bump_before_pda_write` lint rejects such call sites.*/
+Parses the account to validate its owner, type, and stored bump before checking the address. A mismatch returns `ProgramError::InvalidSeeds`, even if the supplied bump derives the account's address. Release any mutable account-data borrow before calling this method. Use [`Self::assert_seeds`] when no supplied bump needs comparison. This checks the stored bump, not its canonicality; canonical creation or a checked PDA loader must establish namespace uniqueness.*/
     pub fn assert_stored_bump(
         account: &pina::AccountView,
         stored_bump: u8,
         authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
+        if stored_bump
+            != pina::AsAccount::as_account::<Self>(account, program_id)?.bump
+        {
+            return Err(pina::ProgramError::InvalidSeeds);
+        }
         let seeds = Self::seeds(authority).with_bump(stored_bump);
         <&pina::AccountView as pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
@@ -1022,9 +1027,8 @@ impl AllSeedState {
         height: u32,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<(), ::pina::ProgramError> {
-        let bump = ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
         let seeds = Self::seeds(authority, amount, side, tag, width, height)
-            .with_bump(bump);
+            .with_bump(::pina::AsAccount::as_account::<Self>(account, program_id)?.bump);
         <&::pina::AccountView as ::pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
                 &seeds.as_slices(),
@@ -1032,9 +1036,9 @@ impl AllSeedState {
             )
             .map(|_| ())
     }
-    /**Assert that `account` is the PDA for the given seeds, using `stored_bump`: a `bump` value the caller already read from `account` in this instruction.
+    /**Assert that `account` is the PDA for the given seeds and that `stored_bump` equals its declared `bump` field.
 
-This performs the identical single-derivation check as [`Self::assert_seeds`], without re-parsing `account` to read `bump` again. The caller must have obtained `stored_bump` from `account`'s own `bump` field — for example from the same `as_account`/`with_compact_account` parse that produced the other fields it is validating against. Passing a bump from any other source (instruction data, a different account) forfeits the stored-bump guarantee this method exists to name, and the `require_canonical_bump_before_pda_write` lint rejects such call sites.*/
+Parses the account to validate its owner, type, and stored bump before checking the address. A mismatch returns `ProgramError::InvalidSeeds`, even if the supplied bump derives the account's address. Release any mutable account-data borrow before calling this method. Use [`Self::assert_seeds`] when no supplied bump needs comparison. This checks the stored bump, not its canonicality; canonical creation or a checked PDA loader must establish namespace uniqueness.*/
     pub fn assert_stored_bump(
         account: &::pina::AccountView,
         stored_bump: u8,
@@ -1046,6 +1050,11 @@ This performs the identical single-derivation check as [`Self::assert_seeds`], w
         height: u32,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        if stored_bump
+            != ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump
+        {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
         let seeds = Self::seeds(authority, amount, side, tag, width, height)
             .with_bump(stored_bump);
         <&::pina::AccountView as ::pina::AccountInfoValidation>::assert_seeds_with_bump(
@@ -1823,8 +1832,8 @@ impl TodoState {
         owner: &::pina::Address,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<(), ::pina::ProgramError> {
-        let bump = ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
-        let seeds = Self::seeds(owner).with_bump(bump);
+        let seeds = Self::seeds(owner)
+            .with_bump(::pina::AsAccount::as_account::<Self>(account, program_id)?.bump);
         <&::pina::AccountView as ::pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
                 &seeds.as_slices(),
@@ -1832,15 +1841,20 @@ impl TodoState {
             )
             .map(|_| ())
     }
-    /**Assert that `account` is the PDA for the given seeds, using `stored_bump`: a `bump` value the caller already read from `account` in this instruction.
+    /**Assert that `account` is the PDA for the given seeds and that `stored_bump` equals its declared `bump` field.
 
-This performs the identical single-derivation check as [`Self::assert_seeds`], without re-parsing `account` to read `bump` again. The caller must have obtained `stored_bump` from `account`'s own `bump` field — for example from the same `as_account`/`with_compact_account` parse that produced the other fields it is validating against. Passing a bump from any other source (instruction data, a different account) forfeits the stored-bump guarantee this method exists to name, and the `require_canonical_bump_before_pda_write` lint rejects such call sites.*/
+Parses the account to validate its owner, type, and stored bump before checking the address. A mismatch returns `ProgramError::InvalidSeeds`, even if the supplied bump derives the account's address. Release any mutable account-data borrow before calling this method. Use [`Self::assert_seeds`] when no supplied bump needs comparison. This checks the stored bump, not its canonicality; canonical creation or a checked PDA loader must establish namespace uniqueness.*/
     pub fn assert_stored_bump(
         account: &::pina::AccountView,
         stored_bump: u8,
         owner: &::pina::Address,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        if stored_bump
+            != ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump
+        {
+            return Err(::pina::ProgramError::InvalidSeeds);
+        }
         let seeds = Self::seeds(owner).with_bump(stored_bump);
         <&::pina::AccountView as ::pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
@@ -3029,11 +3043,13 @@ impl CompactState {
         authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
-        let bump = pina::AsCompactAccount::with_compact_account::<
-            Self,
-            _,
-        >(account, program_id, |state| Ok(state.bump))?;
-        let seeds = Self::seeds(authority).with_bump(bump);
+        let seeds = Self::seeds(authority)
+            .with_bump(
+                pina::AsCompactAccount::with_compact_account::<
+                    Self,
+                    _,
+                >(account, program_id, |state| Ok(state.bump))?,
+            );
         <&pina::AccountView as pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
                 &seeds.as_slices(),
@@ -3041,15 +3057,23 @@ impl CompactState {
             )
             .map(|_| ())
     }
-    /**Assert that `account` is the PDA for the given seeds, using `stored_bump`: a `bump` value the caller already read from `account` in this instruction.
+    /**Assert that `account` is the PDA for the given seeds and that `stored_bump` equals its declared `bump` field.
 
-This performs the identical single-derivation check as [`Self::assert_seeds`], without re-parsing `account` to read `bump` again. The caller must have obtained `stored_bump` from `account`'s own `bump` field — for example from the same `as_account`/`with_compact_account` parse that produced the other fields it is validating against. Passing a bump from any other source (instruction data, a different account) forfeits the stored-bump guarantee this method exists to name, and the `require_canonical_bump_before_pda_write` lint rejects such call sites.*/
+Parses the account to validate its owner, type, and stored bump before checking the address. A mismatch returns `ProgramError::InvalidSeeds`, even if the supplied bump derives the account's address. Release any mutable account-data borrow before calling this method. Use [`Self::assert_seeds`] when no supplied bump needs comparison. This checks the stored bump, not its canonicality; canonical creation or a checked PDA loader must establish namespace uniqueness.*/
     pub fn assert_stored_bump(
         account: &pina::AccountView,
         stored_bump: u8,
         authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
+        if stored_bump
+            != pina::AsCompactAccount::with_compact_account::<
+                Self,
+                _,
+            >(account, program_id, |state| Ok(state.bump))?
+        {
+            return Err(pina::ProgramError::InvalidSeeds);
+        }
         let seeds = Self::seeds(authority).with_bump(stored_bump);
         <&pina::AccountView as pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,

@@ -398,9 +398,8 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				vesting_state.bump,
 			)
 		};
-		// Verify the vesting state is the PDA for the admin, beneficiary, and
-		// mint. The parse above already captured `bump`, so this performs the
-		// identical single-derivation check without re-parsing the account.
+		// Verify the vesting address and compare the captured bump with the
+		// account's declared stored field at runtime.
 		VestingState::assert_stored_bump(
 			self.vesting_state,
 			bump,
@@ -536,9 +535,8 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			)
 		};
 
-		// Verify the vesting state is the PDA for the admin, beneficiary, and
-		// mint. The parse above already captured `bump`, so this performs the
-		// identical single-derivation check without re-parsing the account.
+		// Verify the vesting address and compare the captured bump with the
+		// account's declared stored field at runtime.
 		VestingState::assert_stored_bump(
 			self.vesting_state,
 			bump,
