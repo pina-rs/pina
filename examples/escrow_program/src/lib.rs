@@ -495,6 +495,8 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		// Cancellation must remain available for deposits accepted before Make
 		// rejected mint extensions. No exchange price depends on this refund;
 		// the canonical token program enforces its transfer and close rules.
+		// Vaults with withheld transfer fees first need the permissionless
+		// Token-2022 HarvestWithheldTokensToMint instruction before closing.
 		let mint_a = self.mint_a.as_token_mint_for_program(&token_program)?;
 		let decimals_a = mint_a.decimals();
 		drop(mint_a);
