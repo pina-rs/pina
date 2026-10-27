@@ -479,22 +479,43 @@ mod tests {
 
 	#[cfg(unix)]
 	#[test]
-	fn install_reports_unsearchable_reference_directories_without_changing_documents() {
+	fn install_honors_reference_directory_permissions() {
 		use std::os::unix::fs::PermissionsExt as _;
 
-		let root = tempfile::tempdir().unwrap();
-		let references = root.path().join("references");
-		std::fs::create_dir(&references).unwrap();
-		std::fs::set_permissions(&references, std::fs::Permissions::from_mode(0o400)).unwrap();
-		let outcome = install(Some(root.path().to_path_buf()), false);
-		std::fs::set_permissions(&references, std::fs::Permissions::from_mode(0o700)).unwrap();
+		// Privileged test runners can bypass directory mode bits.
+		for mode in [0o700, 0o400] {
+			let root = tempfile::tempdir().unwrap();
+			let references = root.path().join("references");
+			std::fs::create_dir(&references).unwrap();
+			std::fs::set_permissions(&references, std::fs::Permissions::from_mode(mode)).unwrap();
+			let probe = std::fs::symlink_metadata(references.join("migrations.md"));
+			let outcome = install(Some(root.path().to_path_buf()), false);
+			std::fs::set_permissions(&references, std::fs::Permissions::from_mode(0o700)).unwrap();
 
-		assert!(
-			matches!(outcome, Err(SkillError::Write { .. })),
-			"{outcome:?}"
-		);
-		assert!(!root.path().join("SKILL.md").exists());
-		assert_eq!(std::fs::read_dir(references).unwrap().count(), 0);
+			let probe_error = probe.unwrap_err().kind();
+			assert!(matches!(
+				probe_error,
+				io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied
+			));
+			let permission_denied = probe_error == io::ErrorKind::PermissionDenied;
+
+			assert_eq!(outcome.is_ok(), !permission_denied, "{outcome:?}");
+			assert_eq!(
+				matches!(outcome, Err(SkillError::Write { .. })),
+				permission_denied,
+				"{outcome:?}"
+			);
+			assert_eq!(root.path().join("SKILL.md").exists(), !permission_denied);
+			let reference_count = if permission_denied {
+				0
+			} else {
+				TOPICS.len() - 1
+			};
+			assert_eq!(
+				std::fs::read_dir(references).unwrap().count(),
+				reference_count
+			);
+		}
 	}
 
 	#[cfg(unix)]
