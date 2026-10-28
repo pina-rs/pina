@@ -36,9 +36,15 @@ mkdirSync(target, { recursive: true });
 const executable = join(target, "benchmarks");
 if (!existsSync(executable)) {
   const label = readFileSync(join(process.cwd(), "benchmark-label"), "utf8");
-  writeFileSync(executable,
-    "#!/usr/bin/env node\\nconsole.log(" + JSON.stringify("[BENCH] " + label + ": avg=100ns") + ");\\n",
-    { mode: 0o755 });
+  const program = [
+    "#!/usr/bin/env node",
+    'const { appendFileSync } = require("node:fs");',
+    "appendFileSync(" + JSON.stringify(join(target, "..", "sample-order")) + ", " + JSON.stringify(label + "\\n") + ");",
+    "console.log(" + JSON.stringify("[BENCH] " + label + ": total=100µs, avg=100ns (1000 iterations)") + ");",
+    "console.log(" + JSON.stringify("[BENCH] shared: total=" + (label === "base-only" ? "1.5µs" : "1.6µs") + ", avg=1ns (1000 iterations)") + ");",
+    "",
+  ].join("\\n");
+  writeFileSync(executable, program, { mode: 0o755 });
 }
 console.log(JSON.stringify({ reason: "compiler-artifact", target: { name: "benchmarks" }, executable }));
 `,
@@ -68,5 +74,56 @@ console.log(JSON.stringify({ reason: "compiler-artifact", target: { name: "bench
 	assert.match(
 		report,
 		/\| `head-only` \| n\/a ns \| 100 ns \| n\/a \| 🆕 new baseline \|/u,
+	);
+	assert.match(
+		report,
+		/\| `shared` \| 1\.5 ns \| 1\.6 ns \| -6\.7% \| ⚠️ regressed \|/u,
+	);
+	const samples: unknown = JSON.parse(
+		readFileSync(join(output, "core.json"), "utf8"),
+	);
+	assert.deepEqual(samples, {
+		sampleRuns: 7,
+		comparisons: [
+			{
+				id: "base-only",
+				baseNanoseconds: 100,
+				baseSamples: Array(7).fill(100),
+			},
+			{
+				id: "head-only",
+				headNanoseconds: 100,
+				headSamples: Array(7).fill(100),
+			},
+			{
+				id: "shared",
+				baseNanoseconds: 1.5,
+				headNanoseconds: 1.6,
+				baseSamples: Array(7).fill(1.5),
+				headSamples: Array(7).fill(1.6),
+				performancePercent: (1.5 - 1.6) / 1.5 * 100,
+			},
+		],
+	});
+	assert.deepEqual(
+		readFileSync(join(root, "target", "sample-order"), "utf8").trim().split(
+			"\n",
+		),
+		[
+			"base-only",
+			"head-only",
+			"head-only",
+			"base-only",
+			"base-only",
+			"head-only",
+			"head-only",
+			"base-only",
+			"base-only",
+			"head-only",
+			"head-only",
+			"base-only",
+			"base-only",
+			"head-only",
+		],
 	);
 });
