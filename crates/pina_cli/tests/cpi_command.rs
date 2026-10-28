@@ -132,6 +132,91 @@ fn cpi_command_exposes_source_only_and_destination_modes() {
 	assert!(output_dir.join("src/generated/mod.rs").is_file());
 }
 
+/// Workspace discovery must not execute a checkout-local Git before the
+/// converter's PATH isolation, even when the converter subsequently fails.
+#[cfg(unix)]
+#[test]
+fn cpi_command_never_executes_workspace_git_during_anchor_conversion() {
+	use std::os::unix::fs::PermissionsExt;
+
+	let temp = TempDir::new().expect("create temp dir");
+	let temp_root = temp.path().canonicalize().expect("canonicalize temp dir");
+	let workspace = temp_root.join("workspace");
+	let project = workspace.join("programs/counter");
+	let shadow_bin = workspace.join("node_modules/.bin");
+	let trusted_bin = temp_root.join("trusted-bin");
+	let marker = temp_root.join("shadow-git-executed");
+
+	for directory in [&project, &shadow_bin, &trusted_bin, &workspace.join(".git")] {
+		fs::create_dir_all(directory).expect("create fixture directory");
+	}
+
+	let shadow_git = shadow_bin.join("git");
+	fs::write(
+		&shadow_git,
+		"#!/bin/sh\nprintf executed > \"$PINA_TEST_SHADOW_MARKER\"\nexit 1\n",
+	)
+	.expect("write shadow git");
+	fs::set_permissions(&shadow_git, fs::Permissions::from_mode(0o755))
+		.expect("make shadow git executable");
+
+	let npx = trusted_bin.join("npx");
+	fs::write(
+		&npx,
+		r#"#!/bin/sh
+case "$PATH" in *"$PINA_TEST_WORKSPACE"*) echo 'workspace PATH survived' >&2; exit 90;; esac
+case "$(pwd -P)" in "$PINA_TEST_WORKSPACE"*) echo 'workspace cwd survived' >&2; exit 91;; esac
+if [ -n "$NODE_PATH" ]; then echo 'NODE_PATH survived' >&2; exit 92; fi
+if [ "$PINA_TEST_CONVERTER_STATUS" = 7 ]; then echo 'converter failed deliberately' >&2; exit 7; fi
+/bin/cat "$PINA_TEST_CONVERTED_IDL"
+"#,
+	)
+	.expect("write trusted npx");
+	fs::set_permissions(&npx, fs::Permissions::from_mode(0o755))
+		.expect("make trusted npx executable");
+	let inherited = std::env::var_os("PATH").unwrap_or_default();
+	let path =
+		std::env::join_paths(std::iter::once(shadow_bin).chain(std::env::split_paths(&inherited)))
+			.expect("assemble shadowed PATH");
+
+	for status in [0, 7] {
+		let output_dir = temp_root.join(format!("output-{status}"));
+		let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+			.args(["cpi", "--idl"])
+			.arg(anchor_fixture_path())
+			.arg("--npx")
+			.arg(&npx)
+			.arg("--output")
+			.arg(&output_dir)
+			.current_dir(&project)
+			.env("PATH", &path)
+			.env("NODE_PATH", workspace.join("node_modules"))
+			.env("PINA_TEST_WORKSPACE", &workspace)
+			.env("PINA_TEST_SHADOW_MARKER", &marker)
+			.env("PINA_TEST_CONVERTED_IDL", fixture_path())
+			.env("PINA_TEST_CONVERTER_STATUS", status.to_string())
+			.output()
+			.expect("run Anchor CPI command");
+
+		assert!(!marker.exists(), "workspace Git executed before isolation");
+
+		if status == 0 {
+			assert!(
+				output.status.success(),
+				"conversion failed: {}",
+				String::from_utf8_lossy(&output.stderr)
+			);
+			assert!(output_dir.join("src/generated/mod.rs").is_file());
+		} else {
+			assert!(!output.status.success());
+			assert!(
+				String::from_utf8_lossy(&output.stderr).contains("converter failed deliberately")
+			);
+			assert!(!output_dir.exists());
+		}
+	}
+}
+
 #[cfg(unix)]
 #[test]
 fn cpi_command_converts_a_raw_anchor_idl_and_compiles_the_crate() {
