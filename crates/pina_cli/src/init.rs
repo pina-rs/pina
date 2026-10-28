@@ -339,13 +339,13 @@ fn open_project_directory(path: &Path) -> Result<Dir, InitError> {
 				let top_level = current == root;
 				current.push(name);
 
-				// Preflight permits only root-owned system aliases at this depth (/tmp, /var).
+				// Unix preflight permits only root-owned system aliases here (/tmp, /var).
 				// Their replacement is outside the untrusted project tree's authority.
 				if top_level
 					&& fs::symlink_metadata(&current)
 						.is_ok_and(|metadata| crate::path_security::is_link_like(&metadata))
 				{
-					let resolved = init_io(&current, fs::canonicalize(&current))?;
+					let resolved = resolve_system_alias(&current)?;
 					directory = init_io(
 						&current,
 						Dir::open_ambient_dir(&resolved, ambient_authority()),
@@ -366,6 +366,19 @@ fn open_project_directory(path: &Path) -> Result<Dir, InitError> {
 	}
 
 	Ok(directory)
+}
+
+/// Resolve a link-like root component only where preflight permits trusted aliases.
+fn resolve_system_alias(path: &Path) -> Result<PathBuf, InitError> {
+	#[cfg(windows)]
+	{
+		Err(unsafe_scaffold_path(path.to_path_buf()))
+	}
+
+	#[cfg(not(windows))]
+	{
+		init_io(path, fs::canonicalize(path))
+	}
 }
 
 /// Pin every scaffold parent so links cannot be followed between validation and creation.
@@ -1208,6 +1221,29 @@ mod tests {
 
 		assert!(open_project_directory(&project).is_err());
 		assert_eq!(fs::read_dir(&external).unwrap().count(), 0);
+	}
+
+	#[cfg(windows)]
+	#[test]
+	fn system_alias_resolution_rejects_windows_reparse_points() {
+		use std::os::windows::fs::symlink_dir;
+
+		let temp = tempfile::tempdir().unwrap();
+		let external = temp.path().join("external");
+		let alias = temp.path().join("alias");
+		fs::create_dir(&external).unwrap();
+		fs::create_dir(&alias).unwrap();
+		assert!(!crate::path_security::has_untrusted_link_component(&alias).unwrap());
+
+		fs::remove_dir(&alias).unwrap();
+		symlink_dir(&external, &alias).unwrap();
+		assert!(fs::canonicalize(&alias).is_ok());
+
+		let error = resolve_system_alias(&alias).unwrap_err();
+		assert!(matches!(
+			error,
+			InitError::Io { source, .. } if source.kind() == std::io::ErrorKind::InvalidInput
+		));
 	}
 
 	#[cfg(unix)]
