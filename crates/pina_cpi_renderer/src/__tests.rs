@@ -1491,12 +1491,19 @@ fn untrusted_idl_names_cannot_escape_generated_doc_comments() {
 		account_name.contains('\n'),
 		"expected the newline to survive IDL parsing, got {account_name:?}"
 	);
+	assert!(
+		root.program.instructions[0].arguments[0]
+			.name
+			.as_ref()
+			.contains('\n')
+	);
 
 	let files = render_program_to_files(&root, &RenderConfig::default())
 		.unwrap_or_else(|error| panic!("renders injected idl: {error}"));
 	let page = files
 		.get(Path::new("instructions/transfer.rs"))
 		.unwrap_or_else(|| panic!("instruction page is generated"));
+	assert!(page.contains("/// Instruction argument `acct"));
 
 	// The canary may only appear inside a comment line.
 	for line in page.lines() {
@@ -1551,8 +1558,7 @@ const EVIL_IDL_JSON: &str = r#"{
           {
             "kind": "instructionArgumentNode",
             "name": "acct\n}\nconst _: () = loop {};\npub struct Injected {",
-            "type": { "kind": "publicKeyTypeNode" },
-            "defaultValueStrategy": "omitted"
+            "type": { "kind": "publicKeyTypeNode" }
           }
         ],
         "discriminators": [
