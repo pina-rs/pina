@@ -11,7 +11,7 @@ git-fetch-with-cli = true
 # This list is the repository's single advisory policy: `security:deny` runs
 # the advisories check, and `security:audit` passes no ignore list of its own.
 #
-# Except for crypto-bigint's additional host CLI path documented below,
+# Except for crypto-bigint and zstd's additional host CLI paths documented below,
 # every entry is reachable only from the host-side dev/test stack
 # (surfpool, litesvm, mollusk, solana-runtime, and the Agave precompile host
 # crates) pulled in through `pina_test` and the `*/tests/surfpool` harnesses.
@@ -165,6 +165,28 @@ ignore = [
 	# Reviewed 2026-10-24. Remove when the Surfpool/BIP32 and Solana recovery
 	# dependency trains both resolve crypto-bigint >=0.7.6 — tracked in #654.
 	"RUSTSEC-2026-0387",
+	# Agave 4.2.2 requires zstd ^0.13.3; the fixed zstd 0.14.3 / zstd-safe
+	# 8.2.0 releases are incompatible. Agave's fix is merged on master:
+	# https://github.com/anza-xyz/agave/pull/16391
+	# scripts/check-zstd-advisories.ts enforces a 2026-11-25 expiry and the
+	# exact reviewed direct consumers before either security audit runs.
+	# A new consumer or version must fail until its call sites are reviewed.
+	# The account-decoder crates also reach generated host CLI applications;
+	# this is not a claim that all zstd use is confined to the test harness.
+	# Reviewed 2026-10-27. Remove after the supported Solana train upgrades:
+	# https://github.com/pina-rs/pina/issues/669
+	# RUSTSEC-2026-0391: only borrowed with_context constructors are affected.
+	# All four call sites in these three crates construct fresh Encoder::new,
+	# Decoder::new, or Decoder::with_buffer contexts; none reuses a context.
+	{ id = "RUSTSEC-2026-0391", reason = "Guarded consumers create fresh contexts; expires 2026-11-25" },
+	# RUSTSEC-2026-0398: requires zstd-safe's seekable feature. Its only
+	# consumer is zstd 0.13.3, which does not expose or enable that feature.
+	{ id = "RUSTSEC-2026-0398", reason = "Guarded consumer cannot enable seekable; expires 2026-11-25" },
+	# RUSTSEC-2026-0403: affects Vec-backed streaming write decoders. The
+	# consumers above use only encoders and streaming read decoders, which
+	# the advisory explicitly identifies as unaffected. The 0391 caller check
+	# also guards this call-site review against added or updated consumers.
+	{ id = "RUSTSEC-2026-0403", reason = "Guarded consumers use unaffected read decoders; expires 2026-11-25" },
 ]
 
 [licenses]

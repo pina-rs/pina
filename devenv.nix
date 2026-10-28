@@ -1521,6 +1521,7 @@ in
     "security:deny" = {
       exec = ''
         set -euo pipefail
+        node ${lib.escapeShellArg "${currentDir}/scripts/check-zstd-advisories.ts"}
         # cargo-deny 0.20+ auto-discovers deny.toml from the working directory;
         # the --config flag was removed from the CLI.
         #
@@ -1549,6 +1550,9 @@ in
     "security:audit" = {
       exec = ''
         set -euo pipefail
+        # Enforce the same caller and expiry constraints as security:deny,
+        # including when this task is invoked on its own.
+        node ${lib.escapeShellArg "${currentDir}/scripts/check-zstd-advisories.ts"}
         # The advisory DB lives inside the cached target dir; a stale or
         # partial clone from a cache restore makes cargo-audit refuse to
         # (re)initialize it. Remove it so the clone always starts fresh.
