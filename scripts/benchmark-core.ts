@@ -214,12 +214,12 @@ function run(arguments_: Arguments): void {
 	mkdirSync(arguments_.outputDirectory, { recursive: true });
 	const baseExecutable = buildBenchmark(
 		arguments_.baseWorkspace,
-		arguments_.targetDirectory,
+		join(arguments_.targetDirectory, "base"),
 	);
 	const baseMeasurements = measure(baseExecutable);
 	const headExecutable = buildBenchmark(
 		arguments_.headWorkspace,
-		arguments_.targetDirectory,
+		join(arguments_.targetDirectory, "head"),
 	);
 	const comparisons = compare(baseMeasurements, measure(headExecutable));
 	const statuses = comparisons.map(classify);
