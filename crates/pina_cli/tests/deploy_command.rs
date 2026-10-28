@@ -185,12 +185,32 @@ fn dry_run_json_is_machine_readable_and_starts_no_child() {
 #[test]
 fn upgrade_only_rejects_a_declared_keypair_path_before_planning_or_execution() {
 	let fixture = ProjectFixture::new();
+	let marker = fixture.root.join("unexpected-deploy.txt");
+	let marker_command = "echo started > unexpected-deploy.txt";
+	let output = fixture
+		.command()
+		.args([
+			"--cluster",
+			"localnet",
+			"--upgrade-only",
+			"--remote-command",
+			marker_command,
+		])
+		.output()
+		.unwrap();
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert_eq!(fs::read_to_string(&marker).unwrap().trim(), "started");
+	fs::remove_file(&marker).unwrap();
+
 	fs::write(
 		fixture.root.join("src/lib.rs"),
 		r#"declare_id!("payer.json");"#,
 	)
 	.unwrap();
-	let marker = fixture.root.join("unexpected-deploy.txt");
 
 	for dry_run in [true, false] {
 		let mut command = fixture.command();
@@ -199,7 +219,7 @@ fn upgrade_only_rejects_a_declared_keypair_path_before_planning_or_execution() {
 		if dry_run {
 			command.args(["--dry-run", "--json"]);
 		} else {
-			command.args(["--remote-command", "touch unexpected-deploy.txt"]);
+			command.args(["--remote-command", marker_command]);
 		}
 
 		let output = command.output().unwrap();
