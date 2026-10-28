@@ -338,7 +338,7 @@ fn override_command_replaces_ambient_deployment_environment() {
 	#[cfg(unix)]
 	let script = r#"printf '%s\n' "$PINA_DEPLOY_PROGRAM" "$PINA_DEPLOY_PROGRAM_ID" "${PINA_DEPLOY_PROGRAM_KEYPAIR-unset}" "$PINA_DEPLOY_UPGRADE_AUTHORITY" "$PINA_DEPLOY_PAYER" "$PINA_DEPLOY_RPC_URL" "$PINA_DEPLOY_CLUSTER" "$PINA_DEPLOY_TEST_SENTINEL" > "$PINA_DEPLOY_TEST_LOG""#;
 	#[cfg(not(unix))]
-	let script = r#"(echo %PINA_DEPLOY_PROGRAM%& echo %PINA_DEPLOY_PROGRAM_ID%& if defined PINA_DEPLOY_PROGRAM_KEYPAIR (echo %PINA_DEPLOY_PROGRAM_KEYPAIR%) else (echo unset)& echo %PINA_DEPLOY_UPGRADE_AUTHORITY%& echo %PINA_DEPLOY_PAYER%& echo %PINA_DEPLOY_RPC_URL%& echo %PINA_DEPLOY_CLUSTER%& echo %PINA_DEPLOY_TEST_SENTINEL%)> "%PINA_DEPLOY_TEST_LOG%""#;
+	let script = r#"(echo %PINA_DEPLOY_PROGRAM%& echo %PINA_DEPLOY_PROGRAM_ID%& (if defined PINA_DEPLOY_PROGRAM_KEYPAIR (echo %PINA_DEPLOY_PROGRAM_KEYPAIR%) else (echo unset))& echo %PINA_DEPLOY_UPGRADE_AUTHORITY%& echo %PINA_DEPLOY_PAYER%& echo %PINA_DEPLOY_RPC_URL%& echo %PINA_DEPLOY_CLUSTER%& echo %PINA_DEPLOY_TEST_SENTINEL%)> "%PINA_DEPLOY_TEST_LOG%""#;
 
 	for upgrade_only in [true, false] {
 		let mut command = fixture.command();
