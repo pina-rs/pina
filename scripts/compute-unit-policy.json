@@ -44,6 +44,12 @@
 			"base": 14305,
 			"head": 14345,
 			"reason": "Approved by @ifiokjr on 2026-10-25: bind successor disclosure metadata to transfer proofs while retaining existing public-input and wire layouts."
+		},
+		"escrow_program": {
+			"baseRevision": "25981d44c6b3f13092d0f18b4b9c87bcacb38231",
+			"base": 4326,
+			"head": 4430,
+			"reason": "Approved by @ifiokjr on 2026-10-28 for https://github.com/pina-rs/pina/pull/684: recover already-funded legacy Token-2022 escrows, including the original 122-byte state. Exact approved totals must be confirmed against this refreshed base."
 		}
 	},
 	"runtimeCuApprovals": {
@@ -130,6 +136,12 @@
 			"base": 104147,
 			"head": 105282,
 			"reason": "Approved by @ifiokjr on 2026-10-25: accept 1135 CU for authenticating successor disclosure metadata in each transfer."
+		},
+		"escrow_program/cancel": {
+			"baseRevision": "25981d44c6b3f13092d0f18b4b9c87bcacb38231",
+			"base": 13271,
+			"head": 33030,
+			"reason": "Approved by @ifiokjr on 2026-10-28 for https://github.com/pina-rs/pina/pull/684: recover already-funded legacy Token-2022 escrows, including the original 122-byte state. Exact approved totals must be confirmed against this refreshed base. The higher maximum covers new cold-ATA recovery contexts; the matched existing SPL case improves from 13271 to 13238 CU."
 		}
 	},
 	"binarySizeApprovals": {
@@ -144,6 +156,12 @@
 			"base": 121600,
 			"head": 122008,
 			"reason": "Approved by @ifiokjr on 2026-10-25: accept 408 bytes for the metadata digest and proof binding that prevent copied-proof metadata substitution."
+		},
+		"escrow_program": {
+			"baseRevision": "25981d44c6b3f13092d0f18b4b9c87bcacb38231",
+			"base": 38912,
+			"head": 39808,
+			"reason": "Approved by @ifiokjr on 2026-10-28 for https://github.com/pina-rs/pina/pull/684: recover already-funded legacy Token-2022 escrows, including the original 122-byte state. Exact approved totals must be confirmed against this refreshed base."
 		}
 	}
 }

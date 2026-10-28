@@ -19,6 +19,8 @@ use pina_test::TestError;
 #[path = "../../../src/lib.rs"]
 mod program;
 
+mod legacy_refunds;
+
 use program::EscrowError;
 use program::EscrowInstruction;
 use program::ID;

@@ -431,6 +431,13 @@ pub struct CancelAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
+	/// Preserve the deposit's original mint policy for maker-authorized refunds.
+	/// The canonical token program validates transfer and close semantics.
+	#[allow(unknown_lints)] // Normal Rust tools do not load Pina's lint catalog.
+	#[allow(
+		require_explicit_token_2022_extension_policy,
+		reason = "Refunds must remain available for extensions admitted by earlier Make versions"
+	)]
 	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction data
 		let _ = CancelInstruction::try_from_bytes(data)?;
@@ -453,24 +460,51 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		// Validate escrow state
 		self.escrow.assert_not_empty()?;
 
-		let (maker, mint_a, seed, bump) = {
+		// Before version envelopes, the same program stored 122 bytes:
+		// discriminator, three addresses, three u64 values, and the bump.
+		// Decode that historical shape only for recovery; current accounts
+		// retain their versioned schema and normal typed validation.
+		let (maker, mint_a, seed, bump) = if self.escrow.data_len() == 122 {
+			self.escrow.assert_owner(&ID)?;
+			let data = self.escrow.try_borrow()?;
+
+			if data[0] != EscrowAccount::EscrowState as u8 {
+				return Err(ProgramError::InvalidAccountData);
+			}
+
+			let maker =
+				Address::try_from(&data[1..33]).map_err(|_| ProgramError::InvalidAccountData)?;
+			let mint_a =
+				Address::try_from(&data[33..65]).map_err(|_| ProgramError::InvalidAccountData)?;
+			let seed = u64::from_le_bytes(
+				data[113..121]
+					.try_into()
+					.map_err(|_| ProgramError::InvalidAccountData)?,
+			);
+
+			(maker, mint_a, seed, data[121])
+		} else {
 			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
-			(escrow.maker, escrow.mint_a, escrow.seed, escrow.bump)
+			(escrow.maker, escrow.mint_a, escrow.seed.get(), escrow.bump)
 		};
 
-		// Verify the escrow is the PDA for the maker and seed. The parse above
-		// already captured `bump`, so this performs the identical
-		// single-derivation check without re-parsing the account.
-		EscrowState::assert_stored_bump(self.escrow, bump, &maker, u64::from(seed), &ID)?;
+		// Both layouts supply a program-owned stored bump. Recreate its exact
+		// PDA: historical offers may use a valid noncanonical bump.
+		let escrow_seeds = EscrowState::seeds(&maker, seed).with_bump(bump);
+		if create_program_address(&escrow_seeds.as_slices(), &ID)? != *self.escrow.address() {
+			return Err(ProgramError::InvalidSeeds);
+		}
 
 		// Only the recorded maker may abort its own offer, and the mint must be
 		// the one the offer escrowed.
 		self.maker.assert_address(&maker)?;
 		self.mint_a.assert_address(&mint_a)?;
-		let mint_a = self
-			.mint_a
-			.as_token_mint_for_program(&token_program)?
-			.assert_no_extensions()?;
+		// Cancellation must remain available for deposits accepted before Make
+		// rejected mint extensions. No exchange price depends on this refund;
+		// the canonical token program enforces its transfer and close rules.
+		// Vaults with withheld transfer fees first need the permissionless
+		// Token-2022 HarvestWithheldTokensToMint instruction before closing.
+		let mint_a = self.mint_a.as_token_mint_for_program(&token_program)?;
 		let decimals_a = mint_a.decimals();
 		drop(mint_a);
 
@@ -501,7 +535,6 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 		.invoke()?;
 
 		// Prepare escrow signer for vault operations
-		let escrow_seeds = EscrowState::seeds(&maker, u64::from(seed)).with_bump(bump);
 		let escrow_signer = escrow_seeds.to_signer();
 		let signers = [escrow_signer.as_signer()];
 
