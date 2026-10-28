@@ -398,16 +398,14 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				vesting_state.bump,
 			)
 		};
-		// Verify the vesting address and compare the captured bump with the
-		// account's declared stored field at runtime.
-		VestingState::assert_stored_bump(
+		// Validate the vesting PDA using the account's stored bump.
+		drop(VestingState::load_pda(
 			self.vesting_state,
-			bump,
 			&admin,
 			&beneficiary,
 			&mint,
 			&ID,
-		)?;
+		)?);
 
 		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());
@@ -535,16 +533,14 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			)
 		};
 
-		// Verify the vesting address and compare the captured bump with the
-		// account's declared stored field at runtime.
-		VestingState::assert_stored_bump(
+		// Validate the vesting PDA using the account's stored bump.
+		drop(VestingState::load_pda(
 			self.vesting_state,
-			bump,
 			&admin,
 			&beneficiary,
 			&mint,
 			&ID,
-		)?;
+		)?);
 
 		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());

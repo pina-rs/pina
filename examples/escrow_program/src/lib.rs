@@ -327,9 +327,13 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 			)
 		};
 
-		// Verify the escrow address and compare the captured bump with the
-		// account's declared stored field at runtime.
-		EscrowState::assert_stored_bump(self.escrow, bump, &maker, u64::from(seed), &ID)?;
+		// Validate the escrow PDA using the account's stored bump.
+		drop(EscrowState::load_pda(
+			self.escrow,
+			&maker,
+			u64::from(seed),
+			&ID,
+		)?);
 
 		// Validate maker and mint accounts
 		//
