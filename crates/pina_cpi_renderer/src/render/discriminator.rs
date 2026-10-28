@@ -67,7 +67,6 @@ pub(crate) fn render_constant_discriminator(
 			}
 		})
 		.collect::<Result<Vec<_>>>()?;
-	validate_omitted_arguments(discriminators, arguments, context)?;
 	parts.sort_unstable_by_key(|(offset, _)| *offset);
 
 	if parts.first().map(|(offset, _)| *offset) != Some(0) {
@@ -90,6 +89,7 @@ pub(crate) fn render_constant_discriminator(
 		}
 		bytes.extend_from_slice(&part);
 	}
+	validate_omitted_arguments(discriminators, arguments, &bytes, context)?;
 
 	Ok(DiscriminatorBytes {
 		name: format!("{}_DISCRIMINATOR", prefix.to_shouty_snake_case()),
@@ -97,46 +97,53 @@ pub(crate) fn render_constant_discriminator(
 	})
 }
 
-/// Only discriminator fields are encoded independently of the argument list.
-/// Reject other omitted fields rather than silently moving caller data into them.
+/// Omitted arguments may be described by constant or field discriminators.
+/// Their bytes must already occupy the prefix before they can be skipped.
 fn validate_omitted_arguments(
 	discriminators: &[DiscriminatorNode],
 	arguments: &[InstructionArgumentNode],
+	prefix: &[u8],
 	context: &str,
 ) -> Result<()> {
-	let mut fields = discriminators
-		.iter()
-		.filter_map(|discriminator| {
+	let mut offset = 0;
+	let mut caller_argument_seen = false;
+
+	for (index, argument) in arguments.iter().enumerate() {
+		if argument.default_value_strategy != Some(codama_nodes::DefaultValueStrategy::Omitted) {
+			caller_argument_seen = true;
+			continue;
+		}
+
+		let bytes = field_discriminator_bytes(argument, context)?;
+		let mut fields = discriminators.iter().filter_map(|discriminator| {
 			match discriminator {
-				DiscriminatorNode::Field(field) => Some(field),
+				DiscriminatorNode::Field(field) if field.name == argument.name => Some(field),
 				_ => None,
 			}
-		})
-		.collect::<Vec<_>>();
-	fields.sort_unstable_by_key(|field| field.offset);
-	let omitted_count = arguments
-		.iter()
-		.filter(|argument| {
-			argument.default_value_strategy == Some(codama_nodes::DefaultValueStrategy::Omitted)
-		})
-		.count();
+		});
+		// Contiguous prefix assembly has already bounded every field offset by
+		// `prefix.len()`, so this conversion cannot truncate an offset.
+		let start = fields.next().map_or(offset, |field| field.offset as usize);
 
-	if omitted_count != fields.len()
-		|| fields.iter().enumerate().any(|(index, field)| {
-			arguments.get(index).is_none_or(|argument| {
-				argument.name != field.name
-					|| arguments[..index]
-						.iter()
-						.any(|prior| prior.name == field.name)
-					|| argument.default_value_strategy
-						!= Some(codama_nodes::DefaultValueStrategy::Omitted)
-			})
-		}) {
-		return Err(unsupported_discriminator(
-			context,
-			"omitted arguments must exactly match the leading discriminator fields in wire order"
-				.to_string(),
-		));
+		if caller_argument_seen
+			|| start < offset
+			|| fields.next().is_some()
+			|| arguments[..index]
+				.iter()
+				.any(|prior| prior.name == argument.name)
+			|| !prefix
+				.get(start..)
+				.is_some_and(|remaining| remaining.starts_with(&bytes))
+		{
+			return Err(unsupported_discriminator(
+				context,
+				"omitted arguments must be leading constants covered by the discriminator prefix \
+				 in wire order"
+					.to_string(),
+			));
+		}
+
+		offset = start + bytes.len();
 	}
 
 	Ok(())

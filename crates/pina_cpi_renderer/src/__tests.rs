@@ -839,6 +839,38 @@ fn preserves_secondary_field_discriminators_before_caller_arguments() {
 }
 
 #[test]
+fn preserves_omitted_arguments_covered_by_constant_discriminators() {
+	let mut instruction = instruction_node(
+		"nested",
+		numeric_discriminator(0xa0),
+		vec![],
+		vec![
+			omitted_selector("outer", 0xa0),
+			omitted_selector("inner", 0x10),
+			InstructionArgumentNode::new("value", NumberTypeNode::le(U8)),
+		],
+	);
+	instruction
+		.discriminators
+		.push(DiscriminatorNode::Constant(ConstantDiscriminatorNode::new(
+			ConstantValueNode::new(NumberTypeNode::le(U8), NumberValueNode::new(0x10u8)),
+			1,
+		)));
+	for secondary in [
+		instruction.discriminators[1].clone(),
+		DiscriminatorNode::Field(codama_nodes::FieldDiscriminatorNode::new("inner", 1)),
+	] {
+		instruction.discriminators[1] = secondary;
+		let page = render_instruction_page(&instruction, &mut TypeIndex::default())
+			.unwrap_or_else(|error| panic!("covered constants should render: {error}"));
+		assert!(page.contains("const NESTED_DISCRIMINATOR: [u8; 2] = [160, 16];"));
+		assert!(page.contains("data[2..3].copy_from_slice(&self.value.to_le_bytes());"));
+		assert!(!page.contains("pub outer:"));
+		assert!(!page.contains("pub inner:"));
+	}
+}
+
+#[test]
 fn rejects_reordered_displaced_and_repeated_discriminator_fields() {
 	let field = |name, offset| {
 		DiscriminatorNode::Field(codama_nodes::FieldDiscriminatorNode::new(name, offset))
