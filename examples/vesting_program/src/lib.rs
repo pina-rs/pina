@@ -385,6 +385,22 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				.assert_address(&vesting_state.beneficiary)?;
 			self.mint.assert_address(&vesting_state.mint)?;
 
+			// Creation uses invoke_signed, so this typed borrow can validate the
+			// off-curve address without loading the same account a second time.
+			if !is_derived_address(
+				self.vesting_state.address(),
+				&VestingState::seeds(
+					&vesting_state.admin,
+					&vesting_state.beneficiary,
+					&vesting_state.mint,
+				)
+				.as_slices(),
+				vesting_state.bump,
+				&ID,
+			) {
+				return Err(ProgramError::InvalidSeeds);
+			}
+
 			(
 				vesting_state.admin,
 				vesting_state.beneficiary,
@@ -398,14 +414,6 @@ impl<'a> ProcessAccountInfos<'a> for ClaimAccounts<'a> {
 				vesting_state.bump,
 			)
 		};
-		// Validate the vesting PDA using the account's stored bump.
-		drop(VestingState::load_pda(
-			self.vesting_state,
-			&admin,
-			&beneficiary,
-			&mint,
-			&ID,
-		)?);
 
 		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());
@@ -517,6 +525,22 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 			self.admin.assert_address(&vesting_state.admin)?;
 			self.mint.assert_address(&vesting_state.mint)?;
 
+			// Creation uses invoke_signed, so this typed borrow can validate the
+			// off-curve address without loading the same account a second time.
+			if !is_derived_address(
+				self.vesting_state.address(),
+				&VestingState::seeds(
+					&vesting_state.admin,
+					&vesting_state.beneficiary,
+					&vesting_state.mint,
+				)
+				.as_slices(),
+				vesting_state.bump,
+				&ID,
+			) {
+				return Err(ProgramError::InvalidSeeds);
+			}
+
 			(
 				vesting_state.admin,
 				vesting_state.beneficiary,
@@ -532,15 +556,6 @@ impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
 				),
 			)
 		};
-
-		// Validate the vesting PDA using the account's stored bump.
-		drop(VestingState::load_pda(
-			self.vesting_state,
-			&admin,
-			&beneficiary,
-			&mint,
-			&ID,
-		)?);
 
 		if cancelled {
 			return Err(VestingError::AlreadyCancelled.into());
