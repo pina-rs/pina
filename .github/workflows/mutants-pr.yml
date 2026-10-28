@@ -36,9 +36,9 @@ jobs:
           set -euo pipefail
 
           base_ref="${GITHUB_BASE_REF:-main}"
-          git fetch origin "$base_ref" --depth=1 || true
+          git fetch --no-tags origin "$base_ref"
 
-          changed_files=$(git diff --name-only "origin/${base_ref}...HEAD" || true)
+          changed_files=$(git diff --name-only "origin/${base_ref}...HEAD")
           if [ -z "$changed_files" ]; then
             echo "any_changed=false" >> "$GITHUB_OUTPUT"
             echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
@@ -101,7 +101,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          git fetch origin "$BASE_REF" --depth=1 || true
+          git fetch --no-tags origin "$BASE_REF"
           mkdir -p target
           git diff "origin/${BASE_REF}...HEAD" > target/mutants-pr.diff
 
