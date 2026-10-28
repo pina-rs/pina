@@ -182,7 +182,6 @@ pub(crate) fn expand(
 		params
 	};
 
-	// Keep this as an expression so a local `bump` cannot shadow a seed argument.
 	let load_bump = args.bump.as_ref().map(|bump_field| {
 		if is_compact {
 			quote! {
@@ -199,6 +198,8 @@ pub(crate) fn expand(
 
 	// The `assert_seeds` method (only when a bump field is declared)
 	let assert_seeds = args.bump.as_ref().map(|bump_field| {
+		// The private binding must not capture a seed argument named `bump`.
+		let bump_ident = format_ident!("bump", span = proc_macro2::Span::mixed_site());
 		let doc = format!(
 			"Assert that `account` is the PDA for the given seeds, using the stored \
 			 `{bump_field}` field."
@@ -210,7 +211,8 @@ pub(crate) fn expand(
 				#(#find_seed_params,)*
 				program_id: &#crate_path::Address,
 			) -> ::core::result::Result<(), #crate_path::ProgramError> {
-				let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(#load_bump);
+				let #bump_ident = #load_bump;
+				let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(#bump_ident);
 				<&#crate_path::AccountView as #crate_path::AccountInfoValidation>::assert_seeds_with_bump(
 					account,
 					&seeds.as_slices(),

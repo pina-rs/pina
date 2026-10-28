@@ -343,8 +343,8 @@ impl CounterState {
         authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
-        let seeds = Self::seeds(authority)
-            .with_bump(pina::AsAccount::as_account::<Self>(account, program_id)?.bump);
+        let bump = pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
+        let seeds = Self::seeds(authority).with_bump(bump);
         <&pina::AccountView as pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
                 &seeds.as_slices(),
@@ -1027,8 +1027,9 @@ impl AllSeedState {
         height: u32,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<(), ::pina::ProgramError> {
+        let bump = ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
         let seeds = Self::seeds(authority, amount, side, tag, width, height)
-            .with_bump(::pina::AsAccount::as_account::<Self>(account, program_id)?.bump);
+            .with_bump(bump);
         <&::pina::AccountView as ::pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
                 &seeds.as_slices(),
@@ -1832,8 +1833,8 @@ impl TodoState {
         owner: &::pina::Address,
         program_id: &::pina::Address,
     ) -> ::core::result::Result<(), ::pina::ProgramError> {
-        let seeds = Self::seeds(owner)
-            .with_bump(::pina::AsAccount::as_account::<Self>(account, program_id)?.bump);
+        let bump = ::pina::AsAccount::as_account::<Self>(account, program_id)?.bump;
+        let seeds = Self::seeds(owner).with_bump(bump);
         <&::pina::AccountView as ::pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
                 &seeds.as_slices(),
@@ -3043,13 +3044,11 @@ impl CompactState {
         authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
-        let seeds = Self::seeds(authority)
-            .with_bump(
-                pina::AsCompactAccount::with_compact_account::<
-                    Self,
-                    _,
-                >(account, program_id, |state| Ok(state.bump))?,
-            );
+        let bump = pina::AsCompactAccount::with_compact_account::<
+            Self,
+            _,
+        >(account, program_id, |state| Ok(state.bump))?;
+        let seeds = Self::seeds(authority).with_bump(bump);
         <&pina::AccountView as pina::AccountInfoValidation>::assert_seeds_with_bump(
                 account,
                 &seeds.as_slices(),
