@@ -361,8 +361,7 @@ Parses the account to validate its owner, type, and stored bump before checking 
         authority: &pina::Address,
         program_id: &pina::Address,
     ) -> ::core::result::Result<(), pina::ProgramError> {
-        if stored_bump
-            != pina::AsAccount::as_account::<Self>(account, program_id)?.bump
+        if stored_bump != pina::AsAccount::as_account::<Self>(account, program_id)?.bump
         {
             return Err(pina::ProgramError::InvalidSeeds);
         }
