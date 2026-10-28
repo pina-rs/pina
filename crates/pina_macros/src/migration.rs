@@ -734,12 +734,44 @@ impl MigrationExpansion {
 			}
 
 			impl #struct_name {
+				/// Check account ownership and read its stored version without migrating.
+				///
+				/// The immutable runtime borrow is held for the complete callback, and the
+				/// versioned view cannot escape it. Read-only accounts are supported. Pass
+				/// the trusted program ID that owns the account; validate any required
+				/// address, PDA, or authority relationship separately.
+				///
+				/// # Errors
+				///
+				/// Returns `InvalidAccountOwner` before borrowing a foreign-owned account,
+				/// or propagates a borrow conflict, versioned decoding error, or callback
+				/// error.
+				pub fn with_versioned_account<R>(
+					account: &#crate_path::AccountView,
+					program_id: &#crate_path::Address,
+					use_account: impl FnOnce(#enum_name<'_>) -> Result<R, #crate_path::ProgramError>,
+				) -> Result<R, #crate_path::ProgramError> {
+					<&#crate_path::AccountView as #crate_path::AccountInfoValidation>::assert_owner(
+						account,
+						program_id,
+					)?;
+					let data = account.try_borrow()?;
+					let view = Self::try_from_bytes_versioned(&data)?;
+
+					use_account(view)
+				}
+
 				/// Validate and borrow stored bytes at the version their envelope names.
 				///
 				/// This accessor never mutates, resizes, or requires a writable borrow, so it
 				/// reads a stale account the current transaction cannot write. Unknown
 				/// versions, future versions, foreign discriminators, and malformed
 				/// representations all fail closed.
+				///
+				/// This byte decoder cannot validate runtime ownership or account identity.
+				/// Before borrowing bytes from an `AccountView`, assert its expected owner
+				/// and any required address or PDA. A discriminator does not authenticate
+				/// the source. Prefer `Self::with_versioned_account` for on-chain reads.
 				///
 				/// # Errors
 				///
