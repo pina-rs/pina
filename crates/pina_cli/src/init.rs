@@ -55,7 +55,7 @@ const SCAFFOLD_FILES: &[&str] = &[
 /// Options that vary how `pina init` scaffolds a project.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct InitOptions {
-	/// Overwrite existing regular scaffold files; symbolic links and reparse points are rejected.
+	/// Replace existing regular scaffold files; symbolic links and reparse points are rejected.
 	pub force: bool,
 	/// Scaffold for the experimental upstream sbpf-linker toolchain.
 	pub sbpf_linker: bool,
@@ -64,8 +64,9 @@ pub struct InitOptions {
 /// Initialize a new Pina program project in `project_dir`.
 ///
 /// When `force` is `false`, this function fails if any scaffold file already
-/// exists. When `true`, regular scaffold files are overwritten. Symbolic links,
-/// reparse points, and non-regular destinations are rejected in either mode.
+/// exists. When `true`, regular scaffold entries are replaced, preserving other
+/// hard links to the original files. Symbolic links, reparse points, and
+/// non-regular destinations are rejected in either mode.
 pub fn init_project(project_dir: &Path, package_name: &str, force: bool) -> Result<(), InitError> {
 	init_project_with_options(
 		project_dir,
@@ -387,7 +388,7 @@ fn open_scaffold_directory(project: &Dir, root: &Path, relative: &str) -> Result
 	Ok(directory)
 }
 
-/// No-follow opens and exclusive creation protect against links inserted after preflight.
+/// Replace directory entries without ever opening an existing scaffold file for writing.
 fn write_file(
 	project: &Dir,
 	root: &Path,
@@ -398,24 +399,40 @@ fn write_file(
 	let path = root.join(relative);
 	let (parent, name) = relative.rsplit_once('/').unwrap_or(("", relative));
 	let directory = open_scaffold_directory(project, root, parent)?;
-	let mut options = OpenOptions::new();
-	options.write(true).follow(FollowSymlinks::No);
 
 	if force {
-		options.create(true);
-	} else {
-		options.create_new(true);
+		match directory.symlink_metadata(name) {
+			Ok(metadata) => {
+				if !metadata.is_file() {
+					return Err(unsafe_scaffold_path(path));
+				}
+
+				#[cfg(windows)]
+				{
+					use cap_std::fs::MetadataExt as _;
+
+					const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+
+					if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+						return Err(unsafe_scaffold_path(path));
+					}
+				}
+
+				// Unlinking never follows a swapped leaf or modifies its shared inode.
+				init_io(&path, directory.remove_file(name))?;
+			}
+			Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
+			Err(source) => return init_io(&path, Err(source)),
+		}
 	}
 
-	let mut file = init_io(&path, directory.open_with(name, &options))?.into_std();
-	let metadata = init_io(&path, file.metadata())?;
+	let mut options = OpenOptions::new();
+	options
+		.write(true)
+		.create_new(true)
+		.follow(FollowSymlinks::No);
+	let mut file = init_io(&path, directory.open_with(name, &options))?;
 
-	if !metadata.is_file() || crate::path_security::is_link_like(&metadata) {
-		return Err(unsafe_scaffold_path(path));
-	}
-
-	// Do not truncate until the opened object, rather than an earlier path lookup, is validated.
-	init_io(&path, file.set_len(0))?;
 	init_io(&path, file.write_all(contents.as_bytes()))
 }
 
@@ -1220,6 +1237,24 @@ mod tests {
 	}
 
 	#[test]
+	fn forced_descriptor_writes_replace_hard_links_inserted_after_preflight() {
+		let temp = tempfile::tempdir().unwrap();
+		let root = temp.path().join("project");
+		let project = open_project_directory(&root).unwrap();
+		let external = temp.path().join("external");
+		fs::write(&external, "sentinel").unwrap();
+		fs::hard_link(&external, root.join("Cargo.toml")).unwrap();
+
+		write_file(&project, &root, "Cargo.toml", "replacement", true).unwrap();
+
+		assert_eq!(fs::read_to_string(&external).unwrap(), "sentinel");
+		assert_eq!(
+			fs::read_to_string(root.join("Cargo.toml")).unwrap(),
+			"replacement"
+		);
+	}
+
+	#[test]
 	fn descriptor_writes_do_not_overwrite_files_created_after_preflight() {
 		let temp = tempfile::tempdir().unwrap();
 		let project = open_project_directory(temp.path()).unwrap();
@@ -1251,6 +1286,7 @@ mod tests {
 			Err(InitError::Io { .. })
 		));
 		let project = open_project_directory(temp.path()).unwrap();
+		assert!(write_file(&project, temp.path(), &long, "replacement", true).is_err());
 		assert!(matches!(
 			open_scaffold_directory(&project, temp.path(), &long),
 			Err(InitError::Io { .. })
@@ -1270,13 +1306,10 @@ mod tests {
 			.status()
 			.unwrap();
 		assert!(status.success());
-		let reader = std::thread::spawn(move || fs::File::open(fifo).unwrap());
-
 		assert!(matches!(
 			write_file(&project, temp.path(), "Cargo.toml", "replacement", true),
 			Err(InitError::Io { source, .. }) if source.kind() == std::io::ErrorKind::InvalidInput
 		));
-		drop(reader.join().unwrap());
 	}
 
 	#[test]

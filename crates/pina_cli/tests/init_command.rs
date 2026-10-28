@@ -75,6 +75,37 @@ fn init_command_refuses_to_overwrite_without_force() {
 	);
 }
 
+#[test]
+fn init_command_preserves_external_hard_links_with_and_without_force() {
+	for force in [false, true] {
+		let temp = tempfile::tempdir().unwrap();
+		let project = temp.path().join("project");
+		let external = temp.path().join("external");
+		fs::create_dir(&project).unwrap();
+		fs::write(&external, "sentinel").unwrap();
+		fs::hard_link(&external, project.join("Cargo.toml")).unwrap();
+		let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+		command.args(["init", "my_program", "--path"]).arg(&project);
+
+		if force {
+			command.arg("--force");
+		}
+
+		let output = command.output().unwrap();
+		assert_eq!(output.status.success(), force, "{output:?}");
+		assert_eq!(fs::read_to_string(&external).unwrap(), "sentinel");
+		let manifest = fs::read_to_string(project.join("Cargo.toml")).unwrap();
+
+		if force {
+			assert!(manifest.contains("name = \"my_program\""));
+			assert!(project.join("src/lib.rs").is_file());
+		} else {
+			assert_eq!(manifest, "sentinel");
+			assert_eq!(fs::read_dir(&project).unwrap().count(), 1);
+		}
+	}
+}
+
 #[cfg(unix)]
 #[test]
 fn init_command_refuses_linked_scaffolds_with_and_without_force() {
