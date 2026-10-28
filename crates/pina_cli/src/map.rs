@@ -15,10 +15,12 @@ use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
+#[cfg(not(windows))]
 use cap_fs_ext::DirExt;
 use cap_std::ambient_authority;
 use cap_std::fs::Dir;
-use cap_tempfile::TempFile;
+use cap_std::fs::File;
+use cap_std::fs::OpenOptions;
 use serde::Serialize;
 
 use crate::ir::FieldIr;
@@ -290,12 +292,12 @@ fn open_map_parent(path: &Path) -> io::Result<Dir> {
 					continue;
 				}
 
-				directory = match directory.open_dir_nofollow(name) {
+				directory = match open_map_directory(&directory, name) {
 					Ok(child) => child,
 					Err(error) if error.kind() == io::ErrorKind::NotFound => {
 						directory.create_dir(name)?;
 
-						directory.open_dir_nofollow(name)?
+						open_map_directory(&directory, name)?
 					}
 					Err(error) => return Err(error),
 				};
@@ -306,6 +308,89 @@ fn open_map_parent(path: &Path) -> io::Result<Dir> {
 	}
 
 	Ok(directory)
+}
+
+/// Open one component without following a link, including Windows junctions.
+fn open_map_directory(parent: &Dir, name: &std::ffi::OsStr) -> io::Result<Dir> {
+	#[cfg(not(windows))]
+	{
+		parent.open_dir_nofollow(name)
+	}
+
+	#[cfg(windows)]
+	{
+		use cap_std::fs::OpenOptionsExt;
+
+		const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+		const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+		const FILE_SHARE_READ_WRITE: u32 = 0x3;
+
+		// Inspect the reparse point itself, never the directory it redirects to.
+		// Excluding FILE_SHARE_DELETE also prevents replacing a held directory.
+		let file = parent
+			.open_with(
+				name,
+				OpenOptions::new()
+					.read(true)
+					.share_mode(FILE_SHARE_READ_WRITE)
+					.custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT),
+			)?
+			.into_std();
+		let metadata = file.metadata()?;
+
+		if crate::path_security::is_link_like(&metadata) {
+			return Err(io::Error::other("output parent is a reparse point"));
+		}
+
+		if !metadata.is_dir() {
+			return Err(io::Error::from(io::ErrorKind::NotADirectory));
+		}
+
+		Ok(Dir::from_std_file(file))
+	}
+}
+
+/// A named staging file whose creation and cleanup stay relative to its parent.
+struct MapTempFile<'a> {
+	parent: &'a Dir,
+	name: String,
+	file: File,
+	published: bool,
+}
+
+impl<'a> MapTempFile<'a> {
+	fn new(parent: &'a Dir) -> io::Result<Self> {
+		let mut nonce = [0_u8; 16];
+		getrandom::fill(&mut nonce).map_err(|error| io::Error::other(error.to_string()))?;
+		let name = format!(".pina-map-{:032x}.tmp", u128::from_le_bytes(nonce));
+		// create_new refuses any existing entry, including a planted symlink.
+		// Keeping a name from creation avoids O_TMPFILE's procfs publication path.
+		let file = parent.open_with(&name, OpenOptions::new().write(true).create_new(true))?;
+
+		Ok(Self {
+			parent,
+			name,
+			file,
+			published: false,
+		})
+	}
+
+	fn publish(mut self, name: &std::ffi::OsStr) -> io::Result<()> {
+		self.parent.rename(&self.name, self.parent, name)?;
+		self.published = true;
+
+		Ok(())
+	}
+}
+
+impl Drop for MapTempFile<'_> {
+	fn drop(&mut self) {
+		// Drop cannot report cleanup errors. Never resolve an ambient path while
+		// removing a failed stage, or remove a name we relinquished on publication.
+		if !self.published {
+			let _ = self.parent.remove_file(&self.name);
+		}
+	}
 }
 
 fn publish_html(parent: &Dir, name: &std::ffi::OsStr, html: &[u8]) -> io::Result<()> {
@@ -320,17 +405,17 @@ fn publish_html(parent: &Dir, name: &std::ffi::OsStr, html: &[u8]) -> io::Result
 		Err(error) => return Err(error),
 	};
 
-	let mut file = TempFile::new(parent)?;
+	let mut staged = MapTempFile::new(parent)?;
 
 	if let Some(permissions) = permissions {
-		file.as_file().set_permissions(permissions)?;
+		staged.file.set_permissions(permissions)?;
 	}
 
-	file.write_all(html)?;
-	file.as_file().sync_all()?;
+	staged.file.write_all(html)?;
+	staged.file.sync_all()?;
 	// Rename replaces the directory entry, so even a newly planted symlink or
 	// hard link cannot cause the old inode's contents to be truncated.
-	file.replace(name)
+	staged.publish(name)
 }
 
 /// Escape JSON for an HTML `<script>` element.
@@ -566,6 +651,7 @@ mod tests {
 		assert!(written.contains("id=\"pina-map-data\""));
 		write_html(&map, &path).unwrap_or_else(|error| panic!("replacement failed: {error}"));
 		assert_eq!(fs::read_to_string(&path).unwrap(), written);
+		assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
 
 		let blocker = temp.path().join("blocker");
 		fs::write(&blocker, "").unwrap_or_else(|error| panic!("write failed: {error}"));
@@ -612,6 +698,62 @@ mod tests {
 		assert!(write_html(&map(), &directory_link.join("nested/map.html")).is_err());
 		assert!(!temp.path().join("nested").exists());
 		assert!(open_map_parent(&directory_link.join("map.html")).is_err());
+	}
+
+	#[test]
+	fn stages_named_files_and_cleans_up_after_failed_publication() {
+		let temp = tempfile::tempdir().unwrap();
+		let parent = Dir::open_ambient_dir(temp.path(), ambient_authority()).unwrap();
+		let mut staged = MapTempFile::new(&parent).unwrap();
+		staged.file.write_all(b"staged report").unwrap();
+		// The file is already named, so publication never needs /proc/self/fd.
+		assert_eq!(parent.read(&staged.name).unwrap(), b"staged report");
+		parent.create_dir("blocked.html").unwrap();
+		let name = staged.name.clone();
+		assert!(
+			staged
+				.publish(std::ffi::OsStr::new("blocked.html"))
+				.is_err()
+		);
+
+		assert!(!parent.try_exists(name).unwrap());
+		assert!(parent.is_dir("blocked.html"));
+		assert_eq!(parent.entries().unwrap().count(), 1);
+	}
+
+	#[cfg(windows)]
+	#[test]
+	fn refuses_a_junction_planted_after_path_inspection() {
+		use std::process::Command;
+
+		let temp = tempfile::tempdir().unwrap();
+		let root = fs::canonicalize(temp.path()).unwrap();
+		let parent = Dir::open_ambient_dir(&root, ambient_authority()).unwrap();
+		let victim = root.join("victim");
+		let link = root.join("linked");
+		let output = link.join("nested/map.html");
+		fs::create_dir(&victim).unwrap();
+		fs::write(victim.join("map.html"), b"sentinel").unwrap();
+		assert!(!crate::path_security::has_untrusted_link_component(&output).unwrap());
+
+		let junction = Command::new("cmd.exe")
+			.args(["/C", "mklink", "/J"])
+			.arg(temp.path().join("linked"))
+			.arg(temp.path().join("victim"))
+			.output()
+			.unwrap();
+		assert!(junction.status.success(), "{junction:?}");
+
+		// Bypass write_html's earlier path inspection to exercise traversal's
+		// independent protection against a component swapped in that window.
+		assert!(open_map_directory(&parent, std::ffi::OsStr::new("linked")).is_err());
+		assert!(open_map_parent(&output).is_err());
+		assert!(write_html(&map(), &output).is_err());
+		assert!(!victim.join("nested").exists());
+		assert_eq!(fs::read(victim.join("map.html")).unwrap(), b"sentinel");
+
+		fs::write(root.join("file"), b"not a directory").unwrap();
+		assert!(open_map_directory(&parent, std::ffi::OsStr::new("file")).is_err());
 	}
 
 	#[test]
