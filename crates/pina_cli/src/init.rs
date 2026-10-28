@@ -329,7 +329,7 @@ fn open_project_directory(path: &Path) -> Result<Dir, InitError> {
 
 	for component in absolute.components() {
 		match component {
-			Component::RootDir | Component::Prefix(_) | Component::CurDir => continue,
+			Component::RootDir | Component::Prefix(_) | Component::CurDir => {}
 			Component::ParentDir => {
 				directory = init_io(&current, directory.open_parent_dir(ambient_authority()))?;
 				current.pop();
