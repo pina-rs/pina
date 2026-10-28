@@ -9,6 +9,7 @@ use cap_fs_ext::FollowSymlinks;
 use cap_fs_ext::OpenOptionsFollowExt;
 use cap_std::ambient_authority;
 use cap_std::fs::Dir;
+use cap_std::fs::File;
 use cap_std::fs::Metadata;
 use cap_std::fs::OpenOptions;
 use cap_tempfile::TempFile;
@@ -39,15 +40,19 @@ pub(crate) fn readme_changed(crate_dir: &Dir, crate_path: &Path, content: &str) 
 
 	let mut options = OpenOptions::new();
 	options.read(true).follow(FollowSymlinks::No);
-	let mut file = match crate_dir.open_with("README.md", &options) {
+	let file = match crate_dir.open_with("README.md", &options) {
 		Ok(file) => file,
 		Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(true),
 		Err(source) => return Err(read_file_error(&path, source)),
 	};
 
+	compare_readme(file, &path, content)
+}
+
+fn compare_readme(mut file: File, path: &Path, content: &str) -> Result<bool> {
 	let mut previous = Vec::new();
 	file.read_to_end(&mut previous)
-		.map_err(|source| read_file_error(&path, source))?;
+		.map_err(|source| read_file_error(path, source))?;
 
 	Ok(previous != content.as_bytes())
 }
@@ -69,11 +74,15 @@ pub(crate) fn write_readme(crate_dir: &Dir, crate_path: &Path, content: &str) ->
 	let path = crate_path.join("README.md");
 	// Atomic replacement also leaves an external hard-link target untouched and
 	// cannot follow a link installed after the no-follow read above.
-	let mut file = TempFile::new(crate_dir).map_err(|source| write_file_error(&path, source))?;
+	let file = TempFile::new(crate_dir).map_err(|source| write_file_error(&path, source))?;
+	replace_readme(file, &path, content)
+}
+
+fn replace_readme(mut file: TempFile<'_>, path: &Path, content: &str) -> Result<()> {
 	file.write_all(content.as_bytes())
-		.map_err(|source| write_file_error(&path, source))?;
+		.map_err(|source| write_file_error(path, source))?;
 	file.replace("README.md")
-		.map_err(|source| write_file_error(&path, source))
+		.map_err(|source| write_file_error(path, source))
 }
 
 /// Scaffolds a standalone CPI crate for the rendered program.
@@ -295,6 +304,34 @@ mod tests {
 	use std::time::UNIX_EPOCH;
 
 	use super::*;
+
+	#[test]
+	fn provenance_io_failures_preserve_the_original_and_discard_temporary_files() {
+		let temp = tempfile::tempdir().unwrap();
+		let root = temp.path().join("crate");
+		let handle = open_crate_dir(&root).unwrap();
+		let readme = root.join("README.md");
+		fs::write(&readme, "original").unwrap();
+
+		// Access modes trigger real I/O failures without filesystem quotas or
+		// permission assumptions about the test runner's identity.
+		let mut options = OpenOptions::new();
+		options.write(true);
+		let write_only = handle.open_with("README.md", &options).unwrap();
+		assert!(matches!(
+			compare_readme(write_only, &readme, "provenance"),
+			Err(RenderError::ReadFile { path, .. }) if path == readme
+		));
+
+		let mut replacement = TempFile::new(&handle).unwrap();
+		*replacement.as_file_mut() = handle.open("README.md").unwrap();
+		assert!(matches!(
+			replace_readme(replacement, &readme, "provenance"),
+			Err(RenderError::WriteFile { path, .. }) if path == readme
+		));
+		assert_eq!(fs::read_to_string(readme).unwrap(), "original");
+		assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+	}
 
 	#[test]
 	fn provenance_replacement_preserves_external_hard_links_and_unchanged_files() {
