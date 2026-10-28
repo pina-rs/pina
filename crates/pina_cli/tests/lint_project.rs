@@ -112,8 +112,10 @@ fn lint_forwards_configured_levels() {
 #[test]
 fn project_environment_cannot_replace_the_lint_policy() {
 	let fixture = Fixture::new();
-	let real_cargo = real_cargo_path();
 	let mut environment = fixture.lint_environment();
+	// The fixture captures real Cargo while holding ENV_LOCK. Reading CARGO
+	// before acquiring that lock can select another test's temporary executable.
+	let real_cargo = std::env::var_os("REAL_CARGO").expect("fixture records real Cargo");
 	environment.set("CARGO", real_cargo);
 	environment.set("CARGO_TARGET_DIR", fixture._temp.path().join("target"));
 	environment.set("PINA_LINT_LIST", "1");
