@@ -1192,6 +1192,26 @@ mod tests {
 
 	#[cfg(unix)]
 	#[test]
+	fn project_handles_reject_ancestor_links_inserted_after_preflight() {
+		use std::os::unix::fs::symlink;
+
+		let temp = tempfile::tempdir().unwrap();
+		let ancestor = temp.path().join("ancestor");
+		let external = temp.path().join("external");
+		let project = ancestor.join("project");
+		fs::create_dir(&ancestor).unwrap();
+		fs::create_dir(&external).unwrap();
+		assert!(!crate::path_security::has_untrusted_link_component(&project).unwrap());
+
+		fs::remove_dir(&ancestor).unwrap();
+		symlink(&external, &ancestor).unwrap();
+
+		assert!(open_project_directory(&project).is_err());
+		assert_eq!(fs::read_dir(&external).unwrap().count(), 0);
+	}
+
+	#[cfg(unix)]
+	#[test]
 	fn descriptor_writes_reject_links_inserted_after_preflight() {
 		use std::os::unix::fs::symlink;
 
