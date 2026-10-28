@@ -1350,6 +1350,224 @@ fn reports_render_empty_rehearsals_and_omitted_ranges() {
 }
 
 #[test]
+fn human_reports_escape_untrusted_text_and_json_preserves_the_evidence() {
+	let payload = "\u{1b}[2J\u{1b}]8;;https://example.invalid\u{7}link\u{1b}]8;;\u{7}\u{1b}]52;c;dGVzdA==\u{7}\r\u{8}\n\t\u{9b}\u{061c}\u{200e}\u{200f}\u{2028}\u{2029}\u{202a}\u{202b}\u{202c}\u{202d}\u{202e}\u{2066}\u{2067}\u{2068}\u{2069} café 🦀";
+	let escaped = concat!(
+		r"\u{1b}[2J\u{1b}]8;;https://example.invalid\u{7}link\u{1b}]8;;\u{7}",
+		r"\u{1b}]52;c;dGVzdA==\u{7}\r\u{8}\n\t\u{9b}\u{61c}\u{200e}\u{200f}",
+		r"\u{2028}\u{2029}\u{202a}\u{202b}\u{202c}\u{202d}\u{202e}",
+		r"\u{2066}\u{2067}\u{2068}\u{2069} café 🦀"
+	);
+	let text = |label| format!("{label}{payload}");
+	let mut changed = TransactionRehearsal::skipped(
+		text("changed-signature"),
+		&[],
+		SkipReason::Unavailable,
+		String::new(),
+	);
+	changed.status = RehearsalStatus::OutcomeChanged;
+	changed.skip = None;
+	changed.instructions.push(InstructionRehearsal {
+		name: text("instruction"),
+		baseline_units: Some(1),
+		candidate_units: Some(1),
+	});
+	changed.baseline = Some(RunOutcome {
+		error: Some(text("baseline-error")),
+		compute_units: 1,
+	});
+	changed.candidate = Some(RunOutcome {
+		error: Some(text("candidate-error")),
+		compute_units: 1,
+	});
+	changed.logs = Some(LogExcerpt {
+		baseline: vec![text("baseline-log")],
+		candidate: vec![text("candidate-log")],
+	});
+	changed.accounts.push(AccountChange {
+		address: text("address"),
+		account_type: Some(text("account-type")),
+		baseline: Some(AccountSummary {
+			lamports: 1,
+			owner: text("baseline-owner"),
+			data_len: 0,
+		}),
+		candidate: Some(AccountSummary {
+			lamports: 1,
+			owner: text("candidate-owner"),
+			data_len: 0,
+		}),
+		fields: vec![FieldChange {
+			name: text("field-name"),
+			baseline: text("baseline-value"),
+			candidate: text("candidate-value"),
+		}],
+		byte_ranges: Vec::new(),
+		omitted_byte_ranges: 0,
+	});
+	let mut report = RehearsalReport::new(
+		ReportHeader {
+			cluster: text("cluster"),
+			program_id: text("program"),
+			deployed_sha256: text("deployed-hash"),
+			candidate_sha256: text("candidate-hash"),
+			slot: 1,
+		},
+		vec![
+			changed,
+			TransactionRehearsal::skipped(
+				text("skipped-signature"),
+				&[],
+				SkipReason::NotProfiled,
+				text("skip-detail"),
+			),
+		],
+	);
+	report.instructions.push(InstructionUnits {
+		name: text("table-instruction"),
+		samples: 1,
+		baseline: UnitStats {
+			min: 1,
+			median: 1,
+			max: 1,
+		},
+		candidate: UnitStats {
+			min: 1,
+			median: 1,
+			max: 1,
+		},
+		median_delta: 0,
+	});
+	let json =
+		serde_json::to_value(&report).unwrap_or_else(|error| panic!("serialize report: {error}"));
+
+	for rendered in [report.render_text(), report.render_deploy_text()] {
+		for (pointer, label) in [
+			("/cluster", "cluster"),
+			("/programId", "program"),
+			("/deployedSha256", "deployed-hash"),
+			("/candidateSha256", "candidate-hash"),
+			("/instructions/0/name", "table-instruction"),
+			("/transactions/0/signature", "changed-signature"),
+			("/transactions/0/instructions/0/name", "instruction"),
+			("/transactions/0/baseline/error", "baseline-error"),
+			("/transactions/0/candidate/error", "candidate-error"),
+			("/transactions/0/logs/baseline/0", "baseline-log"),
+			("/transactions/0/logs/candidate/0", "candidate-log"),
+			("/transactions/0/accounts/0/address", "address"),
+			("/transactions/0/accounts/0/accountType", "account-type"),
+			(
+				"/transactions/0/accounts/0/baseline/owner",
+				"baseline-owner",
+			),
+			(
+				"/transactions/0/accounts/0/candidate/owner",
+				"candidate-owner",
+			),
+			("/transactions/0/accounts/0/fields/0/name", "field-name"),
+			(
+				"/transactions/0/accounts/0/fields/0/baseline",
+				"baseline-value",
+			),
+			(
+				"/transactions/0/accounts/0/fields/0/candidate",
+				"candidate-value",
+			),
+			("/transactions/1/signature", "skipped-signature"),
+			("/transactions/1/skip/detail", "skip-detail"),
+		] {
+			assert!(
+				rendered.contains(&format!("{label}{escaped}")),
+				"unescaped {label}"
+			);
+			assert_eq!(
+				json.pointer(pointer).and_then(Value::as_str),
+				Some(text(label).as_str())
+			);
+		}
+
+		assert!(
+			rendered
+				.chars()
+				.all(|character| character == '\n' || !character.is_control())
+		);
+		assert!(!rendered.contains('\u{202e}'));
+		assert!(rendered.contains("Behaviour changed in 1 transaction(s)"));
+	}
+}
+
+#[test]
+fn rpc_diagnostics_escape_remote_text_without_rewriting_the_error() {
+	let message = "\u{1b}]52;c;dGVzdA==\u{7}\r\n\u{202e}example";
+	let escaped = r"\u{1b}]52;c;dGVzdA==\u{7}\r\n\u{202e}example";
+
+	for (error, prefix) in [
+		(RpcError::Transport(message.to_owned()), "request failed: "),
+		(
+			RpcError::Body(message.to_owned()),
+			"the response could not be read: ",
+		),
+		(RpcError::Shape(message.to_owned()), "unexpected response: "),
+		(
+			RpcError::Rpc {
+				code: -1,
+				message: message.to_owned(),
+			},
+			"JSON-RPC error -1: ",
+		),
+	] {
+		assert_eq!(error.to_string(), format!("{prefix}{escaped}"));
+		assert!(matches!(error,
+			RpcError::Transport(raw)
+			| RpcError::Body(raw)
+			| RpcError::Shape(raw)
+			| RpcError::Rpc { message: raw, .. }
+			if raw == message
+		));
+	}
+}
+
+#[test]
+fn skipped_rpc_profiles_preserve_raw_json_evidence_but_render_safe_text() {
+	let message = "remote\u{1b}]52;c;dGVzdA==\u{7}\n\u{202e}error";
+	let fork = FakeFork::new(ForkFaults::default());
+	let server = FakeRpcServer::start(move |method, params| {
+		if method == "surfnet_profileTransaction" {
+			return Reply::Error(-32000, message.to_owned());
+		}
+
+		fork.handle(method, params)
+	});
+	let target = target(Binary::Variant);
+	let transactions = replays(&target, &Selection::Latest(DEFAULT_LIMIT));
+	let client = JsonRpc::new(&server.url, LOCAL_TIMEOUT, true);
+	let report = replay(
+		&client,
+		&endpoint("unused"),
+		&target,
+		&transactions,
+		&mut io::sink(),
+	)
+	.unwrap_or_else(|error| panic!("report skipped profiles: {error}"));
+	let json = serde_json::to_value(&report)
+		.unwrap_or_else(|error| panic!("serialize skipped profiles: {error}"));
+	let detail = json["transactions"][0]["skip"]["detail"]
+		.as_str()
+		.unwrap_or_else(|| panic!("profile errors carry their raw reason"));
+
+	assert_eq!(report.summary.skipped, transactions.len());
+	assert!(
+		detail.contains(message),
+		"raw RPC evidence must survive JSON serialization"
+	);
+	assert!(
+		report
+			.render_text()
+			.contains(r"remote\u{1b}]52;c;dGVzdA==\u{7}\n\u{202e}error")
+	);
+}
+
+#[test]
 fn executable_hashes_ignore_trailing_zero_padding() {
 	assert_eq!(executable_sha256(&[1, 2, 0, 0]), executable_sha256(&[1, 2]));
 	assert_eq!(

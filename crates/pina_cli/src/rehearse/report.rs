@@ -554,10 +554,19 @@ impl RehearsalReport {
 		let _ = writeln!(
 			output,
 			"Rehearsal of {} on {}",
-			self.program_id, self.cluster
+			terminal_text(&self.program_id),
+			terminal_text(&self.cluster)
 		);
-		let _ = writeln!(output, "  deployed   sha256 {}", self.deployed_sha256);
-		let _ = writeln!(output, "  candidate  sha256 {}", self.candidate_sha256);
+		let _ = writeln!(
+			output,
+			"  deployed   sha256 {}",
+			terminal_text(&self.deployed_sha256)
+		);
+		let _ = writeln!(
+			output,
+			"  candidate  sha256 {}",
+			terminal_text(&self.candidate_sha256)
+		);
 		let _ = writeln!(output, "  fork slot  {}", self.slot);
 		let _ = writeln!(output);
 		let _ = writeln!(
@@ -627,7 +636,7 @@ impl RehearsalReport {
 
 		for row in &self.instructions {
 			table.add_row(vec![
-				row.name.clone(),
+				terminal_text(&row.name),
 				row.samples.to_string(),
 				stats(row.baseline),
 				stats(row.candidate),
@@ -676,9 +685,9 @@ impl RehearsalReport {
 			let _ = writeln!(
 				output,
 				"  {}  {}: {}",
-				transaction.signature,
+				terminal_text(&transaction.signature),
 				skip.reason.as_str(),
-				skip.detail
+				terminal_text(&skip.detail)
 			);
 		}
 	}
@@ -688,13 +697,13 @@ fn render_transaction(output: &mut String, transaction: &TransactionRehearsal) {
 	let names = transaction
 		.instructions
 		.iter()
-		.map(|instruction| instruction.name.as_str())
+		.map(|instruction| terminal_text(&instruction.name))
 		.collect::<Vec<_>>()
 		.join(", ");
 	let _ = writeln!(
 		output,
 		"  {}  {}  [{}]",
-		transaction.signature,
+		terminal_text(&transaction.signature),
 		transaction.status.as_str(),
 		names
 	);
@@ -723,7 +732,7 @@ fn render_transaction(output: &mut String, transaction: &TransactionRehearsal) {
 			let _ = writeln!(output, "    {label} logs:");
 
 			for line in lines {
-				let _ = writeln!(output, "      {line}");
+				let _ = writeln!(output, "      {}", terminal_text(line));
 			}
 		}
 	}
@@ -733,8 +742,12 @@ fn render_account(output: &mut String, account: &AccountChange) {
 	let account_type = account
 		.account_type
 		.as_deref()
-		.map_or_else(String::new, |name| format!(" ({name})"));
-	let _ = writeln!(output, "    account {}{account_type}", account.address);
+		.map_or_else(String::new, |name| format!(" ({})", terminal_text(name)));
+	let _ = writeln!(
+		output,
+		"    account {}{account_type}",
+		terminal_text(&account.address)
+	);
 
 	match (&account.baseline, &account.candidate) {
 		(Some(before), Some(after)) => {
@@ -747,7 +760,12 @@ fn render_account(output: &mut String, account: &AccountChange) {
 			}
 
 			if before.owner != after.owner {
-				let _ = writeln!(output, "      owner: {} -> {}", before.owner, after.owner);
+				let _ = writeln!(
+					output,
+					"      owner: {} -> {}",
+					terminal_text(&before.owner),
+					terminal_text(&after.owner)
+				);
 			}
 
 			if before.data_len != after.data_len {
@@ -772,7 +790,9 @@ fn render_account(output: &mut String, account: &AccountChange) {
 		let _ = writeln!(
 			output,
 			"      {}: {} -> {}",
-			field.name, field.baseline, field.candidate
+			terminal_text(&field.name),
+			terminal_text(&field.baseline),
+			terminal_text(&field.candidate)
 		);
 	}
 
@@ -795,8 +815,25 @@ fn render_account(output: &mut String, account: &AccountChange) {
 fn outcome(run: &RunOutcome) -> String {
 	run.error.as_ref().map_or_else(
 		|| "succeeded".to_owned(),
-		|error| format!("failed: {error}"),
+		|error| format!("failed: {}", terminal_text(error)),
 	)
+}
+
+/// Keep remote text within its report line without changing the JSON evidence.
+pub(super) fn terminal_text(value: &str) -> String {
+	let mut escaped = String::with_capacity(value.len());
+
+	for character in value.chars() {
+		if character.is_control()
+			|| matches!(character, '\u{061c}' | '\u{200e}'..='\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+		{
+			escaped.extend(character.escape_default());
+		} else {
+			escaped.push(character);
+		}
+	}
+
+	escaped
 }
 
 fn stats(stats: UnitStats) -> String {
