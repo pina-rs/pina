@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const SAMPLE_RUNS = 7;
+const SAMPLE_RUNS = 8;
 const BENCHMARK_PATTERN =
 	/\[BENCH\] (.+): total=(\d+(?:\.\d+)?)(ns|µs|ms|s), avg=\d+ns \((\d+) iterations\)/u;
 
@@ -31,6 +31,7 @@ type PerformanceStatus =
 	| "removed"
 	| "within-noise";
 
+/** Resolve revision workspaces and output paths before building either side. */
 function parseArguments(values: string[]): Arguments {
 	if (values.length !== 4) {
 		throw new Error(
@@ -46,6 +47,7 @@ function parseArguments(values: string[]): Arguments {
 	};
 }
 
+/** Build one revision and use Cargo's reported executable from its isolated target. */
 function buildBenchmark(workspace: string, target: string): string {
 	const result = spawnSync(
 		"cargo",
@@ -101,11 +103,21 @@ function buildBenchmark(workspace: string, target: string): string {
 	);
 }
 
+/** Average the middle pair for even samples; reject an empty measurement. */
 function median(values: number[]): number {
 	const sorted = values.toSorted((left, right) => left - right);
-	return sorted[Math.floor(sorted.length / 2)] ?? 0;
+	const middle = (sorted.length - 1) / 2;
+	const lower = sorted[Math.floor(middle)];
+	const upper = sorted[Math.ceil(middle)];
+
+	if (lower === undefined || upper === undefined) {
+		throw new Error("cannot calculate the median of an empty measurement");
+	}
+
+	return (lower + upper) / 2;
 }
 
+/** Capture one successful run using full elapsed duration per iteration. */
 function measure(executable: string, samples: Map<string, number[]>): void {
 	const result = spawnSync(
 		executable,
@@ -163,6 +175,7 @@ function measure(executable: string, samples: Map<string, number[]>): void {
 	}
 }
 
+/** Preserve raw samples beside medians and reject partially measured operations. */
 function compare(
 	base: Map<string, number[]>,
 	head: Map<string, number[]>,
@@ -244,6 +257,7 @@ function formatNanoseconds(value: number | undefined): string {
 		: new Intl.NumberFormat("en-US").format(value);
 }
 
+/** Build both sides first, then balance their first and second execution positions. */
 function run(arguments_: Arguments): void {
 	mkdirSync(arguments_.outputDirectory, { recursive: true });
 	const baseExecutable = buildBenchmark(
@@ -260,8 +274,15 @@ function run(arguments_: Arguments): void {
 		{ executable: baseExecutable, samples: baseMeasurements },
 		{ executable: headExecutable, samples: headMeasurements },
 	];
+	const executionOrder: ("base-first" | "head-first")[] = [];
+
 	for (let index = 0; index < SAMPLE_RUNS; index += 1) {
-		for (const run of index % 2 === 0 ? executions : executions.toReversed()) {
+		const order = index % 2 === 0 ? "base-first" : "head-first";
+		executionOrder.push(order);
+
+		for (
+			const run of order === "base-first" ? executions : executions.toReversed()
+		) {
 			measure(run.executable, run.samples);
 		}
 	}
@@ -293,7 +314,7 @@ function run(arguments_: Arguments): void {
 		"<details>",
 		"<summary>View core benchmark details</summary>",
 		"",
-		`Median of ${SAMPLE_RUNS} interleaved runs, calculated from total duration without truncating to integer nanoseconds. Raw samples are retained in the JSON artifact. Positive change means the pull request is faster.`,
+		`Median of ${SAMPLE_RUNS} interleaved runs, calculated from total duration without truncating to integer nanoseconds. Each side runs first equally often. Raw samples and execution order are retained in the JSON artifact. Positive change means the pull request is faster.`,
 		"",
 		"| Operation | Base | Head | Performance change | Status |",
 		"| --------- | ---: | ---: | -----------------: | ------ |",
@@ -323,7 +344,13 @@ function run(arguments_: Arguments): void {
 	);
 	writeFileSync(
 		join(arguments_.outputDirectory, "core.json"),
-		`${JSON.stringify({ sampleRuns: SAMPLE_RUNS, comparisons }, null, 2)}\n`,
+		`${
+			JSON.stringify(
+				{ sampleRuns: SAMPLE_RUNS, executionOrder, comparisons },
+				null,
+				2,
+			)
+		}\n`,
 		"utf8",
 	);
 }

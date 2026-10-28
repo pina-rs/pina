@@ -12,7 +12,7 @@ import { delimiter, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-test("core reports benchmarks added and removed between revisions", (context) => {
+test("core reports revision changes without execution-position bias", (context) => {
 	const root = mkdtempSync(join(tmpdir(), "pina-core-benchmark-"));
 	context.after(() => rmSync(root, { recursive: true, force: true }));
 	const base = join(root, "base");
@@ -38,10 +38,13 @@ if (!existsSync(executable)) {
   const label = readFileSync(join(process.cwd(), "benchmark-label"), "utf8");
   const program = [
     "#!/usr/bin/env node",
-    'const { appendFileSync } = require("node:fs");',
-    "appendFileSync(" + JSON.stringify(join(target, "..", "sample-order")) + ", " + JSON.stringify(label + "\\n") + ");",
+    'const { appendFileSync, existsSync, readFileSync } = require("node:fs");',
+    "const orderFile = " + JSON.stringify(join(target, "..", "sample-order")) + ";",
+    'const position = existsSync(orderFile) ? readFileSync(orderFile, "utf8").trim().split("\\\\n").length % 2 : 0;',
+    "appendFileSync(orderFile, " + JSON.stringify(label + "\\n") + ");",
     "console.log(" + JSON.stringify("[BENCH] " + label + ": total=100µs, avg=100ns (1000 iterations)") + ");",
     "console.log(" + JSON.stringify("[BENCH] shared: total=" + (label === "base-only" ? "1.5µs" : "1.6µs") + ", avg=1ns (1000 iterations)") + ");",
+    'console.log("[BENCH] position-sensitive: total=" + (position === 0 ? "100µs, avg=100ns" : "90µs, avg=90ns") + " (1000 iterations)");',
     "",
   ].join("\\n");
   writeFileSync(executable, program, { mode: 0o755 });
@@ -79,28 +82,50 @@ console.log(JSON.stringify({ reason: "compiler-artifact", target: { name: "bench
 		report,
 		/\| `shared` \| 1\.5 ns \| 1\.6 ns \| -6\.7% \| ⚠️ regressed \|/u,
 	);
+	assert.match(
+		report,
+		/\| `position-sensitive` \| 95 ns \| 95 ns \| \+0\.0% \| ➖ within noise \|/u,
+	);
 	const samples: unknown = JSON.parse(
 		readFileSync(join(output, "core.json"), "utf8"),
 	);
 	assert.deepEqual(samples, {
-		sampleRuns: 7,
+		sampleRuns: 8,
+		executionOrder: [
+			"base-first",
+			"head-first",
+			"base-first",
+			"head-first",
+			"base-first",
+			"head-first",
+			"base-first",
+			"head-first",
+		],
 		comparisons: [
 			{
 				id: "base-only",
 				baseNanoseconds: 100,
-				baseSamples: Array(7).fill(100),
+				baseSamples: Array(8).fill(100),
 			},
 			{
 				id: "head-only",
 				headNanoseconds: 100,
-				headSamples: Array(7).fill(100),
+				headSamples: Array(8).fill(100),
+			},
+			{
+				id: "position-sensitive",
+				baseNanoseconds: 95,
+				headNanoseconds: 95,
+				baseSamples: [100, 90, 100, 90, 100, 90, 100, 90],
+				headSamples: [90, 100, 90, 100, 90, 100, 90, 100],
+				performancePercent: 0,
 			},
 			{
 				id: "shared",
 				baseNanoseconds: 1.5,
 				headNanoseconds: 1.6,
-				baseSamples: Array(7).fill(1.5),
-				headSamples: Array(7).fill(1.6),
+				baseSamples: Array(8).fill(1.5),
+				headSamples: Array(8).fill(1.6),
 				performancePercent: (1.5 - 1.6) / 1.5 * 100,
 			},
 		],
@@ -124,6 +149,8 @@ console.log(JSON.stringify({ reason: "compiler-artifact", target: { name: "bench
 			"base-only",
 			"base-only",
 			"head-only",
+			"head-only",
+			"base-only",
 		],
 	);
 });
