@@ -326,6 +326,7 @@ fn upgrade_only_execution_passes_the_declared_id_to_solana() {
 fn override_command_replaces_ambient_deployment_environment() {
 	let fixture = ProjectFixture::new();
 	let log = fixture.root.join("deployment-environment.txt");
+	let keypair_copy = fixture.root.join("deployment-program-keypair.json");
 	let reserved = [
 		"PINA_DEPLOY_PROGRAM",
 		"PINA_DEPLOY_PROGRAM_ID",
@@ -336,9 +337,9 @@ fn override_command_replaces_ambient_deployment_environment() {
 		"PINA_DEPLOY_CLUSTER",
 	];
 	#[cfg(unix)]
-	let script = r#"printf '%s\n' "$PINA_DEPLOY_PROGRAM" "$PINA_DEPLOY_PROGRAM_ID" "${PINA_DEPLOY_PROGRAM_KEYPAIR-unset}" "$PINA_DEPLOY_UPGRADE_AUTHORITY" "$PINA_DEPLOY_PAYER" "$PINA_DEPLOY_RPC_URL" "$PINA_DEPLOY_CLUSTER" "$PINA_DEPLOY_TEST_SENTINEL" > "$PINA_DEPLOY_TEST_LOG""#;
+	let script = r#"printf '%s\n' "$PINA_DEPLOY_PROGRAM" "$PINA_DEPLOY_PROGRAM_ID" "${PINA_DEPLOY_PROGRAM_KEYPAIR-unset}" "$PINA_DEPLOY_UPGRADE_AUTHORITY" "$PINA_DEPLOY_PAYER" "$PINA_DEPLOY_RPC_URL" "$PINA_DEPLOY_CLUSTER" "$PINA_DEPLOY_TEST_SENTINEL" > "$PINA_DEPLOY_TEST_LOG"; if [ -n "${PINA_DEPLOY_PROGRAM_KEYPAIR-}" ]; then cat "$PINA_DEPLOY_PROGRAM_KEYPAIR" > "$PINA_DEPLOY_TEST_KEYPAIR_COPY"; fi"#;
 	#[cfg(not(unix))]
-	let script = r#"(echo %PINA_DEPLOY_PROGRAM%& echo %PINA_DEPLOY_PROGRAM_ID%& (if defined PINA_DEPLOY_PROGRAM_KEYPAIR (echo %PINA_DEPLOY_PROGRAM_KEYPAIR%) else (echo unset))& echo %PINA_DEPLOY_UPGRADE_AUTHORITY%& echo %PINA_DEPLOY_PAYER%& echo %PINA_DEPLOY_RPC_URL%& echo %PINA_DEPLOY_CLUSTER%& echo %PINA_DEPLOY_TEST_SENTINEL%)> "%PINA_DEPLOY_TEST_LOG%""#;
+	let script = r#"(echo %PINA_DEPLOY_PROGRAM%& echo %PINA_DEPLOY_PROGRAM_ID%& (if defined PINA_DEPLOY_PROGRAM_KEYPAIR (echo %PINA_DEPLOY_PROGRAM_KEYPAIR%) else (echo unset))& echo %PINA_DEPLOY_UPGRADE_AUTHORITY%& echo %PINA_DEPLOY_PAYER%& echo %PINA_DEPLOY_RPC_URL%& echo %PINA_DEPLOY_CLUSTER%& echo %PINA_DEPLOY_TEST_SENTINEL%)> "%PINA_DEPLOY_TEST_LOG%"& if defined PINA_DEPLOY_PROGRAM_KEYPAIR copy /Y "%PINA_DEPLOY_PROGRAM_KEYPAIR%" "%PINA_DEPLOY_TEST_KEYPAIR_COPY%" >NUL"#;
 
 	for upgrade_only in [true, false] {
 		let mut command = fixture.command();
@@ -346,7 +347,8 @@ fn override_command_replaces_ambient_deployment_environment() {
 			.args(["--cluster", "devnet", "--yes", "--remote-command", script])
 			.envs(reserved.iter().map(|key| (key, "stale-parent-value")))
 			.env("PINA_DEPLOY_TEST_SENTINEL", "preserved-parent-value")
-			.env("PINA_DEPLOY_TEST_LOG", &log);
+			.env("PINA_DEPLOY_TEST_LOG", &log)
+			.env("PINA_DEPLOY_TEST_KEYPAIR_COPY", &keypair_copy);
 
 		if upgrade_only {
 			command.arg("--upgrade-only");
@@ -379,9 +381,14 @@ fn override_command_replaces_ambient_deployment_environment() {
 
 		if upgrade_only {
 			assert_eq!(values[2], "unset");
+			assert!(!keypair_copy.exists());
 		} else {
 			assert!(Path::new(values[2]).ends_with("program-keypair.json"));
 			assert_ne!(values[2], canonical(&fixture.program_keypair));
+			assert_eq!(
+				fs::read(&keypair_copy).unwrap(),
+				fs::read(&fixture.program_keypair).unwrap()
+			);
 		}
 	}
 }
