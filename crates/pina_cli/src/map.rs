@@ -116,10 +116,7 @@ pub enum MapError {
 	Json(#[from] serde_json::Error),
 
 	#[error("Could not write the program map to {path}: {source}")]
-	Write {
-		path: PathBuf,
-		source: std::io::Error,
-	},
+	Write { path: PathBuf, source: io::Error },
 }
 
 /// Discover the project at or above `start` and build its map.
