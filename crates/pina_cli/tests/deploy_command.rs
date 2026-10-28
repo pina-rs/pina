@@ -343,7 +343,7 @@ fn override_command_replaces_ambient_deployment_environment() {
 	for upgrade_only in [true, false] {
 		let mut command = fixture.command();
 		command
-			.args(["--cluster", "devnet", "--yes", "--command", script])
+			.args(["--cluster", "devnet", "--yes", "--remote-command", script])
 			.envs(reserved.iter().map(|key| (key, "stale-parent-value")))
 			.env("PINA_DEPLOY_TEST_SENTINEL", "preserved-parent-value")
 			.env("PINA_DEPLOY_TEST_LOG", &log);
