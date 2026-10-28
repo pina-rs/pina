@@ -431,6 +431,13 @@ pub struct CancelAccounts<'a> {
 }
 
 impl<'a> ProcessAccountInfos<'a> for CancelAccounts<'a> {
+	/// Preserve the deposit's original mint policy for maker-authorized refunds.
+	/// The canonical token program validates transfer and close semantics.
+	#[allow(unknown_lints)] // Normal Rust tools do not load Pina's lint catalog.
+	#[allow(
+		require_explicit_token_2022_extension_policy,
+		reason = "Refunds must remain available for extensions admitted by earlier Make versions"
+	)]
 	fn process(self, data: &[u8]) -> ProgramResult {
 		// Parse instruction data
 		let _ = CancelInstruction::try_from_bytes(data)?;
