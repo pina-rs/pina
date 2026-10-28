@@ -42,6 +42,8 @@ devenv shell -- security:pina-lint
 
 `security:pina-lint` is the authoritative gate. It builds the workspace's `pina_lint_driver` binary and runs cargo with `RUSTC_WORKSPACE_WRAPPER` pointing at it, discovering every package under `examples/` and every `security/*/secure` fixture, then checks each one in the driver's no-deps mode with `--locked`. Insecure fixtures are intentionally excluded because they preserve examples of unsafe patterns.
 
+Both gates pin `PINA_LINT_LIST=0`, `PINA_LINT_ONLY=""`, and the effective `PINA_LINT_LEVELS` through Cargo command-line configuration. Cargo's project `[env]` entries can override a parent environment with `force=true`, so setting these variables in the parent process alone does not protect a custom gate. Custom Cargo invocations must also set `env.<name>.value`, `env.<name>.force=true`, and `env.<name>.relative=false` with `--config` for each of these three controls. Direct driver invocations retain catalog and single-lint modes for tooling and UI tests.
+
 ## Importing the lints
 
 Every lint constant and pass is public:

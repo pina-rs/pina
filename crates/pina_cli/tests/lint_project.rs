@@ -106,6 +106,74 @@ fn lint_forwards_configured_levels() {
 	drop(environment);
 }
 
+/// Exercise real Cargo's project [env] precedence, rather than a fake Cargo
+/// that merely observes the parent environment. The wrapper records the
+/// effective controls and delegates compilation to the real compiler.
+#[test]
+fn project_environment_cannot_replace_the_lint_policy() {
+	let fixture = Fixture::new();
+	let mut environment = fixture.lint_environment();
+	// The fixture captures real Cargo while holding ENV_LOCK. Reading CARGO
+	// before acquiring that lock can select another test's temporary executable.
+	let real_cargo = std::env::var_os("REAL_CARGO").expect("fixture records real Cargo");
+	environment.set("CARGO", real_cargo);
+	environment.set("CARGO_TARGET_DIR", fixture._temp.path().join("target"));
+	environment.set("PINA_LINT_LIST", "1");
+	environment.set("PINA_LINT_ONLY", "require_zeroed_before_close");
+	environment.set("PINA_LINT_LEVELS", "require_zeroed_before_close=allow");
+	let driver = fixture._temp.path().join("driver-override");
+	executable(
+		&driver,
+		r#"#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == "-V" ]]; then
+  exit 0
+fi
+printf 'list=%s only=%s levels=%s\n' \
+  "${PINA_LINT_LIST-unset}" "${PINA_LINT_ONLY-unset}" \
+  "${PINA_LINT_LEVELS-unset}" >> "$PINA_LINT_LOG"
+exec "$@"
+"#,
+	);
+	fs::create_dir_all(fixture.project.join(".cargo")).unwrap();
+	fs::write(
+		fixture.project.join(".cargo/config.toml"),
+		r#"[env]
+PINA_LINT_LIST = { value = "1", force = true, relative = true }
+PINA_LINT_ONLY = { value = "require_zeroed_before_close", force = true, relative = true }
+PINA_LINT_LEVELS = { value = "require_zeroed_before_close=allow", force = true, relative = true }
+"#,
+	)
+	.unwrap();
+
+	for levels in [None, Some("require_zeroed_before_close = \"deny\"\n")] {
+		let config = levels.map_or_else(
+			|| "[project]\nprogram = \".\"\n".to_owned(),
+			|levels| format!("[project]\nprogram = \".\"\n[lints]\n{levels}"),
+		);
+		fs::write(fixture.project.join("pina.toml"), config).unwrap();
+		fs::write(
+			fixture.project.join("src/lib.rs"),
+			format!("pub fn fixture() {{ /* {levels:?} */ }}\n"),
+		)
+		.unwrap();
+		fs::write(&fixture.log, "").unwrap();
+		lint_project(&fixture.options()).expect("valid Rust should compile");
+		let expected = if levels.is_some() {
+			"list=0 only= levels=require_zeroed_before_close=deny"
+		} else {
+			"list=0 only= levels="
+		};
+		let log = fs::read_to_string(&fixture.log).unwrap();
+		assert!(!log.is_empty(), "Cargo must invoke the wrapper");
+		assert!(log.lines().all(|line| line == expected), "log: {log}");
+	}
+
+	fs::write(fixture.project.join("src/lib.rs"), "this is invalid Rust\n").unwrap();
+	let error = lint_project(&fixture.options()).expect_err("invalid Rust must fail linting");
+	assert!(matches!(error, LintError::LintFailed { .. }), "{error}");
+}
+
 /// Return the cargo executable in use by the outer test process.
 fn real_cargo_path() -> OsString {
 	// The devenv shell exports `CARGO` as an empty string; treat that like an

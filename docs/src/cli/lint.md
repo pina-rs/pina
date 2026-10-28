@@ -90,7 +90,7 @@ The driver reads a few environment variables:
 | `PINA_LINT_ONLY`    | Restrict linting to a single named lint.                       |
 | `PINA_LINT_LIST`    | Print the lint catalog instead of compiling.                   |
 
-`pina lint` sets `PINA_LINT_NO_DEPS` and forwards `PINA_LINT_LEVELS` from the project's `[lints]` table. `PINA_LINT_NO_DEPS`, `PINA_LINT_LEVELS`, and `PINA_LINT_ONLY` are recorded in dep-info, so changing them invalidates cargo's cached check results.
+`pina lint` sets `PINA_LINT_NO_DEPS` and forwards `PINA_LINT_LEVELS` from the project's `[lints]` table. It pins the effective levels, `PINA_LINT_LIST=0`, and `PINA_LINT_ONLY=""` through Cargo command-line configuration, overriding inherited values and project `[env]` entries even when they use `force=true` or `relative=true`. Catalog and single-lint modes remain available when invoking the driver directly. `PINA_LINT_NO_DEPS`, `PINA_LINT_LEVELS`, and `PINA_LINT_ONLY` are recorded in dep-info, so changing them invalidates cargo's cached check results.
 
 ## Configuring lint levels
 
