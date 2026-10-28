@@ -4,20 +4,22 @@ use syn::Item;
 
 use crate::error::IdlError;
 
-/// Extract a canonical Solana address from a `declare_id!("...")` invocation.
+/// Extract the first canonical address from top-level `declare_id!("...")` invocations.
 ///
-/// Returns `None` when the declaration is missing or invalid.
+/// Returns `None` when no declaration exists or any matching declaration is invalid.
 pub fn extract_program_id(file: &File) -> Option<String> {
 	try_extract_program_id(file).ok().flatten()
 }
 
-/// Extract a canonical address while preserving invalid-declaration diagnostics.
+/// Extract the first canonical address while validating every matching declaration.
 ///
 /// # Errors
 ///
-/// Returns an error when a declaration is not a single string literal whose
+/// Returns an error when any declaration is not a single string literal whose
 /// value is a 32-byte Solana address encoded in Base58.
 pub(crate) fn try_extract_program_id(file: &File) -> Result<Option<String>, IdlError> {
+	let mut program_id = None;
+
 	for item in &file.items {
 		if let Item::Macro(item_macro) = item
 			&& path_ends_with(&item_macro.mac.path, "declare_id")
@@ -35,11 +37,11 @@ pub(crate) fn try_extract_program_id(file: &File) -> Result<Option<String>, IdlE
 				))
 			})?;
 
-			return Ok(Some(address.to_string()));
+			program_id.get_or_insert_with(|| address.to_string());
 		}
 	}
 
-	Ok(None)
+	Ok(program_id)
 }
 
 fn path_ends_with(path: &syn::Path, ident: &str) -> bool {
@@ -65,6 +67,34 @@ mod tests {
 		let source = "pub fn foo() {}";
 		let file = syn::parse_file(source).unwrap_or_else(|e| panic!("parse failed: {e}"));
 		assert_eq!(extract_program_id(&file), None);
+	}
+
+	#[test]
+	fn preserves_the_first_address_after_validating_later_declarations() {
+		let file = syn::parse_file(
+			r#"
+				declare_id!("11111111111111111111111111111111");
+				declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
+			"#,
+		)
+		.unwrap();
+		assert_eq!(
+			try_extract_program_id(&file).unwrap().as_deref(),
+			Some("11111111111111111111111111111111")
+		);
+	}
+
+	#[test]
+	fn rejects_invalid_declarations_after_a_valid_address() {
+		for later in [r#"declare_id!("payer.json");"#, "declare_id!(PROGRAM_ID);"] {
+			let file = syn::parse_file(&format!(
+				r#"declare_id!("11111111111111111111111111111111"); {later}"#
+			))
+			.unwrap();
+			let error = try_extract_program_id(&file).unwrap_err().to_string();
+			assert!(error.contains("declare_id! requires"), "{error}");
+			assert_eq!(extract_program_id(&file), None);
+		}
 	}
 
 	#[test]
