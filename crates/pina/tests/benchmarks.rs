@@ -312,7 +312,7 @@ fn benchmark_pda_assert_stored_bump() {
 		state.authority = authority;
 		Ok(())
 	})
-	.expect("valid benchmark account");
+	.unwrap_or_else(|error| panic!("valid benchmark account: {error:?}"));
 	// SAFETY: the C layout places the complete data buffer immediately after
 	// its initialized header, and `stored` stays in place while the view is used.
 	let account = unsafe { AccountView::new_unchecked(core::ptr::addr_of_mut!(stored.header)) };
@@ -324,7 +324,7 @@ fn benchmark_pda_assert_stored_bump() {
 			black_box(&authority),
 			black_box(&SYSTEM_ID),
 		))
-		.expect("stored bump and address must validate");
+		.unwrap_or_else(|error| panic!("stored bump and address must validate: {error:?}"));
 	});
 }
 

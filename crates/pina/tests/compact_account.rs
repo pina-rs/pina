@@ -475,13 +475,13 @@ fn compact_assert_stored_bump_checks_the_declared_field_at_runtime() {
 				.ok()
 				.map(|address| (address, candidate))
 		})
-		.expect("the fixed seeds have an alternate valid PDA");
+		.unwrap_or_else(|| panic!("the fixed seeds have an alternate valid PDA"));
 	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
 	CompactPdaState::initialize(
 		&mut stored.data,
 		&CompactPdaStatePatch::new().bump(bump).authority(authority),
 	)
-	.expect("initialize compact PDA");
+	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
 
 	assert_eq!(
 		CompactPdaState::assert_stored_bump(&stored.view(), bump, &authority, &OWNER),

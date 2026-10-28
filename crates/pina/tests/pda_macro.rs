@@ -161,7 +161,7 @@ fn build_counter_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
 		state.bump = bump;
 		Ok(())
 	})
-	.expect("valid counter storage");
+	.unwrap_or_else(|error| panic!("valid counter storage: {error:?}"));
 	bytes
 }
 
@@ -568,7 +568,7 @@ fn assert_stored_bump_rejects_an_alternate_valid_pda_with_a_different_stored_bum
 				.ok()
 				.map(|address| (address, bump))
 		})
-		.expect("the fixed seeds have an alternate valid PDA");
+		.unwrap_or_else(|| panic!("the fixed seeds have an alternate valid PDA"));
 	let bytes = build_counter_state_bytes(authority, stored_bump);
 	let test_account = build_account_view(alternate_address, &bytes);
 
@@ -626,7 +626,7 @@ fn assert_stored_bump_rejects_invalid_accounts_even_when_a_fallback_derives_the_
 		let expected_error = parsed
 			.as_ref()
 			.err()
-			.expect("the invalid account must fail typed parsing")
+			.unwrap_or_else(|| panic!("the invalid account must fail typed parsing"))
 			.clone();
 		let fallback = parsed.map_or(bump, |state| state.bump);
 		assert_eq!(
@@ -651,7 +651,7 @@ fn assert_stored_bump_does_not_shadow_a_seed_named_bump() {
 		state.stored_bump = stored_bump;
 		Ok(())
 	})
-	.expect("valid stored-bump state");
+	.unwrap_or_else(|error| panic!("valid stored-bump state: {error:?}"));
 	let account = build_account_view(address, &bytes);
 
 	assert_eq!(
@@ -709,7 +709,7 @@ fn assert_stored_bump_accepts_the_parsed_bump() {
 	let mut aliased_account = account;
 	let held_borrow = aliased_account
 		.try_borrow_mut()
-		.expect("hold mutable data borrow");
+		.unwrap_or_else(|error| panic!("hold mutable data borrow: {error:?}"));
 	assert_eq!(validate(), Err(ProgramError::AccountBorrowFailed));
 	drop(held_borrow);
 	assert_eq!(validate(), Ok(()));
