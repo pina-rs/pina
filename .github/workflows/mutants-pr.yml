@@ -32,13 +32,12 @@ jobs:
 
       - name: detect changed crates
         id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
 
-          base_ref="${GITHUB_BASE_REF:-main}"
-          git fetch --no-tags origin "$base_ref"
-
-          changed_files=$(git diff --name-only "origin/${base_ref}...HEAD")
+          changed_files=$(git diff --name-only "${BASE_SHA}...HEAD")
           if [ -z "$changed_files" ]; then
             echo "any_changed=false" >> "$GITHUB_OUTPUT"
             echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
@@ -98,12 +97,11 @@ jobs:
       # nightly run covers in rotating shards instead.
       - name: write the pull request diff
         env:
-          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          git fetch --no-tags origin "$BASE_REF"
           mkdir -p target
-          git diff "origin/${BASE_REF}...HEAD" > target/mutants-pr.diff
+          git diff "${BASE_SHA}...HEAD" > target/mutants-pr.diff
 
       - name: prepare the mutation baseline
         run: mutants:prepare
