@@ -71,7 +71,7 @@ pub(crate) fn has_untrusted_link_component(path: &Path) -> Result<bool, std::io:
 	Ok(false)
 }
 
-fn is_untrusted_link(metadata: &fs::Metadata, alias_position: bool) -> bool {
+pub(crate) fn is_untrusted_link(metadata: &fs::Metadata, alias_position: bool) -> bool {
 	is_link_like(metadata) && !(alias_position && is_owned_by_root(metadata))
 }
 
