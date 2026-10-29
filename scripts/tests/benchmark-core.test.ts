@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
@@ -42,7 +43,7 @@ if (!existsSync(executable)) {
     "const orderFile = " + JSON.stringify(join(target, "..", "sample-order")) + ";",
     'const position = existsSync(orderFile) ? readFileSync(orderFile, "utf8").trim().split("\\\\n").length % 2 : 0;',
     "appendFileSync(orderFile, " + JSON.stringify(label + "\\n") + ");",
-    "console.log(" + JSON.stringify("[BENCH] " + label + ": total=100µs, avg=100ns (1000 iterations)") + ");",
+    "console.log(" + JSON.stringify("test benchmark ... [BENCH] " + label + ": total=100µs, avg=100ns (1000 iterations)") + ' + (process.env.PINA_TEST_BENCHMARK_SUFFIX ?? ""));',
     "console.log(" + JSON.stringify("[BENCH] shared: total=" + (label === "base-only" ? "1.5µs" : "1.6µs") + ", avg=1ns (1000 iterations)") + ");",
     'console.log("[BENCH] position-sensitive: total=" + (position === 0 ? "100µs, avg=100ns" : "90µs, avg=90ns") + " (1000 iterations)");',
     "",
@@ -153,4 +154,27 @@ console.log(JSON.stringify({ reason: "compiler-artifact", target: { name: "bench
 			"base-only",
 		],
 	);
+	for (const [index, suffix] of [" trailing text", " (malformed)"].entries()) {
+		const invalidOutput = join(root, `invalid-report-${index}`);
+		assert.throws(
+			() =>
+				execFileSync(process.execPath, [
+					fileURLToPath(new URL("../benchmark-core.ts", import.meta.url)),
+					base,
+					head,
+					invalidOutput,
+					join(root, `invalid-target-${index}`),
+				], {
+					env: {
+						...process.env,
+						PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
+						PINA_TEST_BENCHMARK_SUFFIX: suffix,
+					},
+					encoding: "utf8",
+					stdio: "pipe",
+				}),
+			/invalid benchmark output/u,
+		);
+		assert.equal(existsSync(join(invalidOutput, "core.json")), false);
+	}
 });

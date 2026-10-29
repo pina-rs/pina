@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 
 const SAMPLE_RUNS = 8;
 const BENCHMARK_PATTERN =
-	/\[BENCH\] (.+): total=(\d+(?:\.\d+)?)(ns|µs|ms|s), avg=\d+ns \((\d+) iterations\)/u;
+	/\[BENCH\] (.+): total=(\d+(?:\.\d+)?)(ns|µs|ms|s), avg=\d+ns \((\d+) iterations\)$/u;
 
 interface Arguments {
 	baseWorkspace: string;
