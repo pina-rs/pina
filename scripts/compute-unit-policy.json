@@ -126,13 +126,13 @@
 			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
 		},
 		"privacy_pool_program/initialize": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 48259,
 			"head": 48260,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/transfer": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 105282,
 			"head": 105283,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
@@ -144,67 +144,67 @@
 			"reason": "Approved by @ifiokjr on 2026-10-28 for https://github.com/pina-rs/pina/pull/684: recover already-funded legacy Token-2022 escrows, including the original 122-byte state. Exact approved totals must be confirmed against this refreshed base. The higher maximum covers new cold-ATA recovery contexts; the matched existing SPL case improves from 13271 to 13238 CU."
 		},
 		"privacy_pool_program/approveDisclosure": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 437,
 			"head": 438,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/cancelDisclosure": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 120,
 			"head": 121,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/challengeDisclosure": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 1942,
 			"head": 1943,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/deposit": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 15995,
 			"head": 15996,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/grantDisclosure": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 1892,
 			"head": 1893,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/registerRequester": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 318,
 			"head": 319,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/requestDisclosure": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 11014,
 			"head": 11015,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/resolveChallenge": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 197,
 			"head": 198,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/setCustodians": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 242,
 			"head": 243,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/setVerificationKey": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 15258,
 			"head": 15259,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/withdraw": {
-			"baseRevision": "862ae48ca3fe555a62adb0c1072ef0c12c677d03",
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
 			"base": 86949,
 			"head": 86950,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
