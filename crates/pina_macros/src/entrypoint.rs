@@ -614,9 +614,7 @@ fn resolve_migrations(
 ) -> syn::Result<Option<MigrateRoute>> {
 	let crate_path = &args.crate_path;
 	let declared_ladder = &args.migrations;
-	// The budget is optional: with no declared ceiling the reserved route
-	// enforces none, because a transfer is already bounded by the rent deficit
-	// of a growth the runtime caps. Declaring one only tightens that.
+	// A route without a declared budget may migrate only without payer funding.
 	let max_lamports = &args.migrations_max_lamports;
 
 	// An explicit list overrides the derived ladder: it is the only way to
@@ -667,8 +665,7 @@ fn resolve_migrations(
 /// Emit the reserved-`Migrate` helper and the dispatch prelude for a validated
 /// ladder, and count the account slots the route reads.
 ///
-/// `max_lamports` tightens the route when present; `None` emits a call with no
-/// declared ceiling.
+/// `max_lamports` caps the route's payer transfers; omission defaults to zero.
 ///
 /// Split from [`resolve_migrations`] so the emitted shape is unit-testable
 /// without a manifest on disk.
@@ -679,10 +676,8 @@ fn migrate_emission(
 	max_lamports: Option<&Expr>,
 	program_id: &Expr,
 ) -> MigrateRoute {
-	// `None` states the absence of a declared ceiling rather than inventing
-	// one; the executor then enforces none.
 	let budget = max_lamports.map_or_else(
-		|| quote!(::core::option::Option::None),
+		|| quote!(::core::option::Option::Some(0)),
 		|expr| quote!(::core::option::Option::Some(#expr)),
 	);
 	let steps = ladder.iter().enumerate().map(|(position, account)| {
@@ -1141,7 +1136,7 @@ mod tests {
 	}
 
 	#[test]
-	fn migration_emission_without_a_budget_declares_no_ceiling() {
+	fn migration_emission_without_a_budget_disallows_payer_transfers() {
 		let crate_path: Path = syn::parse_quote!(::pina);
 		let program_id: Expr = syn::parse_quote!(ID);
 		let ladder = [ladder_of("State")].map(|path| ::quote::ToTokens::to_token_stream(&path));
@@ -1149,11 +1144,11 @@ mod tests {
 			migrate_emission(&crate_path, Primitive::U8, &ladder, None, &program_id);
 		let helper = squeezed(&helper.to_string());
 
-		// No ceiling is stated as `None` rather than a sentinel maximum, and the
-		// ladder still routes.
+		// The ladder still routes, but payer funding requires an explicit budget.
 		assert!(
-			helper
-				.contains("MigrateContext::new(program_id,accounts,::core::option::Option::None)"),
+			helper.contains(
+				"MigrateContext::new(program_id,accounts,::core::option::Option::Some(0))"
+			),
 			"helper: {helper}"
 		);
 		assert!(helper.contains("run_optional::<State>(2)"));

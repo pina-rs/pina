@@ -136,7 +136,7 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 ///   through `Self::process_migrate`, listing migratable contracts in
 ///   reserved-instruction slot order.
 /// - `migrations_max_lamports = EXPR` — the lamport budget shared by every
-///   slot. Required with `migrations`.
+///   slot. Defaults to zero, so payer funding requires an explicit budget.
 /// - `inline = "hint"` — emit `#[inline]` instead of the default
 ///   `#[inline(always)]` on the generated entrypoint. The two spellings differ
 ///   at the codegen level, so match whichever the program was measured with.
