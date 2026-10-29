@@ -9,7 +9,8 @@
 //! Program-ID placeholder optional accounts and runtime-selected signers are
 //! represented directly in the generated API. The renderer refuses rather
 //! than guess for omitted optional accounts, optional arguments,
-//! non-little-endian numbers, and unsupported argument or discriminator types,
+//! omitted arguments outside the discriminator prefix, non-little-endian
+//! numbers, and unsupported argument or discriminator types,
 //! with errors naming the exact node.
 //! Accounts the IDL derives from PDA seeds stay ordinary builder fields — at
 //! CPI time the caller passes the derived account explicitly anyway, because

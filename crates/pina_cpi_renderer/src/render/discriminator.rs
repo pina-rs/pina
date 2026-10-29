@@ -12,6 +12,7 @@ use codama_nodes::TypeNode;
 use codama_nodes::ValueNode;
 use heck::ToShoutySnakeCase;
 
+use super::args::render_argument;
 use super::helpers::cast_unsigned;
 use super::helpers::decode_base16;
 use crate::error::RenderError;
@@ -88,11 +89,64 @@ pub(crate) fn render_constant_discriminator(
 		}
 		bytes.extend_from_slice(&part);
 	}
+	validate_omitted_arguments(discriminators, arguments, &bytes, context)?;
 
 	Ok(DiscriminatorBytes {
 		name: format!("{}_DISCRIMINATOR", prefix.to_shouty_snake_case()),
 		bytes,
 	})
+}
+
+/// Omitted arguments may be described by constant or field discriminators.
+/// Their bytes must already occupy the prefix before they can be skipped.
+fn validate_omitted_arguments(
+	discriminators: &[DiscriminatorNode],
+	arguments: &[InstructionArgumentNode],
+	prefix: &[u8],
+	context: &str,
+) -> Result<()> {
+	let mut offset = 0;
+	let mut caller_argument_seen = false;
+
+	for (index, argument) in arguments.iter().enumerate() {
+		if argument.default_value_strategy != Some(codama_nodes::DefaultValueStrategy::Omitted) {
+			caller_argument_seen = true;
+			continue;
+		}
+
+		let bytes = field_discriminator_bytes(argument, context)?;
+		let mut fields = discriminators.iter().filter_map(|discriminator| {
+			match discriminator {
+				DiscriminatorNode::Field(field) if field.name == argument.name => Some(field),
+				_ => None,
+			}
+		});
+		// Contiguous prefix assembly has already bounded every field offset by
+		// `prefix.len()`, so this conversion cannot truncate an offset.
+		let start = fields.next().map_or(offset, |field| field.offset as usize);
+
+		if caller_argument_seen
+			|| start < offset
+			|| fields.next().is_some()
+			|| arguments[..index]
+				.iter()
+				.any(|prior| prior.name == argument.name)
+			|| !prefix
+				.get(start..)
+				.is_some_and(|remaining| remaining.starts_with(&bytes))
+		{
+			return Err(unsupported_discriminator(
+				context,
+				"omitted arguments must be leading constants covered by the discriminator prefix \
+				 in wire order"
+					.to_string(),
+			));
+		}
+
+		offset = start + bytes.len();
+	}
+
+	Ok(())
 }
 
 fn field_discriminator_bytes(argument: &InstructionArgumentNode, context: &str) -> Result<Vec<u8>> {
@@ -116,7 +170,7 @@ fn field_discriminator_bytes(argument: &InstructionArgumentNode, context: &str) 
 		(
 			TypeNode::Array(_) | TypeNode::Bytes(_) | TypeNode::FixedSize(_),
 			Some(InstructionInputValueNode::BytesValue(value)),
-		) => bytes_discriminator_bytes(value, context),
+		) => typed_bytes_discriminator(&argument.r#type, value, context),
 		(r#type, Some(value)) => {
 			Err(unsupported_discriminator(
 				context,
@@ -161,7 +215,7 @@ fn discriminator_bytes(
 		(
 			TypeNode::Array(_) | TypeNode::Bytes(_) | TypeNode::FixedSize(_),
 			ValueNode::Bytes(bytes_value),
-		) => bytes_discriminator_bytes(bytes_value, context),
+		) => typed_bytes_discriminator(&discriminator.constant.r#type, bytes_value, context),
 		(other_type, other_value) => {
 			Err(RenderError::UnsupportedDiscriminator {
 				context: context.to_string(),
@@ -174,6 +228,31 @@ fn discriminator_bytes(
 			})
 		}
 	}
+}
+
+/// Literal bytes must fill their declared wire type before following fields are placed.
+fn typed_bytes_discriminator(
+	r#type: &TypeNode,
+	value: &codama_nodes::BytesValueNode,
+	context: &str,
+) -> Result<Vec<u8>> {
+	let bytes = bytes_discriminator_bytes(value, context)?;
+	let layout = render_argument("discriminator", r#type, context).map_err(|error| {
+		unsupported_discriminator(context, format!("constant byte layout: {error}"))
+	})?;
+
+	if layout.variable || bytes.len() != layout.wire_size {
+		return Err(unsupported_discriminator(
+			context,
+			format!(
+				"constant has {} bytes but its declared wire width is {}",
+				bytes.len(),
+				layout.wire_size
+			),
+		));
+	}
+
+	Ok(bytes)
 }
 
 fn number_discriminator_bytes(
