@@ -84,6 +84,7 @@ describe("staking_rewards_program quasar e2e", () => {
 		const rewardMint = createKeyedMintAccount(
 			(await generateKeyPairSigner()).address,
 			{
+				mintAuthority: admin.address,
 				decimals: 6,
 				supply: 10_000n,
 			},

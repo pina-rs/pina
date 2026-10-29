@@ -10,7 +10,7 @@ Staking pools with check-pointed reward accrual and reward release.
 
 <br>
 
-- Pool initialization with stake and reward vault ATAs.
+- Pool initialization with stake and reward vault ATAs, authorized by the reward mint authority.
 - Per-user position PDAs keyed by pool + owner.
 - Deposit, withdraw, and claim validation and bookkeeping flows.
 - Stake custody: `Deposit` transfers the deposited stake tokens into the pool's stake vault and `Withdraw` transfers the principal back out, so the vault balance always equals the pool's `total_staked`.
@@ -24,7 +24,11 @@ The `tests/surfpool` suite funds both vaults through real mints and asserts the 
 - Reward funding schedules, emissions curves, and solvency guarantees: the authority decides when and by how much the index moves, and a claim fails if the reward vault cannot cover it.
 - Pause administration, position closure, pool shutdown, and recovery policy.
 
-- Pool-creation policy: initialization is permissionless per `(stake_mint, reward_mint)` pair and the first initializer becomes the pool admin (who controls `SetRewardIndex`). If you announce a pool ahead of deploying, initialize it in the same transaction as the announcement lands, or front-run your own users — the first-initializer capture is the Audius init-front-run class.
+## Pool creation authority
+
+Each `(stake_mint, reward_mint)` pair has one canonical pool. `InitializePool` requires the current reward mint authority to sign as `admin` and fund initialization. A stake mint authority or unrelated signer cannot reserve that address. A reward mint whose mint authority has been revoked cannot initialize a new pool.
+
+The initializer remains the pool administrator and controls `SetRewardIndex`; later changes to the reward mint authority do not transfer that role. These rules apply to both SPL Token and extension-free Token-2022 mints. Pool addresses, account layouts, and instruction bytes remain unchanged.
 
 See the book's [Production Readiness](../../docs/src/production-readiness.md) checklist for the invariants and adversarial tests a real staking program needs.
 

@@ -4,10 +4,6 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
-[features]
-# Keep the unresolved SEC-26 acceptance test out of normal cargo and Surfpool runs.
-audit-deferred = []
-
 [dependencies]
 # The program is a cdylib only (see ../../Cargo.toml), so its types are
 # included with #[path = "../../../src/lib.rs"] in src/lib.rs rather than

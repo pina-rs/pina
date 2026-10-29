@@ -50,7 +50,7 @@ Before a public deployment:
 - a time-based reward-emission and precision model, plus a way to fund the reward vault;
 - pause, unpause, and administration: `PoolState.paused` is read by every value path but no instruction sets it, so the flag is inert as shipped;
 - position closure and pool shutdown, including what happens to banked rewards;
-- a documented initialization trust model: the pool PDA is a singleton per mint pair, so the first caller to `InitializePool` becomes the permanent administrator (tracked as issue #502);
+- an authority succession policy: only the reward mint authority can initialize the singleton pool and becomes its permanent administrator; later mint-authority rotation or revocation does not change an existing pool's administrator;
 - adversarial deposits, withdrawals, claims, duplicate accounts, and depleted reward vaults against the funded schedule.
 
 ## Vesting completion checklist

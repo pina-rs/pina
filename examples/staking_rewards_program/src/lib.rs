@@ -280,8 +280,6 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 
 		// Validate accounts
 		self.admin.assert_signer()?;
-		self.stake_mint.assert_owners(&SPL_PROGRAM_IDS)?;
-		self.reward_mint.assert_owners(&SPL_PROGRAM_IDS)?;
 		// Every value-exit path asserts extension-free mints, so the entry
 		// path must apply the same policy before creating state or vaults: a
 		// configuration accepted here with no exit would lock funded stake
@@ -289,13 +287,23 @@ impl<'a> ProcessAccountInfos<'a> for InitializePoolAccounts<'a> {
 		self.stake_mint
 			.as_token_mint_for_program(self.token_program.address())?
 			.assert_no_extensions()?;
-		self.reward_mint
+
+		// The singleton address must be reserved by an authority over the
+		// rewards, before any state or vault is created. The mint view also
+		// validates ownership against the selected token program.
+		if self
+			.reward_mint
 			.as_token_mint_for_program(self.token_program.address())?
-			.assert_no_extensions()?;
+			.assert_no_extensions()?
+			.mint_authority()
+			!= Some(self.admin.address())
+		{
+			return Err(StakingError::Unauthorized.into());
+		}
+
 		self.associated_token_program
 			.assert_address(&associated_token_account::ID)?;
 		self.system_program.assert_address(&system::ID)?;
-		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		// The vault addresses are checked by the associated token program inside
 		// each `Create` CPI below, which derives the same
 		// `[wallet, token_program, mint]` seeds and rejects a mismatch with

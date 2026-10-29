@@ -50,6 +50,12 @@
 			"base": 4326,
 			"head": 4430,
 			"reason": "Approved by @ifiokjr on 2026-10-28 for https://github.com/pina-rs/pina/pull/684: recover already-funded legacy Token-2022 escrows, including the original 122-byte state. Exact approved totals must be confirmed against this refreshed base."
+		},
+		"staking_rewards_program": {
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
+			"base": 5798,
+			"head": 5802,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/666: accept 4 static CU to require the validated reward mint authority to sign before pool or vault creation."
 		}
 	},
 	"runtimeCuApprovals": {
@@ -162,6 +168,12 @@
 			"base": 38912,
 			"head": 39808,
 			"reason": "Approved by @ifiokjr on 2026-10-28 for https://github.com/pina-rs/pina/pull/684: recover already-funded legacy Token-2022 escrows, including the original 122-byte state. Exact approved totals must be confirmed against this refreshed base."
+		},
+		"staking_rewards_program": {
+			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
+			"base": 50192,
+			"head": 50224,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/666: accept 32 bytes to require the validated reward mint authority to sign before pool or vault creation."
 		}
 	}
 }
