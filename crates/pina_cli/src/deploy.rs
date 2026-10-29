@@ -1,5 +1,7 @@
 //! Safe planning and execution for `pina deploy`.
 
+mod publication;
+
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fmt;
@@ -479,6 +481,14 @@ impl DeploymentPlan {
 		self.revalidate()
 	}
 
+	/// Independently verify finalized loader state before recording publication.
+	///
+	/// A successful deployment child is not evidence that the approved program
+	/// exists on the selected cluster. Failure leaves publication pending.
+	pub fn verify_publication(&self) -> Result<(), DeployError> {
+		publication::verify(self)
+	}
+
 	fn serializable(&self) -> SerializableDeploymentPlan<'_> {
 		SerializableDeploymentPlan {
 			project_root: self.project_root(),
@@ -728,6 +738,10 @@ fn child_wait_error(error: io::Error) -> io::Error {
 /// Deployment planning or execution failure.
 #[derive(Debug, Error)]
 pub enum DeployError {
+	/// The selected RPC did not prove the approved deployment is finalized.
+	#[error("deployment publication remains pending: {0}")]
+	PublicationUnverified(&'static str),
+
 	/// Project discovery did not find a usable Cargo program crate.
 	#[error("could not resolve a Pina program project from {path:?}: {reason:?}")]
 	Project { path: PathBuf, reason: String },
@@ -983,17 +997,15 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 	let payer = path_string(&payer_path, "fee payer")?;
 	let project_root = path_string(&project.root, "project root")?;
 	let program_dir = path_string(&project.program_dir, "program directory")?;
+	let (authority_bytes, authority_digest) =
+		read_keypair_with_digest(&upgrade_authority_path, "upgrade authority")?;
 	let input_fingerprint = InputFingerprint {
 		program: file_digest(&program_path, "program")?,
 		program_keypair: program_keypair_file.map(|keypair| keypair.digest),
-		upgrade_authority: file_digest(&upgrade_authority_path, "upgrade authority")?,
+		upgrade_authority: authority_digest,
 		payer: file_digest(&payer_path, "fee payer")?,
 	};
-	let warnings = deployment_warnings(
-		&program_path,
-		&read_keypair(&upgrade_authority_path, "upgrade authority")?,
-		&declared_program_id,
-	);
+	let warnings = deployment_warnings(&program_path, &authority_bytes, &declared_program_id);
 
 	Ok(DeploymentPlan {
 		remote_command: request.remote_command.clone(),
@@ -1083,6 +1095,8 @@ fn deploy_command(
 			rpc_url.to_owned(),
 			"--keypair".to_owned(),
 			payer.to_owned(),
+			"--commitment".to_owned(),
+			"finalized".to_owned(),
 		],
 		env: Vec::new(),
 	}
@@ -1206,7 +1220,9 @@ impl DeployError {
 	pub fn is_unsent(&self) -> bool {
 		!matches!(
 			self,
-			Self::CommandFailed { .. } | Self::CommandInterrupted { .. }
+			Self::CommandFailed { .. }
+				| Self::CommandInterrupted { .. }
+				| Self::PublicationUnverified(_)
 		)
 	}
 }
@@ -1515,6 +1531,14 @@ fn digest_reader(mut reader: impl Read) -> io::Result<[u8; 32]> {
 }
 
 fn read_keypair(path: &Path, kind: &'static str) -> Result<Vec<u8>, DeployError> {
+	read_keypair_with_digest(path, kind).map(|(keypair, _)| keypair)
+}
+
+/// Bind the parsed keypair and fingerprint to one bounded file read.
+fn read_keypair_with_digest(
+	path: &Path,
+	kind: &'static str,
+) -> Result<(Vec<u8>, [u8; 32]), DeployError> {
 	let file = fs::File::open(path).map_err(|_| {
 		DeployError::InvalidKeypair {
 			kind,
@@ -1558,7 +1582,7 @@ fn read_keypair(path: &Path, kind: &'static str) -> Result<Vec<u8>, DeployError>
 		});
 	}
 
-	Ok(keypair)
+	Ok((keypair, Sha256::digest(&bytes).into()))
 }
 
 fn keypair_metadata(
@@ -1948,6 +1972,8 @@ mod tests {
 					DEVNET_URL.to_owned(),
 					"--keypair".to_owned(),
 					canonical(&fixture.payer),
+					"--commitment".to_owned(),
+					"finalized".to_owned(),
 				],
 				env: Vec::new(),
 			}
@@ -1986,6 +2012,8 @@ mod tests {
 				DEVNET_URL.to_owned(),
 				"--keypair".to_owned(),
 				canonical(&fixture.payer),
+				"--commitment".to_owned(),
+				"finalized".to_owned(),
 			]
 		);
 

@@ -13,6 +13,10 @@ use tempfile::TempDir;
 #[cfg(unix)]
 mod support;
 
+#[cfg(unix)]
+#[path = "support/rehearse.rs"]
+mod rpc_support;
+
 struct ProjectFixture {
 	_temp: TempDir,
 	root: PathBuf,
@@ -21,6 +25,7 @@ struct ProjectFixture {
 	program_id: String,
 	authority: PathBuf,
 	payer: PathBuf,
+	rpc_url: String,
 }
 
 impl ProjectFixture {
@@ -60,6 +65,7 @@ impl ProjectFixture {
 			program_id,
 			authority,
 			payer,
+			rpc_url: "http://127.0.0.1:1".to_owned(),
 		}
 	}
 
@@ -510,6 +516,7 @@ fn local_deployment_passes_verified_snapshots_and_modeled_arguments_to_solana() 
 	);
 	// The fee payer doubles as the default signer, so no Solana CLI config is read.
 	assert_eq!([args[11], args[12]], ["--keypair", args[8]]);
+	assert_eq!([args[13], args[14]], ["--commitment", "finalized"]);
 	for (actual, original, name) in [
 		(args[2], &fixture.program, "program.so"),
 		(args[4], &fixture.program_keypair, "program-keypair.json"),
@@ -610,7 +617,12 @@ fn remote_command(fixture: &ProjectFixture, name: &str, script: &str) -> Command
 		std::env::join_paths(paths).unwrap_or_else(|error| panic!("construct test PATH: {error}"));
 	let mut command = fixture.command();
 	command
-		.args(["--cluster", "devnet", "--yes"])
+		.args([
+			"--cluster",
+			&fixture.rpc_url,
+			"--record-publication",
+			"--yes",
+		])
 		.env("PATH", joined_path);
 	command
 }
@@ -618,8 +630,10 @@ fn remote_command(fixture: &ProjectFixture, name: &str, script: &str) -> Command
 #[cfg(unix)]
 #[test]
 fn remote_deployments_record_and_retain_crash_safe_migration_state() {
-	let successful = ProjectFixture::new();
+	let mut successful = ProjectFixture::new();
 	successful.enable_migrations();
+	let server = publication_rpc(&successful);
+	successful.rpc_url = server.url.clone();
 	let output = remote_command(&successful, "success-bin", "#!/bin/sh\nset -eu\nexit 0\n")
 		.output()
 		.unwrap_or_else(|error| panic!("run successful remote deployment: {error}"));
@@ -751,36 +765,20 @@ fn conflicting_pending_publication_stops_before_remote_execution() {
 	assert!(!marker.exists());
 }
 
-// ---------------------------------------------------------------------------
-// Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
-//
-// These tests assert the *secure* behavior from the audit report. They fail
-// on the current tree because the finding is still live, and must pass once
-// the corresponding fix lands. Run with:
-//   cargo test -p pina_cli --test deploy_command -- --ignored audit_sec_
-// ---------------------------------------------------------------------------
-
-/// SEC-12: a `--remote-command` deployment child that exits zero is treated
-/// as proof of an on-chain deployment, and a finalized publication receipt is
-/// recorded without any RPC readback of the program account. A fake child
-/// that performs no RPC work at all must not produce a receipt.
-///
-/// Current behavior: the exit-zero fake produces a finalized receipt, so the
-/// `pending` assertion below fails and the test proves the subprocess status
-/// is standing in for deployment evidence.
+/// SEC-12: an exit-zero child cannot finalize a receipt without RPC evidence.
 #[cfg(unix)]
 #[test]
-#[ignore = "SEC-12: exploit is live; must pass once deployment receipts require on-chain proof"]
 fn audit_sec_12_an_exit_zero_remote_command_is_not_deployment_evidence() {
 	let fixture = ProjectFixture::new();
 	fixture.enable_migrations();
 	let output = remote_command(&fixture, "audit-noop-bin", "#!/bin/sh\nset -eu\nexit 0\n")
+		.args(["--remote-command", "exit 0"])
 		.output()
 		.unwrap_or_else(|error| panic!("run no-op remote deployment: {error}"));
 
 	let stderr = String::from_utf8_lossy(&output.stderr);
 	assert!(
-		stderr.contains("pending") || !output.status.success(),
+		stderr.contains("pending") && !output.status.success(),
 		"a no-op deployment child must not report a completed deployment: {stderr}"
 	);
 
@@ -790,12 +788,58 @@ fn audit_sec_12_an_exit_zero_remote_command_is_not_deployment_evidence() {
 	)
 	.unwrap_or_else(|error| panic!("decode publication ledger: {error}"));
 
-	// Without an RPC readback proving finalized ProgramData with the expected
-	// executable bytes and authority, the publication must stay pending (or
-	// the command must have refused to record anything at all).
 	assert!(
-		ledger.pending.is_some() || ledger.receipts.is_empty(),
+		ledger.pending.is_some() && ledger.receipts.is_empty(),
 		"SEC-12: an exit-zero no-op child produced a finalized deployment receipt without any \
 		 on-chain proof"
 	);
+}
+
+/// Serve the approved loader state at finalized commitment, including spare
+/// zero-filled allocation beyond the exact approved artifact.
+#[cfg(unix)]
+fn publication_rpc(fixture: &ProjectFixture) -> rpc_support::FakeRpcServer {
+	use std::str::FromStr as _;
+
+	use base64::Engine as _;
+	use serde_json::json;
+	use solana_address::Address;
+
+	let loader = "BPFLoaderUpgradeab1e11111111111111111111111";
+	let program = Address::from_str(&fixture.program_id).unwrap();
+	let (programdata, _) =
+		Address::find_program_address(&[program.as_ref()], &Address::from_str_const(loader));
+	let mut program_bytes = 2_u32.to_le_bytes().to_vec();
+	program_bytes.extend_from_slice(programdata.as_ref());
+	let mut data_bytes = 3_u32.to_le_bytes().to_vec();
+	data_bytes.extend_from_slice(&41_u64.to_le_bytes());
+	data_bytes.push(1);
+	data_bytes.extend_from_slice(&SigningKey::from_bytes(&[5; 32]).verifying_key().to_bytes());
+	data_bytes.extend_from_slice(b"synthetic SBF\0\0");
+	let account = |data: Vec<u8>, executable| {
+		json!({
+			"owner": loader, "executable": executable, "lamports": 1,
+			"data": [base64::engine::general_purpose::STANDARD.encode(data), "base64"]
+		})
+	};
+	let accounts = json!({ "context": { "slot": 42 }, "value": [
+		account(program_bytes, true), account(data_bytes, false)
+	] });
+	let program_id = fixture.program_id.clone();
+	rpc_support::FakeRpcServer::start(move |method, params| {
+		match method {
+			"getGenesisHash" => {
+				rpc_support::Reply::Result(json!("11111111111111111111111111111111"))
+			}
+			"getMultipleAccounts" => {
+				assert_eq!(params[0], json!([program_id, programdata.to_string()]));
+				assert_eq!(
+					params[1],
+					json!({ "encoding": "base64", "commitment": "finalized" })
+				);
+				rpc_support::Reply::Result(accounts.clone())
+			}
+			_ => panic!("unexpected RPC method {method}"),
+		}
+	})
 }
