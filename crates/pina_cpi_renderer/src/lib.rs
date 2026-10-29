@@ -60,7 +60,9 @@ use render::mods::render_programs_mod;
 use render::mods::render_root_mod;
 use render::scaffold::ensure_crate_scaffold;
 use render::scaffold::open_crate_dir;
+use render::scaffold::readme_changed;
 use render::scaffold::write_files;
+use render::scaffold::write_readme;
 use render::types::render_type_page;
 use render::types::render_types_mod;
 use render::wire::TypeIndex;
@@ -162,6 +164,33 @@ pub fn render_idl_file(path: &Path, crate_dir: &Path, config: &RenderConfig) -> 
 }
 
 pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig) -> Result<()> {
+	render_root_node_inner(root, crate_dir, config, None).map(|_| ())
+}
+
+/// Renders a CPI crate and its provenance README through the same pinned directory.
+///
+/// Returns whether the README changed. An unchanged README is left untouched.
+///
+/// # Errors
+///
+/// Returns a render error for unsupported IDLs, unsafe output paths, or failed
+/// filesystem operations. Existing README links and non-regular files are
+/// refused; replacement never follows a README link.
+pub fn render_root_node_with_readme(
+	root: &RootNode,
+	crate_dir: &Path,
+	config: &RenderConfig,
+	readme: &str,
+) -> Result<bool> {
+	render_root_node_inner(root, crate_dir, config, Some(readme))
+}
+
+fn render_root_node_inner(
+	root: &RootNode,
+	crate_dir: &Path,
+	config: &RenderConfig,
+	readme: Option<&str>,
+) -> Result<bool> {
 	validate_output_path_components(crate_dir)?;
 	let mode = resolve_render_mode(crate_dir, config.mode)?;
 	let manifest = generation_manifest::GenerationManifest::load(crate_dir);
@@ -174,6 +203,10 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 	let files = render_program_to_files(root, config)?;
 	validate_generated_sources(&files)?;
 	let crate_handle = open_crate_dir(crate_dir)?;
+	let changed = match readme {
+		Some(readme) => readme_changed(&crate_handle, crate_dir, readme)?,
+		None => false,
+	};
 	validate_generated_path(&crate_handle, crate_dir, &config.generated_folder)?;
 	validate_existing_generated_dir(
 		&crate_handle,
@@ -225,7 +258,13 @@ pub fn render_root_node(root: &RootNode, crate_dir: &Path, config: &RenderConfig
 			.collect::<Vec<_>>(),
 	);
 
-	generation_manifest::write(crate_dir, &tracked)
+	generation_manifest::write(crate_dir, &tracked)?;
+
+	if let Some(readme) = readme.filter(|_| changed) {
+		write_readme(&crate_handle, crate_dir, readme)?;
+	}
+
+	Ok(changed)
 }
 
 fn resolve_render_mode(crate_dir: &Path, requested: RenderMode) -> Result<RenderMode> {
