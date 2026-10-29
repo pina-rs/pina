@@ -303,7 +303,8 @@ fn targets_reject_missing_projects_and_invalid_program_ids() {
 			Path::new("candidate.so"),
 			Binary::Deployed.elf()
 		),
-		Err(RehearseError::InvalidProgramId { .. })
+		Err(RehearseError::Idl(IdlError::Other(message)))
+			if message.contains("declare_id! requires a base58-encoded 32-byte Solana address")
 	));
 
 	std::fs::write(

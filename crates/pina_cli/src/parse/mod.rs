@@ -202,8 +202,9 @@ pub fn assemble_program_ir_multi_with_auto(
 		.collect::<Vec<_>>();
 
 	for file in files {
+		let file_public_key = program_id::try_extract_program_id(file)?;
 		if public_key.is_none() {
-			public_key = program_id::extract_program_id(file);
+			public_key = file_public_key;
 		}
 
 		all_disc_enums.extend(discriminator::extract_discriminator_enums(file)?);
@@ -853,6 +854,28 @@ mod tests {
 		.expect("manifest");
 		std::fs::write(temp.path().join("src/lib.rs"), source).expect("lib.rs");
 		temp
+	}
+
+	#[test]
+	fn assembly_validates_every_file_and_preserves_the_first_program_id() {
+		let first =
+			syn::parse_file(r#"declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");"#)
+				.unwrap();
+		let second =
+			syn::parse_file(r#"declare_id!("11111111111111111111111111111111");"#).unwrap();
+		let ir = assemble_program_ir_multi(&[&first, &second], "example").unwrap();
+		assert_eq!(
+			ir.public_key,
+			"GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS"
+		);
+
+		for source in [r#"declare_id!("payer.json");"#, "declare_id!(PROGRAM_ID);"] {
+			let invalid = syn::parse_file(source).unwrap();
+			let error = assemble_program_ir_multi(&[&first, &second, &invalid], "example")
+				.unwrap_err()
+				.to_string();
+			assert!(error.contains("declare_id! requires"), "{error}");
+		}
 	}
 
 	#[test]
