@@ -692,6 +692,7 @@ impl CommandRunner for SystemCommandRunner {
 			let mut child = Command::new(program)
 				.raw_arg(args[0].clone())
 				.raw_arg(command.clone())
+				.env_remove("PINA_DEPLOY_PROGRAM_KEYPAIR")
 				.envs(env.iter().map(|(key, value)| (key, value)))
 				.current_dir(current_dir)
 				.stdin(Stdio::null())
@@ -705,6 +706,7 @@ impl CommandRunner for SystemCommandRunner {
 
 		let mut child = Command::new(program)
 			.args(args)
+			.env_remove("PINA_DEPLOY_PROGRAM_KEYPAIR")
 			.envs(env.iter().map(|(key, value)| (key, value)))
 			.current_dir(current_dir)
 			.stdin(Stdio::null())
