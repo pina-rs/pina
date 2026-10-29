@@ -11,7 +11,7 @@
 pub const SET_VERIFICATION_KEY_DISCRIMINATOR: u8 = 1u8;
 /// Compute units `SetVerificationKey` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const SET_VERIFICATION_KEY_MEASURED_COMPUTE_UNITS: u32 = 15257;
+pub const SET_VERIFICATION_KEY_MEASURED_COMPUTE_UNITS: u32 = 15258;
 /// Compute unit limit to request for a transaction carrying `SetVerificationKey`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
