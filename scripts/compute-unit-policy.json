@@ -214,6 +214,12 @@
 			"base": 86949,
 			"head": 86950,
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
+		},
+		"vesting_program/initialize": {
+			"baseRevision": "642a74909f04d93a04b42202f638f0c5ac7243f1",
+			"base": 25884,
+			"head": 25885,
+			"reason": "Maintainer-approved on 2026-10-29 for https://github.com/pina-rs/pina/pull/683: accept the measured 25884-to-25885 CU vesting initialization trade-off for runtime validation of the actual stored bump. Approval requires this exact base and preserves all generic limits."
 		}
 	},
 	"binarySizeApprovals": {
