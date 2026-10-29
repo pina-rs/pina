@@ -125,9 +125,10 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		            must establish namespace uniqueness.",
 		blessing: "`CreateProgramAccount` and `CreateProgramAccountWithBump` validate \
 		           canonicality internally and need no assertion. Where several addresses per \
-		           namespace are genuinely intended, use `AllocateAccountWithNonCanonicalBump`, \
-		           which names the decision. `assert_stored_bump()` checks its supplied bump \
-		           against the account's declared field at runtime. Reach for `#[allow]` only on a validation-only \
+		           namespace are genuinely intended, use `CreateProgramAccountWithUncheckedBump` \
+		           for typed creation or `AllocateAccountWithNonCanonicalBump` for raw allocation. \
+		           `assert_stored_bump()` checks its supplied bump against the account's declared \
+		           field at runtime. Reach for `#[allow]` only on a validation-only \
 		           path that accepts non-canonical bumps by design, and name that invariant in \
 		           the comment.",
 	},

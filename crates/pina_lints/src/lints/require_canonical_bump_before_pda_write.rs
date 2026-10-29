@@ -20,8 +20,9 @@ crate::declare_late_lint! {
 	/// logical seed namespace and break uniqueness assumptions.
 	/// `CreateProgramAccountWithBump` and `CreateProgramAccount` validate
 	/// canonicality internally and do not require either assertion before
-	/// invocation. `AllocateAccountWithNonCanonicalBump` deliberately does
-	/// not: use it only where several addresses per namespace are acceptable.
+	/// invocation. `CreateProgramAccountWithUncheckedBump` and
+	/// `AllocateAccountWithNonCanonicalBump` deliberately do not: use them only
+	/// where several addresses per namespace are acceptable.
 	///
 	/// Generated `assert_seeds()` and `assert_stored_bump()` validate the
 	/// account and read its declared bump field at runtime. Their guarantee
@@ -73,7 +74,8 @@ impl<'tcx> LateLintPass<'tcx> for RequireCanonicalBumpBeforePdaWrite {
 					"call `account.assert_canonical_bump(seeds, program_id)?` before using an \
 					 explicit bump in validation-only code, use `assert_seeds()`, or let \
 					 `CreateProgramAccountWithBump` validate the canonical bump; \
-					 `AllocateAccountWithNonCanonicalBump` skips that check on purpose",
+					 `CreateProgramAccountWithUncheckedBump` and \
+					 `AllocateAccountWithNonCanonicalBump` skip that check on purpose",
 				);
 				diag.help(shared::CONTROL_FLOW_LIMITATION_HELP);
 			});

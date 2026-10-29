@@ -121,7 +121,7 @@ Default level: `deny`
 
 **Why this matters.** A program-derived address has one canonical bump. Accepting any valid bump lets one seed namespace resolve to several addresses, breaking the uniqueness the seeds were chosen to provide. Stored-bump validation proves the address matches the account's own bump; canonical creation or a checked PDA loader must establish namespace uniqueness.
 
-**Blessing an exception.** `CreateProgramAccount` and `CreateProgramAccountWithBump` validate canonicality internally and need no assertion. Where several addresses per namespace are genuinely intended, use `AllocateAccountWithNonCanonicalBump`, which names the decision. `assert_stored_bump()` checks its supplied bump against the account's declared field at runtime. Reach for `#[allow]` only on a validation-only path that accepts non-canonical bumps by design, and name that invariant in the comment.
+**Blessing an exception.** `CreateProgramAccount` and `CreateProgramAccountWithBump` validate canonicality internally and need no assertion. Where several addresses per namespace are genuinely intended, use `CreateProgramAccountWithUncheckedBump` for typed creation or `AllocateAccountWithNonCanonicalBump` for raw allocation. `assert_stored_bump()` checks its supplied bump against the account's declared field at runtime. Reach for `#[allow]` only on a validation-only path that accepts non-canonical bumps by design, and name that invariant in the comment.
 
 ## require_canonical_instruction_dispatch_for_idl
 
