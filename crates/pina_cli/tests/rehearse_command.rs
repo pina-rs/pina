@@ -299,6 +299,31 @@ fn rehearsing_the_deployed_binary_is_clean() {
 }
 
 #[test]
+fn rehearsal_uses_the_cli_worker_without_an_override() {
+	let harness = Harness::new();
+	let remote = FakeRpcServer::start(remote_handler(&Fixtures::load()));
+	let output = harness
+		.pina("1.6.0")
+		.env_remove("PINA_REHEARSE_WORKER")
+		.env("NO_PROXY", "127.0.0.1")
+		.env("no_proxy", "127.0.0.1")
+		.arg("--project")
+		.arg(workspace_root().join("examples/counter_program"))
+		.args(["--rpc-url", &remote.url])
+		.arg("--program")
+		.arg(harness.candidate(Binary::Deployed))
+		.output()
+		.expect("run pina rehearse");
+	assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+	assert!(
+		stderr(&output).contains("could not initialize the rehearsal fork"),
+		"{}",
+		stderr(&output)
+	);
+	assert!(remote.methods().contains(&"getEpochInfo".to_owned()));
+}
+
+#[test]
 fn behaviour_changes_fail_with_a_stable_json_report() {
 	let harness = Harness::new();
 	let remote = FakeRpcServer::start(remote_handler(&Fixtures::load()));

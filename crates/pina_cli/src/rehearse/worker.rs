@@ -181,3 +181,42 @@ fn write_frame(frame: &str) -> Result<(), String> {
 		.and_then(|_| output.flush())
 		.map_err(|_| "could not write worker response".to_owned())
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn rejects_a_response_larger_than_the_frame_limit() {
+		let response = "x".repeat(MAX_RESPONSE_BYTES + 1);
+		assert_eq!(
+			write_frame(&response).unwrap_err(),
+			"worker response exceeds the size limit"
+		);
+	}
+
+	#[test]
+	fn selects_the_cli_or_library_worker_executable() {
+		const CHILD: &str = "PINA_TEST_WORKER_EXECUTABLE_CHILD";
+		if std::env::var_os(CHILD).is_some() {
+			assert_eq!(executable().expect("library worker"), PathBuf::from("pina"));
+			register_cli_executable();
+			assert_eq!(
+				executable().expect("CLI worker"),
+				std::env::current_exe().expect("current executable")
+			);
+			return;
+		}
+
+		let status = std::process::Command::new(std::env::current_exe().expect("test executable"))
+			.args([
+				"--exact",
+				"rehearse::worker::tests::selects_the_cli_or_library_worker_executable",
+			])
+			.env(CHILD, "1")
+			.env_remove("PINA_REHEARSE_WORKER")
+			.status()
+			.expect("run isolated worker selection test");
+		assert!(status.success(), "worker selection test failed");
+	}
+}

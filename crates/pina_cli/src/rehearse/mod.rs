@@ -315,8 +315,10 @@ pub enum RehearseError {
 /// # Errors
 ///
 /// Returns an error when the inputs are invalid, the project or candidate
-/// cannot be read, Surfpool is missing, too old, or fails to start, an RPC
-/// request fails, or the deployed or candidate program cannot be loaded.
+/// cannot be read, a compatible Pina worker cannot be started, an RPC request
+/// fails, or the deployed or candidate program cannot be loaded. Library
+/// callers need a matching `pina` on `PATH`, or `PINA_REHEARSE_WORKER` set to
+/// a compatible executable.
 /// Behaviour changes are not errors: they are in the report.
 pub fn rehearse(
 	options: &RehearseOptions,
