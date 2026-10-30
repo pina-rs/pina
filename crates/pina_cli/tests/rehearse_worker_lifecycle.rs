@@ -33,6 +33,80 @@ fn epoch_server() -> rehearse::FakeRpcServer {
 	})
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn unrelated_process_cannot_mutate_the_worker_fork() -> Result<(), Box<dyn std::error::Error>> {
+	use std::io::BufRead as _;
+	use std::io::Write as _;
+
+	use serde_json::Value;
+	use serde_json::json;
+
+	let remote = epoch_server();
+	let mut worker = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("__pina-rehearse-worker")
+		.env("NO_PROXY", "127.0.0.1")
+		.env("no_proxy", "127.0.0.1")
+		.stdin(Stdio::piped())
+		.stdout(Stdio::piped())
+		.stderr(Stdio::null())
+		.spawn()?;
+	let mut input = worker.stdin.take().ok_or("missing worker stdin")?;
+	let mut output = std::io::BufReader::new(worker.stdout.take().ok_or("missing worker stdout")?);
+	writeln!(input, "{}", json!({"url": remote.url}))?;
+	let mut response = String::new();
+	output.read_line(&mut response)?;
+	assert_eq!(serde_json::from_str::<Value>(&response)?["ready"], true);
+
+	let attack = Command::new("timeout")
+		.args(["10s", "/bin/sh", "-c"])
+		.arg(r#"
+exec 3>"/proc/$1/fd/0" || exit 11
+exec 4<"/proc/$1/fd/1" || exit 12
+printf '%s\n' '{"jsonrpc":"2.0","id":31337,"method":"surfnet_setAccount","params":["11111111111111111111111111111112",{"lamports":1234567}]}' >&3
+IFS= read -r reply <&4 || exit 13
+printf '%s\n' "$reply"
+"#)
+		.arg("unrelated-process")
+		.arg(worker.id().to_string())
+		.stdin(Stdio::null())
+		.output()?;
+
+	if attack.status.success() {
+		let reply: Value = serde_json::from_slice(&attack.stdout)?;
+		assert!(
+			reply.get("error").is_none(),
+			"injected request failed: {reply}"
+		);
+		writeln!(
+			input,
+			"{}",
+			json!({
+				"jsonrpc":"2.0", "id":1, "method":"getAccountInfo",
+				"params":["11111111111111111111111111111112", {"encoding":"base64"}]
+			})
+		)?;
+		response.clear();
+		output.read_line(&mut response)?;
+		let observed: Value = serde_json::from_str(&response)?;
+		assert!(
+			observed["result"]["value"].is_null(),
+			"an unrelated process mutated the fork: {observed}"
+		);
+	} else {
+		assert_ne!(attack.status.code(), Some(124), "the pipe probe timed out");
+		let error = String::from_utf8_lossy(&attack.stderr);
+		assert!(
+			matches!(attack.status.code(), Some(2 | 11 | 12))
+				&& (error.contains("Permission denied") || error.contains("No such file")),
+			"the pipe probe failed unexpectedly: {error}"
+		);
+	}
+	drop(input);
+	let _ = worker.wait()?;
+	Ok(())
+}
+
 #[test]
 fn worker_exits_when_its_output_pipe_is_closed() -> Result<(), Box<dyn std::error::Error>> {
 	use std::io::Write as _;
