@@ -1,7 +1,7 @@
 //! Exploratory real-runtime test for a Surfpool fork without RPC listeners.
 //!
 //! This module uses the offline remote fixture from `rehearse_surfpool.rs`.
-//! It does not yet replace the production rehearsal transport.
+//! The production rehearsal transport uses a private worker built on these APIs.
 
 use std::sync::mpsc;
 use std::time::Duration;
@@ -419,7 +419,7 @@ fn private_worker_exits_if_its_owner_is_killed_during_startup() -> Result<(), Er
 		.stderr(Stdio::null())
 		.spawn()?;
 	let output = owner.stdout.take().ok_or("owner has no stdout")?;
-	let (pid_tx, pid_rx) = std::sync::mpsc::channel();
+	let (pid_tx, pid_rx) = mpsc::channel();
 	std::thread::spawn(move || {
 		for line in std::io::BufReader::new(output).lines() {
 			let Ok(line) = line else { break };

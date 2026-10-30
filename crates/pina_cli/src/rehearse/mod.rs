@@ -25,8 +25,6 @@ mod catalog;
 mod pipe;
 pub mod report;
 pub(crate) mod rpc;
-#[cfg(test)]
-mod surfnet;
 mod wire;
 #[doc(hidden)]
 pub mod worker;

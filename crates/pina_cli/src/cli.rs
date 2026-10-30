@@ -876,13 +876,13 @@ Exit status:
   1 for operational errors, including any failed RPC request; stdout is then empty.
 
 Requirements:
-  Surfpool 1.6 or newer on PATH, or its path in PINA_SURFPOOL. The deployed program must
-  use the upgradeable loader, as `solana program deploy` and `pina deploy` do.
+  The deployed program must use the upgradeable loader, as `solana program deploy` and
+  `pina deploy` do.
 
 Network safety:
   Pina never sends a transaction. A custom URL must be HTTP(S) without user information,
-  queries, or fragments. Surfpool receives it as an argument, so never put a secret
-  anywhere in it. Reports show only the URL's origin.")]
+  queries, or fragments. Never put a secret anywhere in it. Reports show only the URL's
+  origin.")]
 	Rehearse {
 		/// Directory used for pina.toml or Cargo metadata project discovery.
 		#[arg(
@@ -1088,7 +1088,7 @@ Rehearsal:
 		/// Rehearse the upgrade against the target cluster's recent traffic first.
 		///
 		/// Runs before the approval prompt on the exact artifact this plan pins,
-		/// with `pina rehearse`'s classification. Requires Surfpool 1.6 or newer.
+		/// with `pina rehearse`'s classification.
 		#[arg(long)]
 		rehearse: bool,
 

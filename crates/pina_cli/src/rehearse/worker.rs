@@ -44,7 +44,7 @@ pub fn register_cli_executable() {
 }
 
 pub(crate) fn executable() -> io::Result<PathBuf> {
-	if let Some(path) = std::env::var_os("PINA_SURFPOOL") {
+	if let Some(path) = std::env::var_os("PINA_REHEARSE_WORKER") {
 		return Ok(PathBuf::from(path));
 	}
 	if RUNNING_AS_PINA.load(Ordering::Relaxed) {

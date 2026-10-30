@@ -7,7 +7,6 @@ use std::io::BufReader;
 use std::io::Read as _;
 use std::io::Write as _;
 use std::path::Path;
-use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
 use std::sync::mpsc::Sender;
@@ -15,6 +14,8 @@ use std::sync::mpsc::{self};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use process_wrap::std::ChildWrapper;
+use process_wrap::std::CommandWrap;
 use serde_json::Value;
 use serde_json::json;
 
@@ -26,7 +27,7 @@ const MAX_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
 type Exchange = (String, Sender<Result<String, String>>);
 
 pub(crate) struct PipeRpc {
-	child: RefCell<Child>,
+	child: RefCell<Box<dyn ChildWrapper>>,
 	requests: Sender<Exchange>,
 	io_thread: Option<JoinHandle<()>>,
 	next_id: Cell<u64>,
@@ -51,18 +52,24 @@ impl PipeRpc {
 		ready_timeout: Duration,
 		timeout: Duration,
 	) -> Result<Self, RpcError> {
-		let mut child = command
+		command
 			.stdin(Stdio::piped())
 			.stdout(Stdio::piped())
-			.stderr(Stdio::null())
+			.stderr(Stdio::null());
+		let mut command = CommandWrap::from(command);
+		#[cfg(unix)]
+		command.wrap(process_wrap::std::ProcessGroup::leader());
+		#[cfg(windows)]
+		command.wrap(process_wrap::std::JobObject);
+		let mut child = command
 			.spawn()
 			.map_err(|error| RpcError::Transport(error.to_string()))?;
 		let mut stdin = child
-			.stdin
+			.stdin()
 			.take()
 			.ok_or_else(|| RpcError::Transport("worker input unavailable".to_owned()))?;
 		let stdout = child
-			.stdout
+			.stdout()
 			.take()
 			.ok_or_else(|| RpcError::Transport("worker output unavailable".to_owned()))?;
 		let (requests, receiver) = mpsc::channel::<Exchange>();
@@ -217,6 +224,58 @@ mod tests {
 	}
 
 	#[test]
+	fn rejects_a_worker_that_exits_before_readiness() {
+		let error = fake("exit 3", Duration::from_secs(5))
+			.err()
+			.expect("exited worker must fail to start");
+		assert!(
+			error
+				.to_string()
+				.contains("could not start a compatible Pina rehearsal worker")
+		);
+	}
+
+	#[test]
+	fn rejects_a_worker_with_an_incompatible_protocol() {
+		let error = fake(
+			r#"read -r init
+printf '%s\n' '{"ready":true,"protocol":2,"pinaVersion":"__PINA_VERSION__"}'
+"#,
+			Duration::from_secs(5),
+		)
+		.err()
+		.expect("incompatible worker must fail to start");
+		assert!(matches!(error, RpcError::Shape(_)));
+	}
+
+	#[test]
+	fn kills_and_reaps_a_worker_that_never_becomes_ready() {
+		let directory = tempfile::tempdir().expect("create worker directory");
+		let pid_file = directory.path().join("worker.pid");
+		let mut command = Command::new("/bin/sh");
+		command
+			.arg("-c")
+			.arg("echo $$ > \"$1\"; exec sleep 30")
+			.arg("worker")
+			.arg(&pid_file);
+		let error = PipeRpc::start_command(
+			command,
+			"http://localhost",
+			Duration::from_secs(5),
+			Duration::from_secs(5),
+		)
+		.err()
+		.expect("silent worker must time out");
+		assert!(error.to_string().contains("worker request timed out"));
+		let pid = std::fs::read_to_string(pid_file).expect("read worker pid");
+		let status = Command::new("/bin/sh")
+			.args(["-c", "kill -0 \"$1\" 2>/dev/null", "probe", pid.trim()])
+			.status()
+			.expect("probe worker");
+		assert!(!status.success(), "timed-out worker must be reaped");
+	}
+
+	#[test]
 	fn correlates_response_with_request() {
 		let rpc = fake(
 			r#"read -r init
@@ -251,6 +310,23 @@ printf '%s\n' '{"jsonrpc":"2.0","id":99,"result":null}'
 	}
 
 	#[test]
+	fn propagates_worker_rpc_errors() {
+		let rpc = fake(
+			r#"read -r init
+printf '%s\n' '{"ready":true,"protocol":1,"pinaVersion":"__PINA_VERSION__"}'
+read -r request
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"fork failed"}}'
+"#,
+			Duration::from_secs(5),
+		)
+		.expect("start fake worker");
+		assert!(matches!(
+			rpc.call("getAccountInfo", &json!([])),
+			Err(RpcError::Rpc { code: -32000, message }) if message == "fork failed"
+		));
+	}
+
+	#[test]
 	fn times_out_and_reaps_a_stalled_worker() {
 		let rpc = fake(
 			r#"read -r init
@@ -277,6 +353,30 @@ exec sleep 30
 			.status()
 			.expect("probe worker");
 		assert!(!status.success(), "timed-out worker must be reaped");
+	}
+
+	#[test]
+	fn timeout_closes_output_inherited_by_a_worker_descendant() {
+		let rpc = fake(
+			r#"read -r init
+sleep 20 &
+printf '%s\n' '{"ready":true,"protocol":1,"pinaVersion":"__PINA_VERSION__"}'
+read -r request
+wait
+"#,
+			Duration::from_millis(100),
+		)
+		.expect("start fake worker");
+		let started = std::time::Instant::now();
+		assert!(matches!(
+			rpc.call("getAccountInfo", &json!([])),
+			Err(RpcError::Transport(_))
+		));
+		drop(rpc);
+		assert!(
+			started.elapsed() < Duration::from_secs(8),
+			"the descendant kept the response pipe open"
+		);
 	}
 
 	#[test]

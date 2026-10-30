@@ -21,13 +21,13 @@ pina deploy --build --rehearse --cluster devnet \
 
 Nothing is sent while the rehearsal runs, and its result decides whether anything is sent at all:
 
-| Rehearsal result                                                           | `pina deploy`                                                                                 |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| At least one transaction compared, no outcome or state changed             | Continues to confirmation and deployment. Compute-unit changes are informational.             |
-| A transaction's outcome or written account state changed                   | Stops with exit code `2`. `--allow-rehearsal-changes` deploys once you have reviewed them.    |
-| No transaction could be compared                                           | Stops with exit code `3`, even with `--allow-rehearsal-changes`. Nothing was verified.        |
-| The program is not deployed on the target yet                              | Stops with exit code `3` before Surfpool starts. Deploy a first version without `--rehearse`. |
-| The rehearsal cannot run: Surfpool missing or too old, an RPC failure, ... | Stops with exit code `1`.                                                                     |
+| Rehearsal result                                               | `pina deploy`                                                                                      |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| At least one transaction compared, no outcome or state changed | Continues to confirmation and deployment. Compute-unit changes are informational.                  |
+| A transaction's outcome or written account state changed       | Stops with exit code `2`. `--allow-rehearsal-changes` deploys once you have reviewed them.         |
+| No transaction could be compared                               | Stops with exit code `3`, even with `--allow-rehearsal-changes`. Nothing was verified.             |
+| The program is not deployed on the target yet                  | Stops with exit code `3` before the rehearsal starts. Deploy a first version without `--rehearse`. |
+| The rehearsal cannot run: worker or RPC failure, ...           | Stops with exit code `1`.                                                                          |
 
 A rehearsal also proves the runtime loads the new ELF, so an upgrade the cluster would reject fails before anything is sent.
 

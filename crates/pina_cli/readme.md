@@ -262,7 +262,7 @@ pina rehearse --network mainnet --build --limit 100
 pina rehearse --rpc-url http://127.0.0.1:8899 --json
 ```
 
-Nothing is sent to the cluster. Requires Surfpool 1.6 or newer and an upgradeable-loader deployment.
+Nothing is sent to the cluster. Requires an upgradeable-loader deployment.
 
 ### `pina deploy`
 

@@ -1,9 +1,9 @@
 //! CLI coverage for `pina rehearse` and `pina deploy --rehearse` against
 //! loopback fakes.
 //!
-//! The remote cluster is a [`FakeRpcServer`] in this process. Surfpool is a
-//! shell script that re-executes this test binary as `fake_surfnet_sentinel`,
-//! which serves a [`FakeFork`] on the port `pina` chose, so the real binary
+//! The remote cluster is a [`FakeRpcServer`] in this process. A worker script
+//! re-executes this test binary as `fake_worker_sentinel`, which serves a
+//! [`FakeFork`] over pipes, so the real binary
 //! runs its whole pipeline (process start, readiness, hydration, program
 //! swap, profiling, and reporting) without the SVM. Deployments run an
 //! operator `--remote-command` that copies the artifact it was handed, so a
@@ -133,7 +133,8 @@ exec "$PINA_FAKE_SURFNET_EXE" --ignored --exact fake_worker_sentinel --quiet 1>&
 		let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
 		command
 			.arg(subcommand)
-			.env("PINA_SURFPOOL", &self.surfpool)
+			.env("PINA_SURFPOOL", self.directory.path().join("not-a-worker"))
+			.env("PINA_REHEARSE_WORKER", &self.surfpool)
 			.env("PINA_FAKE_SURFPOOL_VERSION", version)
 			.env(
 				"PINA_FAKE_SURFNET_EXE",

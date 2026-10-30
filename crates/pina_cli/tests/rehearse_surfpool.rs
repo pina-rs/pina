@@ -15,8 +15,8 @@
 //! `scripts/build-surfpool-examples.sh` before running these tests.
 //!
 //! The test proves no fork outlives its rehearsal without scanning processes
-//! (CI's shell has no procps): `PINA_SURFPOOL` points at a wrapper that records
-//! its pid and then becomes Surfpool.
+//! (CI's shell has no procps): `PINA_REHEARSE_WORKER` points at a wrapper that
+//! records its pid and then becomes the private worker.
 
 #![cfg(all(unix, not(coverage)))]
 
@@ -469,7 +469,7 @@ fn rehearse(
 		.arg("--program")
 		.arg(candidate)
 		.args(extra)
-		.env("PINA_SURFPOOL", &recorder.executable)
+		.env("PINA_REHEARSE_WORKER", &recorder.executable)
 		.output()
 		.unwrap_or_else(|error| panic!("run pina rehearse: {error}"));
 	println!(
@@ -646,7 +646,7 @@ fn deploy_rehearsed(
 			"cp \"$PINA_DEPLOY_PROGRAM\" '{}'",
 			deployed.display()
 		))
-		.env("PINA_SURFPOOL", &recorder.executable)
+		.env("PINA_REHEARSE_WORKER", &recorder.executable)
 		.output()
 		.unwrap_or_else(|error| panic!("run pina deploy --rehearse: {error}"));
 	println!(

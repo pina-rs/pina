@@ -61,7 +61,7 @@ Options:
       --rehearse
           Rehearse the upgrade against the target cluster's recent traffic first.
           
-          Runs before the approval prompt on the exact artifact this plan pins, with `pina rehearse`'s classification. Requires Surfpool 1.6 or newer.
+          Runs before the approval prompt on the exact artifact this plan pins, with `pina rehearse`'s classification.
 
       --rehearse-limit <N>
           Recent transactions the rehearsal replays, from 1 to 1000 [default: 25]

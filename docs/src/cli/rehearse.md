@@ -141,8 +141,8 @@ Every key is always present; absent values are `null`. `status` and `skip.reason
 
 ## Requirements and limits
 
-- Surfpool 1.6.0 or newer must be on `PATH`, or named by `PINA_SURFPOOL`. Pina checks the version before reading the project.
-- On Windows, Surfpool runs as a direct child: it is stopped on every normal exit path, but a console interrupt that terminates `pina` while Surfpool is still starting can leave it running.
+- The Pina executable includes the rehearsal runtime; an external Surfpool installation is not required. `PINA_SURFPOOL` continues to select Surfpool for `pina dev` but does not select the rehearsal runtime.
+- Library callers need a matching `pina` executable on `PATH`, or can set `PINA_REHEARSE_WORKER` to its path. The worker must match the library version.
 - The deployed program must use the upgradeable loader, as `solana program deploy` and `pina deploy` do.
 - The program ID is the project's `declare_id!`. The candidate defaults to `<cargo-target>/deploy/<library-name>.so`; `--program` names another file and `--build` runs the same build as `pina build` first.
 - Transactions replay against the cluster's current state, not the state they originally saw, and each one sees the same snapshot: state written by one is not visible to the next.
@@ -151,9 +151,9 @@ Every key is always present; absent values are `null`. `status` and `skip.reason
 
 ## Network safety
 
-Pina only reads from the cluster: one `getAccountInfo` request for the program, one `getSignaturesForAddress` request, and one `getTransaction` request per transaction, each sent exactly once with a timeout. A failed request stops the rehearsal with exit code `1` instead of being retried, so a rate-limited endpoint is not hammered; use a dedicated RPC endpoint or a smaller `--limit` when a public endpoint refuses. That includes JSON-RPC errors returned inside an HTTP 200 response, such as an unhealthy node (`-32005`) or a provider's rate limit. The one exception is `-32015`, the RPC's answer for a transaction it cannot encode in a supported version: that transaction is skipped as `undecodable`. Redirects are not followed. The fork fetches each account the transactions touch from the same endpoint once.
+Pina only reads from the cluster: one `getAccountInfo` request for the program, one `getSignaturesForAddress` request, and one `getTransaction` request per transaction, each sent exactly once with a timeout. A failed request stops the rehearsal with exit code `1` instead of being retried, so a rate-limited endpoint is not hammered; use a dedicated RPC endpoint or a smaller `--limit` when a public endpoint refuses. That includes JSON-RPC errors returned inside an HTTP 200 response, such as an unhealthy node (`-32005`) or a provider's rate limit. The one exception is `-32015`, the RPC's answer for a transaction it cannot encode in a supported version: that transaction is skipped as `undecodable`. Pina's traffic queries do not follow redirects. The fork's datasource uses Surfpool's HTTP client, which may follow redirects and use configured proxies. The fork fetches each account the transactions touch from the configured endpoint.
 
-A custom `--rpc-url` must use HTTP or HTTPS with a host. Pina rejects user information, query parameters, fragments, and control characters. Surfpool receives the URL as a child-process argument, where local process inspection can reveal it, so never put a secret anywhere in the URL, including its path. Reports show only the URL's origin.
+A custom `--rpc-url` must use HTTP or HTTPS with a host. Pina rejects user information, query parameters, fragments, and control characters. Never put a secret anywhere in the URL, including its path. Reports show only the URL's origin.
 
 ## Options
 

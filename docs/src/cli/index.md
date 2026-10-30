@@ -122,10 +122,11 @@ Relative paths are resolved from the process working directory. Project-aware co
 
 Project-aware commands read `pina.toml` and respect standard Cargo variables such as `CARGO_TARGET_DIR` and `CARGO`. The CLI also reads these Pina-specific optional environment variables:
 
-| Variable             | Used by                     | Meaning                                          |
-| -------------------- | --------------------------- | ------------------------------------------------ |
-| `PINA_TEMPLATES_DIR` | `pina docs`                 | Directory containing custom `<topic>.t.md` files |
-| `PINA_SURFPOOL`      | `pina dev`, `pina rehearse` | Surfpool executable to run instead of `surfpool` |
+| Variable               | Used by         | Meaning                                                         |
+| ---------------------- | --------------- | --------------------------------------------------------------- |
+| `PINA_TEMPLATES_DIR`   | `pina docs`     | Directory containing custom `<topic>.t.md` files                |
+| `PINA_SURFPOOL`        | `pina dev`      | Surfpool executable to run instead of `surfpool`                |
+| `PINA_REHEARSE_WORKER` | `pina rehearse` | Matching Pina executable to use as the private rehearsal worker |
 
 No configuration file is required for an unambiguous Cargo package. `pina init` creates a small `pina.toml` so every tool and agent discovers the same program and client choices.
 
