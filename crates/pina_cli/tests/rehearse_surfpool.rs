@@ -22,6 +22,9 @@
 
 mod support;
 
+#[path = "support/rehearse_dispatch.rs"]
+mod rehearse_dispatch;
+
 use std::ffi::OsString;
 use std::fs;
 use std::net::TcpListener;
