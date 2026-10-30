@@ -46,6 +46,45 @@ async fn call(
 		.ok_or_else(|| format!("{method} returned no result").into())
 }
 
+fn assert_report_parity(external: &Value, embedded: &Value) {
+	let external = &external["value"];
+	let embedded = &embedded["value"];
+	assert!(
+		external["transactionProfile"]["logMessages"].is_array(),
+		"external profile has no log messages"
+	);
+
+	for field in [
+		"errorMessage",
+		"computeUnitsConsumed",
+		"logMessages",
+		"accountStates",
+	] {
+		assert_eq!(
+			external["transactionProfile"][field], embedded["transactionProfile"][field],
+			"external and embedded profile field {field} differs"
+		);
+	}
+
+	let instruction_units = |profile: &Value| -> Option<Vec<u64>> {
+		profile["instructionProfiles"]
+			.as_array()?
+			.iter()
+			.map(|instruction| instruction["computeUnitsConsumed"].as_u64())
+			.collect()
+	};
+	let external_units = instruction_units(external).expect("external instruction profiles");
+	let embedded_units = instruction_units(embedded).expect("embedded instruction profiles");
+	assert!(
+		!external_units.is_empty(),
+		"no instruction profiles were produced"
+	);
+	assert_eq!(
+		external_units, embedded_units,
+		"instruction compute units differ"
+	);
+}
+
 #[test]
 #[ignore = "starts a disposable offline Surfpool datasource; run in the Surfpool CI job"]
 fn dispatches_fork_operations_without_starting_a_fork_server() -> Result<(), Error> {
@@ -204,16 +243,7 @@ async fn dispatch(
 	)
 	.await?;
 	let baseline_tx = &baseline["value"]["transactionProfile"];
-	assert_eq!(
-		baseline_tx["computeUnitsConsumed"],
-		external_baseline["value"]["transactionProfile"]["computeUnitsConsumed"],
-		"external and embedded baseline compute units differ"
-	);
-	assert_eq!(
-		baseline_tx["accountStates"],
-		external_baseline["value"]["transactionProfile"]["accountStates"],
-		"external and embedded baseline account states differ"
-	);
+	assert_report_parity(external_baseline, &baseline);
 	assert!(
 		baseline_tx["errorMessage"].is_null(),
 		"baseline profile: {baseline}"
@@ -240,16 +270,7 @@ async fn dispatch(
 	}
 	let changed = call(&handler, &context, "surfnet_profileTransaction", params).await?;
 	let changed_tx = &changed["value"]["transactionProfile"];
-	assert_eq!(
-		changed_tx["computeUnitsConsumed"],
-		external_changed["value"]["transactionProfile"]["computeUnitsConsumed"],
-		"external and embedded candidate compute units differ"
-	);
-	assert_eq!(
-		changed_tx["accountStates"],
-		external_changed["value"]["transactionProfile"]["accountStates"],
-		"external and embedded candidate account states differ"
-	);
+	assert_report_parity(external_changed, &changed);
 	assert!(
 		changed_tx["errorMessage"].is_null(),
 		"candidate profile: {changed}"
