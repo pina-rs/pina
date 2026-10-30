@@ -219,3 +219,104 @@ async fn dispatch(
 	geyser_drain.join().map_err(|_| "geyser drain panicked")?;
 	Ok::<(), Error>(())
 }
+
+#[test]
+#[ignore = "starts a disposable offline datasource and private rehearsal worker"]
+fn private_worker_stops_when_its_parent_closes_the_pipe() -> Result<(), Error> {
+	use std::io::BufRead as _;
+	use std::io::Write as _;
+	use std::process::Command;
+	use std::process::Stdio;
+	use std::time::Duration;
+	use std::time::Instant;
+
+	struct Worker(std::process::Child);
+	impl Drop for Worker {
+		fn drop(&mut self) {
+			let _ = self.0.kill();
+			let _ = self.0.wait();
+		}
+	}
+
+	let remote = super::RemoteCluster::start();
+	let address = "11111111111111111111111111111112";
+	super::rpc(
+		&remote.url,
+		"surfnet_setAccount",
+		json!([address, {"lamports": 1234567}]),
+	);
+	let mut child = Worker(
+		Command::new(env!("CARGO_BIN_EXE_pina"))
+			.arg("__pina-rehearse-worker")
+			.stdin(Stdio::piped())
+			.stdout(Stdio::piped())
+			.stderr(Stdio::null())
+			.spawn()?,
+	);
+	let mut input = child.0.stdin.take().ok_or("missing worker stdin")?;
+	let output = child.0.stdout.take().ok_or("missing worker stdout")?;
+	let mut output = std::io::BufReader::new(output);
+	writeln!(input, "{}", json!({"url": remote.url}))?;
+	let mut response = String::new();
+	output.read_line(&mut response)?;
+	assert_eq!(serde_json::from_str::<Value>(&response)?["ready"], true);
+	writeln!(
+		input,
+		"{}",
+		json!({"jsonrpc":"2.0", "id":1, "method":"getAccountInfo", "params":[address, {"encoding":"base64"}]})
+	)?;
+	response.clear();
+	output.read_line(&mut response)?;
+	let response: Value = serde_json::from_str(&response)?;
+	assert_eq!(response["result"]["value"]["lamports"], 1234567);
+	#[cfg(target_os = "linux")]
+	assert_no_listening_sockets(child.0.id())?;
+	drop(input);
+	let deadline = Instant::now() + Duration::from_secs(10);
+	loop {
+		if child.0.try_wait()?.is_some() {
+			break;
+		}
+		if Instant::now() >= deadline {
+			return Err("worker survived loss of its input pipe".into());
+		}
+		std::thread::sleep(Duration::from_millis(25));
+	}
+	Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn assert_no_listening_sockets(pid: u32) -> Result<(), Error> {
+	use std::collections::HashSet;
+	use std::io::ErrorKind;
+	let root = format!("/proc/{pid}");
+	let mut sockets = HashSet::new();
+	for entry in std::fs::read_dir(format!("{root}/fd"))? {
+		let entry = entry?;
+		let target = match std::fs::read_link(entry.path()) {
+			Ok(target) => target,
+			Err(error) if error.kind() == ErrorKind::NotFound => continue,
+			Err(error) => return Err(error.into()),
+		};
+		if let Some(inode) = target
+			.to_str()
+			.and_then(|value| value.strip_prefix("socket:["))
+			.and_then(|value| value.strip_suffix(']'))
+		{
+			sockets.insert(inode.to_owned());
+		}
+	}
+	for table in ["tcp", "tcp6"] {
+		let entries = std::fs::read_to_string(format!("{root}/net/{table}"))?;
+		for row in entries.lines().skip(1) {
+			let fields = row.split_whitespace().collect::<Vec<_>>();
+			if fields.len() < 10 {
+				return Err("malformed Linux socket table".into());
+			}
+			if fields[3] == "0A" && sockets.contains(fields[9]) {
+				return Err(format!("private worker owns a TCP listener: {row}").into());
+			}
+		}
+	}
+	Ok(())
+}

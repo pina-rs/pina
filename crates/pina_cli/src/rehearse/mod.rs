@@ -26,6 +26,8 @@ pub mod report;
 pub(crate) mod rpc;
 mod surfnet;
 mod wire;
+#[doc(hidden)]
+pub mod worker;
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -64,6 +66,7 @@ pub use self::report::SkippedTransaction;
 pub use self::report::TransactionRehearsal;
 pub use self::report::UnitStats;
 use self::rpc::FetchedTransaction;
+use self::rpc::ForkRpc;
 use self::rpc::JsonRpc;
 use self::rpc::RpcError;
 use self::surfnet::Surfnet;
@@ -680,7 +683,7 @@ fn decode(
 
 /// Replay every transaction against the deployed program, then the candidate.
 fn replay(
-	local: &JsonRpc,
+	local: &dyn ForkRpc,
 	endpoint: &Endpoint,
 	target: &Target,
 	transactions: &[Replay],
@@ -800,7 +803,7 @@ struct DeployedProgram {
 
 /// Operations against the local fork.
 struct Fork<'a> {
-	rpc: &'a JsonRpc,
+	rpc: &'a dyn ForkRpc,
 }
 
 impl Fork<'_> {

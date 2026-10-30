@@ -25,11 +25,17 @@ const CLI_STACK_BYTES: usize = 8 * 1024 * 1024;
 /// the common ulimit), so the CLI starts directly and keeps its startup cost.
 #[cfg(not(windows))]
 fn main() {
+	if private_worker() {
+		return;
+	}
 	commands::run(Cli::parse());
 }
 
 #[cfg(windows)]
 fn main() {
+	if private_worker() {
+		return;
+	}
 	let cli = std::thread::Builder::new()
 		.stack_size(CLI_STACK_BYTES)
 		.spawn(|| commands::run(Cli::parse()))
@@ -43,4 +49,19 @@ fn main() {
 		// mistake a failed run for a successful one.
 		std::process::exit(101);
 	}
+}
+
+fn private_worker() -> bool {
+	let mut args = std::env::args_os();
+	let _ = args.next();
+	if args.next().as_deref() != Some(std::ffi::OsStr::new("__pina-rehearse-worker"))
+		|| args.next().is_some()
+	{
+		return false;
+	}
+	if let Err(error) = pina_cli::rehearse::worker::run() {
+		eprintln!("{error}");
+		std::process::exit(1);
+	}
+	true
 }

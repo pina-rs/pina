@@ -27,6 +27,17 @@ pub(crate) struct JsonRpc {
 	next_id: Cell<u64>,
 }
 
+/// Transport for the local fork and its test doubles.
+pub(crate) trait ForkRpc {
+	fn call(&self, method: &str, params: &Value) -> Result<Value, RpcError>;
+}
+
+impl ForkRpc for JsonRpc {
+	fn call(&self, method: &str, params: &Value) -> Result<Value, RpcError> {
+		JsonRpc::call(self, method, params)
+	}
+}
+
 /// Why one JSON-RPC request failed.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub(crate) enum RpcError {
