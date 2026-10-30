@@ -8,9 +8,9 @@ import {
 
 const ZSTD_CALLERS = [
 	"zstd v0.13.3",
-	"agave-snapshots v4.2.2",
-	"solana-account-decoder v4.2.2",
-	"solana-account-decoder-client-types v4.2.2",
+	"agave-snapshots v4.3.2",
+	"solana-account-decoder v4.3.2",
+	"solana-account-decoder-client-types v4.3.2",
 ].join("\n");
 
 test("accepts only the reviewed dependency callers", () => {
@@ -28,8 +28,8 @@ test("rejects a new direct caller and a changed caller version", () => {
 			checkZstdCallers(
 				"zstd",
 				ZSTD_CALLERS.replace(
-					"agave-snapshots v4.2.2",
-					"agave-snapshots v4.2.3",
+					"agave-snapshots v4.3.2",
+					"agave-snapshots v4.3.3",
 				),
 			),
 		/callers changed/,

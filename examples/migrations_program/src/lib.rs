@@ -5,21 +5,22 @@ use pina::*;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
-// Rent-exemption head room for on-demand growth: roughly 6,960 lamports per
-// grown byte (3,480 per byte-year at the two-year exemption threshold). The
-// budget must fund a whole stale ladder, not one step. `ManualState` grows
-// three bytes across its v0→v1→v2 history (u8 → u16, then the compact
-// `String<5>`), so the full reserved `Migrate` ladder needs exactly
-// 3 × 6,960 = 20,880 lamports. The previous 20,000 cap funded the first step
-// and then failed the cumulative check on the second — after the first effect
-// had already landed, which aborts the instruction as a panic — stranding
-// every v0 `ManualState` behind permanent `ProgramFailedToComplete` failures
-// on both the reserved route and the inline `Update` path (security sweep
-// finding N1). 24,000 covers the ladder with margin while keeping the
-// two-`State` sweep (2 × 13,920 = 27,840) above the cap, which the surfpool
-// suite pins as the shared-budget rejection.
-// `pina migrations create` prints the same estimate when a transition grows.
-const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 24_000;
+// Rent-exemption head room for on-demand growth: 5,080 lamports per grown byte
+// at the mainnet rent schedule Surfpool applies (2,540 per byte-year at the
+// two-year exemption threshold). The budget must fund a whole stale ladder, not
+// one step. `ManualState` grows three bytes across its v0→v1→v2 history (u8 →
+// u16, then the compact `String<5>`), so its full ladder needs 3 × 5,080 =
+// 15,240 lamports. 18,000 covers that ladder with margin while keeping a
+// two-`State` step (2 × 10,160 = 20,320) above the cap, which the surfpool
+// suite pins as the shared-budget rejection; the cap is a per-instruction
+// ceiling, so it never accumulates across invocations.
+//
+// A runtime on Agave's older default schedule charges 6,960 per grown byte;
+// the same ladder then needs 20,880, so a deployment there must raise this
+// value. The reserved route's earlier 20,000 cap failed on that schedule after
+// the first effect had landed, stranding every v0 `ManualState` behind
+// permanent `ProgramFailedToComplete` failures (security sweep finding N1).
+const MAX_INLINE_MIGRATION_LAMPORTS: u64 = 18_000;
 
 /// Instruction discriminator.
 ///

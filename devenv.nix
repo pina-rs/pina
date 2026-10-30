@@ -23,6 +23,19 @@ let
       fi
     '';
   });
+  # `cargo-llvm-cov`'s test suite builds an instrumented test binary and runs
+  # it. Under the Nix Darwin linker that binary faults before it can assert
+  # (the same unwinder failure that host test binaries hit further down), so
+  # the derivation only builds where the test harness happens to work. The
+  # nixpkgs package documents this class of failure as tooling-only: the
+  # installed `cargo llvm-cov` works, which is all `coverage:all` needs.
+  cargo-llvm-cov =
+    if pkgs.stdenv.isDarwin then
+      pkgs.cargo-llvm-cov.overrideAttrs (_: {
+        doCheck = false;
+      })
+    else
+      pkgs.cargo-llvm-cov;
 in
 
 {

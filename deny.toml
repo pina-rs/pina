@@ -8,6 +8,9 @@ db-urls = ["https://github.com/RustSec/advisory-db.git"]
 # runners (the database clones but loads empty), so fetch through the git
 # CLI instead. The advisory check itself is unchanged.
 git-fetch-with-cli = true
+# An exception that no longer matches the graph fails the gate, so a dependency
+# upgrade that removes an advisory cannot leave a stale suppression behind.
+unused-ignored-advisory = "deny"
 # This list is the repository's single advisory policy: `security:deny` runs
 # the advisories check, and `security:audit` passes no ignore list of its own.
 #
@@ -21,7 +24,7 @@ git-fetch-with-cli = true
 # host-side test harness, so its dependents do pull in this stack. Verify the
 # runtime crates with, for example:
 #
-#   cargo tree -i h2@0.3.27 -p pina -p pina_abi -p pina_macros -p pina_cli
+#   cargo tree -i unsafe-libyaml@0.2.11 -p pina -p pina_abi -p pina_macros -p pina_cli
 #
 # `cargo-deny` cannot see these crates under its default roots (a virtual
 # manifest roots the graph at the workspace members' normal dependencies, so
@@ -29,7 +32,7 @@ git-fetch-with-cli = true
 # claims above were verified against `cargo tree -i <spec> --workspace
 # --all-features --target all`, which does include dev edges.
 #
-# Review date: 2026-10-16. Re-check on each dependency-train bump; each
+# Review date: 2026-10-28. Re-check on each dependency-train bump; each
 # suppression below should become an upstream upgrade rather than accumulate.
 # Each entry also needs a tracking issue filed on the repository (see the
 # accompanying changeset); this file cannot open one itself.
@@ -68,15 +71,6 @@ ignore = [
 	# surfpool-core → jsonrpc-http-server → net2. Host/test stack only
 	# (via surfpool/litesvm, not in any runtime crate graph).
 	"RUSTSEC-2020-0016",
-	# RUSTSEC-2025-0134: rustls-pemfile is unmaintained. Reached via
-	# surfpool-core → txtx-addon-kit → reqwest 0.11 → rustls-pemfile.
-	# Host/test stack only (via surfpool/litesvm, not in any runtime crate
-	# graph).
-	"RUSTSEC-2025-0134",
-	# RUSTSEC-2026-0173: proc-macro-error2 is unmaintained. Reached via
-	# pina_test → solana-runtime → aquamarine → proc-macro-error2. Host/test
-	# stack only (via surfpool/litesvm, not in any runtime crate graph).
-	"RUSTSEC-2026-0173",
 	# RUSTSEC-2022-0093: ed25519-dalek double-public-key signing oracle.
 	# Reached via litesvm → agave-precompiles → ed25519-dalek 1.0.1.
 	# Host/test stack only (via surfpool/litesvm, not in any runtime crate
@@ -91,68 +85,18 @@ ignore = [
 	# Host/test stack only (via surfpool/litesvm, not in any runtime crate
 	# graph).
 	"RUSTSEC-2024-0421",
-	# RUSTSEC-2026-0098, RUSTSEC-2026-0099, RUSTSEC-2026-0104:
-	# rustls-webpki 0.101 certificate-validation flaws. All three are reached
-	# only through surfpool-core → txtx-addon-kit → reqwest 0.11 →
-	# rustls 0.21 → rustls-webpki 0.101.7. Host/test stack only (via
-	# surfpool/litesvm, not in any runtime crate graph). The workspace's own
-	# rustls-webpki is 0.103.16.
-	"RUSTSEC-2026-0098",
-	"RUSTSEC-2026-0099",
-	"RUSTSEC-2026-0104",
-	# RUSTSEC-2026-0258: h2 unbounded empty DATA frames. Reached via
-	# surfpool-core → jsonrpc-http-server → hyper 0.14 → h2 0.3.27. Host/test
-	# stack only (via surfpool/litesvm, not in any runtime crate graph).
-	"RUSTSEC-2026-0258",
 	# RUSTSEC-2025-0055: tracing-subscriber logs user input without escaping
 	# ANSI sequences. Reached via ark-relations → ark-groth16 → the privacy
 	# pool's Surfpool harness. Host/test stack only (the proving stack never
 	# compiles into an on-chain program; `not(target_os = "solana")` gates
 	# the module).
 	"RUSTSEC-2025-0055",
-	# RUSTSEC-2021-0145: atty performs an unaligned read. Reached via
-	# surfpool-core → hiro-system-kit → atty 0.2.14 — the same chain as the
-	# ignored RUSTSEC-2024-0375 (atty unmaintained). Host/test stack only
-	# (via surfpool/litesvm, not in any runtime crate graph).
-	"RUSTSEC-2021-0145",
-	# RUSTSEC-2026-0186: memmap2 takes an unchecked pointer offset. Reached
-	# via solana-runtime → agave-snapshots → solana-genesis-config →
-	# memmap2 0.5.10. Host/test stack only (via pina_test, not in any runtime
-	# crate graph).
-	"RUSTSEC-2026-0186",
-	# RUSTSEC-2026-0097: rand is unsound with a custom logger using
-	# `rand::rng()`. Reached via litesvm → agave-precompiles →
-	# ed25519-dalek 1.0.1 → rand 0.7.3. Host/test stack only (via
-	# surfpool/litesvm, not in any runtime crate graph). The workspace's own
-	# rand is 0.9.5 and its own ed25519-dalek is 3.0.0.
-	"RUSTSEC-2026-0097",
 	# RUSTSEC-2024-0449: unsafe-libyaml is unmaintained (archived upstream,
 	# no safe upgrade). Reached via pina_test → surfpool-sdk → surfpool-core →
 	# serde_yaml (deprecated) → unsafe-libyaml 0.2.11. Host/test stack only
 	# (via surfpool, not in any runtime crate graph). Removable once surfpool
 	# drops serde_yaml — tracked in #619.
 	"RUSTSEC-2024-0449",
-	# RUSTSEC-2026-0346, RUSTSEC-2026-0349: rustls session-value `Debug`
-	# output can expose TLS secrets, and the pre-authentication key-exchange
-	# record allows a downgrade to classical-only key exchange. Both fire on
-	# rustls 0.21.12, reached through the same txtx-addon-kit → reqwest 0.11 →
-	# rustls 0.21 chain as RUSTSEC-2026-0098/0099/0104 above. Host/test stack
-	# only (via surfpool, not in any runtime crate graph); the advisories are
-	# patched only on the 0.23 line, which the workspace carries at 0.23.46.
-	# Removable once the Surfpool train drops reqwest 0.11 — tracked in #621.
-	"RUSTSEC-2026-0346",
-	"RUSTSEC-2026-0349",
-	# RUSTSEC-2026-0382, RUSTSEC-2026-0381: distrusted emSign intermediates.
-	# rustls-webpki 0.101.7 may accept certificate paths through them, and
-	# webpki-roots 0.25.4 still bundles the root. Both are reached only
-	# through the same txtx-addon-kit → reqwest 0.11 chain as
-	# RUSTSEC-2026-0098/0099/0104 above. Host/test stack only (via surfpool,
-	# not in any runtime crate graph); the fixes exist only on the
-	# rustls-webpki 0.103 and webpki-roots 1.0 lines, which the workspace
-	# carries at 0.103.16 and 1.0.10. Removable once the Surfpool train drops
-	# reqwest 0.11 — tracked in #621.
-	"RUSTSEC-2026-0382",
-	"RUSTSEC-2026-0381",
 	# RUSTSEC-2026-0387: crypto-bigint 0.5.5 has variable-time arithmetic.
 	# Reached through elliptic-curve 0.13 → k256 0.13 from both Surfpool's
 	# txtx-addon-kit → bip32 test-key derivation and Solana's host-side
@@ -165,7 +109,7 @@ ignore = [
 	# Reviewed 2026-10-24. Remove when the Surfpool/BIP32 and Solana recovery
 	# dependency trains both resolve crypto-bigint >=0.7.6 — tracked in #654.
 	"RUSTSEC-2026-0387",
-	# Agave 4.2.2 requires zstd ^0.13.3; the fixed zstd 0.14.3 / zstd-safe
+	# Agave 4.3.2 requires zstd ^0.13.3; the fixed zstd 0.14.3 / zstd-safe
 	# 8.2.0 releases are incompatible. Agave's fix is merged on master:
 	# https://github.com/anza-xyz/agave/pull/16391
 	# scripts/check-zstd-advisories.ts enforces a 2026-11-25 expiry and the
@@ -173,7 +117,7 @@ ignore = [
 	# A new consumer or version must fail until its call sites are reviewed.
 	# The account-decoder crates also reach generated host CLI applications;
 	# this is not a claim that all zstd use is confined to the test harness.
-	# Reviewed 2026-10-27. Remove after the supported Solana train upgrades:
+	# Reviewed 2026-10-28. Remove after the supported Solana train upgrades:
 	# https://github.com/pina-rs/pina/issues/669
 	# RUSTSEC-2026-0391: only borrowed with_context constructors are affected.
 	# All four call sites in these three crates construct fresh Encoder::new,

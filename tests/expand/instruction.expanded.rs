@@ -205,6 +205,116 @@ where
         *self
     }
 }
+impl ::core::cmp::PartialEq for InitializeZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator
+    }
+}
+impl ::core::cmp::Eq for InitializeZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for InitializeZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+    }
+}
+impl ::core::fmt::Debug for InitializeZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("Initialize")
+            .field("discriminator", &self.discriminator)
+            .finish()
+    }
+}
+impl InitializeZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<Initialize, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(Initialize {
+            discriminator: <[u8; InstructionDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for Initialize
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl Initialize
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<InitializeZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "Initialize",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &InitializeZc = unsafe { &*data.as_ptr().cast::<InitializeZc>() };
+        <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        ::core::result::Result::Ok(())
+    }
+}
 const _: () = if !(::core::mem::align_of::<InitializeZc>() == 1) {
     ::core::panicking::panic(
         "assertion failed: ::core::mem::align_of::<InitializeZc>() == 1",
@@ -386,6 +496,227 @@ where
 {
     fn clone(&self) -> Self {
         *self
+    }
+}
+impl ::core::cmp::PartialEq for FlipBitZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator
+            && self.section_index == other.section_index
+            && self.array_index == other.array_index && self.offset == other.offset
+            && self.value == other.value
+    }
+}
+impl ::core::cmp::Eq for FlipBitZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for FlipBitZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+        self.section_index.hash(state);
+        self.array_index.hash(state);
+        self.offset.hash(state);
+        self.value.hash(state);
+    }
+}
+impl ::core::fmt::Debug for FlipBitZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("FlipBit")
+            .field("discriminator", &self.discriminator)
+            .field("section_index", &self.section_index)
+            .field("array_index", &self.array_index)
+            .field("offset", &self.offset)
+            .field("value", &self.value)
+            .finish()
+    }
+}
+impl FlipBitZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<FlipBit, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(FlipBit {
+            discriminator: <[u8; InstructionDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+            section_index: <u8 as pina::pinapod::FromZc>::from_zc(&self.section_index)?,
+            array_index: <u8 as pina::pinapod::FromZc>::from_zc(&self.array_index)?,
+            offset: <u8 as pina::pinapod::FromZc>::from_zc(&self.offset)?,
+            value: <u8 as pina::pinapod::FromZc>::from_zc(&self.value)?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for FlipBit
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl FlipBit
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<FlipBitZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "FlipBit",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &FlipBitZc = unsafe { &*data.as_ptr().cast::<FlipBitZc>() };
+        <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.section_index,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("section_index", error))?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.array_index,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("array_index", error))?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.offset,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("offset", error))?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.value,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("value", error))?;
+        ::core::result::Result::Ok(())
     }
 }
 const _: () = if !(::core::mem::align_of::<FlipBitZc>() == 1) {
@@ -679,6 +1010,143 @@ where
         *self
     }
 }
+impl ::core::cmp::PartialEq for TransferZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator && self.amount == other.amount
+    }
+}
+impl ::core::cmp::Eq for TransferZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for TransferZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+        self.amount.hash(state);
+    }
+}
+impl ::core::fmt::Debug for TransferZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("Transfer")
+            .field("discriminator", &self.discriminator)
+            .field("amount", &self.amount)
+            .finish()
+    }
+}
+impl TransferZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<Transfer, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(Transfer {
+            discriminator: <[u8; InstructionDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+            amount: <PodU64 as pina::pinapod::FromZc>::from_zc(&self.amount)?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for Transfer
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl Transfer
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<TransferZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "Transfer",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &TransferZc = unsafe { &*data.as_ptr().cast::<TransferZc>() };
+        <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.amount,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("amount", error))?;
+        ::core::result::Result::Ok(())
+    }
+}
 const _: () = if !(::core::mem::align_of::<TransferZc>() == 1) {
     ::core::panicking::panic(
         "assertion failed: ::core::mem::align_of::<TransferZc>() == 1",
@@ -879,6 +1347,173 @@ where
 {
     fn clone(&self) -> Self {
         *self
+    }
+}
+impl ::core::cmp::PartialEq for CustomTransferDataZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator && self.amount == other.amount
+            && self.destination == other.destination
+    }
+}
+impl ::core::cmp::Eq for CustomTransferDataZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for CustomTransferDataZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+        self.amount.hash(state);
+        self.destination.hash(state);
+    }
+}
+impl ::core::fmt::Debug for CustomTransferDataZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("CustomTransferData")
+            .field("discriminator", &self.discriminator)
+            .field("amount", &self.amount)
+            .field("destination", &self.destination)
+            .finish()
+    }
+}
+impl CustomTransferDataZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+    [u8; 32]: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<CustomTransferData, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(CustomTransferData {
+            discriminator: <[u8; InstructionDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+            amount: <PodU64 as pina::pinapod::FromZc>::from_zc(&self.amount)?,
+            destination: <[u8; 32] as pina::pinapod::FromZc>::from_zc(&self.destination)?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for CustomTransferData
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+    [u8; 32]: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl CustomTransferData
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<CustomTransferDataZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "CustomTransferData",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &CustomTransferDataZc = unsafe {
+            &*data.as_ptr().cast::<CustomTransferDataZc>()
+        };
+        <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.amount,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("amount", error))?;
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.destination,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("destination", error))?;
+        ::core::result::Result::Ok(())
     }
 }
 const _: () = if !(::core::mem::align_of::<CustomTransferDataZc>() == 1) {
@@ -1129,6 +1764,228 @@ where
 {
     fn clone(&self) -> Self {
         *self
+    }
+}
+impl ::core::cmp::PartialEq for ComplexInstructionZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator && self.seed == other.seed
+            && self.amount == other.amount && self.bump == other.bump
+            && self.flags == other.flags
+    }
+}
+impl ::core::cmp::Eq for ComplexInstructionZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for ComplexInstructionZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+        self.seed.hash(state);
+        self.amount.hash(state);
+        self.bump.hash(state);
+        self.flags.hash(state);
+    }
+}
+impl ::core::fmt::Debug for ComplexInstructionZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("ComplexInstruction")
+            .field("discriminator", &self.discriminator)
+            .field("seed", &self.seed)
+            .field("amount", &self.amount)
+            .field("bump", &self.bump)
+            .field("flags", &self.flags)
+            .finish()
+    }
+}
+impl ComplexInstructionZc
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+    [u8; 32]: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    [u8; 4]: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<ComplexInstruction, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(ComplexInstruction {
+            discriminator: <[u8; InstructionDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+            seed: <[u8; 32] as pina::pinapod::FromZc>::from_zc(&self.seed)?,
+            amount: <PodU64 as pina::pinapod::FromZc>::from_zc(&self.amount)?,
+            bump: <u8 as pina::pinapod::FromZc>::from_zc(&self.bump)?,
+            flags: <[u8; 4] as pina::pinapod::FromZc>::from_zc(&self.flags)?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for ComplexInstruction
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; InstructionDisc::BYTES]: pina::pinapod::FromZc,
+    [u8; 32]: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    [u8; 4]: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl ComplexInstruction
+where
+    [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 4]: pina::pinapod::ZcField,
+    <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<ComplexInstructionZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "ComplexInstruction",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &ComplexInstructionZc = unsafe {
+            &*data.as_ptr().cast::<ComplexInstructionZc>()
+        };
+        <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.seed,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("seed", error))?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.amount,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("amount", error))?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.bump,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("bump", error))?;
+        <<[u8; 4] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.flags,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("flags", error))?;
+        ::core::result::Result::Ok(())
     }
 }
 const _: () = if !(::core::mem::align_of::<ComplexInstructionZc>() == 1) {

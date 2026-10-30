@@ -135,10 +135,8 @@ This crate is for host tests only. Do not enable it in an SBF build.
 
 See [security.md](security.md) for the offline-only trust boundary, dependency audit exceptions, and package-specific license policy.
 
-## Known runtime limitations
+## Runtime behavior
 
-Surfpool 1.6.0's SDK defaults to `BlockProductionMode::Transaction`, which never confirms a submitted transaction on an embedded offline instance — the client's confirmation loop spins indefinitely on `getSignatureStatuses`. [`OfflineSurfnet::start`](src/lib.rs) therefore selects `BlockProductionMode::Clock`, which produces blocks on a timer and confirms normally. This is reported upstream as [surfpool#814](https://github.com/solana-foundation/surfpool/issues/814); the override can be removed once that lands.
+`OfflineSurfnet` starts the embedded Surfnet with the SDK's default `BlockProductionMode::Transaction`, so a block is produced when a transaction arrives instead of on a timer. Surfpool 1.6.0 never confirmed on that path, and the crate forced `BlockProductionMode::Clock` until Surfpool 1.7.0 restored it ([surfpool#814](https://github.com/solana-foundation/surfpool/issues/814)); tests that assert on slots now see only the slots their own transactions produce.
 
 The SDK also picks each RPC port by binding `127.0.0.1:0` and releasing the listener before its runloop rebinds it, so a start can occasionally lose its port and abort with `AddrInUse`. `OfflineSurfnet::start` retries once when the SDK reports an aborted runloop or a port-allocation failure, both of which leave no running instance behind, and prints the first failure to stderr. Other startup errors, a second failure, and anything after startup, such as deployment or transactions, are never retried.
-
-Surfpool 1.5 could not derive CPI signers for PDAs with four or more seed arguments (five including the bump). Surfpool 1.6.0 fixes that: the vesting example's `[b"vesting", admin, beneficiary, mint]` plus bump PDA completes `Initialize` → `Claim` → `Cancel` end to end.

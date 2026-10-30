@@ -266,7 +266,7 @@ http = { default-features = false, version = "^1" }
 insta = { default-features = false, version = "^1" }
 insta-cmd = { default-features = false, version = "^0.7.0" }
 macrotest = { default-features = false, version = "^1.2" }
-mollusk-svm = { default-features = false, version = "0.15.1" }
+mollusk-svm = { default-features = false, version = "0.16.4" }
 # Emits the normalized CLI-surface snapshot release automation diffs.
 monochange_snapshot = { default-features = false, version = "0.1.1" }
 num-derive = { version = "^0.5", default-features = false }
@@ -278,7 +278,7 @@ paste = { default-features = false, version = "^1" }
 # first release binding the generated modules' prelude names to `core`, so a
 # schema module cannot rebind the constructors the generated code spells, and
 # the first whose wincode writers validate stored content at the boundary.
-pinapod = { version = "0.4.7", default-features = false, features = ["solana-address", "solana-program-error"] }
+pinapod = { version = "0.4.9", default-features = false, features = ["solana-address", "solana-program-error"] }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
@@ -314,10 +314,6 @@ solana-program-error = { version = "^3", default-features = false }
 solana-program-log = { default-features = false, version = "^1.1" }
 solana-pubkey = { version = "^4", default-features = false }
 solana-rpc-client = { version = "^4", default-features = false }
-# Held on the Agave 4.x train: `pina_test` anchors the Surfpool 1.6 dependency
-# set, which resolves `solana-pubkey ~4.2`, while `solana-sdk` 5.0.0 requires
-# `solana-pubkey ^4.3`. The two cannot resolve together, so this crate moves
-# when Surfpool's train does rather than on its own.
 solana-sdk = { version = "^4", default-features = false }
 solana-sdk-ids = { version = "^3", default-features = false }
 solana-sha256-hasher = { version = "^3", default-features = false }
