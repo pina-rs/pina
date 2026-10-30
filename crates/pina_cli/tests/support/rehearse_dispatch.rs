@@ -57,10 +57,20 @@ fn dispatches_fork_operations_without_starting_a_fork_server() -> Result<(), Err
 		"surfnet_setAccount",
 		json!([address, {"lamports": 1234567}]),
 	);
+	let signatures = super::counter_traffic(&remote);
+	let transaction = super::rpc(
+		&remote.url,
+		"getTransaction",
+		json!([signatures[3], {"encoding": "base64", "maxSupportedTransactionVersion": 0}]),
+	);
+	let wire = transaction["transaction"][0]
+		.as_str()
+		.ok_or("missing encoded transaction")?;
+	let candidate = std::fs::read(super::artifact("rehearse-variant/counter_program.so"))?;
 	let runtime = tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
 		.build()?;
-	runtime.block_on(dispatch(&remote, address, absent))?;
+	runtime.block_on(dispatch(&remote, address, absent, wire, &candidate))?;
 	let original = super::rpc(
 		&remote.url,
 		"getAccountInfo",
@@ -73,7 +83,13 @@ fn dispatches_fork_operations_without_starting_a_fork_server() -> Result<(), Err
 	Ok(())
 }
 
-async fn dispatch(remote: &super::RemoteCluster, address: &str, absent: &str) -> Result<(), Error> {
+async fn dispatch(
+	remote: &super::RemoteCluster,
+	address: &str,
+	absent: &str,
+	wire: &str,
+	candidate: &[u8],
+) -> Result<(), Error> {
 	let config = SurfnetSvmConfig {
 		skip_blockhash_check: true,
 		..Default::default()
@@ -151,6 +167,49 @@ async fn dispatch(remote: &super::RemoteCluster, address: &str, absent: &str) ->
 	assert!(
 		value["value"].is_null(),
 		"offlined missing account remains absent"
+	);
+	let params = json!([wire, null, {"encoding": "base64", "depth": "instruction"}]);
+	let baseline = call(
+		&handler,
+		&context,
+		"surfnet_profileTransaction",
+		params.clone(),
+	)
+	.await?;
+	let baseline_tx = &baseline["value"]["transactionProfile"];
+	assert!(
+		baseline_tx["errorMessage"].is_null(),
+		"baseline profile: {baseline}"
+	);
+	assert!(
+		baseline_tx["computeUnitsConsumed"]
+			.as_u64()
+			.is_some_and(|cu| cu > 0),
+		"baseline compute units: {baseline}"
+	);
+	for (index, chunk) in candidate.chunks(256 * 1024).enumerate() {
+		call(
+			&handler,
+			&context,
+			"surfnet_writeProgram",
+			json!([
+				super::COUNTER_PROGRAM_ID,
+				super::hex(chunk),
+				index * 256 * 1024,
+				null
+			]),
+		)
+		.await?;
+	}
+	let changed = call(&handler, &context, "surfnet_profileTransaction", params).await?;
+	let changed_tx = &changed["value"]["transactionProfile"];
+	assert!(
+		changed_tx["errorMessage"].is_null(),
+		"candidate profile: {changed}"
+	);
+	assert_ne!(
+		baseline_tx["accountStates"], changed_tx["accountStates"],
+		"candidate changes replayed account state"
 	);
 	drop(context);
 	drop(handler);
