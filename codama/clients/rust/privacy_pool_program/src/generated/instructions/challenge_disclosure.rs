@@ -11,7 +11,7 @@
 pub const CHALLENGE_DISCLOSURE_DISCRIMINATOR: u8 = 9u8;
 /// Compute units `ChallengeDisclosure` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const CHALLENGE_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 1942;
+pub const CHALLENGE_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 1943;
 /// Compute unit limit to request for a transaction carrying `ChallengeDisclosure`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to

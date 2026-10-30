@@ -58,7 +58,8 @@ export function getVerifyingKeyAccountDiscriminator2Bytes(): ReadonlyUint8Array 
 
 /**
  * One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
- * (two public inputs), slot 1 transfer proofs (three).
+ * (root, nullifier, recipient hash), slot 1 transfer proofs
+ * (root, nullifier, output binding).
  */
 export type VerifyingKeyAccount = {
 	discriminator: number;
