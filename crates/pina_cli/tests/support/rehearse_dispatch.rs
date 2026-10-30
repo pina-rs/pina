@@ -320,3 +320,102 @@ fn assert_no_listening_sockets(pid: u32) -> Result<(), Error> {
 	}
 	Ok(())
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "kills a worker owner while the datasource is stalled"]
+fn private_worker_exits_if_its_owner_is_killed_during_startup() -> Result<(), Error> {
+	use std::io::BufRead as _;
+	use std::io::Write as _;
+	use std::net::TcpListener;
+	use std::process::Command;
+	use std::process::Stdio;
+	use std::time::Duration;
+	use std::time::Instant;
+
+	const OWNER_ENV: &str = "PINA_TEST_REHEARSAL_WORKER_OWNER_URL";
+	const PID_PREFIX: &str = "REHEARSAL_WORKER_PID=";
+	if let Some(url) = std::env::var_os(OWNER_ENV) {
+		let mut worker = Command::new(env!("CARGO_BIN_EXE_pina"))
+			.arg("__pina-rehearse-worker")
+			.stdin(Stdio::piped())
+			.stdout(Stdio::null())
+			.stderr(Stdio::null())
+			.spawn()?;
+		let input = worker.stdin.as_mut().ok_or("worker has no stdin")?;
+		writeln!(input, "{}", json!({"url": url.to_string_lossy()}))?;
+		println!("{PID_PREFIX}{}", worker.id());
+		std::io::stdout().flush()?;
+		let _ = worker.wait()?;
+		return Err("worker exited before its owner was killed".into());
+	}
+
+	let listener = TcpListener::bind("127.0.0.1:0")?;
+	listener.set_nonblocking(true)?;
+	let url = format!("http://{}", listener.local_addr()?);
+	let mut owner = Command::new(std::env::current_exe()?)
+		.args([
+			"--exact",
+			"rehearse_dispatch::private_worker_exits_if_its_owner_is_killed_during_startup",
+			"--ignored",
+			"--nocapture",
+		])
+		.env(OWNER_ENV, url)
+		.env("NO_PROXY", "127.0.0.1")
+		.env("no_proxy", "127.0.0.1")
+		.stdin(Stdio::null())
+		.stdout(Stdio::piped())
+		.stderr(Stdio::null())
+		.spawn()?;
+	let output = owner.stdout.take().ok_or("owner has no stdout")?;
+	let (pid_tx, pid_rx) = std::sync::mpsc::channel();
+	std::thread::spawn(move || {
+		for line in std::io::BufReader::new(output).lines() {
+			let Ok(line) = line else { break };
+			if let Some((_, pid)) = line.split_once(PID_PREFIX) {
+				let _ = pid_tx.send(pid.trim().parse::<u32>());
+				break;
+			}
+		}
+	});
+	let result = (|| -> Result<(), Error> {
+		let worker_pid = pid_rx.recv_timeout(Duration::from_secs(20))??;
+		let deadline = Instant::now() + Duration::from_secs(20);
+		let _stalled_connection = loop {
+			match listener.accept() {
+				Ok((stream, _)) => break stream,
+				Err(error)
+					if error.kind() == std::io::ErrorKind::WouldBlock
+						&& Instant::now() < deadline =>
+				{
+					std::thread::sleep(Duration::from_millis(25))
+				}
+				Err(error) => return Err(error.into()),
+			}
+		};
+		owner.kill()?;
+		owner.wait()?;
+		let deadline = Instant::now() + Duration::from_secs(10);
+		loop {
+			let stat = match std::fs::read_to_string(format!("/proc/{worker_pid}/stat")) {
+				Ok(stat) => stat,
+				Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+				Err(error) => return Err(error.into()),
+			};
+			let state = stat
+				.rsplit_once(')')
+				.and_then(|(_, tail)| tail.split_whitespace().next());
+			if state == Some("Z") {
+				break;
+			}
+			if Instant::now() >= deadline {
+				return Err("worker survived owner SIGKILL during a blocked operation".into());
+			}
+			std::thread::sleep(Duration::from_millis(25));
+		}
+		Ok(())
+	})();
+	let _ = owner.kill();
+	let _ = owner.wait();
+	result
+}
