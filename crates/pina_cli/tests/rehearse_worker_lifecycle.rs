@@ -5,6 +5,86 @@ use std::process::Stdio;
 use std::time::Duration;
 use std::time::Instant;
 
+#[path = "support/rehearse.rs"]
+mod rehearse;
+
+#[test]
+fn worker_initializes_and_handles_private_fork_requests() -> Result<(), Box<dyn std::error::Error>>
+{
+	use std::io::BufRead as _;
+	use std::io::Write as _;
+
+	use serde_json::Value;
+	use serde_json::json;
+
+	let remote = rehearse::FakeRpcServer::start(|method, _| {
+		let result = match method {
+			"getEpochInfo" => {
+				json!({
+					"epoch": 0, "slotIndex": 1, "slotsInEpoch": 432000,
+					"absoluteSlot": 1, "blockHeight": 1, "transactionCount": 0
+				})
+			}
+			"getEpochSchedule" => {
+				json!({
+					"slotsPerEpoch": 432000, "leaderScheduleSlotOffset": 432000,
+					"warmup": false, "firstNormalEpoch": 0, "firstNormalSlot": 0
+				})
+			}
+			"getGenesisHash" => json!("11111111111111111111111111111111"),
+			"getAccountInfo" => json!({"context": {"slot": 1}, "value": null}),
+			_ => return rehearse::Reply::Error(-32601, format!("unexpected method {method}")),
+		};
+		rehearse::Reply::Result(result)
+	});
+	let mut worker = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("__pina-rehearse-worker")
+		.env("NO_PROXY", "127.0.0.1")
+		.env("no_proxy", "127.0.0.1")
+		.stdin(Stdio::piped())
+		.stdout(Stdio::piped())
+		.stderr(Stdio::null())
+		.spawn()?;
+	let mut input = worker.stdin.take().ok_or("missing worker stdin")?;
+	let mut output = std::io::BufReader::new(worker.stdout.take().ok_or("missing worker stdout")?);
+	writeln!(input, "{}", json!({"url": remote.url}))?;
+	let mut response = String::new();
+	output.read_line(&mut response)?;
+	assert_eq!(serde_json::from_str::<Value>(&response)?["ready"], true);
+
+	let address = "11111111111111111111111111111112";
+	for (id, method, params) in [
+		(
+			1,
+			"surfnet_setAccount",
+			json!([address, {"lamports": 1234567}]),
+		),
+		(
+			2,
+			"getAccountInfo",
+			json!([address, {"encoding": "base64"}]),
+		),
+	] {
+		writeln!(
+			input,
+			"{}",
+			json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})
+		)?;
+		response.clear();
+		output.read_line(&mut response)?;
+		let value: Value = serde_json::from_str(&response)?;
+		assert!(value.get("error").is_none(), "worker response: {value}");
+		if method == "getAccountInfo" {
+			assert_eq!(value["result"]["value"]["lamports"], 1234567);
+		}
+	}
+	assert!(remote.methods().contains(&"getEpochInfo".to_owned()));
+	drop(input);
+	let status = worker.wait()?;
+	assert!(!status.success(), "worker exits on owner pipe closure");
+	Ok(())
+}
+
 #[test]
 fn worker_exits_when_its_owner_closes_the_pipe() {
 	let mut worker = Command::new(env!("CARGO_BIN_EXE_pina"))
