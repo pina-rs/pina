@@ -79,7 +79,7 @@ jobs:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
     # The status functions are required: without one, a skipped `changes`
     # dependency (pushes to `main`) would skip this job too.
-    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.covered == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.covered == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     permissions:
       contents: read
       id-token: write
@@ -95,13 +95,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: run coverage
-        run: |
-          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
-            mkdir -p target/coverage
-            cargo llvm-cov --all-features --locked -p pina_cli --test rehearse_worker_lifecycle --test cli_snapshots --lcov --output-path target/coverage/lcov.info
-          else
-            coverage:all
-          fi
+        run: coverage:all
         shell: devenv shell -c -- bash -e {0}
 
       - name: upload lcov artifact
@@ -111,7 +105,6 @@ jobs:
           path: target/coverage/*.info
 
       - name: upload codecov report
-        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: target/coverage/lcov.info,target/coverage/pina-test.info
