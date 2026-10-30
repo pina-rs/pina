@@ -67,10 +67,35 @@ fn dispatches_fork_operations_without_starting_a_fork_server() -> Result<(), Err
 		.as_str()
 		.ok_or("missing encoded transaction")?;
 	let candidate = std::fs::read(super::artifact("rehearse-variant/counter_program.so"))?;
+	let external = external_fork(&remote)?;
+	let profile = json!([wire, null, {"encoding": "base64", "depth": "instruction"}]);
+	let external_baseline =
+		super::rpc(&external.url, "surfnet_profileTransaction", profile.clone());
+	for (index, chunk) in candidate.chunks(256 * 1024).enumerate() {
+		super::rpc(
+			&external.url,
+			"surfnet_writeProgram",
+			json!([
+				super::COUNTER_PROGRAM_ID,
+				super::hex(chunk),
+				index * 256 * 1024,
+				null
+			]),
+		);
+	}
+	let external_changed = super::rpc(&external.url, "surfnet_profileTransaction", profile);
 	let runtime = tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
 		.build()?;
-	runtime.block_on(dispatch(&remote, address, absent, wire, &candidate))?;
+	runtime.block_on(dispatch(
+		&remote,
+		address,
+		absent,
+		wire,
+		&candidate,
+		&external_baseline,
+		&external_changed,
+	))?;
 	let original = super::rpc(
 		&remote.url,
 		"getAccountInfo",
@@ -89,6 +114,8 @@ async fn dispatch(
 	absent: &str,
 	wire: &str,
 	candidate: &[u8],
+	external_baseline: &Value,
+	external_changed: &Value,
 ) -> Result<(), Error> {
 	let config = SurfnetSvmConfig {
 		skip_blockhash_check: true,
@@ -177,6 +204,16 @@ async fn dispatch(
 	)
 	.await?;
 	let baseline_tx = &baseline["value"]["transactionProfile"];
+	assert_eq!(
+		baseline_tx["computeUnitsConsumed"],
+		external_baseline["value"]["transactionProfile"]["computeUnitsConsumed"],
+		"external and embedded baseline compute units differ"
+	);
+	assert_eq!(
+		baseline_tx["accountStates"],
+		external_baseline["value"]["transactionProfile"]["accountStates"],
+		"external and embedded baseline account states differ"
+	);
 	assert!(
 		baseline_tx["errorMessage"].is_null(),
 		"baseline profile: {baseline}"
@@ -203,6 +240,16 @@ async fn dispatch(
 	}
 	let changed = call(&handler, &context, "surfnet_profileTransaction", params).await?;
 	let changed_tx = &changed["value"]["transactionProfile"];
+	assert_eq!(
+		changed_tx["computeUnitsConsumed"],
+		external_changed["value"]["transactionProfile"]["computeUnitsConsumed"],
+		"external and embedded candidate compute units differ"
+	);
+	assert_eq!(
+		changed_tx["accountStates"],
+		external_changed["value"]["transactionProfile"]["accountStates"],
+		"external and embedded candidate account states differ"
+	);
 	assert!(
 		changed_tx["errorMessage"].is_null(),
 		"candidate profile: {changed}"
@@ -422,4 +469,58 @@ fn private_worker_exits_if_its_owner_is_killed_during_startup() -> Result<(), Er
 	let _ = owner.kill();
 	let _ = owner.wait();
 	result
+}
+
+/// The current external Surfpool implementation, used only as a parity oracle.
+fn external_fork(remote: &super::RemoteCluster) -> Result<super::RemoteCluster, Error> {
+	use std::process::Command;
+	use std::process::Stdio;
+	use std::time::Duration;
+	use std::time::Instant;
+	let directory = tempfile::tempdir()?;
+	let port = super::free_port();
+	let child = Command::new(super::surfpool())
+		.current_dir(directory.path())
+		.args([
+			"start",
+			"--rpc-url",
+			&remote.url,
+			"--host",
+			"127.0.0.1",
+			"--no-tui",
+			"--no-studio",
+			"--no-deploy",
+			"--skip-blockhash-check",
+			"--block-production-mode",
+			"manual",
+			"--airdrop-amount",
+			"0",
+		])
+		.args([
+			"--port",
+			&port.to_string(),
+			"--ws-port",
+			&super::free_port().to_string(),
+			"--studio-port",
+			&super::free_port().to_string(),
+		])
+		.arg("--log-path")
+		.arg(directory.path().join("logs"))
+		.stdin(Stdio::null())
+		.stdout(Stdio::null())
+		.stderr(Stdio::null())
+		.spawn()?;
+	let fork = super::RemoteCluster {
+		child,
+		url: format!("http://127.0.0.1:{port}"),
+		_directory: directory,
+	};
+	let deadline = Instant::now() + Duration::from_secs(60);
+	while super::try_rpc(&fork.url, "getHealth", json!([])).is_err() {
+		if Instant::now() >= deadline {
+			return Err("external parity fork did not start".into());
+		}
+		std::thread::sleep(Duration::from_millis(100));
+	}
+	Ok(fork)
 }
