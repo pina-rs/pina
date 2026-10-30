@@ -40,10 +40,10 @@
 	},
 	"staticCuApprovals": {
 		"privacy_pool_program": {
-			"baseRevision": "04a47964b3415b320c8d339072bc71cb7d5b9627",
-			"base": 14305,
-			"head": 14345,
-			"reason": "Approved by @ifiokjr on 2026-10-25: bind successor disclosure metadata to transfer proofs while retaining existing public-input and wire layouts."
+			"baseRevision": "83914bad9fbbc6f2b2795ef5e47dd47a0f20e719",
+			"base": 14212,
+			"head": 14268,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/672: bind withdrawal proofs to their payout recipient; base includes the approved migration funding budget change."
 		},
 		"escrow_program": {
 			"baseRevision": "25981d44c6b3f13092d0f18b4b9c87bcacb38231",
@@ -210,10 +210,10 @@
 			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
 		},
 		"privacy_pool_program/withdraw": {
-			"baseRevision": "f3db1d9cdc73c651530b23fa35d80c03890ebf9c",
-			"base": 86949,
-			"head": 86950,
-			"reason": "Approved by @ifiokjr on 2026-10-29 in https://github.com/pina-rs/pina/pull/677: accept one additional CU per privacy-pool instruction for explicit migration funding budgets."
+			"baseRevision": "83914bad9fbbc6f2b2795ef5e47dd47a0f20e719",
+			"base": 86950,
+			"head": 92269,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/672: bind withdrawal proofs to their payout recipient; base includes the approved migration funding budget change."
 		},
 		"vesting_program/initialize": {
 			"baseRevision": "b013436ab66604e780db825855034333d6271248",
@@ -230,10 +230,10 @@
 			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
 		},
 		"privacy_pool_program": {
-			"baseRevision": "04a47964b3415b320c8d339072bc71cb7d5b9627",
-			"base": 121600,
-			"head": 122008,
-			"reason": "Approved by @ifiokjr on 2026-10-25: accept 408 bytes for the metadata digest and proof binding that prevent copied-proof metadata substitution."
+			"baseRevision": "83914bad9fbbc6f2b2795ef5e47dd47a0f20e719",
+			"base": 120960,
+			"head": 121424,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/672: bind withdrawal proofs to their payout recipient; base includes the approved migration funding budget change."
 		},
 		"escrow_program": {
 			"baseRevision": "25981d44c6b3f13092d0f18b4b9c87bcacb38231",
