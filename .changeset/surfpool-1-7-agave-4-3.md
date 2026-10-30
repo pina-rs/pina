@@ -1,5 +1,5 @@
 ---
-pina: feat
+pina: breaking
 pina_test: breaking
 ---
 
@@ -16,7 +16,7 @@ The resolver proves out a single Agave 4.3.2 island. The multi-version crates th
 
 Surfpool 1.7 cannot resolve beside `pinapod` 0.4.7. `surfpool-core` 1.7 pulls `phoenix-rise-math`, which pins `fixed =1.29.0`, while `pinapod` pinned `=1.30.0`, and Agave 4.3 requires `solana-address` 2.7 or newer while `pinapod` capped it at `<2.7`. Neither bound reflected a real incompatibility. `pinapod` 0.4.8 widens them to `^1.29.0` and `>=2.2, <3.0`, and `pinapod` 0.4.9 implements `FromZc` for `PodBool`, which the 0.4.8 companion surface requires of a schema that declares the pod directly. This change moves the workspace pin to 0.4.9, so downstream projects resolve through published releases rather than a repository patch.
 
-`pinapod` 0.4.9's derive also adds the companion value surface that shipped with it: every generated `*Zc` view now implements `PartialEq`, `Eq`, `Hash`, and `Debug` over active content, and `to_native()` / `FromZc` materialize a fully owned value from it. `pina_root`'s expansion snapshots record the added impls, and the two shadowing UI fixtures now pin the new `FromZc` rejection alongside the existing type mismatch. The wire format, validation order, and instruction paths are unchanged.
+`pinapod` 0.4.9's derive also adds the companion value surface that shipped with it: every generated `*Zc` view now implements `PartialEq`, `Eq`, `Hash`, and `Debug` over active content, and `to_native()` / `FromZc` materialize a fully owned value from it. `pina_root`'s expansion snapshots record the added impls, and the two shadowing UI fixtures now pin the new `FromZc` rejection alongside the existing type mismatch. A schema field using a hand-written `ZcField` mapping must now implement the value vocabulary too — `PartialEq`, `Eq`, `Hash`, and `Debug` for the companion traits, and `FromZc` for materialization — and a directly declared `PodBool` needs the `FromZc` impl that 0.4.9 adds. Built-in and derived mappings already qualify. The wire format, validation order, and instruction paths are unchanged.
 
 The devenv `ifiokjr-nixpkgs` pin moves to the revision that packages the Surfpool 1.7.0 CLI, so the installed `surfpool` and the SDK agree; the same revision keeps `agave` at 4.2, which the SBF build toolchain uses independently. `@solana/surfpool` moves to `^1.7.0` for the Codama end-to-end suite.
 
