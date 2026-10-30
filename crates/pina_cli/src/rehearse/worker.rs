@@ -1,6 +1,6 @@
 //! Private worker for rehearsal forks.
 //!
-//! The parent and worker exchange bounded JSON frames over inherited pipes.
+//! The parent and worker exchange bounded JSON frames over inherited channels.
 //! A separate reader owns stdin so it can terminate the worker on parent death
 //! even while the SVM is processing a request.
 

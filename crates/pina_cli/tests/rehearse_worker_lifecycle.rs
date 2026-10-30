@@ -38,21 +38,24 @@ fn epoch_server() -> rehearse::FakeRpcServer {
 fn unrelated_process_cannot_mutate_the_worker_fork() -> Result<(), Box<dyn std::error::Error>> {
 	use std::io::BufRead as _;
 	use std::io::Write as _;
+	use std::os::fd::OwnedFd;
+	use std::os::unix::net::UnixStream;
 
 	use serde_json::Value;
 	use serde_json::json;
 
 	let remote = epoch_server();
+	let (parent, child) = UnixStream::pair()?;
+	let mut input = parent.try_clone()?;
 	let mut worker = Command::new(env!("CARGO_BIN_EXE_pina"))
 		.arg("__pina-rehearse-worker")
 		.env("NO_PROXY", "127.0.0.1")
 		.env("no_proxy", "127.0.0.1")
-		.stdin(Stdio::piped())
-		.stdout(Stdio::piped())
+		.stdin(Stdio::from(OwnedFd::from(child.try_clone()?)))
+		.stdout(Stdio::from(OwnedFd::from(child)))
 		.stderr(Stdio::null())
 		.spawn()?;
-	let mut input = worker.stdin.take().ok_or("missing worker stdin")?;
-	let mut output = std::io::BufReader::new(worker.stdout.take().ok_or("missing worker stdout")?);
+	let mut output = std::io::BufReader::new(parent);
 	writeln!(input, "{}", json!({"url": remote.url}))?;
 	let mut response = String::new();
 	output.read_line(&mut response)?;
@@ -78,31 +81,33 @@ printf '%s\n' "$reply"
 			reply.get("error").is_none(),
 			"injected request failed: {reply}"
 		);
-		writeln!(
-			input,
-			"{}",
-			json!({
-				"jsonrpc":"2.0", "id":1, "method":"getAccountInfo",
-				"params":["11111111111111111111111111111112", {"encoding":"base64"}]
-			})
-		)?;
-		response.clear();
-		output.read_line(&mut response)?;
-		let observed: Value = serde_json::from_str(&response)?;
-		assert!(
-			observed["result"]["value"].is_null(),
-			"an unrelated process mutated the fork: {observed}"
-		);
 	} else {
 		assert_ne!(attack.status.code(), Some(124), "the pipe probe timed out");
 		let error = String::from_utf8_lossy(&attack.stderr);
 		assert!(
 			matches!(attack.status.code(), Some(2 | 11 | 12))
-				&& (error.contains("Permission denied") || error.contains("No such file")),
+				&& (error.contains("Permission denied")
+					|| error.contains("No such file")
+					|| error.contains("No such device or address")),
 			"the pipe probe failed unexpectedly: {error}"
 		);
 	}
-	drop(input);
+	writeln!(
+		input,
+		"{}",
+		json!({
+			"jsonrpc":"2.0", "id":1, "method":"getAccountInfo",
+			"params":["11111111111111111111111111111112", {"encoding":"base64"}]
+		})
+	)?;
+	response.clear();
+	output.read_line(&mut response)?;
+	let observed: Value = serde_json::from_str(&response)?;
+	assert!(
+		observed["result"]["value"].is_null(),
+		"an unrelated process mutated the fork: {observed}"
+	);
+	input.shutdown(std::net::Shutdown::Write)?;
 	let _ = worker.wait()?;
 	Ok(())
 }

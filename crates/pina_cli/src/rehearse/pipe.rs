@@ -53,22 +53,46 @@ impl PipeRpc {
 		ready_timeout: Duration,
 		timeout: Duration,
 	) -> Result<Self, RpcError> {
-		command
-			.stdin(Stdio::piped())
-			.stdout(Stdio::piped())
-			.stderr(Stdio::null());
+		#[cfg(unix)]
+		let (mut stdin, stdout) = {
+			use std::os::fd::OwnedFd;
+			use std::os::unix::net::UnixStream;
+
+			// Anonymous pipes can be reopened by a same-UID process through /proc.
+			// Socketpair ends cannot be reopened as files on Linux.
+			let (parent, worker) =
+				UnixStream::pair().map_err(|error| RpcError::Transport(error.to_string()))?;
+			let output = parent
+				.try_clone()
+				.map_err(|error| RpcError::Transport(error.to_string()))?;
+			let worker_input = worker
+				.try_clone()
+				.map_err(|error| RpcError::Transport(error.to_string()))?;
+			command
+				.stdin(Stdio::from(OwnedFd::from(worker_input)))
+				.stdout(Stdio::from(OwnedFd::from(worker)));
+			(parent, output)
+		};
+		#[cfg(not(unix))]
+		command.stdin(Stdio::piped()).stdout(Stdio::piped());
+		command.stderr(Stdio::null());
 		let mut command = CommandWrap::from(command);
 		#[cfg(unix)]
 		command.wrap(process_wrap::std::ProcessGroup::leader());
 		#[cfg(windows)]
 		command.wrap(process_wrap::std::JobObject);
-		let mut child = command
+		let child = command
 			.spawn()
 			.map_err(|error| RpcError::Transport(error.to_string()))?;
+		drop(command);
+		#[cfg(not(unix))]
+		let mut child = child;
+		#[cfg(not(unix))]
 		let mut stdin = child
 			.stdin()
 			.take()
 			.ok_or_else(|| RpcError::Transport("worker input unavailable".to_owned()))?;
+		#[cfg(not(unix))]
 		let stdout = child
 			.stdout()
 			.take()
@@ -328,6 +352,40 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"ok":true}}'
 			.call("getAccountInfo", &json!([]))
 			.expect("worker result");
 		assert_eq!(result["ok"], true);
+	}
+
+	#[cfg(target_os = "linux")]
+	#[test]
+	fn same_user_cannot_reopen_worker_transport_via_proc() {
+		let rpc = fake(
+			r#"read -r init
+printf '%s\n' '{"ready":true,"protocol":1,"pinaVersion":"__PINA_VERSION__"}'
+read -r request
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"ok":true}}'
+"#,
+			Duration::from_secs(5),
+		)
+		.expect("start fake worker");
+		let pid = rpc.child.borrow().id().to_string();
+		for script in ["exec 3>\"/proc/$1/fd/0\"", "exec 4<\"/proc/$1/fd/1\""] {
+			let probe = Command::new("/bin/sh")
+				.args(["-c", script, "probe", &pid])
+				.stdin(Stdio::null())
+				.output()
+				.expect("probe worker transport");
+			let error = String::from_utf8_lossy(&probe.stderr);
+			assert!(
+				!probe.status.success()
+					&& (error.contains("No such device or address")
+						|| error.contains("Permission denied")),
+				"worker transport was reopened or probe failed unexpectedly: {error}"
+			);
+		}
+		assert_eq!(
+			rpc.call("getAccountInfo", &json!([]))
+				.expect("authorized worker response")["ok"],
+			true
+		);
 	}
 
 	#[test]
