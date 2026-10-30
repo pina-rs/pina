@@ -23,6 +23,14 @@ let
       fi
     '';
   });
+  # `cargo-llvm-cov`'s own test suite fails under the Nix rust infrastructure
+  # on both Darwin (the instrumented test binary faults in the unwinder) and
+  # Linux (its fixture workspaces fail after the current nixpkgs rust update).
+  # The nixpkgs package documents this class of failure as tooling-only: the
+  # installed `cargo llvm-cov` works, which is all `coverage:all` runs.
+  cargo-llvm-cov = pkgs.cargo-llvm-cov.overrideAttrs (_: {
+    doCheck = false;
+  });
 in
 
 {

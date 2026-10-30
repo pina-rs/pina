@@ -1,3 +1,30 @@
+error[E0277]: the trait bound `shadow::u8: FromZc` is not satisfied
+  --> tests/ui/fail/account_shadowed_scalar.rs:21:1
+   |
+21 | #[account(discriminator = Kind)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `FromZc` is not implemented for `shadow::u8`
+  --> tests/ui/fail/account_shadowed_scalar.rs:9:2
+   |
+ 9 |     pub struct u8(pub ::core::primitive::u8);
+   |     ^^^^^^^^^^^^^
+   = help: the following other types implement trait `FromZc`:
+             Address
+             Option<T>
+             PodBool
+             PodI128
+             PodI16
+             PodI32
+             PodI64
+             PodOption<T, PFX>
+           and $N others
+   = note: this error originates in the attribute macro `account` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: add `#![feature(trivial_bounds)]` to the crate attributes to enable
+   |
+ 3 + #![feature(trivial_bounds)]
+   |
+
 error[E0308]: mismatched types
   --> tests/ui/fail/account_shadowed_scalar.rs:21:1
    |

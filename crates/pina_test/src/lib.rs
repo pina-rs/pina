@@ -44,7 +44,6 @@ pub use solana_signer::Signer;
 use solana_transaction::Transaction;
 use solana_transaction::versioned::VersionedTransaction;
 pub use solana_transaction_error::TransactionError;
-use surfpool_sdk::BlockProductionMode;
 use surfpool_sdk::Surfnet;
 use surfpool_sdk::SurfnetError;
 use surfpool_sdk::cheatcodes::builders::DeployProgram;
@@ -333,11 +332,20 @@ impl HistoricalEvent {
 /// The data includes the discriminator and migration version envelope. Tests
 /// install these bytes directly instead of constructing them with the current
 /// generated account type.
+///
+/// Without an explicit [`with_lamports`](Self::with_lamports) override, the
+/// installed balance is the rent-exempt minimum at the running instance's
+/// rates. The host cannot predict those rates: Surfpool applies mainnet rent,
+/// which differs from `Rent::default()`, and a fixture funded at the wrong rate
+/// either hides a rent deficit or leaves a surplus that distorts the migration
+/// budget. The value returned by [`account`](Self::account) is the default-rate
+/// estimate; the install step resolves the real one.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HistoricalAccount {
 	version: u32,
 	address: Pubkey,
 	account: Account,
+	lamports_explicit: bool,
 }
 
 impl HistoricalAccount {
@@ -357,13 +365,18 @@ impl HistoricalAccount {
 				executable: false,
 				rent_epoch: 0,
 			},
+			lamports_explicit: false,
 		}
 	}
 
 	/// Override lamports to exercise rent deficits, surplus retention, or overflow.
+	///
+	/// An explicit balance is installed verbatim; the default is resolved
+	/// against the running instance's rent schedule.
 	#[must_use]
 	pub const fn with_lamports(mut self, lamports: u64) -> Self {
 		self.account.lamports = lamports;
+		self.lamports_explicit = true;
 		self
 	}
 
@@ -380,6 +393,10 @@ impl HistoricalAccount {
 	}
 
 	/// Complete account state that will be installed.
+	///
+	/// The lamports are the default-rate estimate unless
+	/// [`with_lamports`](Self::with_lamports) was called; installation resolves
+	/// the rent-exempt minimum against the running instance otherwise.
 	#[must_use]
 	pub const fn account(&self) -> &Account {
 		&self.account
@@ -465,6 +482,20 @@ impl ProgramTest {
 	#[must_use]
 	pub const fn program_id(&self) -> Pubkey {
 		self.program_id
+	}
+
+	/// Rent-exempt lamport minimum for `size` bytes at the running instance's
+	/// rates.
+	///
+	/// Surfpool applies mainnet rent, which differs from `Rent::default()`. An
+	/// assertion that funds or refunds an exact balance has to quote the
+	/// runtime's schedule rather than the host default.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC cannot answer the query.
+	pub fn minimum_balance_for_rent_exemption(&self, size: usize) -> Result<u64, TestError> {
+		self.surfnet.minimum_balance_for_rent_exemption(size)
 	}
 
 	/// Address of the pre-funded transaction payer.
@@ -840,18 +871,15 @@ impl OfflineSurfnet {
 	///
 	/// Returns an error when Surfpool cannot allocate ports or start its runtime.
 	pub async fn start() -> Result<Self, TestError> {
-		// Surfpool 1.6.0's SDK default is `BlockProductionMode::Transaction`,
-		// but on an embedded offline instance that mode never confirms a
-		// submitted transaction: the client's confirmation loop spins
-		// indefinitely on `getSignatureStatuses`. `Clock` produces blocks on a
-		// timer and confirms normally. Reported upstream in
-		// <https://github.com/solana-foundation/surfpool/issues/814>; drop this
-		// override once the transaction-triggered path is fixed.
+		// Surfpool's SDK default is `BlockProductionMode::Transaction`, which
+		// produces a block when a transaction arrives rather than on a timer.
+		// Surfpool 1.6.0 never confirmed on that path; 1.7.0 restores it, so the
+		// embedded instance uses the default and keeps timer-driven slot growth
+		// out of tests that assert on timing.
 		let inner = start_with_one_retry(|| {
 			Surfnet::builder()
 				.offline(true)
 				.payer(Keypair::new_from_array(TEST_PAYER_SEED))
-				.block_production_mode(BlockProductionMode::Clock)
 				.start()
 		})
 		.await
@@ -1120,11 +1148,17 @@ impl OfflineSurfnet {
 	///
 	/// Returns an error when Surfpool rejects the direct state update.
 	pub fn install_historical_account(&self, fixture: &HistoricalAccount) -> Result<(), TestError> {
+		let lamports = if fixture.lamports_explicit {
+			fixture.account.lamports
+		} else {
+			self.minimum_balance_for_rent_exemption(fixture.account.data.len())?
+		};
+
 		self.inner
 			.cheatcodes()
 			.execute(
 				SetAccount::new(fixture.address)
-					.lamports(fixture.account.lamports)
+					.lamports(lamports)
 					.owner(fixture.account.owner)
 					.data(fixture.account.data.clone())
 					.rent_epoch(fixture.account.rent_epoch)
@@ -1479,6 +1513,18 @@ impl OfflineSurfnet {
 			.rpc_client()
 			.get_account(address)
 			.map_err(|error| test_error("fetch test account", error))
+	}
+
+	/// Rent-exempt lamport minimum for `size` bytes at the local RPC's rates.
+	///
+	/// # Errors
+	///
+	/// Returns an error when the local RPC cannot answer the query.
+	pub fn minimum_balance_for_rent_exemption(&self, size: usize) -> Result<u64, TestError> {
+		self.inner
+			.rpc_client()
+			.get_minimum_balance_for_rent_exemption(size)
+			.map_err(|error| test_error("fetch rent-exempt minimum", error))
 	}
 
 	/// Fetch an address balance from the local RPC.

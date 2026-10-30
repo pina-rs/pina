@@ -329,10 +329,11 @@ fn reserved_migrate_instruction_shares_one_lamport_budget_across_slots() {
 				.expect("install historical state");
 		}
 
-		// Each v0 state is rent-exempt at 42 bytes and grows two bytes across
-		// its ladder (two steps, 6,960 lamports each, 13,920 per account), so
-		// two accounts need 27,840 lamports — above the 24,000-lamport cap,
-		// which the cap must exceed for `ManualState`'s deeper ladder. The
+		// Each v0 state is rent-exempt at 42 bytes and grows two bytes in its
+		// first step (10,160 lamports at the mainnet rent Surfpool applies),
+		// so two accounts need 20,320 lamports — above the 18,000-lamport cap,
+		// which the cap must exceed for `ManualState`'s three-byte ladder
+		// (15,240 lamports). The
 		// cumulative budget crosses the cap on the second account's second
 		// step, after its first effect has landed, so the executor aborts the
 		// instruction with the post-effect panic instead of a typed error —
