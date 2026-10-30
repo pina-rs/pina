@@ -38,7 +38,7 @@ jobs:
         shell: devenv shell -c -- bash -e {0}
 
   rehearsal-worker-windows-probe:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ false }}
     timeout-minutes: 60
     runs-on: windows-latest
     steps:

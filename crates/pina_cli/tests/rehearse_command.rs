@@ -294,7 +294,7 @@ fn rehearsing_the_deployed_binary_is_clean() {
 	let output = harness.rehearse(&remote, Binary::Deployed, &[]);
 
 	assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
-	assert!(stderr(&output).contains("Starting a Surfpool fork of http://127.0.0.1:"));
+	assert!(stderr(&output).contains("Starting a private Surfpool fork of http://127.0.0.1:"));
 	insta::assert_snapshot!("rehearse_unchanged_text", stdout(&output, &remote));
 }
 
@@ -536,7 +536,7 @@ fn deploy_rehearsal_deploys_the_exact_rehearsed_bytes_when_nothing_changed() {
 
 	assert_eq!(output.status.code(), Some(0), "{stderr}");
 	assert!(
-		stderr.contains("Starting a Surfpool fork of http://127.0.0.1:"),
+		stderr.contains("Starting a private Surfpool fork of http://127.0.0.1:"),
 		"{stderr}"
 	);
 	assert!(stdout.starts_with("Deployment plan\n"), "{stdout}");
@@ -611,7 +611,10 @@ fn deploy_rehearsal_cannot_verify_a_first_deployment() {
 		stderr.contains("deploy it the first time without --rehearse"),
 		"{stderr}"
 	);
-	assert!(!stderr.contains("Starting a Surfpool fork"), "{stderr}");
+	assert!(
+		!stderr.contains("Starting a private Surfpool fork"),
+		"{stderr}"
+	);
 	assert!(stdout.starts_with("Deployment plan\n"), "{stdout}");
 	assert!(!stdout.contains("Rehearsal of "), "{stdout}");
 	assert_eq!(remote.methods(), ["getAccountInfo"]);
