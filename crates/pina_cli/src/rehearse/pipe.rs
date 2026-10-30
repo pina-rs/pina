@@ -247,6 +247,33 @@ mod tests {
 	}
 
 	#[test]
+	fn reports_an_unavailable_worker_executable() {
+		let directory = tempfile::tempdir().expect("create worker directory");
+		let error = PipeRpc::start(
+			&directory.path().join("missing-worker"),
+			"http://localhost",
+			Duration::from_secs(5),
+			Duration::from_secs(5),
+		)
+		.err()
+		.expect("missing worker must fail to start");
+		assert!(matches!(error, RpcError::Transport(_)));
+	}
+
+	#[test]
+	fn reports_a_worker_initialization_error() {
+		let error = fake(
+			r#"read -r init
+printf '%s\n' '{"error":"datasource failed"}'
+"#,
+			Duration::from_secs(5),
+		)
+		.err()
+		.expect("failed initialization must fail to start");
+		assert!(error.to_string().contains("datasource failed"));
+	}
+
+	#[test]
 	fn rejects_a_worker_with_an_incompatible_protocol() {
 		let error = fake(
 			r#"read -r init
@@ -317,6 +344,40 @@ printf '%s\n' '{"jsonrpc":"2.0","id":99,"result":null}'
 		assert!(matches!(
 			rpc.call("getAccountInfo", &json!([])),
 			Err(RpcError::Shape(_))
+		));
+	}
+
+	#[test]
+	fn rejects_a_response_without_a_result() {
+		let rpc = fake(
+			r#"read -r init
+printf '%s\n' '{"ready":true,"protocol":1,"pinaVersion":"__PINA_VERSION__"}'
+read -r request
+printf '%s\n' '{"jsonrpc":"2.0","id":1}'
+"#,
+			Duration::from_secs(5),
+		)
+		.expect("start fake worker");
+		assert!(matches!(
+			rpc.call("getAccountInfo", &json!([])),
+			Err(RpcError::Shape(message)) if message.contains("no result")
+		));
+	}
+
+	#[test]
+	fn reports_a_worker_that_closes_its_input() {
+		let rpc = fake(
+			r#"read -r init
+exec 0<&-
+printf '%s\n' '{"ready":true,"protocol":1,"pinaVersion":"__PINA_VERSION__"}'
+exec sleep 30
+"#,
+			Duration::from_secs(5),
+		)
+		.expect("start fake worker");
+		assert!(matches!(
+			rpc.call("getAccountInfo", &json!([])),
+			Err(RpcError::Transport(_))
 		));
 	}
 

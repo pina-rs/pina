@@ -9,6 +9,64 @@ use std::time::Instant;
 mod rehearse;
 
 #[test]
+fn worker_reports_datasource_initialization_failure() -> Result<(), Box<dyn std::error::Error>> {
+	use std::io::BufRead as _;
+	use std::io::Write as _;
+
+	let remote = rehearse::FakeRpcServer::start(|_, _| {
+		rehearse::Reply::Error(-32000, "datasource unavailable".to_owned())
+	});
+	let mut worker = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("__pina-rehearse-worker")
+		.env("NO_PROXY", "127.0.0.1")
+		.env("no_proxy", "127.0.0.1")
+		.stdin(Stdio::piped())
+		.stdout(Stdio::piped())
+		.stderr(Stdio::null())
+		.spawn()?;
+	let mut input = worker.stdin.take().ok_or("missing worker stdin")?;
+	let mut output = std::io::BufReader::new(worker.stdout.take().ok_or("missing worker stdout")?);
+	writeln!(input, "{}", serde_json::json!({"url": remote.url}))?;
+	let mut response = String::new();
+	output.read_line(&mut response)?;
+	let response: serde_json::Value = serde_json::from_str(&response)?;
+	assert!(
+		response["error"]
+			.as_str()
+			.is_some_and(|error| error.contains("could not initialize the rehearsal fork")),
+		"worker response: {response}"
+	);
+	let status = worker.wait()?;
+	drop(input);
+	assert!(
+		!status.success(),
+		"failed initialization must exit unsuccessfully"
+	);
+	Ok(())
+}
+
+#[test]
+fn worker_rejects_an_oversized_frame() -> Result<(), Box<dyn std::error::Error>> {
+	use std::io::Write as _;
+
+	let mut worker = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.arg("__pina-rehearse-worker")
+		.stdin(Stdio::piped())
+		.stdout(Stdio::null())
+		.stderr(Stdio::null())
+		.spawn()?;
+	let mut input = worker.stdin.take().ok_or("missing worker stdin")?;
+	input.write_all(&vec![b'x'; 4 * 1024 * 1024 + 1])?;
+	let status = worker.wait()?;
+	drop(input);
+	assert!(
+		!status.success(),
+		"oversized frames must terminate the worker"
+	);
+	Ok(())
+}
+
+#[test]
 fn worker_initializes_and_handles_private_fork_requests() -> Result<(), Box<dyn std::error::Error>>
 {
 	use std::io::BufRead as _;
