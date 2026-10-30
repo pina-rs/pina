@@ -23,7 +23,7 @@ To gate the upgrade itself, run the rehearsal as part of the deployment with [`p
 ## How a rehearsal runs
 
 1. **Fetch.** Pina confirms the program exists on the cluster (`getAccountInfo`), so a program that was never deployed fails before any Surfpool starts. It then asks the cluster for the program's most recent signatures (`getSignaturesForAddress`, at `confirmed` commitment) and fetches each transaction exactly as it landed. With `--signature`, only the named transactions are fetched.
-2. **Fork.** Pina starts a private Surfpool forked from the same RPC endpoint, on free loopback ports, inside a temporary directory, and waits up to a minute for it to answer. The fork is always stopped: on success, on error, on panic, and on Unix even when `pina` is interrupted or killed, because Surfpool runs under a small supervisor that stops it as soon as `pina` exits.
+2. **Fork.** Pina starts a private worker that forks the same RPC endpoint and waits up to a minute for it to become ready. The worker communicates with Pina through inherited pipes and does not expose a local RPC listener. Pina stops it when the rehearsal ends; the built-in worker also exits when its owner's pipe closes, including if Pina is killed during a request.
 3. **Freeze.** Every account the transactions touch is loaded into the fork in one pass. Accounts that do not exist are marked offline, so the remote is never consulted again: both runs see one frozen snapshot, even on a busy cluster.
 4. **Baseline.** Each signed transaction is profiled against the deployed program. Profiling executes on a throwaway copy of the fork, so nothing commits and every transaction sees the same snapshot.
 5. **Install.** The candidate is written into the program's own program-data account, as an upgrade would write it: the same account and upgrade authority, with the old executable's tail zeroed.
@@ -31,10 +31,10 @@ To gate the upgrade itself, run the rehearsal as part of the deployment with [`p
 
 Two Surfpool behaviours shape the design:
 
-- **Profiling validates blockhash age.** Real traffic carries blockhashes that expired long ago and would fail with `Blockhash not found`, so the fork runs with `--skip-blockhash-check`. Signature verification stays on: only authentic signed transactions are replayed.
+- **Profiling validates blockhash age.** Real traffic carries blockhashes that expired long ago and would fail with `Blockhash not found`, so the fork skips the blockhash-age check. Signature verification stays on: only authentic signed transactions are replayed.
 - **Surfpool hides failed program loads.** When it cannot load an ELF, it logs the error and keeps executing the previously cached program, so a broken candidate could otherwise rehearse as "unchanged". Pina confirms every program swap: it rewrites the program account with one extra lamport, which the runtime only stores after loading the ELF, and reads it back. A candidate the runtime rejects fails the rehearsal, because an upgrade to that ELF would be rejected the same way.
 
-The fork's clock never advances (`--block-production-mode manual`), so programs that read the `Clock` sysvar see the same time in both runs.
+The fork does not advance its clock during replay, so programs that read the `Clock` sysvar see the same time in both runs.
 
 ## Reading the report
 
@@ -70,12 +70,12 @@ The compute-unit table covers transactions that succeeded in both runs, per inst
 
 ## Exit status
 
-| Code | Meaning                                                                                                                                               |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0`  | At least one transaction was compared and none changed outcome or state. Compute-unit changes alone pass.                                             |
-| `2`  | At least one `state_changed` or `outcome_changed` transaction, without `--allow-changes`                                                              |
-| `3`  | No transaction was compared: every one was skipped, or there was no traffic. Nothing was verified.                                                    |
-| `1`  | Operational error: invalid input, missing Surfpool, a program that is not deployed, an RPC failure, a candidate the runtime rejects. Stdout is empty. |
+| Code | Meaning                                                                                                                                                    |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | At least one transaction was compared and none changed outcome or state. Compute-unit changes alone pass.                                                  |
+| `2`  | At least one `state_changed` or `outcome_changed` transaction, without `--allow-changes`                                                                   |
+| `3`  | No transaction was compared: every one was skipped, or there was no traffic. Nothing was verified.                                                         |
+| `1`  | Operational error: invalid input, an unavailable worker, a program that is not deployed, an RPC failure, a candidate the runtime rejects. Stdout is empty. |
 
 This follows the CLI's convention for comparisons (`pina profile compare`, `pina idl diff`, `pina verify check`): `2` means the comparison completed and found a difference. Clap also exits `2` for invalid arguments, but then prints usage to stderr and nothing to stdout. Use `--allow-changes` once the differences are reviewed and intended.
 

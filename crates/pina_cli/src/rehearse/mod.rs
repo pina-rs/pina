@@ -401,8 +401,7 @@ impl Endpoint {
 				})
 			}
 			RehearseNetwork::RpcUrl(url) => {
-				// Surfpool receives the URL as an argument, so it must pass the
-				// same checks as `pina dev --rpc-url`.
+				// Keep the same credential-free URL checks as `pina dev --rpc-url`.
 				crate::workflow::validate_surfpool_network(&SurfpoolNetwork::RpcUrl(url.clone()))?;
 
 				Ok(Self {

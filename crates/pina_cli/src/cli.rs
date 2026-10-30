@@ -908,7 +908,7 @@ Network safety:
 		/// Rehearse against a credential-free HTTP(S) RPC URL with a host.
 		///
 		/// User information, query parameters, fragments, and control characters are rejected.
-		/// Surfpool receives the URL in its arguments, so never put a secret anywhere in it.
+		/// Never put a secret anywhere in the URL, including its host or path.
 		#[arg(long, conflicts_with = "network", value_name = "URL")]
 		rpc_url: Option<String>,
 
