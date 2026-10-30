@@ -28,6 +28,7 @@ fn main() {
 	if private_worker() {
 		return;
 	}
+	register_cli_worker();
 	commands::run(Cli::parse());
 }
 
@@ -36,6 +37,7 @@ fn main() {
 	if private_worker() {
 		return;
 	}
+	register_cli_worker();
 	let cli = std::thread::Builder::new()
 		.stack_size(CLI_STACK_BYTES)
 		.spawn(|| commands::run(Cli::parse()))
@@ -64,4 +66,8 @@ fn private_worker() -> bool {
 		std::process::exit(1);
 	}
 	true
+}
+
+fn register_cli_worker() {
+	pina_cli::rehearse::worker::register_cli_executable();
 }

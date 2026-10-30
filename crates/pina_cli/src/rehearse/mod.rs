@@ -22,16 +22,16 @@
 //! which the runtime only stores when the program loads, and read back.
 
 mod catalog;
+mod pipe;
 pub mod report;
 pub(crate) mod rpc;
+#[cfg(test)]
 mod surfnet;
 mod wire;
 #[doc(hidden)]
 pub mod worker;
 
 use std::collections::BTreeSet;
-use std::ffi::OsStr;
-use std::ffi::OsString;
 use std::io;
 use std::io::Write;
 use std::path::Path;
@@ -69,9 +69,6 @@ use self::rpc::FetchedTransaction;
 use self::rpc::ForkRpc;
 use self::rpc::JsonRpc;
 use self::rpc::RpcError;
-use self::surfnet::Surfnet;
-use self::surfnet::SurfnetLaunch;
-use self::surfnet::SurfnetPorts;
 use self::wire::WireTransaction;
 use crate::build::BuildError;
 use crate::error::IdlError;
@@ -329,10 +326,9 @@ pub fn rehearse(
 ) -> Result<RehearsalReport, RehearseError> {
 	let endpoint = Endpoint::resolve(&options.network)?;
 	let selection = Selection::new(options)?;
-	let surfpool = surfpool_executable()?;
 	let target = Target::load(options, progress)?;
 
-	run(&endpoint, &selection, &target, &surfpool, progress)
+	run(&endpoint, &selection, &target, progress)
 }
 
 /// Rehearse exact candidate bytes against the program's recent traffic.
@@ -365,23 +361,7 @@ pub fn rehearse_candidate(
 		});
 	}
 
-	let surfpool = surfpool_executable()?;
-
-	run(&endpoint, &selection, &target, &surfpool, progress)
-}
-
-/// The Surfpool executable, once it is proven new enough.
-fn surfpool_executable() -> Result<OsString, RehearseError> {
-	let surfpool = crate::workflow::executable("PINA_SURFPOOL", "surfpool");
-	let (version, _) = crate::workflow::surfpool_version(&surfpool)?;
-
-	if !crate::workflow::meets_minimum(&version, MINIMUM_SURFPOOL_VERSION) {
-		return Err(RehearseError::SurfpoolTooOld {
-			found: version.to_string(),
-		});
-	}
-
-	Ok(surfpool)
+	run(&endpoint, &selection, &target, progress)
 }
 
 /// Fetch the traffic, fork the cluster, and replay it against both binaries.
@@ -389,28 +369,20 @@ fn run(
 	endpoint: &Endpoint,
 	selection: &Selection,
 	target: &Target,
-	surfpool: &OsStr,
 	progress: &mut dyn Write,
 ) -> Result<RehearsalReport, RehearseError> {
 	let remote = JsonRpc::new(&endpoint.url, REMOTE_TIMEOUT, false);
 	ensure_deployed(&remote, endpoint, target)?;
 	let transactions = fetch(&remote, endpoint, target, selection, progress)?;
-	let directory = tempfile::tempdir().map_err(RehearseError::WorkDirectory)?;
-	let ports = SurfnetPorts::allocate().map_err(RehearseError::WorkDirectory)?;
-	let _ = writeln!(progress, "Starting a Surfpool fork of {}", endpoint.label);
-	let surfnet = Surfnet::start(&SurfnetLaunch {
-		executable: surfpool,
-		fork_url: &endpoint.url,
-		ports,
-		directory: directory.path(),
-		ready_timeout: READY_TIMEOUT,
-		request_timeout: LOCAL_TIMEOUT,
-	})?;
-	let report = replay(surfnet.rpc(), endpoint, target, &transactions, progress);
-	// Stop the fork before its scratch directory is removed.
-	drop(surfnet);
-
-	report
+	let executable = worker::executable().map_err(RehearseError::StartSurfpool)?;
+	let _ = writeln!(
+		progress,
+		"Starting a private Surfpool fork of {}",
+		endpoint.label
+	);
+	let fork = pipe::PipeRpc::start(&executable, &endpoint.url, READY_TIMEOUT, LOCAL_TIMEOUT)
+		.map_err(|error| fork_error("start worker", &error))?;
+	replay(&fork, endpoint, target, &transactions, progress)
 }
 
 /// The remote RPC endpoint and the label reports show for it.

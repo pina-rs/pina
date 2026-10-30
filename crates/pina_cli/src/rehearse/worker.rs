@@ -8,6 +8,9 @@ use std::io::BufRead as _;
 use std::io::Read as _;
 use std::io::Write as _;
 use std::io::{self};
+use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 
 use crossbeam_channel::Receiver;
@@ -31,6 +34,25 @@ use surfpool_types::SimnetCommand;
 /// A program chunk is hex encoded, so the one-MiB chunk limit needs two MiB.
 const MAX_REQUEST_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
+
+static RUNNING_AS_PINA: AtomicBool = AtomicBool::new(false);
+
+/// Mark the Pina binary as the owner of its private worker entry point.
+#[doc(hidden)]
+pub fn register_cli_executable() {
+	RUNNING_AS_PINA.store(true, Ordering::Relaxed);
+}
+
+pub(crate) fn executable() -> io::Result<PathBuf> {
+	if let Some(path) = std::env::var_os("PINA_SURFPOOL") {
+		return Ok(PathBuf::from(path));
+	}
+	if RUNNING_AS_PINA.load(Ordering::Relaxed) {
+		std::env::current_exe()
+	} else {
+		Ok(PathBuf::from("pina"))
+	}
+}
 
 type Context = Option<RunloopContext>;
 type Handler = MetaIoHandler<Context>;
@@ -89,7 +111,10 @@ pub fn run() -> Result<(), String> {
 			return Err(error);
 		}
 	};
-	write_frame(&json!({"ready": true}).to_string())?;
+	write_frame(
+		&json!({"ready": true, "protocol": 1, "pinaVersion": env!("CARGO_PKG_VERSION")})
+			.to_string(),
+	)?;
 	for request in receiver {
 		let request =
 			std::str::from_utf8(&request).map_err(|_| "invalid request encoding".to_owned())?;

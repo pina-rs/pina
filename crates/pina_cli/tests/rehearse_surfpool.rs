@@ -393,8 +393,7 @@ fn counter_traffic_at(cluster: &RemoteCluster, program_id: &str, artifact: &Path
 	signatures
 }
 
-/// A `PINA_SURFPOOL` wrapper that appends its pid to a file and then `exec`s
-/// the real Surfpool, so every recorded pid is a fork `pina` started.
+/// A worker wrapper records its pid, then executes the real Pina worker.
 struct ForkRecorder {
 	directory: tempfile::TempDir,
 	executable: PathBuf,
@@ -406,15 +405,13 @@ impl ForkRecorder {
 			tempfile::tempdir().unwrap_or_else(|error| panic!("create recorder dir: {error}"));
 		let executable = directory.path().join("surfpool");
 		let pids = directory.path().join("pids");
-		let real = surfpool();
-		let real = real.to_string_lossy();
+		let real = env!("CARGO_BIN_EXE_pina");
 		assert!(
 			!real.contains('\'') && !pids.to_string_lossy().contains('\''),
 			"paths must not contain single quotes"
 		);
-		// The version probe exits at once; only `start` launches a fork.
 		let script = format!(
-			"#!/bin/sh\nif [ \"$1\" != \"--version\" ]; then\n\techo $$ >> '{}'\nfi\nexec '{real}' \"$@\"\n",
+			"#!/bin/sh\necho $$ >> '{}'\nexec '{real}' \"$@\"\n",
 			pids.display()
 		);
 		// Written without this process opening it, so `exec` cannot hit
@@ -439,8 +436,7 @@ impl ForkRecorder {
 
 	/// Assert the rehearsal started exactly one fork and that it has exited.
 	///
-	/// `pina` reaps the fork's supervisor, which reaps the fork, before it
-	/// exits, so a fork that is still running here was left behind.
+	/// `pina` reaps its worker before exiting, so a live worker was left behind.
 	fn assert_forks_stopped(&self) {
 		let pids = self.take();
 		assert_eq!(pids.len(), 1, "a rehearsal starts one fork: {pids:?}");

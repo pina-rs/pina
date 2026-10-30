@@ -16,12 +16,10 @@ mod fakes;
 mod support;
 
 use std::fs;
-use std::net::TcpListener;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
-use std::sync::Arc;
 
 use ed25519_dalek::SigningKey;
 use fakes::Binary;
@@ -29,11 +27,9 @@ use fakes::FakeFork;
 use fakes::FakeRpcServer;
 use fakes::Fixtures;
 use fakes::ForkFaults;
-use fakes::Handler;
 use fakes::Reply;
 use fakes::remote_handler;
 use fakes::remote_handler_for;
-use fakes::serve_forever;
 use serde_json::Value;
 use serde_json::json;
 
@@ -44,25 +40,54 @@ fn workspace_root() -> &'static Path {
 		.unwrap_or_else(|| Path::new("."))
 }
 
-/// Serve a fake fork when the fake Surfpool launches this binary.
+/// Serve the existing fake fork over the private worker protocol.
 #[test]
-#[ignore = "sentinel: the fake Surfpool runs it to serve a fork on its port"]
-fn fake_surfnet_sentinel() {
-	let Some(port) = std::env::var("PINA_FAKE_SURFNET_PORT")
-		.ok()
-		.and_then(|port| port.parse::<u16>().ok())
-	else {
-		return;
+#[ignore = "sentinel: the fake worker launches this test binary"]
+fn fake_worker_sentinel() {
+	use std::io::BufRead as _;
+	use std::io::Write as _;
+	let input = std::io::stdin();
+	let mut lines = input.lock().lines();
+	let _ = lines.next();
+	let mut output = std::fs::OpenOptions::new()
+		.write(true)
+		.open("/dev/fd/3")
+		.unwrap_or_else(|error| panic!("open worker output: {error}"));
+	let version = if std::env::var("PINA_FAKE_SURFPOOL_VERSION").as_deref() == Ok("1.5.0") {
+		"incompatible"
+	} else {
+		env!("CARGO_PKG_VERSION")
 	};
-	let listener = TcpListener::bind(("127.0.0.1", port))
-		.unwrap_or_else(|error| panic!("bind the fake fork on {port}: {error}"));
+	writeln!(
+		output,
+		"{}",
+		json!({"ready": true, "protocol": 1, "pinaVersion": version})
+	)
+	.unwrap_or_else(|error| panic!("write worker readiness: {error}"));
+	output
+		.flush()
+		.unwrap_or_else(|error| panic!("flush worker readiness: {error}"));
 	let fork = std::env::var("PINA_FAKE_SURFNET_PROGRAM_ID").map_or_else(
 		|_| FakeFork::new(ForkFaults::default()),
 		|program_id| FakeFork::for_program(&program_id, ForkFaults::default()),
 	);
-	let handler: Handler = Arc::new(move |method, params| fork.handle(method, params));
-
-	serve_forever(&listener, &handler);
+	for line in lines {
+		let line = line.unwrap_or_else(|error| panic!("read worker request: {error}"));
+		let request: Value = serde_json::from_str(&line)
+			.unwrap_or_else(|error| panic!("parse worker request: {error}"));
+		let method = request["method"].as_str().unwrap_or_default();
+		let response = match fork.handle(method, &request["params"]) {
+			Reply::Result(result) => json!({"jsonrpc":"2.0", "id":request["id"], "result":result}).to_string(),
+			Reply::Error(code, message) => json!({"jsonrpc":"2.0", "id":request["id"], "error":{"code":code, "message":message}}).to_string(),
+			Reply::Body(bytes) => String::from_utf8(bytes).unwrap_or_else(|error| panic!("fake body UTF-8: {error}")),
+			Reply::Status(status) => panic!("fake worker does not support HTTP status {status}"),
+		};
+		writeln!(output, "{response}")
+			.unwrap_or_else(|error| panic!("write worker response: {error}"));
+		output
+			.flush()
+			.unwrap_or_else(|error| panic!("flush worker response: {error}"));
+	}
 }
 
 /// Scratch space with a fake Surfpool and candidate binaries.
@@ -79,22 +104,11 @@ impl Harness {
 		write_executable(
 			&surfpool,
 			r#"#!/bin/sh
-if [ "$1" = "--version" ]; then
-	echo "surfpool $PINA_FAKE_SURFPOOL_VERSION"
-	exit 0
-fi
 if [ -n "$PINA_FAKE_SURFPOOL_REPLACE" ]; then
 	printf 'replaced while rehearsing' > "$PINA_FAKE_SURFPOOL_REPLACE"
 fi
-port=""
-previous=""
-for argument in "$@"; do
-	if [ "$previous" = "--port" ]; then
-		port="$argument"
-	fi
-	previous="$argument"
-done
-PINA_FAKE_SURFNET_PORT="$port" exec "$PINA_FAKE_SURFNET_EXE" --ignored --exact fake_surfnet_sentinel --quiet
+exec 3>&1
+exec "$PINA_FAKE_SURFNET_EXE" --ignored --exact fake_worker_sentinel --quiet 1>&2
 "#,
 		);
 
@@ -360,11 +374,6 @@ fn operational_errors_exit_one_without_output() {
 			"invalid transaction signature \"not-a-signature\"",
 		),
 		(
-			vec!["--network".to_owned(), "devnet".to_owned()],
-			"1.5.0",
-			"`pina rehearse` requires Surfpool 1.6.0 or newer",
-		),
-		(
 			vec![
 				"--network".to_owned(),
 				"testnet".to_owned(),
@@ -396,6 +405,23 @@ fn operational_errors_exit_one_without_output() {
 		.unwrap_or_else(|error| panic!("run pina rehearse: {error}"));
 	assert_eq!(missing_network.status.code(), Some(2));
 	assert!(stderr(&missing_network).contains("--network <CLUSTER>"));
+}
+
+#[test]
+fn rejects_an_incompatible_private_worker() {
+	let harness = Harness::new();
+	let remote = FakeRpcServer::start(remote_handler(&Fixtures::load()));
+	let output = harness
+		.pina("1.5.0")
+		.arg("--project")
+		.arg(workspace_root().join("examples/counter_program"))
+		.args(["--rpc-url", &remote.url])
+		.arg("--program")
+		.arg(harness.candidate(Binary::Deployed))
+		.output()
+		.unwrap_or_else(|error| panic!("run pina rehearse: {error}"));
+	assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+	assert!(stderr(&output).contains("worker is incompatible or did not become ready"));
 }
 
 #[test]
@@ -663,7 +689,7 @@ fn deploy_rehearsal_failures_and_flag_misuse_never_deploy() {
 
 	assert_eq!(old_surfpool.status.code(), Some(1), "{stderr_text}");
 	assert!(
-		stderr_text.contains("the rehearsal failed: Surfpool 1.5.0 is too old"),
+		stderr_text.contains("worker is incompatible or did not become ready"),
 		"{stderr_text}"
 	);
 
