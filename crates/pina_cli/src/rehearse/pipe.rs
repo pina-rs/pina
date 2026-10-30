@@ -406,3 +406,60 @@ read -r request
 		));
 	}
 }
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+	use super::*;
+
+	#[test]
+	fn timed_out_worker_terminates_its_descendant() {
+		let directory = tempfile::tempdir().expect("create worker directory");
+		let pid_file = directory.path().join("descendant.pid");
+		let path = pid_file.to_string_lossy().replace('\'', "''");
+		let script = r#"
+$null = [Console]::ReadLine()
+$child = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile', '-NonInteractive', '-Command', 'Start-Sleep -Seconds 30' -NoNewWindow -PassThru
+[System.IO.File]::WriteAllText('__PID_FILE__', [string]$child.Id)
+[Console]::WriteLine('{"ready":true,"protocol":1,"pinaVersion":"__PINA_VERSION__"}')
+$null = [Console]::ReadLine()
+$child.WaitForExit()
+"#
+		.replace("__PID_FILE__", &path)
+		.replace("__PINA_VERSION__", env!("CARGO_PKG_VERSION"));
+		let mut command = Command::new("powershell.exe");
+		command.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+		let rpc = PipeRpc::start_command(
+			command,
+			"http://localhost",
+			Duration::from_secs(30),
+			Duration::from_millis(100),
+		)
+		.expect("start fake worker");
+		let pid = std::fs::read_to_string(pid_file)
+			.expect("read descendant pid")
+			.trim()
+			.parse::<u32>()
+			.expect("parse descendant pid");
+		assert!(matches!(
+			rpc.call("getAccountInfo", &json!([])),
+			Err(RpcError::Transport(_))
+		));
+		drop(rpc);
+
+		let status = Command::new("powershell.exe")
+			.args(["-NoProfile", "-NonInteractive", "-Command"])
+			.arg(format!(
+				"if (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ exit 0 }} else {{ exit 11 }}"
+			))
+			.stdout(Stdio::null())
+			.stderr(Stdio::null())
+			.status()
+			.expect("inspect descendant");
+		if status.code() != Some(11) {
+			let _ = Command::new("taskkill.exe")
+				.args(["/PID", &pid.to_string(), "/T", "/F"])
+				.status();
+		}
+		assert_eq!(status.code(), Some(11), "the worker's descendant survived");
+	}
+}

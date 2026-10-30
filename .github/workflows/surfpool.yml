@@ -19,6 +19,40 @@ concurrency:
 # Pull requests that touch nothing it exercises skip the job; pushes to
 # `main` always run it. Label a pull request `ci-full` to force a run.
 jobs:
+  rehearsal-worker-probe:
+    if: ${{ false }}
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: $/.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: test private worker and CLI behavior
+        run: |
+          cargo test --locked --all-features -p pina_cli --lib rehearse::pipe::tests
+          cargo test --locked --all-features -p pina_cli --test rehearse_command
+          cargo test --locked --all-features -p pina_cli --test rehearse_worker_lifecycle
+        shell: devenv shell -c -- bash -e {0}
+
+  rehearsal-worker-windows-probe:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    timeout-minutes: 60
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: nightly-2026-02-20
+      - name: test private worker lifecycle
+        run: |
+          cargo test --locked --all-features -p pina_cli --lib rehearse::pipe::windows_tests
+          cargo test --locked --all-features -p pina_cli --test rehearse_worker_lifecycle
+
   changes:
     name: detect changes
     timeout-minutes: 10
@@ -58,7 +92,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-24.04
     needs: changes
-    if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+    if: ${{ github.event_name != 'workflow_dispatch' && !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
