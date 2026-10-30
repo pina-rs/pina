@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const WARMUP_RUNS = 1;
-const BENCHMARK_RUNS = 6;
+const SAMPLE_ROUNDS = 8;
 const COMMANDS = [
 	{ id: "version", args: ["--version"] },
 	{ id: "root help", args: ["--help"] },
@@ -38,11 +38,24 @@ const COMMANDS = [
 interface HyperfineResult {
 	command: string;
 	mean: number;
-	stddev: number;
+	stddev: number | null;
+	median: number;
+	min: number;
+	max: number;
+	user: number;
+	system: number;
+	times: number[];
+	exit_codes: number[];
 }
 
-interface HyperfineReport {
-	results: HyperfineResult[];
+interface Invocation {
+	name: string;
+	command: string;
+}
+
+interface InvocationPair {
+	base: Invocation | undefined;
+	head: Invocation;
 }
 
 interface Arguments {
@@ -163,12 +176,99 @@ function commandSucceeds(binary: string, args: readonly string[]): boolean {
 	return result.status === 0;
 }
 
+/** Read finite, nonnegative timing values from hyperfine's external JSON. */
+function timing(value: unknown): number {
+	if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+		throw new Error("hyperfine returned an invalid timing");
+	}
+	return value;
+}
+
+/** Reject failed commands and incomplete single-sample rounds before comparison. */
+function parseResults(value: unknown): HyperfineResult[] {
+	if (
+		value === null || typeof value !== "object" || !("results" in value) ||
+		!Array.isArray(value.results)
+	) {
+		throw new Error("hyperfine omitted its results");
+	}
+	const rows: unknown[] = value.results;
+	return rows.map((row) => {
+		if (row === null || typeof row !== "object") {
+			throw new Error("hyperfine returned an invalid result");
+		}
+		const fields = row as Record<string, unknown>;
+		if (
+			typeof fields.command !== "string" || !Array.isArray(fields.times) ||
+			fields.times.length !== 1 || !Array.isArray(fields.exit_codes) ||
+			fields.exit_codes.length !== 1 || fields.exit_codes[0] !== 0
+		) {
+			throw new Error("hyperfine returned failed or incomplete samples");
+		}
+		const samples: unknown[] = fields.times;
+		return {
+			command: fields.command,
+			mean: timing(fields.mean),
+			stddev: fields.stddev === null ? null : timing(fields.stddev),
+			median: timing(fields.median),
+			min: timing(fields.min),
+			max: timing(fields.max),
+			user: timing(fields.user),
+			system: timing(fields.system),
+			times: samples.map(timing),
+			exit_codes: [0],
+		};
+	});
+}
+
+/** Sum the same samples in the same order while retaining their original order separately. */
+function mean(values: number[]): number {
+	return values.toSorted((a, b) => a - b).reduce(
+		(sum, value) => sum + value,
+		0,
+	) /
+		values.length;
+}
+
+/** Combine all successful rounds; report means without dropping any raw timing. */
+function aggregate(name: string, samples: HyperfineResult[]): HyperfineResult {
+	if (samples.length !== SAMPLE_ROUNDS) {
+		throw new Error(`incomplete rounds for ${name}`);
+	}
+	const times = samples.flatMap((sample) => sample.times);
+	const average = mean(times);
+	const sorted = times.toSorted((a, b) => a - b);
+	const middle = sorted.length / 2;
+	const lower = sorted[middle - 1];
+	const upper = sorted[middle];
+	if (lower === undefined || upper === undefined) {
+		throw new Error(`incomplete median samples for ${name}`);
+	}
+	return {
+		command: name,
+		mean: average,
+		stddev: Math.sqrt(
+			times.reduce((sum, value) => sum + (value - average) ** 2, 0) /
+				(times.length - 1),
+		),
+		median: (lower + upper) / 2,
+		min: Math.min(...times),
+		max: Math.max(...times),
+		user: mean(samples.map((sample) => sample.user)),
+		system: mean(samples.map((sample) => sample.system)),
+		times,
+		exit_codes: samples.flatMap((sample) => sample.exit_codes),
+	};
+}
+
 function formatCount(count: number, singular: string): string {
 	return `${count} ${singular}${count === 1 ? "" : "s"}`;
 }
 
 function run(arguments_: Arguments): void {
-	const commands: string[] = [];
+	rmSync(arguments_.jsonOutput, { force: true });
+	rmSync(arguments_.markdownOutput, { force: true });
+	const pairs: InvocationPair[] = [];
 	const baseSupported = new Map<string, boolean>();
 	const cleanPaths = COMMANDS.filter((command) => "clean" in command).map(
 		(command) => resolve(command.clean),
@@ -203,56 +303,105 @@ function run(arguments_: Arguments): void {
 			);
 		}
 
-		if (supportsBase) {
-			const baseInvocation = [arguments_.baseBin, ...command.args]
-				.map(shellQuote)
-				.join(" ");
-			commands.push(
-				"--command-name",
-				`base/${command.id}`,
-				baseInvocation,
-			);
-		}
-
-		const headInvocation = [arguments_.headBin, ...command.args]
-			.map(shellQuote)
-			.join(" ");
-		commands.push("--command-name", `head/${command.id}`, headInvocation);
+		pairs.push({
+			base: supportsBase
+				? {
+					name: `base/${command.id}`,
+					command: [arguments_.baseBin, ...command.args].map(shellQuote).join(
+						" ",
+					),
+				}
+				: undefined,
+			head: {
+				name: `head/${command.id}`,
+				command: [arguments_.headBin, ...command.args].map(shellQuote).join(
+					" ",
+				),
+			},
+		});
 	}
 
 	mkdirSync(dirname(arguments_.jsonOutput), { recursive: true });
-	const hyperfineArguments = [
-		"--warmup",
-		String(WARMUP_RUNS),
-		"--runs",
-		String(BENCHMARK_RUNS),
-		"--style",
-		"basic",
-		"--shell=none",
-		...prepareArgument,
-		"--export-json",
+	const measurements = new Map<string, HyperfineResult[]>();
+	for (const pair of pairs) {
+		if (pair.base !== undefined) measurements.set(pair.base.name, []);
+		measurements.set(pair.head.name, []);
+	}
+	const executionOrder: string[] = [];
+	const rounds: unknown[] = [];
+	const roundOutput = `${arguments_.jsonOutput}.round.json`;
+	for (let round = 0; round < SAMPLE_ROUNDS; round++) {
+		const baseFirst = round % 2 === 0;
+		executionOrder.push(baseFirst ? "base-first" : "head-first");
+		const commands = pairs.flatMap((pair) => {
+			const ordered = pair.base === undefined
+				? [pair.head]
+				: baseFirst
+				? [pair.base, pair.head]
+				: [pair.head, pair.base];
+			return ordered.flatMap((invocation) => [
+				"--command-name",
+				invocation.name,
+				invocation.command,
+			]);
+		});
+		const hyperfineArguments = [
+			"--warmup",
+			String(WARMUP_RUNS),
+			"--runs",
+			"1",
+			"--style",
+			"basic",
+			"--shell=none",
+			...prepareArgument,
+			"--export-json",
+			roundOutput,
+			...commands,
+		];
+		const hyperfineBinary = process.env.PINA_HYPERFINE_BIN;
+		const hyperfine = hyperfineBinary === undefined
+			? spawnSync("cargo", ["hyperfine", ...hyperfineArguments], {
+				stdio: "inherit",
+			})
+			: spawnSync(hyperfineBinary, hyperfineArguments, { stdio: "inherit" });
+		if (hyperfine.error !== undefined) throw hyperfine.error;
+		if (hyperfine.status !== 0) {
+			throw new Error(`hyperfine failed with status ${hyperfine.status ?? 1}`);
+		}
+		const report: unknown = JSON.parse(readFileSync(roundOutput, "utf8"));
+		const seen = new Set<string>();
+		for (const result of parseResults(report)) {
+			const samples = measurements.get(result.command);
+			if (samples === undefined || seen.has(result.command)) {
+				throw new Error(`unexpected or duplicate command: ${result.command}`);
+			}
+			seen.add(result.command);
+			samples.push(result);
+		}
+		if (seen.size !== measurements.size) {
+			throw new Error("hyperfine omitted commands from a round");
+		}
+		rounds.push(report);
+		rmSync(roundOutput);
+	}
+	const results = new Map(
+		[...measurements].map((
+			[name, samples],
+		) => [name, aggregate(name, samples)]),
+	);
+	writeFileSync(
 		arguments_.jsonOutput,
-		...commands,
-	];
-	const hyperfineBinary = process.env.PINA_HYPERFINE_BIN;
-	const hyperfine = hyperfineBinary === undefined
-		? spawnSync("cargo", ["hyperfine", ...hyperfineArguments], {
-			stdio: "inherit",
-		})
-		: spawnSync(hyperfineBinary, hyperfineArguments, { stdio: "inherit" });
-
-	if (hyperfine.error !== undefined) {
-		throw hyperfine.error;
-	}
-
-	if (hyperfine.status !== 0) {
-		throw new Error(`hyperfine failed with status ${hyperfine.status ?? 1}`);
-	}
-
-	const report = JSON.parse(
-		readFileSync(arguments_.jsonOutput, "utf8"),
-	) as HyperfineReport;
-	const results = new Map(report.results.map((item) => [item.command, item]));
+		JSON.stringify(
+			{
+				sampleRuns: SAMPLE_ROUNDS,
+				executionOrder,
+				rounds,
+				results: [...results.values()],
+			},
+			null,
+			2,
+		) + "\n",
+	);
 	const rows: string[] = [];
 	const statuses: PerformanceStatus[] = [];
 
@@ -313,7 +462,7 @@ function run(arguments_: Arguments): void {
 		"<details>",
 		"<summary>View CLI benchmark details</summary>",
 		"",
-		`Measured with hyperfine --shell=none --warmup ${WARMUP_RUNS} --runs ${BENCHMARK_RUNS}. Positive change means the pull request is faster.`,
+		`Mean of ${SAMPLE_ROUNDS} interleaved rounds with hyperfine --shell=none --warmup ${WARMUP_RUNS} --runs 1 per round. Each side runs first equally often. Raw samples and execution order are retained in JSON. Positive change means the pull request is faster.`,
 		"",
 		"| Command | Base | Head | Performance change | Status |",
 		"| ------- | ---: | ---: | -----------------: | ------ |",

@@ -465,6 +465,41 @@ fn account_view_loaders_scope_compact_borrows() {
 }
 
 #[test]
+fn compact_assert_stored_bump_checks_the_declared_field_at_runtime() {
+	let authority = Address::new_from_array([31; 32]);
+	let (address, bump) = CompactPdaState::find_pda(&authority, &OWNER);
+	let seeds = CompactPdaState::seeds(&authority);
+	let (alternate_address, alternate_bump) = (0..bump)
+		.find_map(|candidate| {
+			create_program_address(&seeds.with_bump(candidate).as_slices(), &OWNER)
+				.ok()
+				.map(|address| (address, candidate))
+		})
+		.unwrap_or_else(|| panic!("the fixed seeds have an alternate valid PDA"));
+	let mut stored = TestAccount::<{ CompactPdaState::MAX_SIZE }>::new_with_address(address);
+	CompactPdaState::initialize(
+		&mut stored.data,
+		&CompactPdaStatePatch::new().bump(bump).authority(authority),
+	)
+	.unwrap_or_else(|error| panic!("initialize compact PDA: {error:?}"));
+
+	assert_eq!(
+		CompactPdaState::assert_stored_bump(&stored.view(), bump, &authority, &OWNER),
+		Ok(()),
+	);
+
+	stored.header.address = alternate_address;
+	assert_eq!(
+		CompactPdaState::assert_stored_bump(&stored.view(), alternate_bump, &authority, &OWNER),
+		Err(ProgramError::InvalidSeeds),
+	);
+
+	stored.header.address = address;
+	stored.data[0] = 0;
+	assert!(CompactPdaState::assert_stored_bump(&stored.view(), bump, &authority, &OWNER).is_err());
+}
+
+#[test]
 fn compact_pda_loader_validates_data_and_address_in_one_borrow() {
 	let authority = Address::new_from_array([7; 32]);
 	let (address, bump) = CompactPdaState::find_pda(&authority, &OWNER);

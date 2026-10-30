@@ -38,6 +38,8 @@ pub enum TestAccountType {
 	CounterState = 2,
 	InterleavedState = 3,
 	LongSeedState = 4,
+	/// Keeps the seed argument distinct from the stored bump field.
+	SeedNamedBumpState = 5,
 }
 
 /// On-chain state exercising every supported seed type.
@@ -85,6 +87,14 @@ pub struct TestState {
 pub struct CounterState {
 	pub authority: Address,
 	pub bump: u8,
+}
+
+/// A seed named `bump` is independent of the declared stored bump field.
+#[account(crate = ::pina, discriminator = TestAccountType, variant = SeedNamedBumpState)]
+#[pda(crate = ::pina, seeds = [b"seed-named-bump", bump: u8], bump = stored_bump)]
+pub struct SeedNamedBumpState {
+	/// The bump used to derive the account, rather than the `bump` seed argument.
+	pub stored_bump: u8,
 }
 
 /// A PDA whose byte-string constants interleave with its variable seeds.
@@ -141,6 +151,17 @@ fn build_test_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
 		Ok(())
 	})
 	.expect("valid account storage");
+	bytes
+}
+
+fn build_counter_state_bytes(authority: Address, bump: u8) -> Vec<u8> {
+	let mut bytes = vec![0u8; CounterState::SIZE];
+	CounterState::initialize(&mut bytes, |state| {
+		state.authority = authority;
+		state.bump = bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("valid counter storage: {error:?}"));
 	bytes
 }
 
@@ -537,6 +558,127 @@ fn assert_seeds_rejects_wrong_seed_value() {
 }
 
 #[test]
+fn assert_stored_bump_rejects_an_alternate_valid_pda_with_a_different_stored_bump() {
+	let authority = unique_address(64);
+	let (_, stored_bump) = CounterState::find_pda(&authority, &TEST_PROGRAM_ID);
+	let seeds = CounterState::seeds(&authority);
+	let (alternate_address, supplied_bump) = (0..stored_bump)
+		.find_map(|bump| {
+			create_program_address(&seeds.with_bump(bump).as_slices(), &TEST_PROGRAM_ID)
+				.ok()
+				.map(|address| (address, bump))
+		})
+		.unwrap_or_else(|| panic!("the fixed seeds have an alternate valid PDA"));
+	let bytes = build_counter_state_bytes(authority, stored_bump);
+	let test_account = build_account_view(alternate_address, &bytes);
+
+	// The supplied bump derives this address, but the typed account stores a
+	// different bump. Argument provenance cannot establish this invariant.
+	assert_eq!(
+		test_account
+			.view
+			.as_account::<CounterState>(&TEST_PROGRAM_ID)
+			.unwrap()
+			.bump,
+		stored_bump,
+	);
+	assert_eq!(
+		CounterState::assert_stored_bump(
+			&test_account.view,
+			supplied_bump,
+			&authority,
+			&TEST_PROGRAM_ID,
+		),
+		Err(ProgramError::InvalidSeeds),
+	);
+
+	// This helper proves consistency with stored state, not canonicality.
+	let matching_bytes = build_counter_state_bytes(authority, supplied_bump);
+	let matching_account = build_account_view(alternate_address, &matching_bytes);
+	assert_eq!(
+		CounterState::assert_stored_bump(
+			&matching_account.view,
+			supplied_bump,
+			&authority,
+			&TEST_PROGRAM_ID,
+		),
+		Ok(()),
+	);
+}
+
+#[test]
+fn assert_stored_bump_rejects_invalid_accounts_even_when_a_fallback_derives_the_address() {
+	let authority = unique_address(65);
+	let (address, bump) = CounterState::find_pda(&authority, &TEST_PROGRAM_ID);
+	let bytes = build_counter_state_bytes(authority, bump);
+	let mut wrong_type = bytes.clone();
+	wrong_type[0] = TestAccountType::TestState as u8;
+	let cases = [
+		build_account_view_with_owner(address, &bytes, unique_address(66)),
+		build_account_view(address, &wrong_type),
+		build_account_view(address, &[]),
+	];
+
+	for test_account in cases {
+		let parsed = test_account
+			.view
+			.as_account::<CounterState>(&TEST_PROGRAM_ID);
+		let expected_error = parsed
+			.as_ref()
+			.err()
+			.unwrap_or_else(|| panic!("the invalid account must fail typed parsing"))
+			.clone();
+		let fallback = parsed.map_or(bump, |state| state.bump);
+		assert_eq!(
+			CounterState::assert_stored_bump(
+				&test_account.view,
+				fallback,
+				&authority,
+				&TEST_PROGRAM_ID,
+			),
+			Err(expected_error),
+		);
+	}
+}
+
+#[test]
+fn assert_stored_bump_does_not_shadow_a_seed_named_bump() {
+	let seed_bump = 7;
+	let (address, stored_bump) = SeedNamedBumpState::find_pda(seed_bump, &TEST_PROGRAM_ID);
+	assert_ne!(seed_bump, stored_bump);
+	let mut bytes = vec![0u8; SeedNamedBumpState::SIZE];
+	SeedNamedBumpState::initialize(&mut bytes, |state| {
+		state.stored_bump = stored_bump;
+		Ok(())
+	})
+	.unwrap_or_else(|error| panic!("valid stored-bump state: {error:?}"));
+	let account = build_account_view(address, &bytes);
+
+	assert_eq!(
+		SeedNamedBumpState::assert_stored_bump(
+			&account.view,
+			stored_bump,
+			seed_bump,
+			&TEST_PROGRAM_ID,
+		),
+		Ok(()),
+	);
+	assert_eq!(
+		SeedNamedBumpState::assert_seeds(&account.view, seed_bump, &TEST_PROGRAM_ID),
+		Ok(()),
+	);
+	assert_eq!(
+		SeedNamedBumpState::assert_stored_bump(
+			&account.view,
+			stored_bump,
+			seed_bump + 1,
+			&TEST_PROGRAM_ID,
+		),
+		Err(ProgramError::InvalidSeeds),
+	);
+}
+
+#[test]
 fn assert_stored_bump_accepts_the_parsed_bump() {
 	let authority = unique_address(60);
 	let (pda, bump) = TestState::find_pda(&authority, 42, 1, [0xAB; 8], 7, 99, &TEST_PROGRAM_ID);
@@ -544,22 +686,33 @@ fn assert_stored_bump_accepts_the_parsed_bump() {
 	let state_bytes = build_test_state_bytes(authority, bump);
 	let test_account = build_account_view(pda, &state_bytes);
 	let account = test_account.view;
-	let result = TestState::assert_stored_bump(
-		&account,
-		bump,
-		&authority,
-		42,
-		1,
-		[0xAB; 8],
-		7,
-		99,
-		&TEST_PROGRAM_ID,
-	);
+	let validate = || {
+		TestState::assert_stored_bump(
+			&account,
+			bump,
+			&authority,
+			42,
+			1,
+			[0xAB; 8],
+			7,
+			99,
+			&TEST_PROGRAM_ID,
+		)
+	};
+	let result = validate();
 
 	assert!(
 		result.is_ok(),
 		"expected assert_stored_bump to accept the bump parsed from the account: {result:?}"
 	);
+
+	let mut aliased_account = account;
+	let held_borrow = aliased_account
+		.try_borrow_mut()
+		.unwrap_or_else(|error| panic!("hold mutable data borrow: {error:?}"));
+	assert_eq!(validate(), Err(ProgramError::AccountBorrowFailed));
+	drop(held_borrow);
+	assert_eq!(validate(), Ok(()));
 }
 
 #[test]

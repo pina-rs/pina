@@ -4,8 +4,9 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const SAMPLE_RUNS = 7;
-const BENCHMARK_PATTERN = /\[BENCH\] (.+): .*avg=(\d+)ns/u;
+const SAMPLE_RUNS = 8;
+const BENCHMARK_PATTERN =
+	/\[BENCH\] (.+): total=(\d+(?:\.\d+)?)(ns|µs|ms|s), avg=\d+ns \((\d+) iterations\)$/u;
 
 interface Arguments {
 	baseWorkspace: string;
@@ -18,6 +19,8 @@ interface Comparison {
 	id: string;
 	baseNanoseconds?: number;
 	headNanoseconds?: number;
+	baseSamples?: number[];
+	headSamples?: number[];
 	performancePercent?: number;
 }
 
@@ -28,6 +31,7 @@ type PerformanceStatus =
 	| "removed"
 	| "within-noise";
 
+/** Resolve revision workspaces and output paths before building either side. */
 function parseArguments(values: string[]): Arguments {
 	if (values.length !== 4) {
 		throw new Error(
@@ -43,6 +47,7 @@ function parseArguments(values: string[]): Arguments {
 	};
 }
 
+/** Build one revision and use Cargo's reported executable from its isolated target. */
 function buildBenchmark(workspace: string, target: string): string {
 	const result = spawnSync(
 		"cargo",
@@ -98,45 +103,69 @@ function buildBenchmark(workspace: string, target: string): string {
 	);
 }
 
+/** Average the middle pair for even samples; reject an empty measurement. */
 function median(values: number[]): number {
 	const sorted = values.toSorted((left, right) => left - right);
-	return sorted[Math.floor(sorted.length / 2)] ?? 0;
+	const middle = (sorted.length - 1) / 2;
+	const lower = sorted[Math.floor(middle)];
+	const upper = sorted[Math.ceil(middle)];
+
+	if (lower === undefined || upper === undefined) {
+		throw new Error("cannot calculate the median of an empty measurement");
+	}
+
+	return (lower + upper) / 2;
 }
 
-function measure(executable: string): Map<string, number> {
-	const samples = new Map<string, number[]>();
+/** Capture one successful run using full elapsed duration per iteration. */
+function measure(executable: string, samples: Map<string, number[]>): void {
+	const result = spawnSync(
+		executable,
+		["--nocapture", "--test-threads=1"],
+		{ encoding: "utf8" },
+	);
 
-	for (let index = 0; index < SAMPLE_RUNS; index += 1) {
-		const result = spawnSync(
-			executable,
-			["--nocapture", "--test-threads=1"],
-			{ encoding: "utf8" },
+	if (result.error !== undefined) {
+		throw result.error;
+	}
+
+	if (result.status !== 0) {
+		process.stderr.write(result.stderr ?? "");
+		throw new Error(
+			`core benchmark failed with status ${result.status ?? 1}`,
 		);
+	}
 
-		if (result.error !== undefined) {
-			throw result.error;
-		}
+	const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 
-		if (result.status !== 0) {
-			process.stderr.write(result.stderr ?? "");
-			throw new Error(
-				`core benchmark failed with status ${result.status ?? 1}`,
-			);
-		}
+	for (const line of output.split(/\r?\n/u)) {
+		const match = BENCHMARK_PATTERN.exec(line);
 
-		const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-
-		for (const line of output.split(/\r?\n/u)) {
-			const match = BENCHMARK_PATTERN.exec(line);
-
-			if (match === null) {
-				continue;
+		if (match === null) {
+			if (line.includes("[BENCH]")) {
+				throw new Error(`invalid benchmark output: ${line}`);
 			}
 
-			const id = match[1] ?? "unknown";
-			const nanoseconds = Number.parseInt(match[2] ?? "0", 10);
-			samples.set(id, [...(samples.get(id) ?? []), nanoseconds]);
+			continue;
 		}
+
+		const id = match[1] ?? "unknown";
+		const scale = { ns: 1, µs: 1_000, ms: 1_000_000, s: 1_000_000_000 };
+		const unit = match[3];
+		if (unit !== "ns" && unit !== "µs" && unit !== "ms" && unit !== "s") {
+			throw new Error(`unknown benchmark duration unit: ${unit}`);
+		}
+
+		const iterations = Number(match[4]);
+		const nanoseconds = Number(match[2]) * scale[unit] / iterations;
+		if (
+			!Number.isFinite(nanoseconds) || !Number.isSafeInteger(iterations) ||
+			iterations <= 0
+		) {
+			throw new Error(`invalid benchmark duration: ${line}`);
+		}
+
+		samples.set(id, [...(samples.get(id) ?? []), nanoseconds]);
 	}
 
 	if (samples.size === 0) {
@@ -144,27 +173,45 @@ function measure(executable: string): Map<string, number> {
 			`no [BENCH] measurements captured from ${executable}`,
 		);
 	}
-
-	return new Map(
-		[...samples].map(([id, values]) => [id, median(values)]),
-	);
 }
 
+/** Preserve raw samples beside medians and reject partially measured operations. */
 function compare(
-	base: Map<string, number>,
-	head: Map<string, number>,
+	base: Map<string, number[]>,
+	head: Map<string, number[]>,
 ): Comparison[] {
 	const ids = new Set([...base.keys(), ...head.keys()]);
 
 	return [...ids].toSorted().map((id) => {
-		const baseNanoseconds = base.get(id);
-		const headNanoseconds = head.get(id);
+		const baseSamples = base.get(id);
+		const headSamples = head.get(id);
+		for (const samples of [baseSamples, headSamples]) {
+			if (samples !== undefined && samples.length !== SAMPLE_RUNS) {
+				throw new Error(
+					`expected ${SAMPLE_RUNS} samples for ${id}, got ${samples.length}`,
+				);
+			}
+		}
+
+		const baseNanoseconds = baseSamples === undefined
+			? undefined
+			: median(baseSamples);
+		const headNanoseconds = headSamples === undefined
+			? undefined
+			: median(headSamples);
 		const performancePercent = baseNanoseconds === undefined ||
 				headNanoseconds === undefined || baseNanoseconds === 0
 			? undefined
 			: ((baseNanoseconds - headNanoseconds) / baseNanoseconds) * 100;
 
-		return { id, baseNanoseconds, headNanoseconds, performancePercent };
+		return {
+			id,
+			baseNanoseconds,
+			headNanoseconds,
+			baseSamples,
+			headSamples,
+			performancePercent,
+		};
 	});
 }
 
@@ -210,18 +257,37 @@ function formatNanoseconds(value: number | undefined): string {
 		: new Intl.NumberFormat("en-US").format(value);
 }
 
+/** Build both sides first, then balance their first and second execution positions. */
 function run(arguments_: Arguments): void {
 	mkdirSync(arguments_.outputDirectory, { recursive: true });
 	const baseExecutable = buildBenchmark(
 		arguments_.baseWorkspace,
-		arguments_.targetDirectory,
+		join(arguments_.targetDirectory, "base"),
 	);
-	const baseMeasurements = measure(baseExecutable);
 	const headExecutable = buildBenchmark(
 		arguments_.headWorkspace,
-		arguments_.targetDirectory,
+		join(arguments_.targetDirectory, "head"),
 	);
-	const comparisons = compare(baseMeasurements, measure(headExecutable));
+	const baseMeasurements = new Map<string, number[]>();
+	const headMeasurements = new Map<string, number[]>();
+	const executions = [
+		{ executable: baseExecutable, samples: baseMeasurements },
+		{ executable: headExecutable, samples: headMeasurements },
+	];
+	const executionOrder: ("base-first" | "head-first")[] = [];
+
+	for (let index = 0; index < SAMPLE_RUNS; index += 1) {
+		const order = index % 2 === 0 ? "base-first" : "head-first";
+		executionOrder.push(order);
+
+		for (
+			const run of order === "base-first" ? executions : executions.toReversed()
+		) {
+			measure(run.executable, run.samples);
+		}
+	}
+
+	const comparisons = compare(baseMeasurements, headMeasurements);
 	const statuses = comparisons.map(classify);
 	const regressions = statuses.filter((item) => item === "regressed").length;
 	const improvements = statuses.filter((item) => item === "improved").length;
@@ -248,7 +314,7 @@ function run(arguments_: Arguments): void {
 		"<details>",
 		"<summary>View core benchmark details</summary>",
 		"",
-		`Median of ${SAMPLE_RUNS} runs. Positive change means the pull request is faster.`,
+		`Median of ${SAMPLE_RUNS} interleaved runs, calculated from total duration without truncating to integer nanoseconds. Each side runs first equally often. Raw samples and execution order are retained in the JSON artifact. Positive change means the pull request is faster.`,
 		"",
 		"| Operation | Base | Head | Performance change | Status |",
 		"| --------- | ---: | ---: | -----------------: | ------ |",
@@ -278,7 +344,13 @@ function run(arguments_: Arguments): void {
 	);
 	writeFileSync(
 		join(arguments_.outputDirectory, "core.json"),
-		`${JSON.stringify({ sampleRuns: SAMPLE_RUNS, comparisons }, null, 2)}\n`,
+		`${
+			JSON.stringify(
+				{ sampleRuns: SAMPLE_RUNS, executionOrder, comparisons },
+				null,
+				2,
+			)
+		}\n`,
 		"utf8",
 	);
 }

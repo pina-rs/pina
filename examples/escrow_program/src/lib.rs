@@ -317,6 +317,18 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 
 		let (maker, mint_a, mint_b, amount_b, seed, bump) = {
 			let escrow = self.escrow.as_account::<EscrowState>(&ID)?;
+
+			// Creation uses invoke_signed, so this typed borrow can validate the
+			// off-curve address without loading the same account a second time.
+			if !is_derived_address(
+				self.escrow.address(),
+				&EscrowState::seeds(&escrow.maker, u64::from(escrow.seed)).as_slices(),
+				escrow.bump,
+				&ID,
+			) {
+				return Err(ProgramError::InvalidSeeds);
+			}
+
 			(
 				escrow.maker,
 				escrow.mint_a,
@@ -326,11 +338,6 @@ impl<'a> ProcessAccountInfos<'a> for TakeAccounts<'a> {
 				escrow.bump,
 			)
 		};
-
-		// Verify the escrow is the PDA for the maker and seed. The parse above
-		// already captured `bump`, so this performs the identical
-		// single-derivation check without re-parsing the account.
-		EscrowState::assert_stored_bump(self.escrow, bump, &maker, u64::from(seed), &ID)?;
 
 		// Validate maker and mint accounts
 		//

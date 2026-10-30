@@ -182,13 +182,8 @@ pub(crate) fn expand(
 		params
 	};
 
-	// The `assert_seeds` method (only when a bump field is declared)
-	let assert_seeds = args.bump.as_ref().map(|bump_field| {
-		let doc = format!(
-			"Assert that `account` is the PDA for the given seeds, using the stored \
-			 `{bump_field}` field."
-		);
-		let load_bump = if is_compact {
+	let load_bump = args.bump.as_ref().map(|bump_field| {
+		if is_compact {
 			quote! {
 				#crate_path::AsCompactAccount::with_compact_account::<Self, _>(
 					account,
@@ -198,7 +193,17 @@ pub(crate) fn expand(
 			}
 		} else {
 			quote!(#crate_path::AsAccount::as_account::<Self>(account, program_id)?.#bump_field)
-		};
+		}
+	});
+
+	// The `assert_seeds` method (only when a bump field is declared)
+	let assert_seeds = args.bump.as_ref().map(|bump_field| {
+		// The private binding must not capture a seed argument named `bump`.
+		let bump_ident = format_ident!("bump", span = proc_macro2::Span::mixed_site());
+		let doc = format!(
+			"Assert that `account` is the PDA for the given seeds, using the stored \
+			 `{bump_field}` field."
+		);
 		quote! {
 			#[doc = #doc]
 			pub fn assert_seeds(
@@ -206,8 +211,8 @@ pub(crate) fn expand(
 				#(#find_seed_params,)*
 				program_id: &#crate_path::Address,
 			) -> ::core::result::Result<(), #crate_path::ProgramError> {
-				let bump = #load_bump;
-				let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(bump);
+				let #bump_ident = #load_bump;
+				let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(#bump_ident);
 				<&#crate_path::AccountView as #crate_path::AccountInfoValidation>::assert_seeds_with_bump(
 					account,
 					&seeds.as_slices(),
@@ -218,24 +223,16 @@ pub(crate) fn expand(
 		}
 	});
 
-	// The `assert_stored_bump` variant (only when a bump field is declared):
-	// identical validation to `assert_seeds`, but the caller supplies a bump
-	// value it already read from `account`'s `{bump_field}` field in this
-	// instruction, so the method does not re-parse the account for it. The
-	// provenance contract is the method's name: `stored_bump` must originate
-	// from `account` itself, never from instruction data or another account.
 	let assert_stored_bump = args.bump.as_ref().map(|bump_field| {
 		let doc = format!(
-			"Assert that `account` is the PDA for the given seeds, using `stored_bump`: a \
-			 `{bump_field}` value the caller already read from `account` in this \
-			 instruction.\n\nThis performs the identical single-derivation check as \
-			 [`Self::assert_seeds`], without re-parsing `account` to read `{bump_field}` again. \
-			 The caller must have obtained `stored_bump` from `account`'s own `{bump_field}` \
-			 field — for example from the same `as_account`/`with_compact_account` parse that \
-			 produced the other fields it is validating against. Passing a bump from any other \
-			 source (instruction data, a different account) forfeits the stored-bump guarantee \
-			 this method exists to name, and the `require_canonical_bump_before_pda_write` lint \
-			 rejects such call sites."
+			"Assert that `account` is the PDA for the given seeds and that `stored_bump` \
+			 equals its declared `{bump_field}` field.\n\nParses the account to validate its \
+			 owner, type, and stored bump before checking the address. A mismatch returns \
+			 `ProgramError::InvalidSeeds`, even if the supplied bump derives the account's \
+			 address. Release any mutable account-data borrow before calling this method. \
+			 Use [`Self::assert_seeds`] when no supplied bump needs comparison. \
+			 This checks the stored bump, not its canonicality; canonical creation or a \
+			 checked PDA loader must establish namespace uniqueness."
 		);
 		quote! {
 			#[doc = #doc]
@@ -245,6 +242,10 @@ pub(crate) fn expand(
 				#(#find_seed_params,)*
 				program_id: &#crate_path::Address,
 			) -> ::core::result::Result<(), #crate_path::ProgramError> {
+				if stored_bump != #load_bump {
+					return Err(#crate_path::ProgramError::InvalidSeeds);
+				}
+
 				let seeds = Self::seeds(#(#seed_param_names,)*).with_bump(stored_bump);
 				<&#crate_path::AccountView as #crate_path::AccountInfoValidation>::assert_seeds_with_bump(
 					account,
