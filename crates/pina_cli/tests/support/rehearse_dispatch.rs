@@ -342,11 +342,15 @@ fn private_worker_exits_if_its_owner_is_killed_during_startup() -> Result<(), Er
 			.stdout(Stdio::null())
 			.stderr(Stdio::null())
 			.spawn()?;
-		let input = worker.stdin.as_mut().ok_or("worker has no stdin")?;
+		let mut input = worker.stdin.take().ok_or("worker has no stdin")?;
 		writeln!(input, "{}", json!({"url": url.to_string_lossy()}))?;
 		println!("{PID_PREFIX}{}", worker.id());
 		std::io::stdout().flush()?;
-		let _ = worker.wait()?;
+		// Child::wait closes an attached stdin. Keep this separate handle alive
+		// so the owner only loses it when the test kills the owner process.
+		let result = worker.wait();
+		drop(input);
+		let _ = result?;
 		return Err("worker exited before its owner was killed".into());
 	}
 
