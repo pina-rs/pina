@@ -19,6 +19,12 @@ final class ConfigInitializeCommand extends Command<void> {
         'program_config',
         mandatory: false,
         help: "The program_config account [default: derived]",
+      )
+      ..addOption(
+        'program_data',
+        mandatory: true,
+        help:
+            "Canonical loader-owned `ProgramData` authenticating the initial authority",
       );
   }
 
@@ -38,6 +44,10 @@ final class ConfigInitializeCommand extends Command<void> {
         : (await findProgramConfigPda(
             programAddress: context.programAddress,
           )).$1;
+    final programData = pubkey(
+      '--program-data',
+      results['program_data']! as String,
+    );
     final bumpValue = integer('--bump', results['bump']! as String);
     final treasuryValue = pubkey('--treasury', results['treasury']! as String);
     final creationFeeValue = bigInteger(
@@ -49,6 +59,7 @@ final class ConfigInitializeCommand extends Command<void> {
       authority: authority,
       programConfig: programConfig,
       systemProgram: Address("11111111111111111111111111111111"),
+      programData: programData,
       bump: bumpValue,
       treasury: treasuryValue,
       creationFee: creationFeeValue,

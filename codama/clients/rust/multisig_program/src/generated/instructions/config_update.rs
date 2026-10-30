@@ -11,7 +11,7 @@
 pub const CONFIG_UPDATE_DISCRIMINATOR: u8 = 1u8;
 /// Compute units `ConfigUpdate` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const CONFIG_UPDATE_MEASURED_COMPUTE_UNITS: u32 = 1731;
+pub const CONFIG_UPDATE_MEASURED_COMPUTE_UNITS: u32 = 1737;
 /// Compute unit limit to request for a transaction carrying `ConfigUpdate`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to

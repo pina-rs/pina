@@ -81,6 +81,7 @@ const SEED_PROPOSAL: &[u8] = b"proposal";
 const SEED_SPENDING_LIMIT: &[u8] = b"spending-limit";
 const SEED_VAULT: &[u8] = b"vault";
 const SEED_EPHEMERAL_SIGNER: &[u8] = b"ephemeral-signer";
+const UPGRADEABLE_LOADER: Address = address!("BPFLoaderUpgradeab1e11111111111111111111111");
 
 /// Seed prefix a legacy multisig PDA is derived with, under the legacy
 /// program, from the legacy `create_key`. An import only accepts the account
@@ -1529,6 +1530,8 @@ pub struct ConfigInitializeAccounts<'a> {
 	pub authority: &'a mut AccountView,
 	pub program_config: &'a mut AccountView,
 	pub system_program: &'a AccountView,
+	/// Canonical loader-owned `ProgramData` authenticating the initial authority.
+	pub program_data: &'a AccountView,
 }
 
 #[derive(Accounts)]
@@ -2023,6 +2026,22 @@ impl<'a> ProcessAccountInfos<'a> for ConfigInitializeAccounts<'a> {
 		let args = ConfigInitializeIx::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?.assert_writable()?;
+		let (program_data, _) = Address::find_program_address(&[ID.as_ref()], &UPGRADEABLE_LOADER);
+		self.program_data
+			.assert_address(&program_data)?
+			.assert_owner(&UPGRADEABLE_LOADER)?;
+		let metadata = self.program_data.try_borrow()?;
+
+		// Loader ProgramData: u32 variant, u64 slot, Option<Address>. Bootstrap
+		// before making the deployment immutable; only its current authority signs.
+		if metadata.get(..4) != Some(&3_u32.to_le_bytes())
+			|| metadata.get(12) != Some(&1)
+			|| metadata.get(13..45) != Some(self.authority.address().as_ref())
+		{
+			return Err(MultisigError::InvalidConfigAuthority.into());
+		}
+
+		drop(metadata);
 		self.system_program.assert_address(&system::ID)?;
 		let seeds = ProgramConfig::seeds();
 

@@ -116,6 +116,7 @@ Instruction getConfigInitializeInstruction({
   required Address authority,
   required Address programConfig,
   required Address systemProgram,
+  required Address programData,
   required int bump,
   required Address treasury,
   required BigInt creationFee,
@@ -132,6 +133,7 @@ Instruction getConfigInitializeInstruction({
       AccountMeta(address: authority, role: AccountRole.writableSigner),
       AccountMeta(address: programConfig, role: AccountRole.writable),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: programData, role: AccountRole.readonly),
     ],
     data: getConfigInitializeInstructionDataEncoder().encode(instructionData),
   );
