@@ -31,6 +31,7 @@ pub(crate) struct PipeRpc {
 	requests: Sender<Exchange>,
 	io_thread: Option<JoinHandle<()>>,
 	next_id: Cell<u64>,
+	stopped: Cell<bool>,
 	timeout: Duration,
 }
 
@@ -107,6 +108,7 @@ impl PipeRpc {
 			requests,
 			io_thread: Some(io_thread),
 			next_id: Cell::new(1),
+			stopped: Cell::new(false),
 			timeout,
 		};
 		let response = transport
@@ -145,13 +147,23 @@ impl PipeRpc {
 		match receiver.recv_timeout(timeout) {
 			Ok(result) => result.map_err(RpcError::Transport),
 			Err(mpsc::RecvTimeoutError::Timeout) => {
-				let _ = self.child.borrow_mut().kill();
+				self.stop();
 				Err(RpcError::Transport("worker request timed out".to_owned()))
 			}
 			Err(mpsc::RecvTimeoutError::Disconnected) => {
 				Err(RpcError::Transport("worker has exited".to_owned()))
 			}
 		}
+	}
+
+	fn stop(&self) {
+		if self.stopped.replace(true) {
+			return;
+		}
+
+		let mut child = self.child.borrow_mut();
+		let _ = child.start_kill();
+		let _ = child.wait();
 	}
 
 	pub(crate) fn call(&self, method: &str, params: &Value) -> Result<Value, RpcError> {
@@ -194,9 +206,8 @@ impl ForkRpc for PipeRpc {
 
 impl Drop for PipeRpc {
 	fn drop(&mut self) {
-		let child = self.child.get_mut();
-		let _ = child.kill();
-		let _ = child.wait();
+		// Reaping releases the process group ID for reuse, so never signal it twice.
+		self.stop();
 		// Closing the channel lets an idle I/O thread exit after the child dies.
 		let (replacement, _) = mpsc::channel();
 		drop(std::mem::replace(&mut self.requests, replacement));

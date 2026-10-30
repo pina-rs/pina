@@ -49,7 +49,7 @@ fn fake_worker_sentinel() {
 	let input = std::io::stdin();
 	let mut lines = input.lock().lines();
 	let _ = lines.next();
-	let mut output = std::fs::OpenOptions::new()
+	let mut output = fs::OpenOptions::new()
 		.write(true)
 		.open("/dev/fd/3")
 		.unwrap_or_else(|error| panic!("open worker output: {error}"));
@@ -355,7 +355,7 @@ fn operational_errors_exit_one_without_output() {
 	let harness = Harness::new();
 	let project = workspace_root().join("examples/counter_program");
 	let secret = "private-rpc-credential";
-	let cases: [(Vec<String>, &str, &str); 4] = [
+	let cases: [(Vec<String>, &str, &str); 3] = [
 		(
 			vec![
 				"--rpc-url".to_owned(),
