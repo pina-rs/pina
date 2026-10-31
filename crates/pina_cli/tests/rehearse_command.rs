@@ -49,10 +49,14 @@ fn fake_worker_sentinel() {
 	let input = std::io::stdin();
 	let mut lines = input.lock().lines();
 	let _ = lines.next();
-	let mut output = fs::OpenOptions::new()
-		.write(true)
-		.open("/dev/fd/3")
-		.unwrap_or_else(|error| panic!("open worker output: {error}"));
+	// fd 3 is a socket, which cannot be reopened through /dev/fd on Linux.
+	// Let the shell duplicate it and forward the sentinel's protocol output.
+	let mut forwarder = Command::new("sh")
+		.args(["-c", "exec cat >&3"])
+		.stdin(std::process::Stdio::piped())
+		.spawn()
+		.unwrap_or_else(|error| panic!("start worker output forwarder: {error}"));
+	let mut output = forwarder.stdin.take().expect("forwarder stdin");
 	let version = if std::env::var("PINA_FAKE_SURFPOOL_VERSION").as_deref() == Ok("1.5.0") {
 		"incompatible"
 	} else {
@@ -88,6 +92,9 @@ fn fake_worker_sentinel() {
 			.flush()
 			.unwrap_or_else(|error| panic!("flush worker response: {error}"));
 	}
+	drop(output);
+	let status = forwarder.wait().expect("wait for worker output forwarder");
+	assert!(status.success(), "worker output forwarder failed: {status}");
 }
 
 /// Scratch space with a fake Surfpool and candidate binaries.
