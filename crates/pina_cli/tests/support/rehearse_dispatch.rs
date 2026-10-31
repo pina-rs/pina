@@ -396,6 +396,8 @@ fn private_worker_exits_if_its_owner_is_killed_during_startup() -> Result<(), Er
 	use std::io::BufRead as _;
 	use std::io::Write as _;
 	use std::net::TcpListener;
+	use std::os::fd::OwnedFd;
+	use std::os::unix::net::UnixStream;
 	use std::process::Command;
 	use std::process::Stdio;
 	use std::time::Duration;
@@ -404,18 +406,18 @@ fn private_worker_exits_if_its_owner_is_killed_during_startup() -> Result<(), Er
 	const OWNER_ENV: &str = "PINA_TEST_REHEARSAL_WORKER_OWNER_URL";
 	const PID_PREFIX: &str = "REHEARSAL_WORKER_PID=";
 	if let Some(url) = std::env::var_os(OWNER_ENV) {
+		let (mut input, worker_socket) = UnixStream::pair()?;
+		let worker_input = worker_socket.try_clone()?;
 		let mut worker = Command::new(env!("CARGO_BIN_EXE_pina"))
 			.arg("__pina-rehearse-worker")
-			.stdin(Stdio::piped())
-			.stdout(Stdio::null())
+			.stdin(Stdio::from(OwnedFd::from(worker_input)))
+			.stdout(Stdio::from(OwnedFd::from(worker_socket)))
 			.stderr(Stdio::null())
 			.spawn()?;
-		let mut input = worker.stdin.take().ok_or("worker has no stdin")?;
 		writeln!(input, "{}", json!({"url": url.to_string_lossy()}))?;
 		println!("{PID_PREFIX}{}", worker.id());
 		std::io::stdout().flush()?;
-		// Child::wait closes an attached stdin. Keep this separate handle alive
-		// so the owner only loses it when the test kills the owner process.
+		// Keep the socket alive until the test kills the owner process.
 		let result = worker.wait();
 		drop(input);
 		let _ = result?;
