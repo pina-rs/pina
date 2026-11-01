@@ -1380,13 +1380,12 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn directory_handles_accept_preflighted_system_aliases() {
-		for entry in fs::read_dir("/").unwrap() {
-			let path = entry.unwrap().path();
-
-			if fs::symlink_metadata(&path)
-				.unwrap()
-				.file_type()
-				.is_symlink()
+		// Opening macOS's /home can block indefinitely on autofs. Exercise the
+		// ordinary system aliases used by project paths without mounting homes.
+		for path in ["/tmp", "/var", "/etc", "/bin", "/sbin", "/lib", "/lib64"] {
+			let path = PathBuf::from(path);
+			if let Ok(metadata) = fs::symlink_metadata(&path)
+				&& metadata.file_type().is_symlink()
 				&& path.is_dir()
 				&& !crate::path_security::has_untrusted_link_component(&path.join("..")).unwrap()
 			{

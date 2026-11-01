@@ -75,7 +75,7 @@ Macros stay minimal, the IDL is inferred from the validation code you already wr
 
 | Capability                       | Pina                                                                                          | Anchor v1                        | Anchor v2 (`lang-v2`)      | Quasar                    |
 | -------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------- | -------------------------- | ------------------------- |
-| **Version compared**             | v<!-- {~pinaVersion:"{{ cargo.workspace.package.version }}"} -->0.23.0<!-- {/pinaVersion} --> | 1.2.1                            | 2.0.0-rc.1                 | rev `b0de7db`             |
+| **Version compared**             | v<!-- {~pinaVersion:"{{ cargo.workspace.package.version }}"} -->0.23.0<!-- {/pinaVersion} --> | 1.2.2                            | 2.0.0-rc.2                 | rev `863ee77`             |
 | IDL generated from source        | ✅                                                                                            | ✅                               | ✅                         | ✅                        |
 | Declarative account validation   | ✅                                                                                            | ✅                               | ✅                         | ✅                        |
 | Typed generated clients          | ✅ Rust · JS/TS · Dart · CPI crates                                                           | ✅ TS · Rust CPI                 | 🟡 Rust · TS (alpha)       | ✅ Rust · JS · Solana Kit |
@@ -90,13 +90,13 @@ Macros stay minimal, the IDL is inferred from the validation code you already wr
 
 ✅ first-class · 🟡 partial · ❌ not available.
 
-Anchor v1 is the current stable line and Anchor v2 its pre-release rewrite; both share one CLI. Quasar publishes no versioned crates, so its pinned revision is the version. The Pina version follows this repository and refreshes on every release. Update the Anchor and Quasar cells here when bumping the fixtures under [`benchmarks/framework-comparison/`](./benchmarks/framework-comparison/).
+Anchor v1 is the current stable line and Anchor v2 its pre-release rewrite; both share one CLI. Quasar publishes no versioned crates, so its pinned revision is the version; the pin is the `0.2.0-release` branch head. The Pina version follows this repository and refreshes on every release. Update the Anchor and Quasar cells here when bumping the fixtures under [`benchmarks/framework-comparison/`](./benchmarks/framework-comparison/).
 
 ### On-chain cost
 
 <br>
 
-The same hello-world and counter programs written in each framework, built with `cargo build-sbf --lto` under one release profile, and executed in a Mollusk VM. Pinocchio (hand-written) is the floor a framework has to justify. Regenerate with `devenv shell -- benchmark:frameworks`; the full methodology and caveats live in [the framework comparison](https://pina.rs/framework-comparison.html).
+The same hello-world and counter programs written in each framework, built with `cargo build-sbf --lto` under one release profile, and executed in a Mollusk VM. Pinocchio (hand-written) is the compute-unit floor a framework has to justify; Pina's counter is also smaller than it. Regenerate with `devenv shell -- benchmark:frameworks`; the full methodology and caveats live in [the framework comparison](https://pina.rs/framework-comparison.html).
 
 <!-- BEGIN GENERATED: readme-framework-comparison -->
 
@@ -105,22 +105,26 @@ The same hello-world and counter programs written in each framework, built with 
 | Framework                | Version       | Size (bytes) | `hello` CU | vs Pinocchio size |
 | ------------------------ | ------------- | -----------: | ---------: | ----------------: |
 | Pina                     | 0.23.0        |        1,616 |        136 |              −49% |
+| Pina (unchecked hello)   | 0.23.0        |        1,392 |        117 |              −56% |
 | Pinocchio (hand-written) | 0.11.2        |        3,160 |        111 |               +0% |
-| Quasar                   | rev `b0de7db` |        2,520 |        115 |              −20% |
-| Anchor v1                | 1.2.1         |       74,416 |        421 |            +2255% |
-| Anchor v2 (`lang-v2`)    | 2.0.0-rc.1    |        1,880 |        127 |              −41% |
+| Quasar                   | rev `863ee77` |        1,880 |        119 |              −41% |
+| Anchor v1                | 1.2.2         |       74,416 |        421 |            +2255% |
+| Anchor v2 (`lang-v2`)    | 2.0.0-rc.2    |        2,456 |        152 |              −22% |
 
 #### Counter
 
 | Framework                | Version       | Size (bytes) | `initialize` CU | `increment` CU | vs Pinocchio size |
 | ------------------------ | ------------- | -----------: | --------------: | -------------: | ----------------: |
 | Pina                     | 0.23.0        |        7,592 |           1,694 |            360 |              +17% |
+| Pina (SIMD-0312)         | 0.23.0        |        6,376 |           1,705 |            360 |               −2% |
 | Pinocchio (hand-written) | 0.11.2        |        6,512 |           1,490 |          1,721 |               +0% |
-| Quasar                   | rev `b0de7db` |        7,808 |           3,488 |            330 |              +20% |
-| Anchor v1                | 1.2.1         |      139,408 |          12,676 |         10,374 |            +2041% |
-| Anchor v2 (`lang-v2`)    | 2.0.0-rc.1    |        8,696 |           3,458 |          2,117 |              +34% |
+| Quasar                   | rev `863ee77` |       12,056 |           3,474 |          1,134 |              +85% |
+| Anchor v1                | 1.2.2         |      139,496 |          12,673 |         10,391 |            +2042% |
+| Anchor v2 (`lang-v2`)    | 2.0.0-rc.2    |       10,752 |           3,518 |          2,165 |              +65% |
 
 <!-- END GENERATED: readme-framework-comparison -->
+
+The unchecked hello is a benchmark opt-in that omits program-ID, signer, and exact payload-length checks. The SIMD-0312 counter enables `create-account-allow-prefund`, requiring that runtime feature and exchanging 11 initialization CU for 1,216 fewer bytes. Default builds retain the original checks and allocation sequence. See the [comparison methodology](./docs/src/framework-comparison.md) for validation and account-layout differences.
 
 ## Getting started
 

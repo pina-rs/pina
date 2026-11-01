@@ -61,7 +61,7 @@ impl syn::parse::Parse for DiscriminatorArgs {
 				}
 				// Flags that also accept an explicit boolean, as the proc macro
 				// grammar does: `final`, `entrypoint = false`, and so on.
-				"final" | "capacity_test" => {
+				"final" | "capacity_test" | "skip_program_id_check" => {
 					if input.peek(syn::Token![=]) {
 						input.parse::<syn::Token![=]>()?;
 						input.parse::<syn::LitBool>()?;
@@ -455,7 +455,7 @@ mod tests {
 		// path, the bare flags, the expression-valued arguments, the string
 		// argument, and the parenthesized ladder.
 		let args = parse_discriminator_args(
-			r#"primitive = u8, crate = ::pina, final, capacity_test,
+			r#"primitive = u8, crate = ::pina, final, capacity_test, skip_program_id_check,
 				migrations_max_lamports = 20_000, maximum_accounts = 255,
 				program_id = ID, inline = "hint", migrations(State, ManualState)"#,
 		)
@@ -474,8 +474,10 @@ mod tests {
 	fn argument_scanner_accepts_explicit_boolean_flags() {
 		// The proc macro accepts `entrypoint = true` and `capacity_test = false`,
 		// so the scanner must consume the value rather than rejecting it.
-		parse_discriminator_args("entrypoint = true, capacity_test = false, final = false")
-			.unwrap_or_else(|error| panic!("boolean flags must parse: {error}"));
+		let parsed = parse_discriminator_args(
+			"entrypoint = true, capacity_test = false, final = false, skip_program_id_check = false",
+		);
+		assert!(parsed.is_ok());
 	}
 
 	#[test]
@@ -507,7 +509,7 @@ mod tests {
 		// The scanner's result feeds `extract_discriminator_enums`, so the
 		// entrypoint spelling must survive a full extraction.
 		let source = r#"
-			#[discriminator(entrypoint)]
+			#[discriminator(entrypoint, skip_program_id_check)]
 			pub enum CounterInstruction {
 				Initialize = 0,
 				Increment = 1,

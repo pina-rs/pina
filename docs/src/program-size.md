@@ -1,6 +1,6 @@
 # Program size
 
-Deployed program size determines rent, and rent is paid in SOL. A Pina program is built to be small: the framework's own overhead above a hand-written `pinocchio` program is a few hundred bytes once link-time optimization runs.
+Deployed program size determines rent, and rent is paid in SOL. Pina's hello fixture is smaller than the hand-written `pinocchio` fixture. Its counter also becomes smaller when the optional SIMD-0312 creation path is enabled.
 
 ## Framework comparison
 
@@ -8,15 +8,16 @@ Same toolchain for every row: `cargo-build-sbf` (Agave 4.2.2), `sbpf-solana-sola
 
 | Framework                | Hello world | Counter   |
 | ------------------------ | ----------- | --------- |
-| Quasar                   | 2,520       | 7,808     |
+| Quasar                   | 1,880       | 12,056    |
 | Pinocchio (hand-written) | 3,160       | 6,512     |
 | **Pina**                 | **1,616**   | **7,592** |
-| Anchor v2 (`lang-v2`)    | 1,880       | 8,696     |
-| Anchor v1                | 74,416      | 139,408   |
+| Pina (SIMD-0312)         | —           | 6,376     |
+| Anchor v2 (`lang-v2`)    | 2,456       | 10,752    |
+| Anchor v1                | 74,416      | 139,496   |
 
-[Framework comparison](./framework-comparison.md) holds the generated version of this table — Anchor v1 at 1.2.1, Anchor v2 at 2.0.0-rc.1, Quasar at revision `b0de7db` — together with the compute units each instruction consumes, and `benchmark:frameworks` rebuilds and rewrites it. The headline: a v1 Anchor program is more than an order of magnitude larger than any of the others, and LTO makes it _larger_ rather than smaller.
+[Framework comparison](./framework-comparison.md) holds the generated version of this table — Anchor v1 at 1.2.2, Anchor v2 at 2.0.0-rc.2, Quasar at revision `863ee77` (0.2.0) — together with the compute units each instruction consumes, and `benchmark:frameworks` rebuilds and rewrites it. The headline: a v1 Anchor program is more than an order of magnitude larger than any of the others, and LTO makes it _larger_ rather than smaller.
 
-Pina's hello world is smaller than the hand-written Pinocchio program, which carries pinocchio's full account deserializer and its out-of-line error conversion. Its counter is 1,080 bytes over Pinocchio's, mostly derive-generated validation that the hand-written program does not perform.
+Pina's hello world is smaller than the hand-written Pinocchio program, which carries pinocchio's full account deserializer and its out-of-line error conversion. Pina's default counter is 1,080 bytes larger than Pinocchio's; enabling `create-account-allow-prefund` makes it 136 bytes smaller. Both Pina modes handle pre-funded targets, which the hand-written fixture does not. The generated comparison additionally shows an explicitly unchecked hello variant; it omits program-ID, signer, and payload-length checks and is not equivalent to the default validation policy.
 
 ## What determines the size
 
@@ -266,6 +267,12 @@ A stack array passed to a syscall keeps every store to it, because LLVM cannot s
 ## Convert entrypoint errors where they are returned
 
 The entrypoint turns a `ProgramError` into the `u64` status the runtime reads. Pinocchio's `program_entrypoint!` does this in an `#[inline(never)]` function, an 864-byte comparison tree over every `ProgramError` variant that every program carries, even one whose errors are all constants. `nostd_entrypoint!` declares its own entrypoint instead: it deserializes accounts through the same pinocchio function and converts the error inline, so an error returned by value folds to its status code where it is returned. The comparison tree is only emitted for errors the compiler cannot see through, such as one returned by an outlined helper or a CPI. That measured −856 bytes on the hello fixture, which drops the tree entirely, and −1,048 on `escrow_program`, at no compute-unit cost.
+
+## Create an account with one call, funded or not
+
+The optional `create-account-allow-prefund` Cargo feature uses SIMD-0312's `CreateAccountAllowPrefund` for both fresh and pre-funded targets. It transfers the rent deficit, allocates, and assigns in one call, omitting the funding account when the target already covers its rent. The runtime must have SIMD-0312 activated when this feature is enabled. Default builds retain the zero-lamport `CreateAccount` branch and the transfer/allocate/assign fallback for pre-funded targets. The optional path measures 6,376 bytes and 1,705 CU on counter initialization, compared with the default's 7,592 bytes and 1,694 CU. It exchanges a small initialization cost for a smaller deployment. Quasar and both Anchor lines also support pre-funded targets; the hand-written Pinocchio fixture does not.
+
+`invoke_fresh_with` and `invoke_signed_fresh_with` are the smaller opt-in path: they require a zero-lamport target, reject existing state, and emit only the original `CreateAccount` instruction. Anyone can send a lamport to a deterministic PDA and block initialization through this path. Use it when that griefing vector is acceptable or the caller already proved the target fresh; keep the permissive methods when the address must still initialize after a transfer.
 
 ## Keep a shared check's error at its call site
 

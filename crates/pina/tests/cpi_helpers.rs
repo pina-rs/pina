@@ -18,6 +18,7 @@ use pina::CreateCompactProgramAccount;
 use pina::CreateCompactProgramAccountWithBump;
 use pina::CreateProgramAccount;
 use pina::CreateProgramAccountWithBump;
+use pina::CreateProgramAccountWithUncheckedBump;
 use pina::IntoDiscriminator;
 use pina::PdaSigner;
 use pina::Program;
@@ -288,6 +289,163 @@ fn program_account_public_creation_paths_reach_checked_allocation() {
 	}
 	.invoke_signed::<BuilderState>(&[]);
 	assert_eq!(explicit_signed, Err(ProgramError::UnsupportedSysvar));
+
+	let unchecked_signed_with = CreateProgramAccountWithUncheckedBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke_signed_with::<BuilderState>(&[], |_| Ok(()));
+	assert_eq!(unchecked_signed_with, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[test]
+fn fresh_creation_paths_reach_rent_lookup_on_a_zero_lamport_target() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"builder-fresh"];
+	let (address, bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected builder PDA"));
+	let mut stored_target = TestAccount::<0>::new(address, false, true);
+	stored_target.header.lamports = 0;
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+
+	let canonical = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_fresh_with::<BuilderState>(|_| Ok(()));
+	assert_eq!(canonical, Err(ProgramError::UnsupportedSysvar));
+
+	let canonical_with_bump = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_fresh_with_bump::<BuilderState>(|_, _| Ok(()));
+	assert_eq!(canonical_with_bump, Err(ProgramError::UnsupportedSysvar));
+
+	let explicit = CreateProgramAccountWithBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke_fresh_with::<BuilderState>(|_| Ok(()));
+	assert_eq!(explicit, Err(ProgramError::UnsupportedSysvar));
+
+	let unchecked = CreateProgramAccountWithUncheckedBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke_fresh_with::<BuilderState>(|_| Ok(()));
+	assert_eq!(unchecked, Err(ProgramError::UnsupportedSysvar));
+}
+
+#[test]
+fn fresh_creation_paths_reject_a_prefunded_target_before_rent_lookup() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"builder-fresh-funded"];
+	let (address, bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected builder PDA"));
+	let mut stored_target = TestAccount::<0>::new(address, false, true);
+	stored_target.header.lamports = 1;
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+
+	let canonical = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_fresh_with::<BuilderState>(|_| Ok(()));
+	assert_eq!(canonical, Err(ProgramError::AccountAlreadyInitialized));
+
+	let explicit = CreateProgramAccountWithBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke_fresh_with::<BuilderState>(|_| Ok(()));
+	assert_eq!(explicit, Err(ProgramError::AccountAlreadyInitialized));
+
+	let unchecked = CreateProgramAccountWithUncheckedBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke_fresh_with::<BuilderState>(|_| Ok(()));
+	assert_eq!(unchecked, Err(ProgramError::AccountAlreadyInitialized));
+}
+
+#[test]
+fn fresh_signed_paths_reach_rent_lookup_with_extra_signers() {
+	let owner = Address::new_from_array([5u8; 32]);
+	let seeds: &[&[u8]] = &[b"builder-fresh-signed"];
+	let (address, bump) =
+		try_find_program_address(seeds, &owner).unwrap_or_else(|| panic!("expected builder PDA"));
+	let mut stored_target = TestAccount::<0>::new(address, false, true);
+	stored_target.header.lamports = 0;
+	let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([6u8; 32]), true, true);
+	let mut target = stored_target.view();
+	let payer = stored_payer.view();
+	let empty_seeds: [Seed; 0] = [];
+	let signer = Signer::from(&empty_seeds);
+	let signers = core::slice::from_ref(&signer);
+
+	let canonical = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_signed_fresh_with::<BuilderState>(signers, |_| Ok(()));
+	assert_eq!(canonical, Err(ProgramError::UnsupportedSysvar));
+
+	let canonical_with_bump = CreateProgramAccount {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+	}
+	.invoke_signed_fresh_with_bump::<BuilderState>(signers, |_, _| Ok(()));
+	assert_eq!(canonical_with_bump, Err(ProgramError::UnsupportedSysvar));
+
+	let explicit = CreateProgramAccountWithBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke_signed_fresh_with::<BuilderState>(signers, |_| Ok(()));
+	assert_eq!(explicit, Err(ProgramError::UnsupportedSysvar));
+
+	let unchecked = CreateProgramAccountWithUncheckedBump {
+		account: &mut target,
+		payer: &payer,
+		owner: &owner,
+		seeds,
+		bump,
+	}
+	.invoke_signed_fresh_with::<BuilderState>(signers, |_| Ok(()));
+	assert_eq!(unchecked, Err(ProgramError::UnsupportedSysvar));
 }
 
 #[test]

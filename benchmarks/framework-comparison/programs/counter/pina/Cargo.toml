@@ -6,6 +6,9 @@ publish = false
 
 [workspace]
 
+[features]
+simd-0312 = ["pina/create-account-allow-prefund"]
+
 [lib]
 crate-type = ["cdylib"]
 

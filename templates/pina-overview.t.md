@@ -12,6 +12,7 @@
 | `token`          | No      | Enables SPL token / token-2022 helpers and ATA utilities     |
 | `memo`           | No      | Enables memo program helpers via `pina::memo`                |
 | `account-resize` | No      | Enables raw account reallocation and safe Pinocchio resizing |
+| `create-account-allow-prefund` | No | Uses a smaller creation sequence requiring SIMD-0312 |
 
 <!-- {/pinaFeatureFlags} -->
 
@@ -27,6 +28,7 @@
 - `token` enables `pina::token`, `pina::token_2022`, `pina::associated_token_account`, and the `TokenAccount` compatibility aliases over the upstream renamed account types.
 - `memo` is separate from `token`, so memo CPI support can be enabled without pulling in the token helper surface.
 - `account-resize` enables `ReallocAccount` and `ReallocAccountZeroed`. Enable it together with `compact` for `UpdateResizableAccount`, `ReallocCompactAccount`, and the compact creation builders. Close helpers still do not implicitly resize or zero account data.
+- `create-account-allow-prefund` enables one-CPI PDA creation for empty and pre-funded targets. Enable it only on clusters with SIMD-0312 activated. It reduces deployed size at a small initialization CU cost; default builds retain the legacy creation sequence. Explicit `invoke_fresh_with` methods always use `CreateAccount` and reject pre-funded targets.
 
 <!-- {/pinaFeatureSelectionTips} -->
 

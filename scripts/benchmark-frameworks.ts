@@ -42,6 +42,8 @@ interface Framework {
 	version: string;
 	/// Package name, which is also the SBF artifact stem.
 	crateName: string;
+	/// Optional features for explicitly labelled benchmark variants.
+	features?: string[];
 	/// Instruction data per instruction, as hex.
 	data: Record<string, string>;
 	/// Whether `initialize` reads the PDA bump from its instruction data.
@@ -112,6 +114,29 @@ function frameworksFor(program: string, root: string): Framework[] {
 			initializeTakesBump: true,
 			counterAccount: BUMP_THEN_COUNT,
 		},
+		...(program === "hello"
+			? [{
+				directory: "pina",
+				label: "Pina (unchecked hello)",
+				version: pinaVersion(root),
+				crateName: "hello_pina",
+				features: ["benchmark-unchecked"],
+				data: { hello: "00" },
+				counterAccount: BUMP_THEN_COUNT,
+			}]
+			: []),
+		...(program === "counter"
+			? [{
+				directory: "pina",
+				label: "Pina (SIMD-0312)",
+				version: pinaVersion(root),
+				crateName: "counter_pina",
+				features: ["simd-0312"],
+				data: { initialize: "00", increment: "01" },
+				initializeTakesBump: true,
+				counterAccount: BUMP_THEN_COUNT,
+			}]
+			: []),
 		{
 			directory: "pinocchio",
 			label: "Pinocchio (hand-written)",
@@ -126,7 +151,7 @@ function frameworksFor(program: string, root: string): Framework[] {
 			label: "Quasar",
 			// Quasar publishes no versioned release: `quasar-lang` on crates.io
 			// is a 0.0.0 placeholder, so the pinned revision is the version.
-			version: "rev `b0de7db`",
+			version: "rev `863ee77`",
 			crateName: `${program}_quasar`,
 			data: { hello: "00", initialize: "00", increment: "01" },
 			counterAccount: BUMP_THEN_COUNT,
@@ -134,7 +159,7 @@ function frameworksFor(program: string, root: string): Framework[] {
 		{
 			directory: "anchor_v1",
 			label: "Anchor v1",
-			version: "1.2.1",
+			version: "1.2.2",
 			crateName: `${program}_anchor_v1`,
 			// Anchor names its handlers instead of numbering them, so every
 			// instruction carries an eight-byte `sha256("global:<handler>")`.
@@ -155,8 +180,8 @@ function frameworksFor(program: string, root: string): Framework[] {
 		{
 			directory: "anchor_v2",
 			label: "Anchor v2 (`lang-v2`)",
-			// The pinned revision is the `v2.0.0-rc.1` tag.
-			version: "2.0.0-rc.1",
+			// The fixture pins the published `2.0.0-rc.2` crate.
+			version: "2.0.0-rc.2",
 			crateName: `${program}_anchor_v2`,
 			data: {
 				hello: anchorDiscriminator("hello"),
@@ -257,7 +282,13 @@ function buildProgram(
 	program: string,
 	outputDir: string,
 ): string {
-	const outDir = join(outputDir, "programs", program, framework.directory);
+	const outDir = join(
+		outputDir,
+		"programs",
+		program,
+		framework.directory,
+		framework.features?.join("-") ?? "default",
+	);
 	mkdirSync(outDir, { recursive: true });
 
 	const result = command(
@@ -265,6 +296,9 @@ function buildProgram(
 		[
 			"build-sbf",
 			"--lto",
+			...(framework.features
+				? ["--features", framework.features.join(",")]
+				: []),
 			"--manifest-path",
 			join(
 				root,
@@ -312,6 +346,11 @@ function measure(
 		args.push("--expect-log", EXPECTED_LOGS[program]);
 		args.push("--hello-data", framework.data.hello);
 	} else {
+		if (framework.directory === "pina") {
+			// Prove all funding cases in both allocation modes without adding
+			// setup work to the measured initialize instruction.
+			args.push("--verify-prefund");
+		}
 		args.push("--initialize-data", framework.data.initialize);
 		args.push("--increment-data", framework.data.increment);
 		if (framework.initializeTakesBump) {

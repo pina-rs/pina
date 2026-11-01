@@ -57,7 +57,7 @@ A scratch copy of the counter fixture replaced `nostd_entrypoint!` with an entry
 
 The per-instruction walk replaces about 1,400 bytes with 536: 328 for the three-account route and 208 for the two-account route. Building the account structs from a fixed-size array instead of the cursor saved nothing (+8 bytes), because LLVM already folds the cursor once the slice length is a constant.
 
-An arithmetic error conversion removes the rest of the gap. LLVM merges a program's many constant errors into one value in front of `solana_program_error`'s 26-way comparison tree, so the counter carries about 900 bytes of it even though every error it returns is a constant. Computing the status from the enum's tag instead, with the layout proven at compile time, measured 8,056 bytes on the counter and 13,160 bytes smaller across the examples, but it cost 1 to 8 compute units on 53 example instructions because LLVM hoists the now-cheap tag constants onto success paths. It is held until that trade-off is decided. Together with the dispatch-first entrypoint, the counter measures 7,248 bytes, 560 under Quasar.
+An experimental arithmetic error conversion removed the rest of the gap. LLVM merges a program's many constant errors into one value in front of `solana_program_error`'s comparison tree, so the counter carried about 900 bytes of it. Reading the enum's raw tag measured 8,056 bytes on the counter and 13,160 bytes smaller across the examples, but added 1 to 8 compute units on 53 example instructions. That experiment is rejected: const assertions inspected one compiler's layout, while [Rust does not guarantee that representation](https://doc.rust-lang.org/reference/type-layout.html#the-rust-representation). Production entrypoints retain the dependency's standard error conversion.
 
 Every build in the table ran in the comparison verifier, which executes each instruction in Mollusk and checks the account state it leaves.
 
@@ -115,6 +115,8 @@ Accepted. Decisions 1 to 5 and 10 are implemented as described below, which refi
 
 ## Results
 
+> **Amended 2026-11-01.** The comparison now tracks Anchor v1 1.2.2, Anchor v2 2.0.0-rc.2, and Quasar `863ee77` (0.2.0). The proposed raw enum-tag conversion remains rejected because Rust does not guarantee that representation. Entrypoints retain the dependency standard conversion. The current account-creation optimization uses SIMD-0312 `CreateAccountAllowPrefund`, which requires runtime activation and brings the permissive counter to 6,376 bytes. The generated current table and an explicitly unchecked hello variant live in [Framework comparison](../framework-comparison.md).
+
 Measured against `main` after the `sha256` loaders, the creation check, and the capacity fix had merged.
 
 | Fixture                               | Pina before |      Pina after |      Quasar |     Anchor v2 |
@@ -156,7 +158,7 @@ Across the fleet, 13 programs got smaller (−16 to −3,000 bytes) and two larg
 - **Keep pinocchio's walk with a bounded array (ADR 0010, as amended).** This is what ships today. It only removes code when the bound is five or fewer, and the counter stops at 8,632 bytes.
 - **Walk lazily through pinocchio's `InstructionContext`.** Measured in ADR 0010 at +384 bytes over the bounded array, because it still walks every account before the data.
 - **Build account structs from fixed arrays in the derive.** Measured at +8 bytes: LLVM already folds the cursor for constant-length slices.
-- **Fold the error conversion by inlining.** Folding only happens when LLVM threads every constant error to its own status, which it stops doing once a program has many error sites. The arithmetic conversion reads the `ProgramError` tag through a layout proven by const-evaluated assertions over every variant, then computes `(tag + 1) << 32`. Reading the tag by value instead of through a pointer produced identical binaries.
+- **Fold the error conversion by inlining.** Folding only happens when LLVM threads every constant error to its own status, which it stops doing once a program has many error sites. An experimental raw-tag conversion inspected each variant with const assertions, but depended on an unspecified enum representation. It is not used.
 - **Wait for pinocchio to ship an `r2` entrypoint.** Pina would drop its own walk and adopt pinocchio's if one appears. Nothing in pinocchio 0.11.2 suggests it is imminent, and the size gap is measurable now.
 - **Inline the walk in every route.** The fastest code, but before the leading walk replaced pinocchio's deserializer it grew `escrow_program` by 1,560 bytes, `staking_rewards_program` by 2,536, and `multisig_program` by 4,488 over `nostd_entrypoint!`.
 - **Share the walk in every program.** The smallest `counter_program`, but the hello fixture grew 400 bytes and 13 compute units, and the counter fixture 64 bytes and 22 to 35 compute units.
