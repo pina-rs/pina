@@ -59,9 +59,9 @@
 		},
 		"multisig_program": {
 			"baseRevision": "b7c3c8af51c66bceb9cb7a5e8333718f414a4578",
-			"base": 19050,
-			"head": 19135,
-			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Totals were measured against 862ae48ca3fe555a62adb0c1072ef0c12c677d03 and must be confirmed against this current base."
+			"base": 19020,
+			"head": 19105,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Measurements confirmed against this base in https://github.com/pina-rs/pina/actions/runs/41304167830."
 		}
 	},
 	"runtimeCuApprovals": {
@@ -231,21 +231,21 @@
 			"baseRevision": "b7c3c8af51c66bceb9cb7a5e8333718f414a4578",
 			"base": 4543,
 			"head": 6152,
-			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Totals were measured against 862ae48ca3fe555a62adb0c1072ef0c12c677d03 and must be confirmed against this current base."
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Measurements confirmed against this base in https://github.com/pina-rs/pina/actions/runs/41304167830."
 		},
 		"multisig_program/configUpdate": {
 			"baseRevision": "b7c3c8af51c66bceb9cb7a5e8333718f414a4578",
 			"base": 1731,
 			"head": 1737,
-			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Totals were measured against 862ae48ca3fe555a62adb0c1072ef0c12c677d03 and must be confirmed against this current base. The new maximum includes treasury-update coverage; the matched fee-update case remains 1731 CU."
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Measurements confirmed against this base in https://github.com/pina-rs/pina/actions/runs/41304167830. The matched fee update stays at 1731 CU; the new 1737 CU maximum covers treasury-update testing."
 		}
 	},
 	"binarySizeApprovals": {
 		"multisig_program": {
 			"baseRevision": "b7c3c8af51c66bceb9cb7a5e8333718f414a4578",
-			"base": 162608,
-			"head": 163456,
-			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Totals were measured against 862ae48ca3fe555a62adb0c1072ef0c12c677d03 and must be confirmed against this current base."
+			"base": 162384,
+			"head": 163232,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Measurements confirmed against this base in https://github.com/pina-rs/pina/actions/runs/41304167830."
 		},
 		"privacy_pool_program": {
 			"baseRevision": "83914bad9fbbc6f2b2795ef5e47dd47a0f20e719",
