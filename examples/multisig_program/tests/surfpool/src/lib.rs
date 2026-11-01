@@ -72,6 +72,15 @@ fn system() -> Pubkey {
 	Pubkey::new_from_array(SYSTEM_BYTES)
 }
 
+/// Canonical deployment metadata used to authenticate config initialization.
+fn program_data_address() -> Pubkey {
+	Pubkey::find_program_address(
+		&[program_id().as_ref()],
+		&Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111"),
+	)
+	.0
+}
+
 /// Fixed identities so recorded benchmarks stay deterministic.
 fn member_a() -> Keypair {
 	Keypair::new_from_array([0xA1; 32])
@@ -314,7 +323,10 @@ fn end_to_end_governed_sol_transfer() {
 			.await
 			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
-		let config_authority = Keypair::new_from_array([0xCA; 32]);
+		let config_authority = config_authority();
+		program
+			.set_upgrade_authority(Some(config_authority.pubkey()))
+			.unwrap_or_else(|error| panic!("configure deployment authority: {error:?}"));
 		program
 			.fund(&config_authority.pubkey(), FUND)
 			.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
@@ -338,6 +350,7 @@ fn end_to_end_governed_sol_transfer() {
 						AccountMeta::new(config_authority.pubkey(), true),
 						AccountMeta::new(config_key, false),
 						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(program_data_address(), false),
 					],
 				),
 				&[&config_authority],
@@ -2716,24 +2729,9 @@ fn audit_create_multisig_ix(
 	data
 }
 
-/// SEC-11: the global `ProgramConfig` PDA is a singleton and
-/// `ConfigInitialize` stores whichever signer arrives first as its permanent
-/// authority, with no bootstrap binding. An unapproved first caller must not
-/// be able to occupy it.
-///
-/// Current behavior: any funded signer initializes the config and becomes the
-/// authority, so the `expect_err` below fails and the test proves the capture
-/// is live.
-///
-/// Dormant acceptance test for issue #501: the exploit this test proves is
-/// deferred pending the bootstrap-mechanism decision. The `audit-deferred`
-/// feature keeps it out of every default run — plain `cargo test` and
-/// `pina test` alike — while staying one flag away: run it explicitly with
-/// `cargo test -p multisig-program-surfpool-tests --features audit-deferred
-/// -- --include-ignored` once the fix lands.
-#[cfg(feature = "audit-deferred")]
+/// SEC-11: a funded stranger or stale deployer cannot capture the singleton.
 #[test]
-#[ignore = "deferred: issue #501"]
+#[ignore = "run with pina test"]
 fn audit_sec_11_unauthorized_first_initializer_cannot_capture_the_program_config() {
 	pina_test::run(async {
 		let pid = program_id();
@@ -2742,45 +2740,107 @@ fn audit_sec_11_unauthorized_first_initializer_cannot_capture_the_program_config
 			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
 		let attacker = Keypair::new_from_array([0xA1; 32]);
+		let deployer = config_authority();
 		program
-			.fund(&attacker.pubkey(), FUND)
-			.unwrap_or_else(|error| panic!("fund attacker: {error:?}"));
+			.set_upgrade_authority(Some(deployer.pubkey()))
+			.unwrap();
 
 		let (config_key, config_bump) = program_config_pda();
-		let mut config_ix = vec![0_u8; ConfigInitializeIx::SIZE];
-		ConfigInitializeIx::initialize(&mut config_ix, |ix| {
-			ix.bump = config_bump;
-			ix.treasury = pina_address(&attacker.pubkey());
-			ix.creation_fee.set(0);
+		// Distinct fees keep cached signatures from hiding authority changes.
+		let initialize = |authority: Pubkey, creation_fee: u64| {
+			let mut config_ix = vec![0_u8; ConfigInitializeIx::SIZE];
+			ConfigInitializeIx::initialize(&mut config_ix, |ix| {
+				ix.bump = config_bump;
+				ix.treasury = pina_address(&attacker.pubkey());
+				ix.creation_fee.set(creation_fee);
+				Ok(())
+			})
+			.unwrap_or_else(|error| panic!("encode config init: {error:?}"));
+
+			Instruction::new_with_bytes(
+				pid,
+				&config_ix,
+				vec![
+					AccountMeta::new(authority, true),
+					AccountMeta::new(config_key, false),
+					AccountMeta::new_readonly(system(), false),
+					AccountMeta::new_readonly(program_data_address(), false),
+				],
+			)
+		};
+
+		for (signer, creation_fee) in [(&attacker, 0), (&deployer, 1)] {
+			if signer.pubkey() == deployer.pubkey() {
+				program
+					.set_upgrade_authority(Some(attacker.pubkey()))
+					.unwrap();
+			}
+
+			program.fund(&signer.pubkey(), FUND).unwrap();
+			let balance = program.balance(&signer.pubkey()).unwrap();
+			let error = program
+				.send_with_signers(initialize(signer.pubkey(), creation_fee), &[signer])
+				.expect_err("an unapproved signer must not capture the global config");
+			pina_test::assert_custom_error(&error, MultisigError::InvalidConfigAuthority as u32);
+			assert_eq!(program.balance(&signer.pubkey()).unwrap(), balance);
+			assert!(program.account(&config_key).is_err());
+		}
+
+		program.set_upgrade_authority(None).unwrap();
+		let error = program
+			.send_with_signers(initialize(attacker.pubkey(), 2), &[&attacker])
+			.expect_err("an immutable deployment cannot bootstrap");
+		pina_test::assert_custom_error(&error, MultisigError::InvalidConfigAuthority as u32);
+		assert!(program.account(&config_key).is_err());
+
+		program
+			.set_upgrade_authority(Some(deployer.pubkey()))
+			.unwrap();
+		program
+			.send_with_signers(initialize(deployer.pubkey(), 3), &[&deployer])
+			.unwrap();
+		let account = program.account(&config_key).unwrap();
+		let config = ProgramConfig::try_from_bytes(&account.data).unwrap();
+		assert_eq!(config.authority, pina_address(&deployer.pubkey()));
+		assert_eq!(config.creation_fee.get(), 3);
+		let snapshot = account.data;
+		program
+			.send_with_signers(initialize(deployer.pubkey(), 4), &[&deployer])
+			.expect_err("the config cannot be initialized twice");
+		assert_eq!(program.account(&config_key).unwrap().data, snapshot);
+
+		// Deployment authority changes do not take over an initialized config.
+		program
+			.set_upgrade_authority(Some(attacker.pubkey()))
+			.unwrap();
+		let mut update = vec![0_u8; ConfigUpdateIx::SIZE];
+		ConfigUpdateIx::initialize(&mut update, |ix| {
+			ix.set_treasury = true.into();
+			ix.treasury = pina_address(&deployer.pubkey());
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode config init: {error:?}"));
-
-		let error = program
-			.send_with_signers(
-				Instruction::new_with_bytes(
-					pid,
-					&config_ix,
-					vec![
-						AccountMeta::new(attacker.pubkey(), true),
-						AccountMeta::new(config_key, false),
-						AccountMeta::new_readonly(system(), false),
-					],
-				),
-				&[&attacker],
+		.unwrap();
+		let update_instruction = |signer| {
+			Instruction::new_with_bytes(
+				pid,
+				&update,
+				vec![
+					AccountMeta::new_readonly(signer, true),
+					AccountMeta::new(config_key, false),
+				],
 			)
-			.expect_err("an unapproved signer must not capture the global config");
-
-		assert!(
-			program.account(&config_key).is_err(),
-			"the rejected initialization must not leave config state behind"
-		);
-		assert!(
-			error.message().contains("custom program error")
-				|| error.message().contains("Unauthorized"),
-			"expected an authorization rejection, got: {}",
-			error.message()
-		);
+		};
+		let error = program
+			.send_with_signers(update_instruction(attacker.pubkey()), &[&attacker])
+			.expect_err("the stored config authority controls updates");
+		pina_test::assert_custom_error(&error, MultisigError::InvalidConfigAuthority as u32);
+		assert_eq!(program.account(&config_key).unwrap().data, snapshot);
+		program
+			.send_with_signers(update_instruction(deployer.pubkey()), &[&deployer])
+			.unwrap();
+		let account = program.account(&config_key).unwrap();
+		let config = ProgramConfig::try_from_bytes(&account.data).unwrap();
+		assert_eq!(config.treasury, pina_address(&deployer.pubkey()));
 
 		program
 			.stop()

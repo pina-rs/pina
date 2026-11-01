@@ -56,6 +56,12 @@
 			"base": 5798,
 			"head": 5802,
 			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/666: accept 4 static CU to require the validated reward mint authority to sign before pool or vault creation."
+		},
+		"multisig_program": {
+			"baseRevision": "b7c3c8af51c66bceb9cb7a5e8333718f414a4578",
+			"base": 19020,
+			"head": 19105,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Measurements confirmed against this base in https://github.com/pina-rs/pina/actions/runs/41304167830."
 		}
 	},
 	"runtimeCuApprovals": {
@@ -220,14 +226,26 @@
 			"base": 25884,
 			"head": 25885,
 			"reason": "Maintainer-approved on 2026-10-29 for https://github.com/pina-rs/pina/pull/683: accept the measured 25884-to-25885 CU vesting initialization trade-off for runtime validation of the actual stored bump. Approval requires this exact base and preserves all generic limits."
+		},
+		"multisig_program/configInitialize": {
+			"baseRevision": "b7c3c8af51c66bceb9cb7a5e8333718f414a4578",
+			"base": 4543,
+			"head": 6152,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Measurements confirmed against this base in https://github.com/pina-rs/pina/actions/runs/41304167830."
+		},
+		"multisig_program/configUpdate": {
+			"baseRevision": "b7c3c8af51c66bceb9cb7a5e8333718f414a4578",
+			"base": 1731,
+			"head": 1737,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Measurements confirmed against this base in https://github.com/pina-rs/pina/actions/runs/41304167830. The matched fee update stays at 1731 CU; the new 1737 CU maximum covers treasury-update testing."
 		}
 	},
 	"binarySizeApprovals": {
 		"multisig_program": {
-			"baseRevision": "e68f8672d199eb2e6ddf0b33451cd59589054539",
-			"base": 158992,
-			"head": 162608,
-			"reason": "Approved by @ifiokjr on 2026-10-19 in #624: per-member join generations stop a re-added member drawing on a spending limit granted before they left (#581)."
+			"baseRevision": "b7c3c8af51c66bceb9cb7a5e8333718f414a4578",
+			"base": 162384,
+			"head": 163232,
+			"reason": "Approved by @ifiokjr on 2026-10-29 for https://github.com/pina-rs/pina/pull/671: authenticate multisig configuration bootstrap. Measurements confirmed against this base in https://github.com/pina-rs/pina/actions/runs/41304167830."
 		},
 		"privacy_pool_program": {
 			"baseRevision": "83914bad9fbbc6f2b2795ef5e47dd47a0f20e719",

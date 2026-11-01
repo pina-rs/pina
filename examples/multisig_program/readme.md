@@ -2,6 +2,10 @@
 
 An ambitious, production-shaped multisig wallet built with pina: permissioned members, threshold approvals, timelocked execution of arbitrary compiled messages, governed configuration, spending limits, and first-class migration support.
 
+Initialize the global `ProgramConfig` before making a deployment immutable. `ConfigInitialize` requires the current upgrade authority to sign and the canonical upgradeable-loader-owned `ProgramData` account after the system program. Derive that PDA using the program ID's bytes as its sole seed under `BPFLoaderUpgradeab1e11111111111111111111111`.
+
+That signer becomes the stored config authority; later deployment authority changes do not transfer an existing config. Upgrading an already initialized deployment does not repair a config previously captured by another signer.
+
 ## What it covers
 
 - **Consensus core**: sorted member rosters with permission masks (initiate / vote / execute), draft → active → approved / rejected / cancelled → executed proposal lifecycle, and stale-proposal invalidation whenever the consensus parameters move.
@@ -21,9 +25,9 @@ An ambitious, production-shaped multisig wallet built with pina: permissioned me
 - Token-2022 transfer paths and spl-associated-token account creation.
 - Funds held by a legacy vault stay under the legacy program's control after an import.
 
-### Deployment note
+### Governance constraints
 
-`ConfigInitialize` is permissionless and first-writer-wins: whoever initializes the global program config first becomes its authority and sets the treasury and creation fee. A deployment that intends to charge a creation fee must initialize the config in the same transaction the upgrade lands — before a sniper's transaction can claim the singleton (the Audius init-front-run class). `ConfigAuthorityExecute` also refuses `AddSpendingLimit` actions: creating an allowance moves vault funds, which stays behind threshold and timelock even in controlled mode. Removing a member through governance removes their spending rights immediately, but a spending limit created before the removal stays on-chain until it is removed. Re-adding the member does not restore those rights: each limit records the membership generation it was granted at, so a member who joins later, including one who returns, can draw only on a new grant.
+`ConfigAuthorityExecute` refuses `AddSpendingLimit` actions: creating an allowance moves vault funds, which stays behind threshold and timelock even in controlled mode. Removing a member through governance removes their spending rights immediately, but a spending limit created before the removal stays on-chain until it is removed. Re-adding the member does not restore those rights: each limit records the membership generation it was granted at, so a member who joins later, including one who returns, can draw only on a new grant.
 
 See [Production Readiness](../../docs/src/production-readiness.md) before adapting this example for an asset-bearing program.
 

@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 1,
 	"measurement": "surfpool-simulation-max",
-	"artifactSha256": "f9e9d2af0959ca46afde51ba2c06ae782de78ac5a57779b09342ad3a5b07b3cf",
+	"artifactSha256": "99d514c5b6cf267bb6096db1b3df9e8e26a0bd7606a30dee7f81482298e5033c",
 	"instructions": {
 		"configAuthorityExecute": {
 			"computeUnits": 3707,
@@ -12,12 +12,12 @@
 			"samples": 9
 		},
 		"configInitialize": {
-			"computeUnits": 4543,
-			"samples": 1
+			"computeUnits": 6152,
+			"samples": 2
 		},
 		"configUpdate": {
-			"computeUnits": 1731,
-			"samples": 1
+			"computeUnits": 1737,
+			"samples": 2
 		},
 		"multisigCreate": {
 			"computeUnits": 4212,

@@ -539,6 +539,8 @@ in
       exec = ''
         set -euo pipefail
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        pnpm --dir "$DEVENV_ROOT" run build:codama-nodes
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cpi
         pnpm --dir "$DEVENV_ROOT" run check:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:codama-renderer-cpi

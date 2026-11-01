@@ -28,6 +28,10 @@ export const configInitializeCommand = registerGlobals(
 		"--program-config <programConfig>",
 		"The `program_config` account [default: derived]",
 	)
+	.requiredOption(
+		"--program-data <programData>",
+		"Canonical loader-owned `ProgramData` authenticating the initial authority",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
@@ -38,6 +42,7 @@ export const configInitializeCommand = registerGlobals(
 			programConfig: options.programConfig === undefined
 				? undefined
 				: pubkey("--program-config", options.programConfig),
+			programData: pubkey("--program-data", options.programData),
 		};
 		const instruction = await getConfigInitializeInstructionAsync(
 			...[input],

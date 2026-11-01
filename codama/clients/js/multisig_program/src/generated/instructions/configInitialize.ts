@@ -58,6 +58,7 @@ export type ConfigInitializeInstruction<
 	TAccountProgramConfig extends string | AccountMeta<string> = string,
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
+	TAccountProgramData extends string | AccountMeta<string> = string,
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
@@ -74,6 +75,8 @@ export type ConfigInitializeInstruction<
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
+			TAccountProgramData extends string ? ReadonlyAccount<TAccountProgramData>
+				: TAccountProgramData,
 			...TRemainingAccounts,
 		]
 	>;
@@ -138,10 +141,13 @@ export type ConfigInitializeAsyncInput<
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
+	TAccountProgramData extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	authority: TAccountAuthority;
 	programConfig?: TAccountProgramConfig;
 	systemProgram?: TAccountSystemProgram;
+	/** Canonical loader-owned `ProgramData` authenticating the initial authority. */
+	programData: TAccountProgramData;
 	bump: ConfigInitializeInstructionDataArgs["bump"];
 	treasury: ConfigInitializeInstructionDataArgs["treasury"];
 	creationFee: ConfigInitializeInstructionDataArgs["creationFee"];
@@ -151,12 +157,14 @@ export async function getConfigInitializeInstructionAsync<
 	TAccountAuthority extends InstructionSignerInput,
 	TAccountProgramConfig extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountProgramData extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ConfigInitializeAsyncInput<
 		TAccountAuthority,
 		TAccountProgramConfig,
-		TAccountSystemProgram
+		TAccountSystemProgram,
+		TAccountProgramData
 	>,
 	config?: { programAddress?: TProgramAddress },
 ): Promise<
@@ -173,6 +181,10 @@ export async function getConfigInitializeInstructionAsync<
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
 			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramData,
+			InstructionAccountInputAddress<TAccountProgramData>
 		>
 	>
 > {
@@ -197,6 +209,11 @@ export async function getConfigInitializeInstructionAsync<
 		},
 		systemProgram: {
 			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		programData: {
+			value: input.programData ?? null,
 			isSigner: false,
 			isWritable: false,
 		},
@@ -227,6 +244,7 @@ export async function getConfigInitializeInstructionAsync<
 			getAccountMeta("authority", accounts.authority),
 			getAccountMeta("programConfig", accounts.programConfig),
 			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("programData", accounts.programData),
 		],
 		data: getConfigInitializeInstructionDataEncoder().encode(
 			args as ConfigInitializeInstructionDataArgs,
@@ -245,6 +263,10 @@ export async function getConfigInitializeInstructionAsync<
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
 			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramData,
+			InstructionAccountInputAddress<TAccountProgramData>
 		>
 	>);
 }
@@ -255,10 +277,13 @@ export type ConfigInitializeInput<
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
+	TAccountProgramData extends InstructionAccountInput = InstructionAccountInput,
 > = {
 	authority: TAccountAuthority;
 	programConfig: TAccountProgramConfig;
 	systemProgram?: TAccountSystemProgram;
+	/** Canonical loader-owned `ProgramData` authenticating the initial authority. */
+	programData: TAccountProgramData;
 	bump: ConfigInitializeInstructionDataArgs["bump"];
 	treasury: ConfigInitializeInstructionDataArgs["treasury"];
 	creationFee: ConfigInitializeInstructionDataArgs["creationFee"];
@@ -268,12 +293,14 @@ export function getConfigInitializeInstruction<
 	TAccountAuthority extends InstructionSignerInput,
 	TAccountProgramConfig extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountProgramData extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof MULTISIG_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ConfigInitializeInput<
 		TAccountAuthority,
 		TAccountProgramConfig,
-		TAccountSystemProgram
+		TAccountSystemProgram,
+		TAccountProgramData
 	>,
 	config?: { programAddress?: TProgramAddress },
 ): ConfigInitializeInstruction<
@@ -289,6 +316,10 @@ export function getConfigInitializeInstruction<
 	ResolvedInstructionAccountMeta<
 		TAccountSystemProgram,
 		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountProgramData,
+		InstructionAccountInputAddress<TAccountProgramData>
 	>
 > {
 	// Program address.
@@ -315,6 +346,11 @@ export function getConfigInitializeInstruction<
 			isSigner: false,
 			isWritable: false,
 		},
+		programData: {
+			value: input.programData ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
 	};
 	const accounts = originalAccounts as Record<
 		keyof typeof originalAccounts,
@@ -337,6 +373,7 @@ export function getConfigInitializeInstruction<
 			getAccountMeta("authority", accounts.authority),
 			getAccountMeta("programConfig", accounts.programConfig),
 			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("programData", accounts.programData),
 		],
 		data: getConfigInitializeInstructionDataEncoder().encode(
 			args as ConfigInitializeInstructionDataArgs,
@@ -355,6 +392,10 @@ export function getConfigInitializeInstruction<
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
 			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountProgramData,
+			InstructionAccountInputAddress<TAccountProgramData>
 		>
 	>);
 }
@@ -368,6 +409,8 @@ export type ParsedConfigInitializeInstruction<
 		authority: TAccountMetas[0];
 		programConfig: TAccountMetas[1];
 		systemProgram: TAccountMetas[2];
+		/** Canonical loader-owned `ProgramData` authenticating the initial authority. */
+		programData: TAccountMetas[3];
 	};
 	data: ConfigInitializeInstructionData;
 };
@@ -381,12 +424,12 @@ export function parseConfigInitializeInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedConfigInitializeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 3) {
+	if (instruction.accounts.length < 4) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 3,
+				expectedAccountMetas: 4,
 			},
 		);
 	}
@@ -402,6 +445,7 @@ export function parseConfigInitializeInstruction<
 			authority: getNextAccount(),
 			programConfig: getNextAccount(),
 			systemProgram: getNextAccount(),
+			programData: getNextAccount(),
 		},
 		data: getConfigInitializeInstructionDataDecoder().decode(instruction.data),
 	};
