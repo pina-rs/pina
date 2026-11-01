@@ -559,6 +559,9 @@ pub(crate) struct DiscriminatorArgs {
 	/// Defaults to `ID` from the crate's `declare_id!`.
 	#[darling(default)]
 	pub(crate) program_id: Option<Expr>,
+	/// Omit the declared program ID check in the instruction routers.
+	#[darling(default)]
+	pub(crate) skip_program_id_check: Flag,
 	/// Set the inline attribute on the generated entrypoint.
 	///
 	/// Defaults to `always`. The two spellings are not interchangeable at the

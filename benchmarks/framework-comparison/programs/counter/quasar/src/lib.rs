@@ -7,22 +7,7 @@ use quasar_lang::prelude::*;
 
 declare_id!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 
-#[program]
-mod counter_quasar {
-	use super::*;
-
-	#[instruction(discriminator = 0)]
-	pub fn initialize(ctx: Ctx<Initialize>) -> Result<(), ProgramError> {
-		ctx.accounts.handler(&ctx.bumps)
-	}
-
-	#[instruction(discriminator = 1)]
-	pub fn increment(ctx: Ctx<Increment>) -> Result<(), ProgramError> {
-		ctx.accounts.handler()
-	}
-}
-
-#[account(discriminator = 1, set_inner)]
+#[account(discriminator = 1)]
 #[seeds(b"counter", authority: Address)]
 pub struct CounterState {
 	pub bump: u8,
@@ -32,44 +17,43 @@ pub struct CounterState {
 #[derive(Accounts)]
 pub struct Initialize {
 	pub authority: Signer,
-	#[account(init, payer = authority, address = CounterState::seeds(authority.address()))]
-	pub counter: Account<CounterState>,
+	#[account(init(payer = authority), seeds(authority))]
+	pub counter: Pda<Account<CounterState>>,
 	pub system_program: Program<SystemProgram>,
-}
-
-impl Initialize {
-	#[inline(always)]
-	pub fn handler(&mut self, bumps: &InitializeBumps) -> Result<(), ProgramError> {
-		self.counter.set_inner(CounterStateInner {
-			bump: bumps.counter,
-			count: 0,
-		});
-		log!("Counter initialized");
-		Ok(())
-	}
 }
 
 #[derive(Accounts)]
 pub struct Increment {
 	pub authority: Signer,
-	#[account(mut, address = CounterState::seeds(authority.address()))]
-	pub counter: Account<CounterState>,
+	#[account(mut, seeds(authority))]
+	pub counter: Pda<Account<CounterState>>,
 }
 
-impl Increment {
-	#[inline(always)]
-	pub fn handler(&mut self) -> Result<(), ProgramError> {
-		let bump = self.counter.bump;
-		let count = self
+#[program]
+mod counter_quasar {
+	use super::*;
+
+	#[instruction(0)]
+	pub fn initialize(mut ctx: Ctx<Initialize>) -> Result<()> {
+		let bump = ctx.accounts.counter.bump();
+		ctx.accounts
 			.counter
-			.count
+			.set_inner(&CounterState { bump, count: 0 })?;
+		solana_program_log::log("Counter initialized");
+		Ok(())
+	}
+
+	#[instruction(1)]
+	pub fn increment(mut ctx: Ctx<Increment>) -> Result<()> {
+		let bump = ctx.accounts.counter.bump();
+		let count = ctx.accounts.counter.count();
+		let count = count
 			.checked_add(1)
 			.ok_or(ProgramError::ArithmeticOverflow)?;
-		self.counter.set_inner(CounterStateInner {
-			bump,
-			count: count.into(),
-		});
-		log!("Counter incremented");
+		ctx.accounts
+			.counter
+			.set_inner(&CounterState { bump, count })?;
+		solana_program_log::log("Counter incremented");
 		Ok(())
 	}
 }

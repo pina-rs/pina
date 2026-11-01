@@ -128,6 +128,13 @@ pub fn accounts_derive(input: TokenStream) -> TokenStream {
 ///
 /// - `crate = path` — the Pina crate path. Defaults to `::pina`.
 /// - `program_id = EXPR` — the checked program id. Defaults to `ID`.
+/// - `skip_program_id_check` — explicitly omit the declared program ID comparison
+///   in both instruction routers. This permits execution under a different
+///   program address, including benchmark deployments. Instruction decoding,
+///   account validation, and signer checks still run, and account parsers
+///   continue receiving the runtime program ID.
+///   The reserved migration helper keeps its independent program ID check.
+///   Omit this flag to retain the default deployment identity check.
 /// - `maximum_accounts = EXPR` — the saturation cap for
 ///   `MAX_INSTRUCTION_ACCOUNTS`. Defaults to `pinocchio::MAX_TX_ACCOUNTS`.
 /// - `capacity_test` / `capacity_test = false` — emit or suppress the

@@ -10,5 +10,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# Pinned to the revision the published numbers were measured at.
-quasar-lang = { git = "https://github.com/blueshift-gg/quasar", rev = "b0de7db4cd271654a2dcf78807dd865e98e0b339" }
+# Pinned to the `0.2.0-release` branch head the published numbers were
+# measured at; Quasar publishes no versioned crate.
+quasar-lang = { git = "https://github.com/blueshift-gg/quasar", rev = "863ee777a4520dba165f15bb1037bed1f2f739b8" }
+solana-program-log = { version = "1.2.0", default-features = false }

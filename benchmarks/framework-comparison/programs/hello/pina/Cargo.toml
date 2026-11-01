@@ -11,5 +11,8 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+benchmark-unchecked = []
+
 [dependencies]
 pina = { path = "../../../../../crates/pina", features = ["logs", "derive"] }

@@ -15,6 +15,7 @@
 //!                    [--initialize-takes-bump]
 //!                    [--account-size <N>] [--account-discriminator <HEX>]
 //!                    [--bump-offset <N>] [--count-offset <N>]
+//!                    [--verify-prefund]
 //! ```
 //!
 //! The counter's account layout is described on the command line rather than
@@ -172,6 +173,62 @@ fn main() {
 			));
 			require_ok(&increment_result, "increment");
 			verify_counter_value(&increment_result, &counter, &arguments);
+
+			if arguments.verify_prefund {
+				let rent = mollusk.sysvars.rent.minimum_balance(arguments.account_size);
+				for prefund in [1, rent, rent + 42] {
+					let payer_lamports = 1_000_000_000;
+					let result = process(
+						&mollusk,
+						&Instruction::new_with_bytes(
+							program_id,
+							&initialize_data,
+							vec![
+								AccountMeta::new(authority, true),
+								AccountMeta::new(counter, false),
+								AccountMeta::new_readonly(
+									solana_sdk_ids::system_program::id(),
+									false,
+								),
+							],
+						),
+						&[
+							(
+								authority,
+								Account {
+									lamports: payer_lamports,
+									..Account::default()
+								},
+							),
+							(
+								counter,
+								Account {
+									lamports: prefund,
+									..Account::default()
+								},
+							),
+							keyed_account_for_system_program(),
+						],
+					);
+					require_ok(&result, "prefunded initialize");
+					let stored = |key: &Pubkey| {
+						&result
+							.resulting_accounts
+							.iter()
+							.find(|(candidate, _)| candidate == key)
+							.unwrap_or_else(|| fail("missing prefunded result account"))
+							.1
+					};
+					let account = stored(&counter);
+					verify_counter_state(account, &arguments, bump);
+					assert_eq!(account.owner, program_id);
+					assert_eq!(account.lamports, prefund.max(rent));
+					assert_eq!(
+						stored(&authority).lamports,
+						payer_lamports - rent.saturating_sub(prefund)
+					);
+				}
+			}
 		}
 		other => fail(&format!("unknown case {other:?}")),
 	}
@@ -193,6 +250,7 @@ struct Arguments {
 	initialize_data: Vec<u8>,
 	increment_data: Vec<u8>,
 	initialize_takes_bump: bool,
+	verify_prefund: bool,
 	expect_log: String,
 	account_size: usize,
 	account_discriminator: Vec<u8>,
@@ -210,6 +268,7 @@ impl Arguments {
 			initialize_data: Vec::new(),
 			increment_data: Vec::new(),
 			initialize_takes_bump: false,
+			verify_prefund: false,
 			expect_log: String::new(),
 			account_size: 0,
 			account_discriminator: Vec::new(),
@@ -231,6 +290,7 @@ impl Arguments {
 				"--initialize-data" => arguments.initialize_data = decode_hex(&value()),
 				"--increment-data" => arguments.increment_data = decode_hex(&value()),
 				"--initialize-takes-bump" => arguments.initialize_takes_bump = true,
+				"--verify-prefund" => arguments.verify_prefund = true,
 				"--expect-log" => arguments.expect_log = value(),
 				"--account-size" => arguments.account_size = parse_usize(&value(), flag.as_str()),
 				"--account-discriminator" => arguments.account_discriminator = decode_hex(&value()),

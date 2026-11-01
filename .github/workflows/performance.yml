@@ -45,7 +45,9 @@ jobs:
   program-profiles:
     name: program compute units and sizes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    timeout-minutes: 20
+    # A cold base/head build reached 20 minutes even with a clean comparison.
+    # Leave headroom for both profiles, artifact uploads, and post-job cleanup.
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target/performance-build/programs
