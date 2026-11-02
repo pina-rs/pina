@@ -330,6 +330,136 @@ fn rehearsal_uses_the_cli_worker_without_an_override() {
 	assert!(remote.methods().contains(&"getEpochInfo".to_owned()));
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn real_worker_exits_when_its_cli_owner_is_killed() -> Result<(), Box<dyn std::error::Error>> {
+	use std::os::unix::process::ExitStatusExt as _;
+	use std::process::Stdio;
+	use std::sync::Arc;
+	use std::sync::atomic::AtomicBool;
+	use std::sync::atomic::Ordering;
+	use std::sync::mpsc;
+	use std::time::Duration;
+	use std::time::Instant;
+
+	struct ReleaseDatasource(Arc<AtomicBool>);
+
+	impl Drop for ReleaseDatasource {
+		fn drop(&mut self) {
+			self.0.store(true, Ordering::SeqCst);
+		}
+	}
+
+	fn identity(stat: &str) -> Option<(&str, &str)> {
+		let fields: Vec<_> = stat.rsplit_once(')')?.1.split_whitespace().collect();
+		Some((*fields.first()?, *fields.get(19)?))
+	}
+
+	let harness = Harness::new();
+	let handler = remote_handler(&Fixtures::load());
+	let released = Arc::new(AtomicBool::new(false));
+	let release = Arc::clone(&released);
+	let (started, startup) = mpsc::channel();
+	let remote = FakeRpcServer::start(move |method, params| {
+		if method == "getEpochInfo" {
+			let _ = started.send(());
+
+			while !release.load(Ordering::SeqCst) {
+				std::thread::sleep(Duration::from_millis(10));
+			}
+
+			return Reply::Error(-32000, "test datasource released".to_owned());
+		}
+
+		handler(method, params)
+	});
+	// Release the blocked handler before the server's Drop joins its thread.
+	let _release = ReleaseDatasource(released);
+	let mut owner = harness
+		.pina("1.6.0")
+		.env_remove("PINA_REHEARSE_WORKER")
+		.env_remove("PINA_SURFPOOL")
+		.env("NO_PROXY", "127.0.0.1")
+		.env("no_proxy", "127.0.0.1")
+		.arg("--project")
+		.arg(workspace_root().join("examples/counter_program"))
+		.args(["--rpc-url", &remote.url])
+		.arg("--program")
+		.arg(harness.candidate(Binary::Deployed))
+		.stdin(Stdio::null())
+		.stdout(Stdio::null())
+		.stderr(Stdio::piped())
+		.spawn()?;
+	let mut worker = None;
+	let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+		startup.recv_timeout(Duration::from_secs(20))?;
+		let children = fs::read_to_string(format!("/proc/{0}/task/{0}/children", owner.id()))?;
+		let mut children = children.split_whitespace();
+		let pid: u32 = children.next().ok_or("CLI has no worker child")?.parse()?;
+
+		if children.next().is_some() {
+			return Err("CLI has unexpected additional children".into());
+		}
+
+		let command = fs::read(format!("/proc/{pid}/cmdline"))?;
+
+		if !command
+			.split(|byte| *byte == 0)
+			.any(|arg| arg == b"__pina-rehearse-worker")
+		{
+			return Err("CLI child is not its private worker".into());
+		}
+
+		let stat = fs::read_to_string(format!("/proc/{pid}/stat"))?;
+		let (_, started) = identity(&stat).ok_or("invalid worker process identity")?;
+		worker = Some((pid, started.to_owned()));
+		owner.kill()?;
+
+		if owner.wait()?.signal() != Some(9) {
+			return Err("CLI owner did not terminate by SIGKILL".into());
+		}
+
+		let deadline = Instant::now() + Duration::from_secs(10);
+
+		loop {
+			let stat = match fs::read_to_string(format!("/proc/{pid}/stat")) {
+				Ok(stat) => stat,
+				Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+				Err(error) => return Err(error.into()),
+			};
+			let (state, current) = identity(&stat).ok_or("invalid worker process state")?;
+
+			if state == "Z" || current != started {
+				return Ok(());
+			}
+
+			if Instant::now() >= deadline {
+				return Err("private worker survived its actual CLI owner".into());
+			}
+
+			std::thread::sleep(Duration::from_millis(25));
+		}
+	})();
+	let _ = owner.kill();
+	let output = owner.wait_with_output()?;
+
+	if result.is_err() {
+		eprintln!("CLI stderr: {}", String::from_utf8_lossy(&output.stderr));
+
+		if let Some((pid, started)) = worker {
+			let stat = fs::read_to_string(format!("/proc/{pid}/stat")).unwrap_or_default();
+
+			if identity(&stat).is_some_and(|(_, current)| current == started) {
+				let _ = Command::new("/bin/kill")
+					.args(["-KILL", &pid.to_string()])
+					.status();
+			}
+		}
+	}
+
+	result
+}
+
 #[test]
 fn behaviour_changes_fail_with_a_stable_json_report() {
 	let harness = Harness::new();
