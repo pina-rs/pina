@@ -15,7 +15,7 @@ const ZSTD_CALLERS = [
 
 test("accepts only the reviewed dependency callers", () => {
 	checkZstdCallers("zstd", `${ZSTD_CALLERS}\n`);
-	checkZstdCallers("zstd-safe", "zstd-safe v7.3.0\r\nzstd v0.13.3\r\n");
+	checkZstdCallers("zstd-safe", "zstd-safe v7.4.0\r\nzstd v0.13.3\r\n");
 });
 
 test("rejects a new direct caller and a changed caller version", () => {
@@ -36,13 +36,17 @@ test("rejects a new direct caller and a changed caller version", () => {
 	);
 });
 
-test("rejects a direct zstd-safe dependency that could enable seekable", () => {
+test("rejects a new zstd-safe consumer and a backport downgrade", () => {
 	assert.throws(
 		() =>
 			checkZstdCallers(
 				"zstd-safe",
-				"zstd-safe v7.3.0\nzstd v0.13.3\nnew-caller v1.0.0",
+				"zstd-safe v7.4.0\nzstd v0.13.3\nnew-caller v1.0.0",
 			),
+		/callers changed/,
+	);
+	assert.throws(
+		() => checkZstdCallers("zstd-safe", "zstd-safe v7.3.0\nzstd v0.13.3"),
 		/callers changed/,
 	);
 });

@@ -109,8 +109,9 @@ ignore = [
 	# Reviewed 2026-10-24. Remove when the Surfpool/BIP32 and Solana recovery
 	# dependency trains both resolve crypto-bigint >=0.7.6 — tracked in #654.
 	"RUSTSEC-2026-0387",
-	# Agave 4.3.2 requires zstd ^0.13.3; the fixed zstd 0.14.3 / zstd-safe
-	# 8.2.0 releases are incompatible. Agave's fix is merged on master:
+	# Agave 4.3.2 requires zstd ^0.13.3; the fixed zstd 0.14.3 release is
+	# incompatible. The compatible zstd-safe 7.4.0 security backport is locked
+	# and needs no advisory exception. Agave's zstd fix is merged on master:
 	# https://github.com/anza-xyz/agave/pull/16391
 	# scripts/check-zstd-advisories.ts enforces a 2026-11-25 expiry and the
 	# exact reviewed direct consumers before either security audit runs.
@@ -120,15 +121,14 @@ ignore = [
 	# Reviewed 2026-10-28. Remove after the supported Solana train upgrades:
 	# https://github.com/pina-rs/pina/issues/669
 	# RUSTSEC-2026-0391: only borrowed with_context constructors are affected.
-	# All four call sites in these three crates construct fresh Encoder::new,
-	# Decoder::new, or Decoder::with_buffer contexts; none reuses a context.
-	{ id = "RUSTSEC-2026-0391", reason = "Guarded consumers create fresh contexts; expires 2026-11-25" },
-	# RUSTSEC-2026-0398: requires zstd-safe's seekable feature. Its only
-	# consumer is zstd 0.13.3, which does not expose or enable that feature.
-	{ id = "RUSTSEC-2026-0398", reason = "Guarded consumer cannot enable seekable; expires 2026-11-25" },
+	# These consumers use owned Encoder::new, Decoder::new, Decoder::with_buffer
+	# and bulk::Compressor::new contexts, never the borrowed with_context APIs.
+	# The snapshot bulk compressor reuses its owned context for complete
+	# one-shot frames; it does not borrow an existing streaming context.
+	{ id = "RUSTSEC-2026-0391", reason = "Guarded consumers avoid borrowed contexts; expires 2026-11-25" },
 	# RUSTSEC-2026-0403: affects Vec-backed streaming write decoders. The
-	# consumers above use only encoders and streaming read decoders, which
-	# the advisory explicitly identifies as unaffected. The 0391 caller check
+	# consumers above use encoders, streaming read decoders and a bulk
+	# compressor, not a streaming write decoder. The 0391 caller check
 	# also guards this call-site review against added or updated consumers.
 	{ id = "RUSTSEC-2026-0403", reason = "Guarded consumers use unaffected read decoders; expires 2026-11-25" },
 ]

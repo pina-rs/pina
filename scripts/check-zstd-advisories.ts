@@ -2,8 +2,8 @@
 
 import { execFileSync } from "node:child_process";
 
-// These immutable crate versions were reviewed against RUSTSEC-2026-0391,
-// RUSTSEC-2026-0398, and RUSTSEC-2026-0403. See deny.toml for the call sites.
+// These immutable crate versions were reviewed against RUSTSEC-2026-0391
+// and RUSTSEC-2026-0403. See deny.toml for the call sites.
 const REVIEWED_TREES = {
 	zstd: [
 		"zstd v0.13.3",
@@ -11,7 +11,7 @@ const REVIEWED_TREES = {
 		"solana-account-decoder v4.3.2",
 		"solana-account-decoder-client-types v4.3.2",
 	],
-	"zstd-safe": ["zstd-safe v7.3.0", "zstd v0.13.3"],
+	"zstd-safe": ["zstd-safe v7.4.0", "zstd v0.13.3"],
 } as const;
 
 export function checkZstdReviewDate(now: Date): void {
