@@ -334,6 +334,43 @@ mod tests {
 	}
 
 	#[test]
+	fn reports_a_worker_that_closes_its_channel() -> Result<(), Box<dyn std::error::Error>> {
+		let directory = tempfile::tempdir()?;
+		let marker = directory.path().join("channel-closed");
+		let script = r#"read -r init
+printf '%s\n' '{"ready":true,"protocol":1,"pinaVersion":"__PINA_VERSION__"}'
+exec 0<&- 1>&-
+printf closed > "$1"
+exec sleep 30
+"#
+		.replace("__PINA_VERSION__", env!("CARGO_PKG_VERSION"));
+		let mut command = Command::new("/bin/sh");
+		command
+			.args(["-c", &script, "closed-channel-worker"])
+			.arg(&marker);
+		let rpc = PipeRpc::start_command(
+			command,
+			"http://localhost",
+			Duration::from_secs(5),
+			Duration::from_secs(5),
+		)?;
+		let deadline = std::time::Instant::now() + Duration::from_secs(5);
+		while !marker.exists() {
+			assert!(
+				std::time::Instant::now() < deadline,
+				"worker did not close its channel"
+			);
+			std::thread::sleep(Duration::from_millis(10));
+		}
+		assert!(rpc.child.borrow_mut().try_wait()?.is_none());
+		assert!(matches!(
+			rpc.call("getAccountInfo", &json!([])),
+			Err(RpcError::Transport(message)) if message.contains("Broken pipe")
+		));
+		Ok(())
+	}
+
+	#[test]
 	fn reports_a_closed_transport_on_subsequent_calls() -> Result<(), Box<dyn std::error::Error>> {
 		let mut rpc = fake(
 			r#"read -r init
