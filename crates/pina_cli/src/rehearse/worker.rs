@@ -224,7 +224,7 @@ mod tests {
 	}
 
 	#[test]
-	fn rejects_unrelated_methods_with_standard_jsonrpc_errors() {
+	fn rejects_unrelated_methods_with_standard_jsonrpc_errors() -> Result<(), serde_json::Error> {
 		let handler = handler();
 		let request = json!([
 			{"jsonrpc": "2.0", "id": 7, "method": "surfnet_exportSnapshot", "params": []},
@@ -234,8 +234,7 @@ mod tests {
 		let response = handler
 			.handle_request_sync(&request.to_string(), None)
 			.expect("batch response");
-		let response: Value = serde_json::from_str(&response)
-			.unwrap_or_else(|error| panic!("invalid JSON response: {error}"));
+		let response: Value = serde_json::from_str(&response)?;
 		let responses = response.as_array().expect("batch response array");
 		assert_eq!(responses.len(), 3);
 
@@ -245,6 +244,7 @@ mod tests {
 			assert_eq!(response["error"]["code"], -32601);
 			assert!(response.get("result").is_none());
 		}
+		Ok(())
 	}
 
 	#[test]

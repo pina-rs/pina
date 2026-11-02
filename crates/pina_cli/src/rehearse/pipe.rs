@@ -285,6 +285,80 @@ mod tests {
 	}
 
 	#[test]
+	fn reports_channel_descriptor_exhaustion() -> Result<(), Box<dyn std::error::Error>> {
+		const CHILD: &str = "PINA_TEST_CHANNEL_DESCRIPTOR_SLOTS";
+
+		if let Ok(slots) = std::env::var(CHILD) {
+			let slots: usize = slots.parse()?;
+			let mut files = Vec::new();
+
+			while let Ok(file) = std::fs::File::open("/dev/null") {
+				files.push(file);
+			}
+
+			// Leave room for the socketpair, then each successive descriptor clone.
+			for _ in 0..slots {
+				files.pop().ok_or("not enough held descriptors")?;
+			}
+
+			let result = PipeRpc::start(
+				Path::new("/worker-must-not-start"),
+				"http://localhost",
+				Duration::from_secs(5),
+				Duration::from_secs(5),
+			);
+			drop(files);
+			let error = result
+				.err()
+				.ok_or("descriptor exhaustion must prevent startup")?;
+			assert!(matches!(error, RpcError::Transport(_)));
+			assert!(error.to_string().contains("Too many open files"), "{error}");
+			return Ok(());
+		}
+
+		for slots in ["0", "2", "3"] {
+			let status = Command::new("/bin/sh")
+				.args([
+					"-c",
+					"ulimit -n 64 && exec \"$1\" --exact \"$2\" --nocapture",
+					"descriptor-pressure-test",
+				])
+				.arg(std::env::current_exe()?)
+				.arg("rehearse::pipe::tests::reports_channel_descriptor_exhaustion")
+				.env(CHILD, slots)
+				.status()?;
+			assert!(status.success(), "descriptor-pressure case {slots} failed");
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn reports_a_closed_transport_on_subsequent_calls() -> Result<(), Box<dyn std::error::Error>> {
+		let mut rpc = fake(
+			r#"read -r init
+printf '%s\n' '{"ready":true,"protocol":1,"pinaVersion":"__PINA_VERSION__"}'
+read -r request
+"#,
+			Duration::from_secs(5),
+		)?;
+		assert!(matches!(
+			rpc.call("getAccountInfo", &json!([])),
+			Err(RpcError::Transport(_))
+		));
+		rpc.io_thread
+			.take()
+			.ok_or("missing I/O thread")?
+			.join()
+			.map_err(|_| "I/O thread panicked")?;
+		assert!(matches!(
+			rpc.call("getAccountInfo", &json!([])),
+			Err(RpcError::Transport(message)) if message == "worker has exited"
+		));
+		Ok(())
+	}
+
+	#[test]
 	fn reports_a_worker_initialization_error() {
 		let error = fake(
 			r#"read -r init
