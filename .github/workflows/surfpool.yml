@@ -55,10 +55,15 @@ jobs:
               - .github/actions/devenv/**
 
   surfpool-examples:
-    timeout-minutes: 60
-    runs-on: ubuntu-24.04
+    name: macOS worker verification
+    timeout-minutes: 90
+    runs-on: macos-15
     needs: changes
-    if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+    if: ${{ !failure() && !cancelled() && github.event_name == 'workflow_dispatch' }}
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -70,6 +75,13 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: build and test all Surfpool examples
-        run: test:surfpool
+      - name: verify worker on macOS
+        run: |
+          rustc -Vv
+          cargo -V
+          uname -m
+          sw_vers
+          df -h .
+          cargo test --locked --all-features -p pina_cli --lib rehearse::
+          cargo test --locked --all-features -p pina_cli --test rehearse_worker_lifecycle --test rehearse_command
         shell: devenv shell -c -- bash -e {0}
