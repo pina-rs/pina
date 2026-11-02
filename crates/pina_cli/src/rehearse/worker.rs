@@ -75,12 +75,11 @@ pub fn run() -> Result<Infallible, String> {
 		let mut input = stdin.lock();
 		loop {
 			let mut frame = Vec::new();
-			let count = match (&mut input)
+			let Ok(count) = (&mut input)
 				.take(MAX_REQUEST_BYTES + 1)
 				.read_until(b'\n', &mut frame)
-			{
-				Ok(count) => count,
-				Err(_) => std::process::exit(1),
+			else {
+				std::process::exit(1);
 			};
 			// EOF means the parent disappeared. Do not wait for a blocked SVM.
 			if count == 0 {
@@ -150,8 +149,8 @@ async fn initialize(url: &str) -> Result<Fork, String> {
 			error.code.code()
 		)
 	})?;
-	let (simnet_commands_tx, _commands) = crossbeam_channel::unbounded();
-	let (plugin_commands_tx, _plugins) = crossbeam_channel::unbounded();
+	let (simnet_commands_tx, commands) = crossbeam_channel::unbounded();
+	let (plugin_commands_tx, plugins) = crossbeam_channel::unbounded();
 	let context = Some(RunloopContext {
 		id: None,
 		svm_locker: locker,
@@ -164,8 +163,8 @@ async fn initialize(url: &str) -> Result<Fork, String> {
 	Ok(Fork {
 		handler: handler(),
 		context,
-		_commands,
-		_plugins,
+		_commands: commands,
+		_plugins: plugins,
 	})
 }
 
@@ -199,8 +198,8 @@ fn write_frame(frame: &str) -> Result<(), String> {
 	let mut output = stdout.lock();
 	output
 		.write_all(frame.as_bytes())
-		.and_then(|_| output.write_all(b"\n"))
-		.and_then(|_| output.flush())
+		.and_then(|()| output.write_all(b"\n"))
+		.and_then(|()| output.flush())
 		.map_err(|_| "could not write worker response".to_owned())
 }
 

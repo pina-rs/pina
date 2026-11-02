@@ -104,8 +104,8 @@ impl PipeRpc {
 				let response = (|| -> Result<String, String> {
 					stdin
 						.write_all(frame.as_bytes())
-						.and_then(|_| stdin.write_all(b"\n"))
-						.and_then(|_| stdin.flush())
+						.and_then(|()| stdin.write_all(b"\n"))
+						.and_then(|()| stdin.flush())
 						.map_err(|error| error.to_string())?;
 					let mut bytes = Vec::new();
 					let count = (&mut output)
