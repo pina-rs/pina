@@ -179,8 +179,8 @@ jobs:
             fi
           done
           nproc > target/performance/cli/runner-before.txt
-          uptime >> target/performance/cli/runner-before.txt
-          ps -eo comm,pcpu --sort=-pcpu | head -n 12 >> target/performance/cli/runner-before.txt
+          /usr/bin/uptime >> target/performance/cli/runner-before.txt
+          /usr/bin/ps -eo comm,pcpu --sort=-pcpu | head -n 12 >> target/performance/cli/runner-before.txt
         shell: devenv shell -c -- bash -e {0}
 
       - name: benchmark CLI
@@ -197,7 +197,7 @@ jobs:
         run: |
           mkdir -p target/performance/cli
           nproc > target/performance/cli/runner-after.txt
-          uptime >> target/performance/cli/runner-after.txt
+          /usr/bin/uptime >> target/performance/cli/runner-after.txt
         shell: devenv shell -c -- bash -e {0}
 
       - name: prepare CLI report
