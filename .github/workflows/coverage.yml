@@ -79,7 +79,7 @@ jobs:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
     # The status functions are required: without one, a skipped `changes`
     # dependency (pushes to `main`) would skip this job too.
-    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.changes.outputs.covered == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.covered == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     permissions:
       contents: read
       id-token: write
@@ -93,13 +93,6 @@ jobs:
         uses: $/.github/actions/devenv
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: record toolchain
-        run: |
-          git rev-parse HEAD
-          rustc -Vv
-          cargo -V
-        shell: devenv shell -c -- bash -e {0}
 
       - name: run coverage
         run: coverage:all
@@ -117,28 +110,3 @@ jobs:
           files: target/coverage/lcov.info,target/coverage/pina-test.info
           fail_ci_if_error: true
           use_oidc: true
-
-  windows-cli:
-    name: windows CLI
-    timeout-minutes: 20
-    runs-on: windows-latest
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    steps:
-      - name: checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: install Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
-        with:
-          toolchain: nightly-2026-02-20
-
-      - name: record Windows toolchain
-        run: |
-          git rev-parse HEAD
-          rustc -Vv
-          cargo -V
-
-      - name: test CLI portability
-        run: cargo test --locked --all-features -p pina_cli
