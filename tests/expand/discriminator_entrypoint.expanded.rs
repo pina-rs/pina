@@ -274,8 +274,8 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::proce
         }
     }
     /// The dispatch-first router behind `dispatch_entrypoint!`: validates
-    /// the program ID and discriminator, then parses only the routed
-    /// struct's accounts from the loader's input.
+    /// the configured program ID policy and discriminator, then parses
+    /// only the routed struct's accounts from the loader's input.
     #[doc(hidden)]
     #[inline(always)]
     pub fn __dispatch(
@@ -656,8 +656,8 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::proc
         }
     }
     /// The dispatch-first router behind `dispatch_entrypoint!`: validates
-    /// the program ID and discriminator, then parses only the routed
-    /// struct's accounts from the loader's input.
+    /// the configured program ID policy and discriminator, then parses
+    /// only the routed struct's accounts from the loader's input.
     #[doc(hidden)]
     #[inline(always)]
     pub fn __dispatch(

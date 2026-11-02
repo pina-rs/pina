@@ -450,7 +450,9 @@ fn withdraw_ix(
 	let circuit = prover::SpendCircuit {
 		root: prover::fr_from_le(&root).unwrap_or_else(|| panic!("root")),
 		nullifier: prover::fr_from_le(&nullifier).unwrap_or_else(|| panic!("nullifier")),
-		output_binding: None,
+		output: prover::SpendOutput::Withdraw {
+			recipient: Address::new_from_array(recipient.to_bytes()),
+		},
 		amount: ark_bn254::Fr::from(DEPOSIT_LAMPORTS),
 		witness: Some(prover::SpendWitness {
 			spent: *secrets,
@@ -517,7 +519,9 @@ fn transfer_ix(
 	let circuit = prover::SpendCircuit {
 		root: prover::fr_from_le(&root).unwrap_or_else(|| panic!("root")),
 		nullifier: prover::fr_from_le(&nullifier).unwrap_or_else(|| panic!("nullifier")),
-		output_binding: Some(prover::fr_from_le(&binding).unwrap()),
+		output: prover::SpendOutput::Transfer {
+			binding: prover::fr_from_le(&binding).unwrap(),
+		},
 		amount: ark_bn254::Fr::from(DEPOSIT_LAMPORTS),
 		witness: Some(prover::SpendWitness {
 			spent: *spent,
@@ -801,6 +805,61 @@ fn withdraw_pays_out_with_a_real_proof() {
 	let mut stored = [0_u8; 32];
 	stored.copy_from_slice(&set.data[HEADER + 9..HEADER + 41]);
 	assert_eq!(stored, nullifier_bytes(&secrets));
+}
+
+#[test]
+#[ignore = "requires the SBF artifact"]
+fn withdraw_rejects_a_legacy_verifying_key() {
+	let mut pool = setup_pool();
+	let key = vkey_pda(VK_SLOT_WITHDRAW).0;
+	let before = pool.world.get(&key).clone();
+	let mut legacy = prover::serialize_vk(&pool.withdraw_pk.vk);
+	legacy.ic_len = 3;
+	pool.world.run(
+		&pool.mollusk,
+		&set_vkey_ix(VK_SLOT_WITHDRAW, &legacy),
+		&[Check::err(PrivacyPoolError::InvalidVerifyingKeySlot.into())],
+	);
+	assert_eq!(pool.world.get(&key), &before);
+}
+
+#[test]
+#[ignore = "requires the SBF artifact"]
+fn withdraw_rejects_a_copied_proof_with_a_different_recipient() {
+	let mut pool = setup_pool();
+	let recipient = key(5);
+	let attacker = key(6);
+	let secrets = deposit_note(&mut pool, 2, 0x88, [0x22; 32]);
+	let ix = withdraw_ix(
+		current_root(&pool.world),
+		&secrets,
+		recipient,
+		&pool.withdraw_pk,
+		0,
+		&tree_nodes(&pool.world),
+		0x99,
+	);
+	let before = pool.world.accounts.clone();
+	let recipient_before = pool.world.get(&recipient).lamports;
+	let attacker_before = pool.world.get(&attacker).clone();
+	let mut copied = ix.clone();
+	copied.accounts[5].pubkey = attacker;
+
+	pool.world.run(
+		&pool.mollusk,
+		&copied,
+		&[Check::err(PrivacyPoolError::ProofVerificationFailed.into())],
+	);
+	for (key, account) in &before {
+		assert_eq!(pool.world.get(key), account);
+	}
+
+	pool.world.run(&pool.mollusk, &ix, &[Check::success()]);
+	assert_eq!(
+		pool.world.get(&recipient).lamports,
+		recipient_before + DEPOSIT_LAMPORTS
+	);
+	assert_eq!(pool.world.get(&attacker), &attacker_before);
 }
 
 #[test]

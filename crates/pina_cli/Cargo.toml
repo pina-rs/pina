@@ -51,8 +51,8 @@ serde = { workspace = true, features = ["derive"], default-features = true }
 serde_json = { workspace = true, default-features = true }
 sha2 = { workspace = true, default-features = true }
 solana-address = { workspace = true, default-features = true }
-surfpool-core = { version = "=1.6.0", default-features = false }
-surfpool-types = "=1.6.0"
+surfpool-core = { version = "~1.7", default-features = false }
+surfpool-types = "~1.7"
 syn = { workspace = true, default-features = true, features = ["full", "extra-traits", "visit", "printing"] }
 tempfile = { workspace = true, default-features = true }
 termimad = { workspace = true, default-features = true }

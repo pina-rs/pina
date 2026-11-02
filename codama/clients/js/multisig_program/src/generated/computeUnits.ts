@@ -16,20 +16,20 @@ import { MULTISIG_PROGRAM_PROGRAM_ADDRESS } from "./programs";
  * Compute units `configInitialize` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const CONFIG_INITIALIZE_MEASURED_COMPUTE_UNITS = 4543;
+export const CONFIG_INITIALIZE_MEASURED_COMPUTE_UNITS = 6152;
 
 /**
  * Compute unit limit to request for a transaction carrying `configInitialize`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const CONFIG_INITIALIZE_COMPUTE_UNIT_LIMIT = 5800;
+export const CONFIG_INITIALIZE_COMPUTE_UNIT_LIMIT = 7700;
 
 /**
  * Compute units `configUpdate` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const CONFIG_UPDATE_MEASURED_COMPUTE_UNITS = 1731;
+export const CONFIG_UPDATE_MEASURED_COMPUTE_UNITS = 1737;
 
 /**
  * Compute unit limit to request for a transaction carrying `configUpdate`: the

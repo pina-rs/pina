@@ -31,7 +31,8 @@ pub(crate) fn expand(
 					"could not parse the `#[discriminator(...)]` input: {reason} Supported \
 					 arguments are `primitive = u8 | u16 | u32 | u64`, `crate = path`, `final`, \
 					 `entrypoint`, `migrations(Account, ...)`, `migrations_max_lamports = EXPR`, \
-					 `capacity_test`, `maximum_accounts = EXPR`, `program_id = EXPR`, and `inline \
+					 `capacity_test`, `maximum_accounts = EXPR`, `program_id = EXPR`, \
+					 `skip_program_id_check`, and `inline \
 					 = \"always\" | \"hint\"`"
 				),
 			)
@@ -84,6 +85,10 @@ pub(crate) fn expand(
 			("capacity_test", args.capacity_test.is_some()),
 			("maximum_accounts", args.maximum_accounts.is_some()),
 			("program_id", args.program_id.is_some()),
+			(
+				"skip_program_id_check",
+				args.skip_program_id_check.is_present(),
+			),
 			("inline", args.inline.is_some()),
 		]
 		.into_iter()
@@ -244,6 +249,20 @@ mod tests {
 	}
 
 	#[test]
+	fn unknown_arguments_document_the_program_id_optout() {
+		let expanded = expand_with(
+			quote::quote!(unknown_option),
+			quote::quote!(
+				pub enum Instruction {
+					Run = 0,
+				}
+			),
+		);
+		assert!(expanded.contains("could not parse"));
+		assert!(expanded.contains("skip_program_id_check"));
+	}
+
+	#[test]
 	fn entrypoint_only_arguments_require_the_entrypoint_flag() {
 		// Silently ignoring these would let a ladder compile without generating
 		// `process_migrate`.
@@ -256,6 +275,10 @@ mod tests {
 			(quote::quote!(capacity_test = false), "capacity_test"),
 			(quote::quote!(maximum_accounts = 8), "maximum_accounts"),
 			(quote::quote!(program_id = ID), "program_id"),
+			(
+				quote::quote!(skip_program_id_check),
+				"skip_program_id_check",
+			),
 			(quote::quote!(inline = "hint"), "inline"),
 		] {
 			let expanded = expand_with(

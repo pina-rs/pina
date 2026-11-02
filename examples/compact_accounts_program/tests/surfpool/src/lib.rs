@@ -10,7 +10,6 @@ use pina_test::AccountMeta;
 use pina_test::Keypair;
 use pina_test::ProgramTest;
 use pina_test::Pubkey;
-use pina_test::Rent;
 use pina_test::Signer;
 use program::CompactInstruction;
 use program::DEFAULT_TITLE;
@@ -134,7 +133,9 @@ fn assert_journal(
 	assert_eq!(account.data.len(), expected_size);
 	assert_eq!(
 		account.lamports,
-		Rent::default().minimum_balance(expected_size),
+		program
+			.minimum_balance_for_rent_exemption(expected_size)
+			.expect("fetch the runtime rent-exempt minimum"),
 		"compact realloc keeps exactly the rent-exempt minimum",
 	);
 	assert_eq!(journal.authority.to_bytes(), authority.to_bytes());

@@ -212,6 +212,200 @@ where
         *self
     }
 }
+impl ::core::cmp::PartialEq for TransferEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator && self.from == other.from
+            && self.to == other.to && self.amount == other.amount
+    }
+}
+impl ::core::cmp::Eq for TransferEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for TransferEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+        self.from.hash(state);
+        self.to.hash(state);
+        self.amount.hash(state);
+    }
+}
+impl ::core::fmt::Debug for TransferEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("TransferEvent")
+            .field("discriminator", &self.discriminator)
+            .field("from", &self.from)
+            .field("to", &self.to)
+            .field("amount", &self.amount)
+            .finish()
+    }
+}
+impl TransferEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; EventDisc::BYTES]: pina::pinapod::FromZc,
+    [u8; 32]: pina::pinapod::FromZc,
+    [u8; 32]: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<TransferEvent, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(TransferEvent {
+            discriminator: <[u8; EventDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+            from: <[u8; 32] as pina::pinapod::FromZc>::from_zc(&self.from)?,
+            to: <[u8; 32] as pina::pinapod::FromZc>::from_zc(&self.to)?,
+            amount: <PodU64 as pina::pinapod::FromZc>::from_zc(&self.amount)?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for TransferEvent
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; EventDisc::BYTES]: pina::pinapod::FromZc,
+    [u8; 32]: pina::pinapod::FromZc,
+    [u8; 32]: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl TransferEvent
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; 32]: pina::pinapod::ZcField,
+    <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<TransferEventZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "TransferEvent",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &TransferEventZc = unsafe {
+            &*data.as_ptr().cast::<TransferEventZc>()
+        };
+        <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.from,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("from", error))?;
+        <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.to,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("to", error))?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.amount,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("amount", error))?;
+        ::core::result::Result::Ok(())
+    }
+}
 const _: () = if !(::core::mem::align_of::<TransferEventZc>() == 1) {
     ::core::panicking::panic(
         "assertion failed: ::core::mem::align_of::<TransferEventZc>() == 1",
@@ -508,6 +702,143 @@ where
         *self
     }
 }
+impl ::core::cmp::PartialEq for InitEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator && self.choice == other.choice
+    }
+}
+impl ::core::cmp::Eq for InitEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for InitEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+        self.choice.hash(state);
+    }
+}
+impl ::core::fmt::Debug for InitEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("InitEvent")
+            .field("discriminator", &self.discriminator)
+            .field("choice", &self.choice)
+            .finish()
+    }
+}
+impl InitEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; EventDisc::BYTES]: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<InitEvent, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(InitEvent {
+            discriminator: <[u8; EventDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+            choice: <u8 as pina::pinapod::FromZc>::from_zc(&self.choice)?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for InitEvent
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; EventDisc::BYTES]: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl InitEvent
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<InitEventZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "InitEvent",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &InitEventZc = unsafe { &*data.as_ptr().cast::<InitEventZc>() };
+        <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.choice,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("choice", error))?;
+        ::core::result::Result::Ok(())
+    }
+}
 const _: () = if !(::core::mem::align_of::<InitEventZc>() == 1) {
     ::core::panicking::panic(
         "assertion failed: ::core::mem::align_of::<InitEventZc>() == 1",
@@ -731,6 +1062,116 @@ where
         *self
     }
 }
+impl ::core::cmp::PartialEq for EmptyEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator
+    }
+}
+impl ::core::cmp::Eq for EmptyEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for EmptyEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+    }
+}
+impl ::core::fmt::Debug for EmptyEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("EmptyEvent")
+            .field("discriminator", &self.discriminator)
+            .finish()
+    }
+}
+impl EmptyEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; EventDisc::BYTES]: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<EmptyEvent, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(EmptyEvent {
+            discriminator: <[u8; EventDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for EmptyEvent
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; EventDisc::BYTES]: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl EmptyEvent
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<EmptyEventZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "EmptyEvent",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &EmptyEventZc = unsafe { &*data.as_ptr().cast::<EmptyEventZc>() };
+        <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        ::core::result::Result::Ok(())
+    }
+}
 const _: () = if !(::core::mem::align_of::<EmptyEventZc>() == 1) {
     ::core::panicking::panic(
         "assertion failed: ::core::mem::align_of::<EmptyEventZc>() == 1",
@@ -949,6 +1390,171 @@ where
 {
     fn clone(&self) -> Self {
         *self
+    }
+}
+impl ::core::cmp::PartialEq for AuditEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> ::core::primitive::bool {
+        true && self.discriminator == other.discriminator && self.action == other.action
+            && self.timestamp == other.timestamp
+    }
+}
+impl ::core::cmp::Eq for AuditEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::cmp::Eq,
+{}
+impl ::core::hash::Hash for AuditEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::hash::Hash,
+{
+    fn hash<__State: ::core::hash::Hasher>(&self, state: &mut __State) {
+        self.discriminator.hash(state);
+        self.action.hash(state);
+        self.timestamp.hash(state);
+    }
+}
+impl ::core::fmt::Debug for AuditEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <u8 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+    <PodU64 as pina::pinapod::ZcField>::Pod: ::core::fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        formatter
+            .debug_struct("AuditEvent")
+            .field("discriminator", &self.discriminator)
+            .field("action", &self.action)
+            .field("timestamp", &self.timestamp)
+            .finish()
+    }
+}
+impl AuditEventZc
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; EventDisc::BYTES]: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+{
+    /// Materialize the declared schema type from this stored representation.
+    ///
+    /// The result is a fully owned, self-contained value: snapshots,
+    /// logging, tests, and off-chain decoding all want a shape a
+    /// borrowed view cannot serve. For a value that reached the caller
+    /// through a validating reader this always succeeds; a stored enum
+    /// discriminant naming no variant is the only failure.
+    #[inline]
+    pub fn to_native(
+        &self,
+    ) -> ::core::result::Result<AuditEvent, pina::pinapod::PinaPodError> {
+        ::core::result::Result::Ok(AuditEvent {
+            discriminator: <[u8; EventDisc::BYTES] as pina::pinapod::FromZc>::from_zc(
+                &self.discriminator,
+            )?,
+            action: <u8 as pina::pinapod::FromZc>::from_zc(&self.action)?,
+            timestamp: <PodU64 as pina::pinapod::FromZc>::from_zc(&self.timestamp)?,
+        })
+    }
+}
+impl pina::pinapod::FromZc for AuditEvent
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    [u8; EventDisc::BYTES]: pina::pinapod::FromZc,
+    u8: pina::pinapod::FromZc,
+    PodU64: pina::pinapod::FromZc,
+{
+    #[inline]
+    fn from_zc(
+        pod: &Self::Pod,
+    ) -> ::core::result::Result<Self, pina::pinapod::PinaPodError> {
+        pod.to_native()
+    }
+}
+impl AuditEvent
+where
+    [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
+    <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    u8: pina::pinapod::ZcField,
+    <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+    PodU64: pina::pinapod::ZcField,
+    <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
+{
+    /// Validate and attribute: names the first field whose stored value
+    /// a reader would reject.
+    ///
+    /// Accepts exactly what [`PinaPodFixed::validate_prefix`](pinapod::PinaPodFixed::validate_prefix)
+    /// accepts, so a diagnostic run after a rejected read answers
+    /// *which field*, never *whether*. A nested schema field is
+    /// attributed at its own name; call the nested `diagnose` on the
+    /// field's bytes for one level deeper.
+    #[inline]
+    pub fn diagnose(
+        data: &[::core::primitive::u8],
+    ) -> ::core::result::Result<(), pina::pinapod::Diagnostic> {
+        let size = ::core::mem::size_of::<AuditEventZc>();
+        if data.len() < size {
+            return ::core::result::Result::Err(
+                pina::pinapod::Diagnostic::new(
+                    "AuditEvent",
+                    pina::pinapod::PinaPodError::BufferTooSmall,
+                ),
+            );
+        }
+        let value: &AuditEventZc = unsafe { &*data.as_ptr().cast::<AuditEventZc>() };
+        <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.discriminator,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("discriminator", error))?;
+        <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.action,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("action", error))?;
+        <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
+                &value.timestamp,
+            )
+            .map_err(|error| pina::pinapod::Diagnostic::new("timestamp", error))?;
+        ::core::result::Result::Ok(())
     }
 }
 const _: () = if !(::core::mem::align_of::<AuditEventZc>() == 1) {

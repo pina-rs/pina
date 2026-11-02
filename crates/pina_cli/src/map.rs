@@ -841,11 +841,12 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn opens_trusted_system_aliases_without_following_project_links() {
-		for entry in fs::read_dir("/").unwrap() {
-			let path = entry.unwrap().path();
-			let metadata = fs::symlink_metadata(&path).unwrap();
-
-			if crate::path_security::is_link_like(&metadata)
+		// Avoid autofs aliases such as macOS's /home, whose open can wait for
+		// a network mount. These ordinary aliases exercise the same trust gate.
+		for path in ["/tmp", "/var", "/etc", "/bin", "/sbin", "/lib", "/lib64"] {
+			let path = PathBuf::from(path);
+			if let Ok(metadata) = fs::symlink_metadata(&path)
+				&& crate::path_security::is_link_like(&metadata)
 				&& !crate::path_security::is_untrusted_link(&metadata, true)
 				&& path.is_dir()
 			{

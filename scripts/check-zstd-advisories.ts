@@ -7,9 +7,9 @@ import { execFileSync } from "node:child_process";
 const REVIEWED_TREES = {
 	zstd: [
 		"zstd v0.13.3",
-		"agave-snapshots v4.2.2",
-		"solana-account-decoder v4.2.2",
-		"solana-account-decoder-client-types v4.2.2",
+		"agave-snapshots v4.3.2",
+		"solana-account-decoder v4.3.2",
+		"solana-account-decoder-client-types v4.3.2",
 	],
 	"zstd-safe": ["zstd-safe v7.3.0", "zstd v0.13.3"],
 } as const;

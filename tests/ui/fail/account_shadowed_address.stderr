@@ -1,3 +1,30 @@
+error[E0277]: the trait bound `Address: FromZc` is not satisfied
+  --> tests/ui/fail/account_shadowed_address.rs:15:1
+   |
+15 | #[account(discriminator = Kind)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `FromZc` is not implemented for `Address`
+  --> tests/ui/fail/account_shadowed_address.rs:4:1
+   |
+ 4 | pub struct Address([u8; 32]);
+   | ^^^^^^^^^^^^^^^^^^
+   = help: the following other types implement trait `FromZc`:
+             Option<T>
+             PodBool
+             PodI128
+             PodI16
+             PodI32
+             PodI64
+             PodOption<T, PFX>
+             PodString<N, PFX>
+           and $N others
+   = note: this error originates in the attribute macro `account` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: add `#![feature(trivial_bounds)]` to the crate attributes to enable
+   |
+ 1 + #![feature(trivial_bounds)]
+   |
+
 error[E0308]: mismatched types
   --> tests/ui/fail/account_shadowed_address.rs:15:1
    |

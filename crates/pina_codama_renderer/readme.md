@@ -14,7 +14,13 @@ Codama Rust renderer that generates Pina-style validated PinaPod models and disc
 
 <!-- {=crateReadmeBadgeRow:"pina_codama_renderer"} -->
 
-[![Crates.io](https://img.shields.io/badge/crates.io-pina__codama__renderer-orange?logo=rust)](https://crates.io/crates/pina_codama_renderer) [![Docs.rs](https://img.shields.io/badge/docs.rs-pina__codama__renderer-1f425f?logo=docs.rs)](https://docs.rs/pina_codama_renderer/) [![CI](https://github.com/pina-rs/pina/actions/workflows/ci.yml/badge.svg)](https://github.com/pina-rs/pina/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/pina-rs/pina/branch/main/graph/badge.svg)](https://codecov.io/gh/pina-rs/pina) [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/license/apache-2.0)
+<p align="center">
+	<a href="https://crates.io/crates/pina_codama_renderer"><img alt="Crates.io" src="https://img.shields.io/badge/crates.io-pina__codama__renderer-orange?logo=rust&style=flat-square"></a>
+	<a href="https://docs.rs/pina_codama_renderer/"><img alt="Docs.rs" src="https://img.shields.io/badge/docs.rs-pina__codama__renderer-1f425f?logo=docs.rs&style=flat-square"></a>
+	<a href="https://github.com/pina-rs/pina/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/pina-rs/pina/ci.yml?label=CI&logo=githubactions&style=flat-square"></a>
+	<a href="https://codecov.io/gh/pina-rs/pina"><img alt="Coverage" src="https://img.shields.io/codecov/c/github/pina-rs/pina?label=coverage&logo=codecov&style=flat-square"></a>
+	<a href="https://opensource.org/license/apache-2.0"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?logo=apache&style=flat-square"></a>
+</p>
 
 <!-- {/crateReadmeBadgeRow} -->
 

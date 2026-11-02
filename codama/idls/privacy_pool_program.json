@@ -26,9 +26,10 @@
 			"and inserts a client-computed Poseidon commitment into an on-chain",
 			"incremental Merkle tree. [`PrivacyPoolInstruction::Withdraw`] and",
 			"[`PrivacyPoolInstruction::Transfer`] spend a note by verifying a Groth16",
-			"proof (public inputs: the tree root, the derived nullifier, and for",
-			"transfers a binding of the successor commitment and disclosure metadata)",
-			"and recording the nullifier. The pairing check runs entirely through the",
+			"proof (public inputs: the tree root, the derived nullifier, and either",
+			"the withdrawal recipient hash or a binding of the successor commitment",
+			"and disclosure metadata) and recording the nullifier. The pairing check",
+			"runs entirely through the",
 			"`sol_alt_bn128_group_op` syscall,",
 			"so a spend fits in one transaction at a fraction of the compute budget",
 			"instead of demanding the multi-transaction slicing a hand-written",
@@ -1306,7 +1307,8 @@
 				"name": "verifyingKeyAccount",
 				"docs": [
 					"One installed Groth16 verifying key. Slot 0 verifies withdraw proofs",
-					"(two public inputs), slot 1 transfer proofs (three)."
+					"(root, nullifier, recipient hash), slot 1 transfer proofs",
+					"(root, nullifier, output binding)."
 				],
 				"data": {
 					"kind": "structTypeNode",
@@ -1767,7 +1769,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 58300,
-							"measured": 48259
+							"measured": 48260
 						}
 					}
 				]
@@ -2066,7 +2068,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 600,
-							"measured": 242
+							"measured": 243
 						}
 					}
 				]
@@ -2170,7 +2172,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 700,
-							"measured": 318
+							"measured": 319
 						}
 					}
 				]
@@ -2361,7 +2363,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 19500,
-							"measured": 15995
+							"measured": 15996
 						}
 					}
 				]
@@ -2552,8 +2554,8 @@
 						"kind": "pluginNode",
 						"name": "pinaComputeUnits",
 						"payload": {
-							"limit": 104700,
-							"measured": 86949
+							"limit": 111100,
+							"measured": 92269
 						}
 					}
 				]
@@ -2799,7 +2801,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 126700,
-							"measured": 105282
+							"measured": 105283
 						}
 					}
 				]
@@ -2993,7 +2995,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 13600,
-							"measured": 11014
+							"measured": 11015
 						}
 					}
 				]
@@ -3076,7 +3078,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 2600,
-							"measured": 1892
+							"measured": 1893
 						}
 					}
 				]
@@ -3166,7 +3168,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 2700,
-							"measured": 1942
+							"measured": 1943
 						}
 					}
 				]
@@ -3257,7 +3259,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 600,
-							"measured": 197
+							"measured": 198
 						}
 					}
 				]
@@ -3382,7 +3384,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 900,
-							"measured": 437
+							"measured": 438
 						}
 					}
 				]
@@ -3458,7 +3460,7 @@
 						"name": "pinaComputeUnits",
 						"payload": {
 							"limit": 500,
-							"measured": 120
+							"measured": 121
 						}
 					}
 				]

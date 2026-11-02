@@ -23,6 +23,14 @@ let
       fi
     '';
   });
+  # `cargo-llvm-cov`'s own test suite fails under the Nix rust infrastructure
+  # on both Darwin (the instrumented test binary faults in the unwinder) and
+  # Linux (its fixture workspaces fail after the current nixpkgs rust update).
+  # The nixpkgs package documents this class of failure as tooling-only: the
+  # installed `cargo llvm-cov` works, which is all `coverage:all` runs.
+  cargo-llvm-cov = pkgs.cargo-llvm-cov.overrideAttrs (_: {
+    doCheck = false;
+  });
 in
 
 {
@@ -531,6 +539,8 @@ in
       exec = ''
         set -euo pipefail
         pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
+        pnpm --dir "$DEVENV_ROOT" run build:codama-nodes
+        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cpi
         pnpm --dir "$DEVENV_ROOT" run check:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:npm-packages
         pnpm --dir "$DEVENV_ROOT" run test:codama-renderer-cpi

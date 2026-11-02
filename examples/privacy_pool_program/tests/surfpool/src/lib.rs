@@ -452,7 +452,9 @@ fn withdraw_pays_out_through_a_real_proof() {
 		let circuit = prover::SpendCircuit {
 			root: prover::fr_from_le(&root).unwrap(),
 			nullifier: prover::fr_from_le(&nullifier).unwrap(),
-			output_binding: None,
+			output: prover::SpendOutput::Withdraw {
+				recipient: Address::new_from_array(recipient().to_bytes()),
+			},
 			amount: prover::amount_field(),
 			witness: Some(prover::SpendWitness {
 				spent: secrets,
@@ -463,11 +465,14 @@ fn withdraw_pays_out_through_a_real_proof() {
 			}),
 		};
 		let proof = prover::prove_spend(&pk, circuit, 0x99);
+		let recipient_hash =
+			program::recipient_hash(&Address::new_from_array(recipient().to_bytes())).unwrap();
 		assert!(prover::verify_host(
 			&vk,
 			&[
 				prover::fr_from_le(&root).unwrap(),
-				prover::fr_from_le(&nullifier).unwrap()
+				prover::fr_from_le(&nullifier).unwrap(),
+				prover::fr_from_le(&recipient_hash).unwrap(),
 			],
 			&proof,
 		));
@@ -711,7 +716,9 @@ fn every_instruction_discriminator_is_exercised() {
 		let circuit = prover::SpendCircuit {
 			root: prover::fr_from_le(&root).unwrap(),
 			nullifier: prover::fr_from_le(&nullifier).unwrap(),
-			output_binding: Some(prover::fr_from_le(&binding).unwrap()),
+			output: prover::SpendOutput::Transfer {
+				binding: prover::fr_from_le(&binding).unwrap(),
+			},
 			amount: prover::amount_field(),
 			witness: Some(prover::SpendWitness {
 				spent: secrets,

@@ -12,7 +12,8 @@
 use crate::generated_types::*;
 
 /// One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
-/// (two public inputs), slot 1 transfer proofs (three).
+/// (root, nullifier, recipient hash), slot 1 transfer proofs
+/// (root, nullifier, output binding).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VerifyingKeyAccount {
 	pub bump: u8,

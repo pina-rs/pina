@@ -37,9 +37,10 @@ use solana_sdk::pubkey::Pubkey;
 /// and inserts a client-computed Poseidon commitment into an on-chain
 /// incremental Merkle tree. [`PrivacyPoolInstruction::Withdraw`] and
 /// [`PrivacyPoolInstruction::Transfer`] spend a note by verifying a Groth16
-/// proof (public inputs: the tree root, the derived nullifier, and for
-/// transfers a binding of the successor commitment and disclosure metadata)
-/// and recording the nullifier. The pairing check runs entirely through the
+/// proof (public inputs: the tree root, the derived nullifier, and either
+/// the withdrawal recipient hash or a binding of the successor commitment
+/// and disclosure metadata) and recording the nullifier. The pairing check
+/// runs entirely through the
 /// `sol_alt_bn128_group_op` syscall,
 /// so a spend fits in one transaction at a fraction of the compute budget
 /// instead of demanding the multi-transaction slicing a hand-written

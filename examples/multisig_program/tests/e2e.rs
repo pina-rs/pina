@@ -381,6 +381,17 @@ fn clock_meta() -> AccountMeta {
 // Tests
 // ---------------------------------------------------------------------------
 
+/// Canonical loader-owned deployment metadata for a chosen test authority.
+fn program_data_fixture(authority: &Pubkey) -> (Pubkey, Account) {
+	let loader = solana_pubkey::pubkey!("BPFLoaderUpgradeab1e11111111111111111111111");
+	let address = Pubkey::find_program_address(&[program_id().as_ref()], &loader).0;
+	let mut metadata = Account::new(RENT_LAMPORTS, 45, &loader);
+	metadata.data[..4].copy_from_slice(&3_u32.to_le_bytes());
+	metadata.data[12] = 1;
+	metadata.data[13..45].copy_from_slice(authority.as_ref());
+	(address, metadata)
+}
+
 #[test]
 #[ignore = "build the SBF artifact first"]
 fn config_initialize_writes_the_global_pda() {
@@ -388,12 +399,13 @@ fn config_initialize_writes_the_global_pda() {
 	let (config_key, bump) = program_config_pda();
 	let authority = key(9);
 	let treasury = key(10);
+	let (metadata_key, metadata) = program_data_fixture(&authority);
 
 	let mut data = vec![0_u8; ConfigInitializeIx::SIZE];
 	ConfigInitializeIx::initialize(&mut data, |ix| {
 		ix.bump = bump;
 		ix.treasury = pina_address(&treasury);
-		ix.creation_fee.set(0);
+		ix.creation_fee.set(1_000_000);
 		Ok(())
 	})
 	.unwrap();
@@ -405,11 +417,13 @@ fn config_initialize_writes_the_global_pda() {
 			AccountMeta::new(authority, true),
 			AccountMeta::new(config_key, false),
 			AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+			AccountMeta::new_readonly(metadata_key, false),
 		],
 	);
 	let mut world = World::new();
 	world.add(authority, system_account(RENT_LAMPORTS));
 	world.add(config_key, Account::default());
+	world.add(metadata_key, metadata);
 	world.add(
 		solana_sdk_ids::system_program::id(),
 		keyed_account_for_system_program().1,
@@ -420,6 +434,103 @@ fn config_initialize_writes_the_global_pda() {
 		account(&result, &config_key).data[0],
 		MultisigAccountType::ProgramConfig as u8
 	);
+	let config = ProgramConfig::try_from_bytes(&account(&result, &config_key).data).unwrap();
+	assert_eq!(config.authority, pina_address(&authority));
+	assert_eq!(config.treasury, pina_address(&treasury));
+	assert_eq!(config.creation_fee.get(), 1_000_000);
+}
+
+/// Authenticate every part of deployment metadata before creating the singleton.
+#[test]
+#[ignore = "build the SBF artifact first"]
+fn config_initialize_rejects_untrusted_deployment_metadata() {
+	let mollusk = create_mollusk();
+	let authority = key(9);
+	let (config_key, bump) = program_config_pda();
+	let (metadata_key, metadata) = program_data_fixture(&authority);
+	let mut cases = Vec::new();
+
+	let mut stranger = metadata.clone();
+	stranger.data[13..45].copy_from_slice(key(10).as_ref());
+	cases.push((
+		metadata_key,
+		stranger,
+		MultisigError::InvalidConfigAuthority.into(),
+	));
+
+	for option in [0, 2] {
+		let mut invalid = metadata.clone();
+		invalid.data[12] = option;
+		cases.push((
+			metadata_key,
+			invalid,
+			MultisigError::InvalidConfigAuthority.into(),
+		));
+	}
+
+	let mut wrong_variant = metadata.clone();
+	wrong_variant.data[..4].copy_from_slice(&2_u32.to_le_bytes());
+	cases.push((
+		metadata_key,
+		wrong_variant,
+		MultisigError::InvalidConfigAuthority.into(),
+	));
+
+	for len in [0, 3, 12, 13, 44] {
+		let mut truncated = metadata.clone();
+		truncated.data.truncate(len);
+		cases.push((
+			metadata_key,
+			truncated,
+			MultisigError::InvalidConfigAuthority.into(),
+		));
+	}
+
+	let mut forged = metadata.clone();
+	forged.owner = solana_sdk_ids::system_program::id();
+	cases.push((
+		metadata_key,
+		forged,
+		pina::ProgramError::InvalidAccountOwner,
+	));
+	cases.push((key(98), metadata, pina::ProgramError::InvalidAccountData));
+
+	let mut data = vec![0_u8; ConfigInitializeIx::SIZE];
+	ConfigInitializeIx::initialize(&mut data, |ix| {
+		ix.bump = bump;
+		ix.treasury = pina_address(&authority);
+		ix.creation_fee.set(1_000_000);
+		Ok(())
+	})
+	.unwrap();
+
+	for (address, metadata, expected_error) in cases {
+		let instruction = Instruction::new_with_bytes(
+			program_id(),
+			&data,
+			vec![
+				AccountMeta::new(authority, true),
+				AccountMeta::new(config_key, false),
+				AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+				AccountMeta::new_readonly(address, false),
+			],
+		);
+		let accounts = vec![
+			(authority, system_account(RENT_LAMPORTS)),
+			(config_key, Account::default()),
+			keyed_account_for_system_program(),
+			(address, metadata),
+		];
+		let result = mollusk.process_and_validate_instruction(
+			&instruction,
+			&accounts,
+			&[Check::err(expected_error)],
+		);
+
+		for (address, original) in &accounts {
+			assert_eq!(account(&result, address), original);
+		}
+	}
 }
 
 #[test]

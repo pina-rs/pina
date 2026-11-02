@@ -16,9 +16,10 @@
 //! and inserts a client-computed Poseidon commitment into an on-chain
 //! incremental Merkle tree. [`PrivacyPoolInstruction::Withdraw`] and
 //! [`PrivacyPoolInstruction::Transfer`] spend a note by verifying a Groth16
-//! proof (public inputs: the tree root, the derived nullifier, and for
-//! transfers a binding of the successor commitment and disclosure metadata)
-//! and recording the nullifier. The pairing check runs entirely through the
+//! proof (public inputs: the tree root, the derived nullifier, and either
+//! the withdrawal recipient hash or a binding of the successor commitment
+//! and disclosure metadata) and recording the nullifier. The pairing check
+//! runs entirely through the
 //! `sol_alt_bn128_group_op` syscall,
 //! so a spend fits in one transaction at a fraction of the compute budget
 //! instead of demanding the multi-transaction slicing a hand-written
@@ -160,13 +161,13 @@ pub const LOG_ENTRY_BYTES: usize = 96;
 /// Flat byte length of the log store.
 pub const LOG_BYTES: usize = LOG_CAPACITY * LOG_ENTRY_BYTES;
 
-/// Verifying-key slot for withdraw proofs (public inputs: root, nullifier).
+/// Verifying-key slot for withdraw proofs (root, nullifier, recipient hash).
 pub const VK_SLOT_WITHDRAW: u8 = 0;
 
 /// Verifying-key slot for transfer proofs (root, nullifier, output binding).
 pub const VK_SLOT_TRANSFER: u8 = 1;
 
-/// Largest IC array either circuit uses (transfer: four entries).
+/// Largest IC array either circuit uses (three inputs plus the constant).
 pub const MAX_PUBLIC_INPUTS: usize = 4;
 
 /// Disclosure tiers.
@@ -463,7 +464,8 @@ pub struct DisclosureLog {
 }
 
 /// One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
-/// (two public inputs), slot 1 transfer proofs (three).
+/// (root, nullifier, recipient hash), slot 1 transfer proofs
+/// (root, nullifier, output binding).
 #[account(discriminator = PrivacyPoolAccountType)]
 #[pda(seeds = [SEED_VKEY, slot: u64], bump = bump)]
 pub struct VerifyingKeyAccount {
@@ -495,6 +497,18 @@ mod crypto;
 mod syscalls;
 
 pub use crypto::poseidon2;
+
+/// Hash the full payout address into one canonical BN254 scalar input.
+///
+/// Each half is a zero-extended little-endian 128-bit integer. Reducing the
+/// entire address modulo the scalar field would alias distinct recipients.
+pub fn recipient_hash(recipient: &Address) -> Result<[u8; 32], ProgramError> {
+	let mut low = [0_u8; 32];
+	let mut high = [0_u8; 32];
+	low[..16].copy_from_slice(&recipient.as_ref()[..16]);
+	high[..16].copy_from_slice(&recipient.as_ref()[16..]);
+	poseidon2(&low, &high)
+}
 
 /// View a 32-byte commitment as an address; the note PDA seeds off it.
 /// A commitment is exactly 32 bytes, so the conversion always succeeds.
@@ -1173,8 +1187,7 @@ impl<'a> ProcessAccountInfos<'a> for SetVerificationKeyAccounts<'a> {
 		if args.slot != VK_SLOT_WITHDRAW && args.slot != VK_SLOT_TRANSFER {
 			return Err(PrivacyPoolError::InvalidVerifyingKeySlot.into());
 		}
-		let expected_ic = if args.slot == VK_SLOT_WITHDRAW { 3 } else { 4 };
-		if usize::from(args.ic_len) != expected_ic {
+		if usize::from(args.ic_len) != MAX_PUBLIC_INPUTS {
 			return Err(PrivacyPoolError::InvalidVerifyingKeySlot.into());
 		}
 
@@ -1486,7 +1499,11 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawAccounts<'a> {
 				b: args.proof_b,
 				c: args.proof_c,
 			},
-			public_inputs: &[args.root, args.nullifier],
+			public_inputs: &[
+				args.root,
+				args.nullifier,
+				recipient_hash(self.recipient.address())?,
+			],
 		};
 		spend_note(
 			self.merkle_tree,
@@ -1969,6 +1986,7 @@ pub mod prover {
 	use rand::SeedableRng;
 	use rand::rngs::StdRng;
 
+	use super::Address;
 	use super::TREE_DEPTH;
 
 	// -------------------------------------------------------------------
@@ -2137,17 +2155,27 @@ pub mod prover {
 		pub successor_metadata_digest: Option<Fr>,
 	}
 
+	/// The public effect authorized by a spend proof.
+	#[derive(Clone)]
+	pub enum SpendOutput {
+		/// Payout address, bound through [`super::recipient_hash`].
+		Withdraw { recipient: Address },
+		/// Poseidon binding of the successor commitment and disclosure digest.
+		Transfer { binding: Fr },
+	}
+
 	/// Shared join-split shape: knowledge of a committed note in the tree
-	/// that derives the public nullifier. Transfers additionally bind the
-	/// public output binding to fresh secrets and a disclosure digest.
+	/// that derives the public nullifier. The third public input binds the
+	/// withdrawal's recipient hash or the transfer's successor commitment
+	/// and disclosure digest.
 	#[derive(Clone)]
 	pub struct SpendCircuit {
 		/// Merkle root the witness proves membership against (public).
 		pub root: Fr,
 		/// Derived nullifier (public).
 		pub nullifier: Fr,
-		/// Poseidon(successor commitment, disclosure digest), public for transfers.
-		pub output_binding: Option<Fr>,
+		/// Recipient hash or transfer output binding (the third public input).
+		pub output: SpendOutput,
 		/// Fixed denomination as a field element (constant in-circuit).
 		pub amount: Fr,
 		/// Private witness material, provided as closures so both setup
@@ -2161,9 +2189,20 @@ pub mod prover {
 
 			let root = FpVar::new_input(cs.clone(), || Ok(self.root))?;
 			let nullifier_pub = FpVar::new_input(cs.clone(), || Ok(self.nullifier))?;
-			let output = match self.output_binding {
-				Some(value) => Some(FpVar::new_input(cs.clone(), || Ok(value))?),
-				None => None,
+			let output = match self.output {
+				SpendOutput::Withdraw { recipient } => {
+					let hash = super::recipient_hash(&recipient)
+						.map_err(|_| SynthesisError::Unsatisfiable)?;
+					let value = fr_from_le(&hash).ok_or(SynthesisError::Unsatisfiable)?;
+					let recipient_pub = FpVar::new_input(cs.clone(), || Ok(value))?;
+					// An unused public input has a zero IC coefficient in Groth16.
+					// A nonlinear constraint binds the payout hash to this proof.
+					let _ = recipient_pub.square()?;
+					None
+				}
+				SpendOutput::Transfer { binding } => {
+					Some(FpVar::new_input(cs.clone(), || Ok(binding))?)
+				}
 			};
 
 			let witness = self.witness;
@@ -2266,7 +2305,15 @@ pub mod prover {
 		let circuit = SpendCircuit {
 			root: Fr::zero(),
 			nullifier: Fr::zero(),
-			output_binding: with_output.then(Fr::zero),
+			output: if with_output {
+				SpendOutput::Transfer {
+					binding: Fr::zero(),
+				}
+			} else {
+				SpendOutput::Withdraw {
+					recipient: Address::new_from_array([0; 32]),
+				}
+			},
 			amount: Fr::from(super::DEPOSIT_LAMPORTS),
 			witness: None,
 		};
@@ -2380,6 +2427,7 @@ pub mod prover {
 
 	#[cfg(test)]
 	mod tests {
+		use ark_ec::AffineRepr;
 		use ark_relations::r1cs::ConstraintSystem;
 		use ark_relations::r1cs::Variable;
 
@@ -2502,7 +2550,9 @@ pub mod prover {
 			let circuit = SpendCircuit {
 				root: fr_from_le(&root).unwrap(),
 				nullifier: fr_from_le(&nullifier).unwrap(),
-				output_binding: None,
+				output: SpendOutput::Withdraw {
+					recipient: Address::new_from_array([0xFF; 32]),
+				},
 				amount,
 				witness: Some(SpendWitness {
 					spent: secrets,
@@ -2512,10 +2562,28 @@ pub mod prover {
 					successor_metadata_digest: None,
 				}),
 			};
+			let recipient =
+				super::super::recipient_hash(&Address::new_from_array([0xFF; 32])).unwrap();
+			let cs = ConstraintSystem::<Fr>::new_ref();
+			circuit.clone().generate_constraints(cs.clone()).unwrap();
+			assert_eq!(
+				cs.borrow().unwrap().instance_assignment,
+				vec![
+					Fr::from(1_u64),
+					fr_from_le(&root).unwrap(),
+					fr_from_le(&nullifier).unwrap(),
+					fr_from_le(&recipient).unwrap(),
+				]
+			);
+			assert!(!vk.gamma_abc_g1[3].is_zero());
 			let proof = prove_spend(&pk, circuit, 0x8888);
 			assert!(verify_host(
 				&vk,
-				&[fr_from_le(&root).unwrap(), fr_from_le(&nullifier).unwrap()],
+				&[
+					fr_from_le(&root).unwrap(),
+					fr_from_le(&nullifier).unwrap(),
+					fr_from_le(&recipient).unwrap(),
+				],
 				&proof
 			));
 
@@ -2529,11 +2597,37 @@ pub mod prover {
 				ic: wire_vk.ic,
 				ic_len: usize::from(wire_vk.ic_len),
 			};
-			let inputs = [root, nullifier];
+			let inputs = [root, nullifier, recipient];
 			assert!(
 				verify_groth16(&key, &wire_proof.a, &wire_proof.b, &wire_proof.c, &inputs)
 					.unwrap_or_else(|e| panic!("host verify: {e:?}"))
 			);
+
+			for byte in [0, 15, 16, 31] {
+				let mut redirected = [0xFF; 32];
+				redirected[byte] ^= 1;
+				let redirected_hash =
+					super::super::recipient_hash(&Address::new_from_array(redirected)).unwrap();
+				assert!(!verify_host(
+					&vk,
+					&[
+						fr_from_le(&root).unwrap(),
+						fr_from_le(&nullifier).unwrap(),
+						fr_from_le(&redirected_hash).unwrap(),
+					],
+					&proof
+				));
+				assert!(
+					!verify_groth16(
+						&key,
+						&wire_proof.a,
+						&wire_proof.b,
+						&wire_proof.c,
+						&[root, nullifier, redirected_hash]
+					)
+					.unwrap()
+				);
+			}
 
 			// A flipped public input must fail.
 			let mut bad = root;
@@ -2544,7 +2638,7 @@ pub mod prover {
 					&wire_proof.a,
 					&wire_proof.b,
 					&wire_proof.c,
-					&[bad, nullifier]
+					&[bad, nullifier, recipient]
 				)
 				.unwrap()
 			);
@@ -2585,7 +2679,9 @@ pub mod prover {
 			let circuit = SpendCircuit {
 				root: fr_from_le(&root_bytes).unwrap(),
 				nullifier: fr_from_le(&nullifier_bytes).unwrap(),
-				output_binding: None,
+				output: SpendOutput::Withdraw {
+					recipient: Address::new_from_array([0xFF; 32]),
+				},
 				amount,
 				witness: Some(SpendWitness {
 					spent: secrets,

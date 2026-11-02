@@ -261,7 +261,7 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 	.addCommand(
 		registerGlobals(new Command("verifying-key-account"))
 			.description(
-				"One installed Groth16 verifying key. Slot 0 verifies withdraw proofs\n(two public inputs), slot 1 transfer proofs (three).",
+				"One installed Groth16 verifying key. Slot 0 verifies withdraw proofs\n(root, nullifier, recipient hash), slot 1 transfer proofs\n(root, nullifier, output binding).",
 			)
 			.option(
 				"--address <address>",
