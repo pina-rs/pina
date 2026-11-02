@@ -4,6 +4,7 @@
 //! A separate reader owns stdin so it can terminate the worker on parent death
 //! even while the SVM is processing a request.
 
+use std::convert::Infallible;
 use std::io::BufRead as _;
 use std::io::Read as _;
 use std::io::Write as _;
@@ -65,7 +66,9 @@ struct Fork {
 }
 
 /// A private entry point used by the `pina` binary, not a public CLI command.
-pub fn run() -> Result<(), String> {
+///
+/// Parent EOF terminates the process; losing the input reader is a failure.
+pub fn run() -> Result<Infallible, String> {
 	let (requests, receiver) = mpsc::sync_channel::<Vec<u8>>(1);
 	std::thread::spawn(move || {
 		let stdin = io::stdin();
@@ -123,7 +126,7 @@ pub fn run() -> Result<(), String> {
 			.ok_or("request returned no response")?;
 		write_frame(&response)?;
 	}
-	Ok(())
+	Err("worker input reader stopped".to_owned())
 }
 
 async fn initialize(url: &str) -> Result<Fork, String> {
