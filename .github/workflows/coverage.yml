@@ -110,3 +110,111 @@ jobs:
           files: target/coverage/lcov.info,target/coverage/pina-test.info
           fail_ci_if_error: true
           use_oidc: true
+
+  rehearsal-cli-cost:
+    name: rehearsal release CLI cost
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    # Building both CLIs and running the benchmarks against them peaked at
+    # ~11.5 minutes, which left too little room on a slow runner and surfaced
+    # as spurious job timeouts on otherwise healthy pull requests.
+    timeout-minutes: 25
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: setup
+        uses: $/.github/actions/devenv
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create base worktree
+        run: git worktree add --detach ../pina-performance-base 7b2c0c31bf4209258ff488f4ae83ccdcfa12a2ce
+        shell: bash
+
+      - name: record source and toolchain
+        run: |
+          git rev-parse HEAD
+          git -C ../pina-performance-base rev-parse HEAD
+          sha256sum Cargo.lock ../pina-performance-base/Cargo.lock
+          rustc -Vv
+          cargo -V
+          node --version
+          hyperfine --version
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: build base and head CLIs
+        run: |
+          # Separate target dirs: sharing one makes cargo reuse the base
+          # build's pina_profile rlib for the head build when only content
+          # (not mtime) differs, and the head CLI then fails with missing
+          # symbols for anything the PR added to pina_profile.
+          mkdir -p ./target/performance-build/cli/base-bin ./target/performance-build/cli/head-bin
+          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/base-target" \
+            cargo build --release --locked -p pina_cli \
+            --manifest-path "${{ github.workspace }}/../pina-performance-base/Cargo.toml"
+          cp ./target/performance-build/cli/base-target/release/pina \
+            ./target/performance-build/cli/base-bin/pina
+          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/head-target" \
+            cargo build --release --locked -p pina_cli
+          cp ./target/performance-build/cli/head-target/release/pina \
+            ./target/performance-build/cli/head-bin/pina
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: preserve release binary provenance and resource profile
+        run: |
+          mkdir -p target/performance/cli
+          for side in base head; do
+            binary="./target/performance-build/cli/$side-bin/pina"
+            sha256sum "$binary" >> target/performance/cli/binary-provenance.txt
+            wc -c "$binary" >> target/performance/cli/binary-provenance.txt
+            "$binary" --version >> target/performance/cli/binary-provenance.txt
+            if [ -x /usr/bin/time ]; then
+              /usr/bin/time -v "$binary" docs pina-overview > "target/performance/cli/$side-docs-profile.stdout" 2> "target/performance/cli/$side-docs-profile.stderr"
+            else
+              echo "Resource profiling unavailable; timing limiter unknown" > "target/performance/cli/$side-docs-profile.stderr"
+            fi
+          done
+          nproc > target/performance/cli/runner-before.txt
+          uptime >> target/performance/cli/runner-before.txt
+          ps -eo comm,pcpu --sort=-pcpu | head -n 12 >> target/performance/cli/runner-before.txt
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: benchmark CLI
+        run: |
+          node ./scripts/benchmark-cli.ts \
+            --base-bin ./target/performance-build/cli/base-bin/pina \
+            --head-bin ./target/performance-build/cli/head-bin/pina \
+            --markdown-output ./target/performance/cli/report.md \
+            --json-output ./target/performance/cli/report.json
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: record runner after measurement
+        if: always()
+        run: |
+          mkdir -p target/performance/cli
+          nproc > target/performance/cli/runner-after.txt
+          uptime >> target/performance/cli/runner-after.txt
+        shell: devenv shell -c -- bash -e {0}
+
+      - name: prepare CLI report
+        if: always()
+        run: |
+          mkdir -p ./target/performance/cli
+          if [ ! -f ./target/performance/cli/report.md ]; then
+            printf '## CLI performance\n\n⚠️ The benchmark did not finish. See the job log.\n' \
+              > ./target/performance/cli/report.md
+          fi
+          cat ./target/performance/cli/report.md >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      - name: upload CLI report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: performance-cli
+          path: target/performance/cli
+          if-no-files-found: error
