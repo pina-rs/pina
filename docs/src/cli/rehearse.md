@@ -139,10 +139,20 @@ A rehearsal that compares nothing is never a pass, so `0` always means the upgra
 
 Every key is always present; absent values are `null`. `status` and `skip.reason` use the snake_case spellings shown in the status table. Executable hashes are SHA-256 with trailing zero padding removed, matching `solana-verify`, so a deployed program's zero-padded program data and its local `.so` hash the same. The `schemaVersion` changes only with a breaking change to the document.
 
+## Worker configuration
+
+By default, the Pina CLI starts the rehearsal worker from its own executable. An external Surfpool installation is not required for `pina rehearse` or `pina deploy --rehearse`.
+
+| Use case                                                      | Configuration                                        | Executable                                        |
+| ------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| Choose the development server for `pina dev`                  | `PINA_SURFPOOL`                                      | Surfpool                                          |
+| Override the worker for rehearsal, including deploy rehearsal | `PINA_REHEARSE_WORKER`                               | Pina, matching the calling CLI or library version |
+| Call rehearsal through the Rust library                       | Matching `pina` on `PATH`, or `PINA_REHEARSE_WORKER` | Pina, matching the library version                |
+
+If you previously used `PINA_SURFPOOL` to override rehearsal, move that configuration to `PINA_REHEARSE_WORKER` and select a matching Pina executable. Renaming the variable while retaining a Surfpool executable is insufficient: the worker must implement Pina's worker protocol and pass its version handshake. `PINA_SURFPOOL` continues to configure `pina dev`.
+
 ## Requirements and limits
 
-- The Pina executable includes the rehearsal runtime; an external Surfpool installation is not required. `PINA_SURFPOOL` continues to select Surfpool for `pina dev` but does not select the rehearsal runtime.
-- Library callers need a matching `pina` executable on `PATH`, or can set `PINA_REHEARSE_WORKER` to its path. The worker must match the library version.
 - The deployed program must use the upgradeable loader, as `solana program deploy` and `pina deploy` do.
 - The program ID is the project's `declare_id!`. The candidate defaults to `<cargo-target>/deploy/<library-name>.so`; `--program` names another file and `--build` runs the same build as `pina build` first.
 - Transactions replay against the cluster's current state, not the state they originally saw, and each one sees the same snapshot: state written by one is not visible to the next.
