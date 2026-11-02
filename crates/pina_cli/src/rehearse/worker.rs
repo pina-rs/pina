@@ -158,15 +158,34 @@ async fn initialize(url: &str) -> Result<Fork, String> {
 		cheatcode_config: CheatcodeConfig::new(),
 		plugin_commands_tx,
 	});
-	let mut handler = Handler::default();
-	handler.extend_with(SurfpoolAccountsDataRpc.to_delegate());
-	handler.extend_with(SurfnetCheatcodesRpc::empty().to_delegate());
 	Ok(Fork {
-		handler,
+		handler: handler(),
 		context,
 		_commands,
 		_plugins,
 	})
+}
+
+fn handler() -> Handler {
+	let mut handler = Handler::default();
+	let methods = SurfpoolAccountsDataRpc
+		.to_delegate()
+		.into_iter()
+		.chain(SurfnetCheatcodesRpc::empty().to_delegate())
+		.filter(|(name, _)| {
+			// Rehearsal needs no clock control, snapshot export or other server APIs.
+			matches!(
+				name.as_str(),
+				"getAccountInfo"
+					| "getMultipleAccounts"
+					| "surfnet_offlineAccount"
+					| "surfnet_setAccount"
+					| "surfnet_writeProgram"
+					| "surfnet_profileTransaction"
+			)
+		});
+	handler.extend_with(methods);
+	handler
 }
 
 fn write_frame(frame: &str) -> Result<(), String> {
@@ -185,6 +204,48 @@ fn write_frame(frame: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn exposes_only_the_rehearsal_rpc_surface() {
+		let handler = handler();
+		let mut methods: Vec<_> = handler.iter().map(|(name, _)| name.as_str()).collect();
+		methods.sort_unstable();
+		assert_eq!(
+			methods,
+			[
+				"getAccountInfo",
+				"getMultipleAccounts",
+				"surfnet_offlineAccount",
+				"surfnet_profileTransaction",
+				"surfnet_setAccount",
+				"surfnet_writeProgram",
+			]
+		);
+	}
+
+	#[test]
+	fn rejects_unrelated_methods_with_standard_jsonrpc_errors() {
+		let handler = handler();
+		let request = json!([
+			{"jsonrpc": "2.0", "id": 7, "method": "surfnet_exportSnapshot", "params": []},
+			{"jsonrpc": "2.0", "id": "clock", "method": "surfnet_pauseClock", "params": []},
+			{"jsonrpc": "2.0", "id": 9, "method": "getTokenSupply", "params": []},
+		]);
+		let response = handler
+			.handle_request_sync(&request.to_string(), None)
+			.expect("batch response");
+		let response: Value = serde_json::from_str(&response)
+			.unwrap_or_else(|error| panic!("invalid JSON response: {error}"));
+		let responses = response.as_array().expect("batch response array");
+		assert_eq!(responses.len(), 3);
+
+		for (response, id) in responses.iter().zip([json!(7), json!("clock"), json!(9)]) {
+			assert_eq!(response["jsonrpc"], "2.0");
+			assert_eq!(response["id"], id);
+			assert_eq!(response["error"]["code"], -32601);
+			assert!(response.get("result").is_none());
+		}
+	}
 
 	#[test]
 	fn rejects_a_response_larger_than_the_frame_limit() {
