@@ -528,6 +528,15 @@ jobs:
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.idl == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
+      # The hosted image's unused SDKs compete with the restored Rust cache
+      # and Nix closure for disk space before client generation can start.
+      - name: free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h /
+        shell: bash
+
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
