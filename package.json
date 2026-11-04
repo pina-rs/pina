@@ -23,7 +23,7 @@
 		"check:migration-docs": "node scripts/check-migration-docs.mjs"
 	},
 	"dependencies": {
-		"@codama/renderers-js": "^2.6.0",
+		"@codama/renderers-js": "^2.8.0",
 		"@pina-rs/codama-renderer-cli": "workspace:*",
 		"codama": "^1.11.0",
 		"codama-renderers-dart": "0.5.7"
@@ -33,7 +33,7 @@
 		"@solana/kit": "^8.5.0",
 		"@solana/program-client-core": "^8.5.0",
 		"@solana/surfpool": "^1.7.0",
-		"@types/node": "^26.6.5",
+		"@types/node": "^26.6.6",
 		"commander": "^15.0.0",
 		"tsx": "^4.23.15",
 		"typescript": "^7.0.2"
