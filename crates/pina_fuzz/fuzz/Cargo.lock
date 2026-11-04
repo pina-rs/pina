@@ -339,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "pina"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "pina_macros",
  "pinapod",
@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "pina_macros"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "darling",
  "heck",
