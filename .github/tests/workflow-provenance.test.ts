@@ -69,6 +69,8 @@ if (endpoint.endsWith("/branches/main")) {
 				GITHUB_RUN_ID: "123",
 				GITHUB_RUN_ATTEMPT: "2",
 				GITHUB_EVENT_NAME: "workflow_dispatch",
+				GITHUB_REPOSITORY_ID: "123456",
+				GITHUB_REPOSITORY_OWNER_ID: "654321",
 				GITHUB_REF: "refs/heads/main",
 				GITHUB_SHA: MAIN,
 				WORKFLOW_SHA: MAIN,
@@ -248,6 +250,13 @@ test("provenance identifies the release source separately from the workflow comm
 						path: ".github/workflows/publish.yml",
 					},
 					...(inputs === null ? {} : { inputs }),
+				},
+				internalParameters: {
+					github: {
+						event_name: event,
+						repository_id: "123456",
+						repository_owner_id: "654321",
+					},
 				},
 				resolvedDependencies: [{
 					name: "workflow",

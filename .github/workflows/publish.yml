@@ -245,6 +245,9 @@ jobs:
             --arg workflow_sha "$WORKFLOW_SHA" \
             --arg tag "$RELEASE_TAG" \
             --arg source_sha "$SOURCE_SHA" \
+            --arg event_name "$GITHUB_EVENT_NAME" \
+            --arg repository_id "$GITHUB_REPOSITORY_ID" \
+            --arg repository_owner_id "$GITHUB_REPOSITORY_OWNER_ID" \
             --arg builder "$GITHUB_SERVER_URL/$WORKFLOW_REF" \
             --arg invocation "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" \
             --argjson inputs "$DISPATCH_INPUTS" '
@@ -254,6 +257,13 @@ jobs:
                 externalParameters: ({
                   workflow: {repository: $repository, ref: $ref, path: $path}
                 } + if $inputs == null then {} else {inputs: $inputs} end),
+                internalParameters: {
+                  github: {
+                    event_name: $event_name,
+                    repository_id: $repository_id,
+                    repository_owner_id: $repository_owner_id
+                  }
+                },
                 resolvedDependencies: [
                   {
                     name: "workflow",
