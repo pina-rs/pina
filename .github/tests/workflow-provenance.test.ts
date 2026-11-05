@@ -330,3 +330,34 @@ test("builders have only read access and all entry points depend on authorizatio
 		assert.equal(count, workflow === "release-pr" ? 2 : 1);
 	}
 });
+
+test("release dispatches start as the release-token actor", () => {
+	const source = readFileSync(
+		new URL("../workflows/release-pr.yml", import.meta.url),
+		"utf8",
+	);
+
+	// A workflow_dispatch made with the job token starts as `startup_failure`
+	// under the github-actions bot actor, so every publish dispatch must bind
+	// the release token instead.
+	for (const step of [
+		"dispatch publish dry run",
+		"dispatch publish dry run for the release tree",
+		"dispatch release publishing",
+	]) {
+		const section = source
+			.split(`- name: ${step}\n`)[1]
+			?.split("\n      - name: ")[0];
+		assert.ok(section, `Missing workflow step: ${step}`);
+		assert.match(
+			section,
+			/GH_TOKEN: \$\{\{ secrets\.RELEASE_TOKEN \}\}/,
+			`${step} must dispatch as the release token`,
+		);
+		assert.doesNotMatch(
+			section,
+			/GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/,
+			`${step} must not dispatch as the job token`,
+		);
+	}
+});
