@@ -121,7 +121,11 @@ jobs:
       - name: dispatch publish dry run
         if: steps.release_record.outputs.is_release_commit != 'true' && steps.refresh.outputs.created == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A workflow_dispatch made with GITHUB_TOKEN starts as
+          # `startup_failure` when the actor is github-actions[bot]. Release
+          # automation must dispatch as a user/App identity, so use the
+          # repository's release PAT here.
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           # Simulate the full publish against the release PR's own commit: the
@@ -194,7 +198,9 @@ jobs:
 
       - name: dispatch publish dry run for the release tree
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # See the create job: GITHUB_TOKEN dispatches start as
+          # `startup_failure`. Dispatch as the release PAT actor.
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           # Run the publish dry run against the exact merge commit being
@@ -252,7 +258,9 @@ jobs:
       # authorized commit separately from the release tag.
       - name: dispatch release publishing
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN dispatches start as `startup_failure`, so publish
+          # must be dispatched as the release PAT actor.
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           release_record="$RUNNER_TEMP/release-record.json"
