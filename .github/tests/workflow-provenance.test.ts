@@ -340,11 +340,13 @@ test("release dispatches start as the release-token actor", () => {
 	// A workflow_dispatch made with the job token starts as `startup_failure`
 	// under the github-actions bot actor, so every publish dispatch must bind
 	// the release token instead.
-	for (const step of [
-		"dispatch publish dry run",
-		"dispatch publish dry run for the release tree",
-		"dispatch release publishing",
-	]) {
+	for (
+		const step of [
+			"dispatch publish dry run",
+			"dispatch publish dry run for the release tree",
+			"dispatch release publishing",
+		]
+	) {
 		const section = source
 			.split(`- name: ${step}\n`)[1]
 			?.split("\n      - name: ")[0];
