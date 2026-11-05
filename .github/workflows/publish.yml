@@ -248,6 +248,7 @@ jobs:
             --arg event_name "$GITHUB_EVENT_NAME" \
             --arg repository_id "$GITHUB_REPOSITORY_ID" \
             --arg repository_owner_id "$GITHUB_REPOSITORY_OWNER_ID" \
+            --arg runner_environment "$RUNNER_ENVIRONMENT" \
             --arg builder "$GITHUB_SERVER_URL/$WORKFLOW_REF" \
             --arg invocation "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" \
             --argjson inputs "$DISPATCH_INPUTS" '
@@ -261,7 +262,8 @@ jobs:
                   github: {
                     event_name: $event_name,
                     repository_id: $repository_id,
-                    repository_owner_id: $repository_owner_id
+                    repository_owner_id: $repository_owner_id,
+                    runner_environment: $runner_environment
                   }
                 },
                 resolvedDependencies: [
