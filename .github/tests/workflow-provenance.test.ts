@@ -69,6 +69,8 @@ if (endpoint.endsWith("/branches/main")) {
 				GITHUB_RUN_ID: "123",
 				GITHUB_RUN_ATTEMPT: "2",
 				GITHUB_EVENT_NAME: "workflow_dispatch",
+				GITHUB_REPOSITORY_ID: "123456",
+				GITHUB_REPOSITORY_OWNER_ID: "654321",
 				GITHUB_REF: "refs/heads/main",
 				GITHUB_SHA: MAIN,
 				WORKFLOW_SHA: MAIN,
@@ -220,6 +222,9 @@ test("pre-tag previews can resolve unmerged commits without authorizing a real p
 
 test("provenance identifies the release source separately from the workflow commit", () => {
 	for (const event of ["workflow_dispatch", "push"]) {
+		const runnerEnvironment = event === "push"
+			? "self-hosted"
+			: "github-hosted";
 		const ref = event === "push" ? "refs/tags/v1.0.0" : "refs/heads/main";
 		const workflowSha = event === "push" ? RELEASE : MAIN;
 		const workflowRef = `pina-rs/pina/.github/workflows/publish.yml@${ref}`;
@@ -234,6 +239,7 @@ test("provenance identifies the release source separately from the workflow comm
 			WORKFLOW_SHA: workflowSha,
 			SOURCE_SHA: RELEASE,
 			DISPATCH_INPUTS: JSON.stringify(inputs),
+			RUNNER_ENVIRONMENT: runnerEnvironment,
 		});
 		assert.equal(result.status, 0, result.stderr);
 		assert.ok(result.predicate);
@@ -248,6 +254,14 @@ test("provenance identifies the release source separately from the workflow comm
 						path: ".github/workflows/publish.yml",
 					},
 					...(inputs === null ? {} : { inputs }),
+				},
+				internalParameters: {
+					github: {
+						event_name: event,
+						repository_id: "123456",
+						repository_owner_id: "654321",
+						runner_environment: runnerEnvironment,
+					},
 				},
 				resolvedDependencies: [{
 					name: "workflow",
