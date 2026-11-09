@@ -1,0 +1,4 @@
+{
+	"name": "Pina",
+	"install": "bash .cursor/cloud-agent-install.sh"
+}
