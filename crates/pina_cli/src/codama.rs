@@ -147,6 +147,18 @@ try {
 	for (const idlPath of idlPaths.sort()) {
 		const name = basename(idlPath, ".json");
 		const json = sanitizeDocs(readFileSync(idlPath, "utf8"));
+
+		if (renderer === "rust-kit") {
+			// Feed sanitized plain JSON into the Kit visitor. Skip createFromJson:
+			// it re-expands through whatever `codama` major npx resolved, and the
+			// Kit engine only accepts the Codama 1.8 schema family. Prepare also
+			// strips Pina account/event struct field defaults the engine rejects.
+			const { renderVisitor } = await loadPackage("codama-renderers-rust-solana-kit");
+			const root = prepareRustKitRoot(JSON.parse(json));
+			visit(root, renderVisitor(join(stagingRoot, name, "src", "generated")));
+			continue;
+		}
+
 		const codama = createFromJson(json);
 
 		if (renderer === "typescript") {
@@ -164,16 +176,6 @@ try {
 				formatCode: false,
 				deleteFolderBeforeRendering: true,
 			}));
-			continue;
-		}
-
-		if (renderer === "rust-kit") {
-			// Feed sanitized plain JSON into the Kit visitor: createFromJson would
-			// re-expand through whatever `codama` major npx resolved, and the Kit
-			// engine only accepts the Codama 1.8 schema family.
-			const { renderVisitor } = await loadPackage("codama-renderers-rust-solana-kit");
-			const root = prepareRustKitRoot(JSON.parse(json));
-			visit(root, renderVisitor(join(stagingRoot, name, "src", "generated")));
 			continue;
 		}
 
@@ -462,6 +464,10 @@ pub use generated::*;
 // Strip Pina-only plugins and rewrite instruction discriminators into the
 // field form the Kit engine's public Codama frontend accepts. Account and
 // event discriminators that encode a numeric constant become base16 bytes.
+// Struct field `defaultValue` / `defaultValueStrategy` (Pina omitted
+// discriminators and migrationVersion) are dropped: the Kit engine rejects
+// record field defaults without an explicit typed contract. Instruction
+// argument defaults stay on `instructionArgumentNode`.
 function prepareRustKitRoot(root) {
 	if (root && typeof root === "object" && root.kind === "rootNode" && root.version !== "1.0.0") {
 		root.version = "1.8.0";
@@ -487,6 +493,12 @@ function transformRustKitNode(node, ctx) {
 	const out = {};
 	for (const [key, value] of Object.entries(node)) {
 		if (key === "plugins") {
+			continue;
+		}
+		if (
+			node.kind === "structFieldTypeNode"
+			&& (key === "defaultValue" || key === "defaultValueStrategy")
+		) {
 			continue;
 		}
 		if (key === "discriminators" && Array.isArray(value) && nextCtx === "instructionNode") {
@@ -533,10 +545,17 @@ function convertNumericAccountDiscriminator(discriminator, ctx) {
 		if (width) {
 			const number = Number(constant.value.number);
 			const bytes = Buffer.alloc(width);
+			const bigEndian = type.endian === "be";
 			if (width === 1) {
 				bytes.writeUInt8(number);
 			} else if (width === 2) {
-				bytes.writeUInt16LE(number);
+				if (bigEndian) {
+					bytes.writeUInt16BE(number);
+				} else {
+					bytes.writeUInt16LE(number);
+				}
+			} else if (bigEndian) {
+				bytes.writeUInt32BE(number);
 			} else {
 				bytes.writeUInt32LE(number);
 			}
@@ -2280,10 +2299,8 @@ fn client_root(plan: &GenerationPlan, renderer: ClientLanguage) -> &Path {
 	match renderer {
 		ClientLanguage::CliTs | ClientLanguage::Typescript => &plan.typescript_out,
 		ClientLanguage::CliDart | ClientLanguage::Dart => &plan.dart_out,
-		ClientLanguage::Cpi
-		| ClientLanguage::Rust
-		| ClientLanguage::RustKit
-		| ClientLanguage::CliRust => &plan.cpi_out,
+		ClientLanguage::RustKit => &plan.rust_kit_out,
+		ClientLanguage::Cpi | ClientLanguage::Rust | ClientLanguage::CliRust => &plan.cpi_out,
 	}
 }
 
@@ -3304,6 +3321,57 @@ mod tests {
 			"codama-renderers-rust-solana-kit@0.2.1"
 		);
 		assert_eq!(MINIMUM_GENERATED_KIT_RUST, (0, 2));
+	}
+
+	#[test]
+	fn rust_kit_prepare_strips_struct_field_defaults_before_create_from_json() {
+		let rust_kit = CLIENT_RENDER_SCRIPT
+			.find("if (renderer === \"rust-kit\")")
+			.expect("rust-kit branch");
+		let create_from_json = CLIENT_RENDER_SCRIPT
+			.find("const codama = createFromJson(json);")
+			.expect("createFromJson for other renderers");
+		assert!(
+			rust_kit < create_from_json,
+			"rust-kit must prepare plain JSON without createFromJson expansion"
+		);
+		assert!(
+			CLIENT_RENDER_SCRIPT.contains("structFieldTypeNode")
+				&& CLIENT_RENDER_SCRIPT.contains("defaultValueStrategy"),
+			"prepare must drop Pina struct field defaults the Kit engine rejects"
+		);
+		assert!(
+			CLIENT_RENDER_SCRIPT.contains("type.endian === \"be\""),
+			"account discriminator rewrite must honor big-endian number types"
+		);
+	}
+
+	#[test]
+	fn rust_kit_client_root_points_at_the_kit_output() {
+		let plan = GenerationPlan {
+			programs: Vec::new(),
+			override_idl_names: false,
+			cpi_package_names: BTreeMap::new(),
+			idls_dir: PathBuf::from("idl"),
+			rust_out: PathBuf::from("rust"),
+			rust_kit_out: PathBuf::from("rust-kit"),
+			cpi_out: PathBuf::from("cpi"),
+			typescript_out: PathBuf::from("typescript"),
+			dart_out: PathBuf::from("dart"),
+			cli_rust_out: PathBuf::from("cli-rust"),
+			cli_ts_out: PathBuf::from("cli-ts"),
+			cli_dart_out: PathBuf::from("cli-dart"),
+			clients: BTreeSet::from([ClientLanguage::RustKit]),
+			generation: default_generation_settings(),
+			npx: "npx".to_owned(),
+			project_root: PathBuf::from("workspace"),
+			workspace_root: std::cell::OnceCell::new(),
+		};
+		assert_eq!(
+			client_root(&plan, ClientLanguage::RustKit),
+			Path::new("rust-kit")
+		);
+		assert_eq!(client_root(&plan, ClientLanguage::Rust), Path::new("cpi"));
 	}
 
 	#[test]

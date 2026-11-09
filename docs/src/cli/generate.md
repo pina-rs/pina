@@ -33,6 +33,8 @@ pina generate --mode overwrite
 
 Repeating a language is harmless. Explicit `--client` values replace the configured list for that invocation. CPI-only, Rust-only, and `cli-rust` generation do not invoke Node.js. `rust-kit`, TypeScript, and Dart use the pinned Codama Node renderers. Each CLI variant implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`); projects normally pick one CLI, and Pina warns when several are selected together. `rust-kit` does not imply `rust` and there is no `cli-rust-kit`.
 
+`rust-kit` prepares the Codama JSON for the Kit engine (strip Pina plugins, rewrite discriminators, drop account/event struct field defaults the engine rejects) before rendering under `src/generated/`. Some advanced Codama node shapes (for example `postOffsetTypeNode`, or unsupported `prefix` forms) can still be rejected by the Kit renderer; those programs keep using `--client rust` until the Kit frontend accepts them.
+
 `auto` initializes an empty destination and otherwise updates it. Updates replace only renderer-owned generated source, preserving customized manifests and crate/package entrypoints. `create` and `update` enforce the expected destination state. `overwrite` deletes the entire selected client target before regeneration; use it for an intentional clean sweep. Command-line `--mode` and `--no-scaffold` override every selected target for that invocation.
 
 Outputs are grouped by ecosystem:
