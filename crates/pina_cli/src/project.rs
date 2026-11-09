@@ -30,9 +30,6 @@ pub const CONFIG_FILE_NAME: &str = "pina.toml";
 #[serde(rename_all = "lowercase")]
 pub enum ClientLanguage {
 	Rust,
-	/// Off-chain Rust client against `solana_kit_core` (Codama Kit renderer).
-	#[serde(rename = "rust-kit")]
-	RustKit,
 	Typescript,
 	Dart,
 	Cpi,
@@ -42,6 +39,11 @@ pub enum ClientLanguage {
 	CliTs,
 	#[serde(rename = "cli-dart")]
 	CliDart,
+	/// Off-chain Rust client against `solana_kit_core` (Codama Kit renderer).
+	///
+	/// Kept last so existing variant discriminants stay stable.
+	#[serde(rename = "rust-kit")]
+	RustKit,
 }
 
 impl ClientLanguage {

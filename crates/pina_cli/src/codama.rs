@@ -1637,18 +1637,37 @@ fn verify_rust_kit_scaffold_kit_range(
 }
 
 /// Collect every `solana_kit_core` dependency range from a Cargo.toml, covering
-/// both the inline (`solana_kit_core = "0.2.1"`) and the table
-/// (`solana_kit_core = { version = "0.2.1", ... }`) forms.
+/// the inline (`solana_kit_core = "0.2.1"`), inline-table
+/// (`solana_kit_core = { version = "0.2.1", ... }`), and section-table
+/// (`[dependencies.solana_kit_core]` / `[workspace.dependencies.solana_kit_core]`)
+/// forms.
 fn rust_kit_core_ranges(manifest: &str) -> Vec<(&str, &str)> {
 	let mut ranges = Vec::new();
 	let mut in_dependencies = false;
+	let mut in_kit_table = false;
 
 	for line in manifest.lines() {
 		let trimmed = line.trim();
 		if trimmed.starts_with('[') {
-			in_dependencies = trimmed == "[dependencies]"
-				|| trimmed.starts_with("[dependencies.")
-				|| trimmed == "[workspace.dependencies]";
+			in_kit_table = trimmed == "[dependencies.solana_kit_core]"
+				|| trimmed == "[workspace.dependencies.solana_kit_core]";
+			in_dependencies = !in_kit_table
+				&& (trimmed == "[dependencies]"
+					|| trimmed.starts_with("[dependencies.")
+					|| trimmed == "[workspace.dependencies]");
+			continue;
+		}
+		if in_kit_table {
+			let Some((name, value)) = trimmed.split_once('=') else {
+				continue;
+			};
+			if name.trim() != "version" {
+				continue;
+			}
+			let version = value.trim().trim_matches(['"', '\'']);
+			if !version.is_empty() {
+				ranges.push(("solana_kit_core", version));
+			}
 			continue;
 		}
 		if !in_dependencies {
@@ -2901,6 +2920,22 @@ mod tests {
 			rust_kit_core_ranges("[dependencies.foo]\nbar = \"1\"\nsolana_kit_core = \"0.2.1\"\n")
 				== vec![("solana_kit_core", "0.2.1")],
 			"dotted dependency sections still scan following key/value lines"
+		);
+		assert_eq!(
+			rust_kit_core_ranges(
+				"[dependencies.solana_kit_core]\ndefault-features = false\nnot_kv\nversion = \"0.1.1\"\n"
+			),
+			vec![("solana_kit_core", "0.1.1")],
+			"section-table form must read the version key"
+		);
+		assert_eq!(
+			rust_kit_core_ranges("[workspace.dependencies.solana_kit_core]\nversion = '0.1.1'\n"),
+			vec![("solana_kit_core", "0.1.1")],
+			"workspace section-table form must read the version key"
+		);
+		assert!(
+			rust_kit_core_ranges("[dependencies.solana_kit_core]\nversion = \"\"\n").is_empty(),
+			"empty section-table versions are ignored"
 		);
 	}
 
