@@ -33,7 +33,7 @@ languages = [
 	"cpi",
 	"rust",
 	"typescript",
-] # also dart, cli-rust, cli-ts, cli-dart
+] # also rust-kit, dart, cli-rust, cli-ts, cli-dart
 mode = "auto"
 scaffold = true
 
@@ -42,7 +42,7 @@ rename = ["value:points"]
 assume_removed = []
 ```
 
-- `[clients]` resolves `languages`, `output`, `mode`, and `scaffold`. Each language can override `output`, `mode`, and `scaffold` under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, `[clients.dart]`, `[clients.cli_rust]`, `[clients.cli_ts]`, and `[clients.cli_dart]`.
+- `[clients]` resolves `languages`, `output`, `mode`, and `scaffold`. Each language can override `output`, `mode`, and `scaffold` under `[clients.cpi]`, `[clients.rust]`, `[clients.rust_kit]`, `[clients.typescript]`, `[clients.dart]`, `[clients.cli_rust]`, `[clients.cli_ts]`, and `[clients.cli_dart]`. `rust-kit` is opt-in Solana Kit Rust client generation; defaults stay `rust` + `typescript` (+ `cpi` from `pina init`).
 - `pina init` scaffolds the `build.rs` rerun directive and the `account-resize` feature that the reserved `Migrate` route needs, but no `[migrations]` table and no manifest. The manifest binds the history to the declared program address, and a new project still carries the placeholder `declare_id!`. Run `pina keys new`, then `pina migrations create --auto true` once to turn migrations on and record the version-0 baseline.
 - The program keypair lives at `target/deploy/<library-name>-keypair.json`, below the git-ignored `target/`, so `cargo clean` deletes it. Back it up (outside the repository) before the first deployment; it is the program's address and, by default, how later upgrades find it.
 - `pina.toml` holds no migration policy. The version width and the `auto` policy live only in the manifest: `pina migrations create --version-type <u8|u16|u32>` and `--auto <POLICY>` record them, and a run without either flag keeps what is recorded. The width can change only while nothing is published and cannot be widened after release. Prefer `u8`: versions are counted per contract, so its 255-version budget applies to each account, instruction, and event separately. `[migrations.answers]` persists rename, removal, and manual-conversion decisions for CI.

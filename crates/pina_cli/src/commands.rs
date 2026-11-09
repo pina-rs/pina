@@ -1248,6 +1248,7 @@ fn run_generate(
 			match client {
 				ClientArg::Cpi => pina_cli::project::ClientLanguage::Cpi,
 				ClientArg::Rust => pina_cli::project::ClientLanguage::Rust,
+				ClientArg::RustKit => pina_cli::project::ClientLanguage::RustKit,
 				ClientArg::Typescript => pina_cli::project::ClientLanguage::Typescript,
 				ClientArg::Dart => pina_cli::project::ClientLanguage::Dart,
 				ClientArg::CliRust => pina_cli::project::ClientLanguage::CliRust,

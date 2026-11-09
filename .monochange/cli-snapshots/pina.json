@@ -3,7 +3,7 @@
 	"kind": "cli-surface",
 	"tool": {
 		"name": "pina",
-		"version": "0.22.0"
+		"version": "0.24.0"
 	},
 	"provenance": {
 		"extractor": "clap",
@@ -1183,6 +1183,7 @@
 						"enum_values": [
 							"cpi",
 							"rust",
+							"rust-kit",
 							"typescript",
 							"dart",
 							"cli-rust",
@@ -1254,7 +1255,7 @@
 					"canonical_name": "--npx",
 					"hidden": false,
 					"global": false,
-					"summary": "Executable used to invoke JavaScript or Dart renderers. Defaults to npx, which resolves the pinned packages isolated from the project; pass a Node executable to resolve packages from the project on purpose",
+					"summary": "Executable used to invoke TypeScript, Dart, or rust-kit renderers. Defaults to npx, which resolves the pinned packages isolated from the project; pass a Node executable to resolve packages from the project on purpose",
 					"value": {
 						"kind": "string",
 						"required": false,
@@ -3996,6 +3997,25 @@
 				},
 				{
 					"names": [
+						"--upgrade-only"
+					],
+					"canonical_name": "--upgrade-only",
+					"hidden": false,
+					"global": false,
+					"summary": "Upgrade the program already deployed at the declared program ID without reading a program keypair",
+					"value": {
+						"kind": "flag",
+						"required": false,
+						"repeatable": false,
+						"variadic": false,
+						"enum_values": [
+							"true",
+							"false"
+						]
+					}
+				},
+				{
+					"names": [
 						"--upgrade-authority"
 					],
 					"canonical_name": "--upgrade-authority",
@@ -4141,7 +4161,7 @@
 					"canonical_name": "--remote-command",
 					"hidden": false,
 					"global": false,
-					"summary": "Run this command instead of `solana program deploy`. The deployment facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`, `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR`, `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and `PINA_DEPLOY_CLUSTER` environment variables",
+					"summary": "Run this command instead of `solana program deploy`. The deployment facts are exported as `PINA_DEPLOY_RPC_URL`, `PINA_DEPLOY_PROGRAM`, `PINA_DEPLOY_PROGRAM_ID`, `PINA_DEPLOY_PROGRAM_KEYPAIR` (absent with --upgrade-only), `PINA_DEPLOY_UPGRADE_AUTHORITY`, `PINA_DEPLOY_PAYER`, and `PINA_DEPLOY_CLUSTER` environment variables",
 					"value": {
 						"kind": "string",
 						"required": false,

@@ -315,10 +315,12 @@ pub fn diagnose(start: &Path) -> DoctorReport {
 	let lint_driver = diagnose_lint_driver(&lint_root, &mut findings, &mut checks);
 
 	let needs_node = project.as_ref().is_some_and(|project| {
-		project
-			.clients
-			.iter()
-			.any(|client| matches!(client, ClientLanguage::Typescript | ClientLanguage::Dart))
+		project.clients.iter().any(|client| {
+			matches!(
+				client,
+				ClientLanguage::Typescript | ClientLanguage::Dart | ClientLanguage::RustKit
+			)
+		})
 	});
 	let tools = tool_specs(needs_node)
 		.iter()
@@ -353,7 +355,7 @@ pub fn diagnose(start: &Path) -> DoctorReport {
 			message: if renderer_available {
 				"an npx or pnpm renderer is available".to_owned()
 			} else {
-				"configured TypeScript or Dart clients require npx or pnpm".to_owned()
+				"configured TypeScript, Dart, or rust-kit clients require npx or pnpm".to_owned()
 			},
 		});
 	}
@@ -1399,6 +1401,32 @@ mod tests {
 
 	fn check<'a>(report: &'a DoctorReport, id: &str) -> Option<&'a DoctorCheck> {
 		report.checks.iter().find(|check| check.id == id)
+	}
+
+	#[test]
+	fn rust_kit_clients_require_an_npx_or_pnpm_renderer() {
+		let temp = project_with_crate_types("[\"cdylib\"]", "opt-level = 3\nlto = \"fat\"\n");
+		fs::write(
+			temp.path().join("pina.toml"),
+			"[clients]\nlanguages = [\"rust-kit\"]\n",
+		)
+		.expect("config write failed");
+
+		let report = diagnose(temp.path());
+		let renderer =
+			check(&report, "client.renderer").expect("rust-kit must request a Node renderer");
+		assert!(
+			["rust-kit", "npx", "pnpm"]
+				.iter()
+				.any(|needle| renderer.message.contains(needle)),
+			"unexpected renderer check: {}",
+			renderer.message
+		);
+		assert_eq!(
+			report.project.as_ref().map(|project| &project.clients),
+			Some(&vec![ClientLanguage::RustKit]),
+			"doctor must surface the configured rust-kit language"
+		);
 	}
 
 	/// A second crate type silently disables fat LTO. Measured in the wild: a

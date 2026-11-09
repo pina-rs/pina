@@ -39,6 +39,11 @@ pub enum ClientLanguage {
 	CliTs,
 	#[serde(rename = "cli-dart")]
 	CliDart,
+	/// Off-chain Rust client against `solana_kit_core` (Codama Kit renderer).
+	///
+	/// Kept last so existing variant discriminants stay stable.
+	#[serde(rename = "rust-kit")]
+	RustKit,
 }
 
 impl ClientLanguage {
@@ -48,6 +53,7 @@ impl ClientLanguage {
 		match self {
 			Self::Cpi => "cpi",
 			Self::Rust => "rust",
+			Self::RustKit => "rust-kit",
 			Self::Typescript => "typescript",
 			Self::Dart => "dart",
 			Self::CliRust => "cli-rust",
@@ -63,7 +69,7 @@ impl ClientLanguage {
 			Self::CliRust => Some(Self::Rust),
 			Self::CliTs => Some(Self::Typescript),
 			Self::CliDart => Some(Self::Dart),
-			Self::Cpi | Self::Rust | Self::Typescript | Self::Dart => None,
+			Self::Cpi | Self::Rust | Self::RustKit | Self::Typescript | Self::Dart => None,
 		}
 	}
 }
@@ -252,6 +258,7 @@ struct ClientsConfig {
 	scaffold: bool,
 	cpi: ClientGenerationOverride,
 	rust: ClientGenerationOverride,
+	rust_kit: ClientGenerationOverride,
 	typescript: ClientGenerationOverride,
 	dart: ClientGenerationOverride,
 	cli_rust: ClientGenerationOverride,
@@ -268,6 +275,7 @@ impl Default for ClientsConfig {
 			scaffold: true,
 			cpi: ClientGenerationOverride::default(),
 			rust: ClientGenerationOverride::default(),
+			rust_kit: ClientGenerationOverride::default(),
 			typescript: ClientGenerationOverride::default(),
 			dart: ClientGenerationOverride::default(),
 			cli_rust: ClientGenerationOverride::default(),
@@ -296,6 +304,7 @@ impl ClientsConfig {
 		for language in [
 			ClientLanguage::Cpi,
 			ClientLanguage::Rust,
+			ClientLanguage::RustKit,
 			ClientLanguage::Typescript,
 			ClientLanguage::Dart,
 			ClientLanguage::CliRust,
@@ -305,6 +314,7 @@ impl ClientsConfig {
 			let overrides = match language {
 				ClientLanguage::Cpi => &self.cpi,
 				ClientLanguage::Rust => &self.rust,
+				ClientLanguage::RustKit => &self.rust_kit,
 				ClientLanguage::Typescript => &self.typescript,
 				ClientLanguage::Dart => &self.dart,
 				ClientLanguage::CliRust => &self.cli_rust,
@@ -314,6 +324,7 @@ impl ClientsConfig {
 			let field = match language {
 				ClientLanguage::Cpi => "clients.cpi.output",
 				ClientLanguage::Rust => "clients.rust.output",
+				ClientLanguage::RustKit => "clients.rust_kit.output",
 				ClientLanguage::Typescript => "clients.typescript.output",
 				ClientLanguage::Dart => "clients.dart.output",
 				ClientLanguage::CliRust => "clients.cli_rust.output",
@@ -1889,6 +1900,35 @@ mode = "overwrite"
 			expected
 		);
 		assert_eq!(ClientLanguage::CliRust.as_str(), "cli-rust");
+		assert_eq!(
+			languages("\"rust\", \"rust-kit\""),
+			vec![ClientLanguage::Rust, ClientLanguage::RustKit]
+		);
+		assert_eq!(ClientLanguage::RustKit.as_str(), "rust-kit");
+		assert_eq!(ClientLanguage::RustKit.base_client(), None);
+	}
+
+	#[test]
+	fn rust_kit_client_override_resolves_under_clients_rust_kit() {
+		let temp = TempDir::new().expect("temp dir failed");
+		write_program(temp.path(), "counter");
+		fs::write(
+			temp.path().join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[clients]\nlanguages = [\"rust-kit\"]\n\n\
+			 [clients.rust_kit]\noutput = \"kit\"\nscaffold = false\n",
+		)
+		.expect("failed to write config");
+
+		let project = Project::discover(temp.path()).expect("rust-kit config must parse");
+		assert_eq!(project.clients, vec![ClientLanguage::RustKit]);
+		assert_eq!(
+			project.client_generation[&ClientLanguage::RustKit],
+			ClientGenerationConfig {
+				output: PathBuf::from("kit"),
+				mode: GenerationMode::Auto,
+				scaffold: false,
+			}
+		);
 	}
 
 	#[test]

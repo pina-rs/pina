@@ -45,9 +45,16 @@ const CODAMA_PACKAGE: &str = "codama@1.11.0";
 const RENDERERS_JS_PACKAGE: &str = "@codama/renderers-js@2.5.0";
 /// The `codama-renderers-dart` line matching [`CODAMA_PACKAGE`].
 const RENDERERS_DART_PACKAGE: &str = "codama-renderers-dart@0.5.6";
+/// The Codama Rust Solana Kit renderer. Absolute pin, same style as the JS
+/// renderer line above. Scaffolded crates depend on `solana_kit_core` 0.2.1.
+const RENDERERS_RUST_SOLANA_KIT_PACKAGE: &str = "codama-renderers-rust-solana-kit@0.2.1";
 /// The minimum `@solana/kit` major the generated TypeScript sources compile
 /// against, matching the manifests [`RENDERERS_JS_PACKAGE`] scaffolds.
 const MINIMUM_GENERATED_KIT_MAJOR: u16 = 8;
+/// The minimum `solana_kit_core` minor the generated rust-kit sources compile
+/// against, matching the manifests [`RENDERERS_RUST_SOLANA_KIT_PACKAGE`]
+/// scaffolds.
+const MINIMUM_GENERATED_KIT_RUST: (u16, u16) = (0, 2);
 
 const CLIENT_RENDER_SCRIPT: &str = r#"
 import {
@@ -140,6 +147,18 @@ try {
 	for (const idlPath of idlPaths.sort()) {
 		const name = basename(idlPath, ".json");
 		const json = sanitizeDocs(readFileSync(idlPath, "utf8"));
+
+		if (renderer === "rust-kit") {
+			// Feed sanitized plain JSON into the Kit visitor. Skip createFromJson:
+			// it re-expands through whatever `codama` major npx resolved, and the
+			// Kit engine only accepts the Codama 1.8 schema family. Prepare also
+			// strips Pina account/event struct field defaults the engine rejects.
+			const { renderVisitor } = await loadPackage("codama-renderers-rust-solana-kit");
+			const root = prepareRustKitRoot(JSON.parse(json));
+			visit(root, renderVisitor(join(stagingRoot, name, "src", "generated")));
+			continue;
+		}
+
 		const codama = createFromJson(json);
 
 		if (renderer === "typescript") {
@@ -190,6 +209,10 @@ try {
 	if (renderer === "typescript") {
 		for (const name of names) {
 			publishTypescript(name);
+		}
+	} else if (renderer === "rust-kit") {
+		for (const name of names) {
+			publishRustKit(name);
 		}
 	} else if (renderer === "cli-ts") {
 		for (const name of names) {
@@ -380,6 +403,178 @@ function publishTypescript(name) {
 		copyFileSync(join(staged, "package.json"), manifest);
 		record(destination, manifest);
 	}
+}
+
+function publishRustKit(name) {
+	const destination = join(outputRoot, name);
+	const staged = join(stagingRoot, name);
+	const mode = resolveMode(destination);
+
+	if (mode === "overwrite") {
+		refuseUntrackedOverwrite(destination);
+		removeTrackedUnder(destination, destination);
+	}
+
+	publishDirectory(
+		destination,
+		join(staged, "src", "generated"),
+		join(destination, "src", "generated"),
+	);
+
+	const manifest = join(destination, "Cargo.toml");
+	if (scaffold && !existsSync(manifest)) {
+		mkdirSync(join(destination, "src"), { recursive: true });
+		writeFileSync(manifest, rustKitManifest(name), "utf8");
+		record(destination, manifest);
+		const lib = join(destination, "src", "lib.rs");
+		writeFileSync(lib, rustKitLib(), "utf8");
+		record(destination, lib);
+	}
+}
+
+function rustKitManifest(name) {
+	const crateName = `${name.replaceAll("_", "-")}-kit-client`;
+	return `[package]
+name = "${crateName}"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+pda = ["solana_kit_core/crypto"]
+
+[dependencies]
+solana_kit_core = { version = "0.2.1", default-features = false }
+
+[workspace]
+`;
+}
+
+function rustKitLib() {
+	return `#![no_std]
+
+extern crate alloc;
+
+pub mod generated;
+pub use generated::*;
+`;
+}
+
+// Strip Pina-only plugins and rewrite instruction discriminators into the
+// field form the Kit engine's public Codama frontend accepts. Account and
+// event discriminators that encode a numeric constant become base16 bytes.
+// Struct field `defaultValue` / `defaultValueStrategy` (Pina omitted
+// discriminators and migrationVersion) are dropped: the Kit engine rejects
+// record field defaults without an explicit typed contract. Instruction
+// argument defaults stay on `instructionArgumentNode`.
+function prepareRustKitRoot(root) {
+	if (root && typeof root === "object" && root.kind === "rootNode" && root.version !== "1.0.0") {
+		root.version = "1.8.0";
+	}
+	return transformRustKitNode(root, "root");
+}
+
+function transformRustKitNode(node, ctx) {
+	if (Array.isArray(node)) {
+		return node
+			.map((item) => transformRustKitNode(item, ctx))
+			.filter((item) => item !== undefined);
+	}
+	if (!node || typeof node !== "object") {
+		return node;
+	}
+	if (node.kind === "pluginNode") {
+		return undefined;
+	}
+	const nextCtx = ["instructionNode", "accountNode", "eventNode"].includes(node.kind)
+		? node.kind
+		: ctx;
+	const out = {};
+	for (const [key, value] of Object.entries(node)) {
+		if (key === "plugins") {
+			continue;
+		}
+		if (
+			node.kind === "structFieldTypeNode"
+			&& (key === "defaultValue" || key === "defaultValueStrategy")
+		) {
+			continue;
+		}
+		if (key === "discriminators" && Array.isArray(value) && nextCtx === "instructionNode") {
+			out[key] = value.map((discriminator) => {
+				if (discriminator?.kind === "constantDiscriminatorNode") {
+					return {
+						kind: "fieldDiscriminatorNode",
+						name: "discriminator",
+						offset: discriminator.offset ?? 0,
+					};
+				}
+				return transformRustKitNode(discriminator, nextCtx);
+			});
+			continue;
+		}
+		if (
+			key === "discriminators"
+			&& Array.isArray(value)
+			&& (nextCtx === "accountNode" || nextCtx === "eventNode")
+		) {
+			out[key] = value.map((discriminator) =>
+				convertNumericAccountDiscriminator(discriminator, nextCtx)
+			);
+			continue;
+		}
+		const transformed = transformRustKitNode(value, nextCtx);
+		if (transformed !== undefined) {
+			out[key] = transformed;
+		}
+	}
+	return out;
+}
+
+function convertNumericAccountDiscriminator(discriminator, ctx) {
+	const constant = discriminator?.constant;
+	const type = constant?.type;
+	if (
+		discriminator?.kind === "constantDiscriminatorNode"
+		&& constant?.kind === "constantValueNode"
+		&& type?.kind === "numberTypeNode"
+		&& constant.value?.kind === "numberValueNode"
+	) {
+		const width = { u8: 1, u16: 2, u32: 4 }[type.format];
+		if (width) {
+			const number = Number(constant.value.number);
+			const bytes = Buffer.alloc(width);
+			const bigEndian = type.endian === "be";
+			if (width === 1) {
+				bytes.writeUInt8(number);
+			} else if (width === 2) {
+				if (bigEndian) {
+					bytes.writeUInt16BE(number);
+				} else {
+					bytes.writeUInt16LE(number);
+				}
+			} else if (bigEndian) {
+				bytes.writeUInt32BE(number);
+			} else {
+				bytes.writeUInt32LE(number);
+			}
+			return {
+				kind: "constantDiscriminatorNode",
+				offset: discriminator.offset ?? 0,
+				constant: {
+					kind: "constantValueNode",
+					type: { kind: "bytesTypeNode" },
+					value: {
+						kind: "bytesValueNode",
+						data: bytes.toString("hex"),
+						encoding: "base16",
+					},
+				},
+			};
+		}
+	}
+	return transformRustKitNode(discriminator, ctx);
 }
 
 function publishDart() {
@@ -607,6 +802,7 @@ struct GenerationPlan {
 	cpi_package_names: BTreeMap<String, String>,
 	idls_dir: PathBuf,
 	rust_out: PathBuf,
+	rust_kit_out: PathBuf,
 	cpi_out: PathBuf,
 	typescript_out: PathBuf,
 	dart_out: PathBuf,
@@ -725,6 +921,7 @@ pub fn generate_project_clients(
 		)]),
 		idls_dir: project.idl_dir.clone(),
 		rust_out: client_target(ClientLanguage::Rust),
+		rust_kit_out: client_target(ClientLanguage::RustKit),
 		cpi_out: client_target(ClientLanguage::Cpi),
 		typescript_out: client_target(ClientLanguage::Typescript),
 		dart_out: client_target(ClientLanguage::Dart),
@@ -979,6 +1176,17 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 		run_client_generation(plan, ClientLanguage::Typescript, &idl_paths)?;
 		harden_generated_clients(&plan.typescript_out, &examples, &idl_paths)?;
 		record_added_files(&roots, snapshots, harden_javascript_error)?;
+	}
+
+	if plan.clients.contains(&ClientLanguage::RustKit) {
+		let settings = plan.generation[&ClientLanguage::RustKit];
+
+		for example in &examples {
+			validate_generation_target(&plan.rust_kit_out.join(example), settings)?;
+			verify_rust_kit_scaffold_kit_range(&plan.rust_kit_out.join(example), settings)?;
+		}
+
+		run_client_generation(plan, ClientLanguage::RustKit, &idl_paths)?;
 	}
 
 	if plan.clients.contains(&ClientLanguage::Dart) {
@@ -1415,6 +1623,109 @@ fn dart_kit_ranges(pubspec: &str) -> Vec<(&str, &str)> {
 /// against, matching the ranges the `dartManifest` scaffold writes.
 const MINIMUM_GENERATED_KIT_DART: (u16, u16) = (0, 10);
 
+/// Refuse to regenerate a rust-kit client whose scaffold still pins an older
+/// `solana_kit_core` than the generated sources need.
+fn verify_rust_kit_scaffold_kit_range(
+	path: &Path,
+	settings: GenerationSettings,
+) -> Result<(), CodamaError> {
+	if settings.mode == GenerationMode::Overwrite {
+		return Ok(());
+	}
+
+	let manifest_path = path.join("Cargo.toml");
+	let Ok(manifest) = std::fs::read_to_string(&manifest_path) else {
+		return Ok(());
+	};
+
+	for (name, range) in rust_kit_core_ranges(&manifest) {
+		if range_reaches_floor(range, MINIMUM_GENERATED_KIT_RUST) == Some(false) {
+			return Err(CodamaError::StaleKitScaffold {
+				path: manifest_path,
+				ecosystem: "rust-kit",
+				range: format!("{name} = {range}"),
+				minimum: format!(
+					"{}.{}",
+					MINIMUM_GENERATED_KIT_RUST.0, MINIMUM_GENERATED_KIT_RUST.1
+				),
+			});
+		}
+	}
+
+	Ok(())
+}
+
+/// Collect every `solana_kit_core` dependency range from a Cargo.toml, covering
+/// the inline (`solana_kit_core = "0.2.1"`), inline-table
+/// (`solana_kit_core = { version = "0.2.1", ... }`), and section-table
+/// (`[dependencies.solana_kit_core]` / `[workspace.dependencies.solana_kit_core]`)
+/// forms.
+fn rust_kit_core_ranges(manifest: &str) -> Vec<(&str, &str)> {
+	let mut ranges = Vec::new();
+	let mut in_dependencies = false;
+	let mut in_kit_table = false;
+
+	for line in manifest.lines() {
+		let trimmed = line.trim();
+		if trimmed.starts_with('[') {
+			in_kit_table = trimmed == "[dependencies.solana_kit_core]"
+				|| trimmed == "[workspace.dependencies.solana_kit_core]";
+			in_dependencies = !in_kit_table
+				&& (trimmed == "[dependencies]"
+					|| trimmed.starts_with("[dependencies.")
+					|| trimmed == "[workspace.dependencies]");
+			continue;
+		}
+		if in_kit_table {
+			let Some((name, value)) = trimmed.split_once('=') else {
+				continue;
+			};
+			if name.trim() != "version" {
+				continue;
+			}
+			let version = value.trim().trim_matches(['"', '\'']);
+			if !version.is_empty() {
+				ranges.push(("solana_kit_core", version));
+			}
+			continue;
+		}
+		if !in_dependencies {
+			continue;
+		}
+		let Some((name, value)) = trimmed.split_once('=') else {
+			continue;
+		};
+		let name = name.trim();
+		if name != "solana_kit_core" {
+			continue;
+		}
+		let value = value.trim();
+		if let Some(version) = value
+			.strip_prefix('{')
+			.and_then(|_| value.split("version").nth(1))
+			.and_then(|rest| rest.split('=').nth(1))
+			.and_then(|rest| {
+				let rest = rest.trim_start();
+				let quote = rest.chars().next()?;
+				if quote != '"' && quote != '\'' {
+					return None;
+				}
+				let body = rest.trim_start_matches(['"', '\'']);
+				let end = body.find(['"', '\''])?;
+				Some(&body[..end])
+			}) {
+			ranges.push((name, version));
+		} else {
+			let version = value.trim_matches(['"', '\'']);
+			if !version.is_empty() && !version.starts_with('{') {
+				ranges.push((name, version));
+			}
+		}
+	}
+
+	ranges
+}
+
 fn validate_generation_target(
 	path: &Path,
 	settings: GenerationSettings,
@@ -1640,6 +1951,10 @@ fn selected_output_dirs(plan: &GenerationPlan) -> Vec<&Path> {
 
 	if plan.clients.contains(&ClientLanguage::Rust) {
 		paths.push(plan.rust_out.as_path());
+	}
+
+	if plan.clients.contains(&ClientLanguage::RustKit) {
+		paths.push(plan.rust_kit_out.as_path());
 	}
 
 	if plan.clients.contains(&ClientLanguage::Cpi) {
@@ -1984,6 +2299,7 @@ fn client_root(plan: &GenerationPlan, renderer: ClientLanguage) -> &Path {
 	match renderer {
 		ClientLanguage::CliTs | ClientLanguage::Typescript => &plan.typescript_out,
 		ClientLanguage::CliDart | ClientLanguage::Dart => &plan.dart_out,
+		ClientLanguage::RustKit => &plan.rust_kit_out,
 		ClientLanguage::Cpi | ClientLanguage::Rust | ClientLanguage::CliRust => &plan.cpi_out,
 	}
 }
@@ -1994,6 +2310,7 @@ fn renderer_output(plan: &GenerationPlan, renderer: ClientLanguage) -> &Path {
 		ClientLanguage::Typescript => &plan.typescript_out,
 		ClientLanguage::Dart => &plan.dart_out,
 		ClientLanguage::Rust => &plan.rust_out,
+		ClientLanguage::RustKit => &plan.rust_kit_out,
 		ClientLanguage::CliTs => &plan.cli_ts_out,
 		ClientLanguage::CliDart => &plan.cli_dart_out,
 		ClientLanguage::CliRust => &plan.cli_rust_out,
@@ -2009,6 +2326,7 @@ fn add_npx_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 		}
 		ClientLanguage::Typescript => command.arg(RENDERERS_JS_PACKAGE),
 		ClientLanguage::Dart => command.arg(RENDERERS_DART_PACKAGE),
+		ClientLanguage::RustKit => command.arg(RENDERERS_RUST_SOLANA_KIT_PACKAGE),
 		ClientLanguage::CliTs | ClientLanguage::CliDart => command.arg(renderer_cli_package()),
 	};
 }
@@ -2022,6 +2340,7 @@ fn add_pnpm_renderer_package(command: &mut Command, renderer: ClientLanguage) {
 		}
 		ClientLanguage::Typescript => command.arg(RENDERERS_JS_PACKAGE),
 		ClientLanguage::Dart => command.arg(RENDERERS_DART_PACKAGE),
+		ClientLanguage::RustKit => command.arg(RENDERERS_RUST_SOLANA_KIT_PACKAGE),
 		ClientLanguage::CliTs | ClientLanguage::CliDart => command.arg(renderer_cli_package()),
 	};
 }
@@ -2086,6 +2405,7 @@ mod tests {
 		[
 			ClientLanguage::Cpi,
 			ClientLanguage::Rust,
+			ClientLanguage::RustKit,
 			ClientLanguage::Typescript,
 			ClientLanguage::Dart,
 			ClientLanguage::CliRust,
@@ -2112,6 +2432,7 @@ mod tests {
 			cpi_package_names: BTreeMap::new(),
 			idls_dir: PathBuf::from("idl"),
 			rust_out: PathBuf::from("rust"),
+			rust_kit_out: PathBuf::from("rust-kit"),
 			cpi_out: PathBuf::from("cpi"),
 			typescript_out: PathBuf::from("typescript"),
 			dart_out: PathBuf::from("dart"),
@@ -2510,6 +2831,131 @@ mod tests {
 		);
 	}
 
+	fn write_rust_kit_manifest(dir: &Path, range: &str) {
+		write_manifest(
+			dir,
+			"Cargo.toml",
+			format!(
+				"[package]\nname = \"example-kit-client\"\nversion = \"0.0.0\"\nedition = \
+				 \"2024\"\n\n[dependencies]\nsolana_kit_core = {{ version = \"{range}\", \
+				 default-features = false }}\n"
+			),
+		);
+	}
+
+	#[test]
+	fn rust_kit_scaffold_guard_rejects_stale_solana_kit_core_pins() {
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let settings = GenerationSettings {
+			mode: GenerationMode::Auto,
+			scaffold: true,
+		};
+		let client = temp.path().join("counter_program");
+		write_rust_kit_manifest(&client, "0.1.1");
+
+		let error = verify_rust_kit_scaffold_kit_range(&client, settings)
+			.expect_err("a Kit 0.1 scaffold must block regeneration");
+		assert!(
+			matches!(
+				error,
+				CodamaError::StaleKitScaffold {
+					ecosystem: "rust-kit",
+					ref range,
+					ref minimum,
+					..
+				} if range.contains("solana_kit_core") && minimum == "0.2"
+			),
+			"unexpected error: {error}"
+		);
+
+		let current = temp.path().join("current");
+		write_rust_kit_manifest(&current, "0.2.1");
+		assert!(
+			verify_rust_kit_scaffold_kit_range(&current, settings).is_ok(),
+			"current rust-kit scaffold must pass"
+		);
+
+		let inline = temp.path().join("inline");
+		write_manifest(
+			&inline,
+			"Cargo.toml",
+			"[dependencies]\nsolana_kit_core = \"0.1.0\"\n".to_owned(),
+		);
+		assert!(matches!(
+			verify_rust_kit_scaffold_kit_range(&inline, settings),
+			Err(CodamaError::StaleKitScaffold { .. })
+		));
+
+		let missing = temp.path().join("missing");
+		assert!(
+			verify_rust_kit_scaffold_kit_range(&missing, settings).is_ok(),
+			"missing rust-kit manifest must pass"
+		);
+
+		let overwrite = GenerationSettings {
+			mode: GenerationMode::Overwrite,
+			scaffold: true,
+		};
+		assert!(
+			verify_rust_kit_scaffold_kit_range(&client, overwrite).is_ok(),
+			"overwrite must skip the rust-kit guard"
+		);
+
+		assert_eq!(
+			rust_kit_core_ranges(
+				"[dependencies]\nsolana_kit_core = { version = \"^0.2.1\", default-features = false }\n"
+			),
+			vec![("solana_kit_core", "^0.2.1")]
+		);
+		assert_eq!(
+			rust_kit_core_ranges("[dependencies]\nsolana_kit_core = \"0.2.1\"\n"),
+			vec![("solana_kit_core", "0.2.1")]
+		);
+		assert_eq!(
+			rust_kit_core_ranges(
+				"[workspace.dependencies]\nsolana_kit_core = { version = '0.2.1' }\n"
+			),
+			vec![("solana_kit_core", "0.2.1")]
+		);
+		assert!(rust_kit_core_ranges("[package]\nname = \"x\"\n").is_empty());
+		assert!(
+			rust_kit_core_ranges(
+				"[dependencies]\nsolana_kit_core = { path = \"../core\", default-features = false }\n"
+			)
+			.is_empty(),
+			"path-only deps carry no version to police"
+		);
+		assert!(
+			rust_kit_core_ranges(
+				"[dependencies]\n# comment\nother_crate = \"1\"\nnot_kv\nsolana_kit_core = { version = bare }\n"
+			)
+			.is_empty(),
+			"non-kit keys, bare versions, and non-assignments are ignored"
+		);
+		assert!(
+			rust_kit_core_ranges("[dependencies.foo]\nbar = \"1\"\nsolana_kit_core = \"0.2.1\"\n")
+				== vec![("solana_kit_core", "0.2.1")],
+			"dotted dependency sections still scan following key/value lines"
+		);
+		assert_eq!(
+			rust_kit_core_ranges(
+				"[dependencies.solana_kit_core]\ndefault-features = false\nnot_kv\nversion = \"0.1.1\"\n"
+			),
+			vec![("solana_kit_core", "0.1.1")],
+			"section-table form must read the version key"
+		);
+		assert_eq!(
+			rust_kit_core_ranges("[workspace.dependencies.solana_kit_core]\nversion = '0.1.1'\n"),
+			vec![("solana_kit_core", "0.1.1")],
+			"workspace section-table form must read the version key"
+		);
+		assert!(
+			rust_kit_core_ranges("[dependencies.solana_kit_core]\nversion = \"\"\n").is_empty(),
+			"empty section-table versions are ignored"
+		);
+	}
+
 	#[test]
 	fn ranges_are_judged_by_what_they_can_resolve() {
 		let kit_floor = (MINIMUM_GENERATED_KIT_MAJOR, 0);
@@ -2774,6 +3220,7 @@ mod tests {
 			cpi_package_names: BTreeMap::new(),
 			idls_dir: PathBuf::from("idl"),
 			rust_out: PathBuf::from("rust"),
+			rust_kit_out: PathBuf::from("rust-kit"),
 			cpi_out: PathBuf::from("cpi"),
 			typescript_out: PathBuf::from("typescript"),
 			dart_out: PathBuf::from("dart"),
@@ -2783,6 +3230,7 @@ mod tests {
 			clients: [
 				ClientLanguage::Cpi,
 				ClientLanguage::Rust,
+				ClientLanguage::RustKit,
 				ClientLanguage::Typescript,
 				ClientLanguage::Dart,
 			]
@@ -2798,6 +3246,7 @@ mod tests {
 			selected_output_dirs(&plan),
 			vec![
 				Path::new("rust"),
+				Path::new("rust-kit"),
 				Path::new("cpi"),
 				Path::new("typescript"),
 				Path::new("dart")
@@ -2806,6 +3255,10 @@ mod tests {
 		assert_eq!(
 			renderer_output(&plan, ClientLanguage::Cpi),
 			Path::new("cpi")
+		);
+		assert_eq!(
+			renderer_output(&plan, ClientLanguage::RustKit),
+			Path::new("rust-kit")
 		);
 		assert_eq!(
 			renderer_output(&plan, ClientLanguage::Rust),
@@ -2863,6 +3316,62 @@ mod tests {
 		assert_eq!(CODAMA_PACKAGE, "codama@1.11.0");
 		assert_eq!(RENDERERS_JS_PACKAGE, "@codama/renderers-js@2.5.0");
 		assert_eq!(RENDERERS_DART_PACKAGE, "codama-renderers-dart@0.5.6");
+		assert_eq!(
+			RENDERERS_RUST_SOLANA_KIT_PACKAGE,
+			"codama-renderers-rust-solana-kit@0.2.1"
+		);
+		assert_eq!(MINIMUM_GENERATED_KIT_RUST, (0, 2));
+	}
+
+	#[test]
+	fn rust_kit_prepare_strips_struct_field_defaults_before_create_from_json() {
+		let rust_kit = CLIENT_RENDER_SCRIPT
+			.find("if (renderer === \"rust-kit\")")
+			.expect("rust-kit branch");
+		let create_from_json = CLIENT_RENDER_SCRIPT
+			.find("const codama = createFromJson(json);")
+			.expect("createFromJson for other renderers");
+		assert!(
+			rust_kit < create_from_json,
+			"rust-kit must prepare plain JSON without createFromJson expansion"
+		);
+		assert!(
+			CLIENT_RENDER_SCRIPT.contains("structFieldTypeNode")
+				&& CLIENT_RENDER_SCRIPT.contains("defaultValueStrategy"),
+			"prepare must drop Pina struct field defaults the Kit engine rejects"
+		);
+		assert!(
+			CLIENT_RENDER_SCRIPT.contains("type.endian === \"be\""),
+			"account discriminator rewrite must honor big-endian number types"
+		);
+	}
+
+	#[test]
+	fn rust_kit_client_root_points_at_the_kit_output() {
+		let plan = GenerationPlan {
+			programs: Vec::new(),
+			override_idl_names: false,
+			cpi_package_names: BTreeMap::new(),
+			idls_dir: PathBuf::from("idl"),
+			rust_out: PathBuf::from("rust"),
+			rust_kit_out: PathBuf::from("rust-kit"),
+			cpi_out: PathBuf::from("cpi"),
+			typescript_out: PathBuf::from("typescript"),
+			dart_out: PathBuf::from("dart"),
+			cli_rust_out: PathBuf::from("cli-rust"),
+			cli_ts_out: PathBuf::from("cli-ts"),
+			cli_dart_out: PathBuf::from("cli-dart"),
+			clients: BTreeSet::from([ClientLanguage::RustKit]),
+			generation: default_generation_settings(),
+			npx: "npx".to_owned(),
+			project_root: PathBuf::from("workspace"),
+			workspace_root: std::cell::OnceCell::new(),
+		};
+		assert_eq!(
+			client_root(&plan, ClientLanguage::RustKit),
+			Path::new("rust-kit")
+		);
+		assert_eq!(client_root(&plan, ClientLanguage::Rust), Path::new("cpi"));
 	}
 
 	#[test]
@@ -2874,6 +3383,7 @@ mod tests {
 			(ClientLanguage::CliRust, CODAMA_PACKAGE),
 			(ClientLanguage::Typescript, RENDERERS_JS_PACKAGE),
 			(ClientLanguage::Dart, RENDERERS_DART_PACKAGE),
+			(ClientLanguage::RustKit, RENDERERS_RUST_SOLANA_KIT_PACKAGE),
 			(ClientLanguage::CliTs, renderer_cli.as_str()),
 			(ClientLanguage::CliDart, renderer_cli.as_str()),
 		] {
