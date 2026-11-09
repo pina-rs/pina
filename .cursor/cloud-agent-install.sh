@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Bootstrap the Pina toolchain on a Linux Cloud Agent VM.
+# Bootstrap Nix and devenv on a Linux Cloud Agent VM.
 #
-# The repository's development shell is Nix via devenv (see devenv.nix and
-# .github/actions/devenv). Cloud Agent VMs run under tini rather than systemd,
-# so this uses Nix's single-user installer instead of the multi-user daemon.
-# macOS host-linker overrides and the Windows CLI job are outside this image.
+# Pina's development shell is the lockfile in devenv.lock, realized by
+# devenv.nix. Cloud Agent VMs run under tini rather than systemd, so Nix is
+# installed single-user. The devenv package is the immutable revision from
+# devenv.lock (the same pin CI uses), substituted from devenv.cachix.org
+# rather than built from source. macOS host-linker overrides and the Windows
+# CLI job are outside this image.
 
 set -euo pipefail
 
@@ -38,7 +40,9 @@ retry() {
 	done
 }
 
-if ! command -v nix >/dev/null 2>&1; then
+# Single-user Nix lives in the user profile. A second run finds that binary
+# even when the current shell has not sourced the profile yet.
+if [[ ! -x "${HOME}/.nix-profile/bin/nix" ]] && ! command -v nix >/dev/null 2>&1; then
 	curl -fsSL https://nixos.org/nix/install -o /tmp/nix-install.sh
 	sh /tmp/nix-install.sh --no-daemon --yes
 fi
@@ -71,15 +75,28 @@ devenv_revision="$(
 )"
 
 if ! command -v devenv >/dev/null 2>&1 || [[ "$(devenv version)" != *"${devenv_revision:0:7}"* ]]; then
-	retry 3 nix profile add --accept-flake-config "github:cachix/devenv/${devenv_revision}#devenv"
+	# `install` is Nix 2.35's alias for `profile add`. The flake URL is the
+	# cachix/devenv pin recorded in devenv.lock, not a floating nixpkgs copy.
+	retry 3 nix profile install --accept-flake-config "github:cachix/devenv/${devenv_revision}#devenv"
 fi
 
-if [[ -x "${HOME}/.nix-profile/bin/nix" ]]; then
-	sudo ln -sfn "${HOME}/.nix-profile/bin/nix" /usr/local/bin/nix
+# Login shells source /etc/profile.d. Non-login shells do not, so wrappers in
+# /usr/local/bin (on the default PATH) source the Nix profile and exec the
+# real binaries. That covers `bash -c` as well as `bash -lc`.
+install_wrapper() {
+	local name="$1"
+	sudo tee "/usr/local/bin/${name}" >/dev/null <<EOF
+#!/bin/sh
+if [ -n "\${HOME-}" ] && [ -f "\${HOME}/.nix-profile/etc/profile.d/nix.sh" ]; then
+	. "\${HOME}/.nix-profile/etc/profile.d/nix.sh"
 fi
-if [[ -x "${HOME}/.nix-profile/bin/devenv" ]]; then
-	sudo ln -sfn "${HOME}/.nix-profile/bin/devenv" /usr/local/bin/devenv
-fi
+exec "\${HOME}/.nix-profile/bin/${name}" "\$@"
+EOF
+	sudo chmod 755 "/usr/local/bin/${name}"
+}
+
+install_wrapper nix
+install_wrapper devenv
 
 sudo tee /etc/profile.d/nix-devenv.sh >/dev/null <<'EOF'
 if [[ -f "${HOME}/.nix-profile/etc/profile.d/nix.sh" ]]; then
@@ -87,5 +104,7 @@ if [[ -f "${HOME}/.nix-profile/etc/profile.d/nix.sh" ]]; then
 fi
 EOF
 
+# Realize the devenv shell once so later agents reuse the cached closure.
+retry 3 devenv shell -- true
 retry 3 devenv shell -- install:all
 retry 3 devenv shell -- bash -euo pipefail -c 'pnpm install --frozen-lockfile && cargo fetch --locked'
