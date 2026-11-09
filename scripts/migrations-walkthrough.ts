@@ -534,6 +534,112 @@ function generateClients(step: number): string {
 	return jsRoot;
 }
 
+const UPGRADEABLE_LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
+
+type ListedLoaderAccount = {
+	pubkey: string;
+	account: {
+		lamports: number;
+		owner: string;
+		executable: boolean;
+		data: [string, string];
+	};
+};
+
+async function surfpoolRpc<T>(
+	rpcUrl: string,
+	method: string,
+	params: unknown[],
+): Promise<T> {
+	const response = await fetch(rpcUrl, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+		signal: AbortSignal.timeout(10_000),
+	});
+	if (!response.ok) {
+		throw new Error(`${method} failed: ${response.status}`);
+	}
+	const body = (await response.json()) as {
+		error?: { message?: string };
+		result?: T;
+	};
+	if (body.error || body.result === undefined) {
+		const message = body.error?.message ?? "unknown RPC error";
+		throw new Error(`${method} failed: ${message}`);
+	}
+	return body.result;
+}
+
+// `surfnet.deploy` writes an upgradeable ProgramData account whose authority
+// is the system program and whose slot is the processed clock. A shorter
+// redeploy also leaves the previous ELF's tail in place. Publication reads
+// the finalized bank and rejects each of those, so correct them before the
+// receipt is recorded. The approved program bytes stay in place.
+async function alignUpgradeAuthority(
+	surfnet: Surfnet,
+	programId: string,
+	authority: string,
+	artifact: string,
+): Promise<void> {
+	const rpcUrl = surfnet.rpcUrl;
+	await surfpoolRpc<unknown>(rpcUrl, "surfnet_setProgramAuthority", [
+		programId,
+		authority,
+	]);
+	const listed = await surfpoolRpc<ListedLoaderAccount[]>(
+		rpcUrl,
+		"getProgramAccounts",
+		[
+			UPGRADEABLE_LOADER,
+			{ encoding: "base64", commitment: "finalized" },
+		],
+	);
+	const finalizedSlot = await surfpoolRpc<number>(rpcUrl, "getSlot", [
+		{ commitment: "finalized" },
+	]);
+	const programData = listed.find((entry) => {
+		if (entry.account.executable) {
+			return false;
+		}
+		const header = Buffer.from(entry.account.data[0], "base64");
+		return header.length >= 45 && header.readUInt32LE(0) === 3;
+	});
+	if (!programData) {
+		throw new Error("ProgramData account is missing after deploy");
+	}
+	const bytes = Buffer.from(programData.account.data[0], "base64");
+	const approved = readFileSync(artifact);
+	const elfEnd = 45 + approved.length;
+	if (
+		bytes.length < elfEnd ||
+		!bytes.subarray(45, elfEnd).equals(approved)
+	) {
+		throw new Error(
+			"deployed program bytes do not match the approved artifact",
+		);
+	}
+	const stamped = bytes.readBigUInt64LE(4);
+	const slotNeedsUpdate = stamped > BigInt(finalizedSlot);
+	const tail = bytes.subarray(elfEnd);
+	const tailDirty = tail.some((byte) => byte !== 0);
+	if (!slotNeedsUpdate && !tailDirty) {
+		return;
+	}
+	if (slotNeedsUpdate) {
+		bytes.writeBigUInt64LE(BigInt(finalizedSlot), 4);
+	}
+	if (tailDirty) {
+		tail.fill(0);
+	}
+	surfnet.setAccount(
+		programData.pubkey,
+		programData.account.lamports,
+		new Uint8Array(bytes),
+		programData.account.owner,
+	);
+}
+
 async function deploy(
 	context: StepContext,
 	artifact: string,
@@ -556,6 +662,12 @@ async function deploy(
 		if (!response.ok) {
 			throw new Error(`survival probe failed: ${response.status}`);
 		}
+		await alignUpgradeAuthority(
+			context.network.surfnet,
+			context.programId,
+			context.authority,
+			artifact,
+		);
 	};
 	try {
 		await attempt();
