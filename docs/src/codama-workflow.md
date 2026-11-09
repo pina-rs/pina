@@ -45,7 +45,7 @@ The generated Dart package lives in `codama/clients/dart`. It exposes one packag
 
 Generation is driven entirely by the Pina CLI. `pina generate` discovers a project through its `pina.toml`, refreshes its IDL, and renders only the configured client ecosystems, which keeps the repository dogfooding the same command that users run. Generating a whole repository means running the command once per project.
 
-For project-aware generation, `[clients]` in `pina.toml` controls `mode` (`auto`, `create`, `update`, or `overwrite`) and `scaffold`, with optional overrides under `[clients.cpi]`, `[clients.rust]`, `[clients.typescript]`, and `[clients.dart]`. Dart is also the Flutter target. Update mode replaces only generated sources, so user-owned manifests and entrypoints can be customized without being rewritten. See [Project Configuration](./cli/configuration.md) for the complete schema.
+For project-aware generation, `[clients]` in `pina.toml` controls `mode` (`auto`, `create`, `update`, or `overwrite`) and `scaffold`, with optional overrides under `[clients.cpi]`, `[clients.rust]`, `[clients.rust_kit]`, `[clients.typescript]`, and `[clients.dart]`. Dart is also the Flutter target. Opt into Solana Kit Rust clients with `rust-kit` (pinned `codama-renderers-rust-solana-kit@0.2.1`); it coexists with `rust` and is not part of the default `pina init` languages. Update mode replaces only generated sources, so user-owned manifests and entrypoints can be customized without being rewritten. See [Project Configuration](./cli/configuration.md) for the complete schema.
 
 ### Compute unit budgets
 

@@ -76,12 +76,12 @@ Configured IDL and Cargo target directories must stay inside the Git worktree, o
 
 ## `[clients]` fields
 
-| Field               | Required | Default              | Meaning                                                                                                                                                                                                                                |
-| ------------------- | -------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `clients.output`    | no       | `clients`            | Root directory for generated client ecosystems. Resolved relative to the `pina.toml` directory, and every configured output must resolve inside the project's Git worktree; pass `--output` on the command line to publish outside it. |
-| `clients.languages` | no       | `rust`, `typescript` | Which ecosystems to generate: any of `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, and `cli-dart`.                                                                                                                        |
-| `clients.mode`      | no       | `auto`               | Default destination policy for every selected client; see the mode table below.                                                                                                                                                        |
-| `clients.scaffold`  | no       | `true`               | Whether missing package-level files (manifests, entrypoints) are initialized around the generated sources.                                                                                                                             |
+| Field               | Required | Default              | Meaning                                                                                                                                                                                                                                                               |
+| ------------------- | -------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clients.output`    | no       | `clients`            | Root directory for generated client ecosystems. Resolved relative to the `pina.toml` directory, and every configured output must resolve inside the project's Git worktree; pass `--output` on the command line to publish outside it.                                |
+| `clients.languages` | no       | `rust`, `typescript` | Which ecosystems to generate: any of `cpi`, `rust`, `rust-kit`, `typescript`, `dart`, `cli-rust`, `cli-ts`, and `cli-dart`. `rust-kit` is opt-in (not in the default `pina init` list) and emits off-chain Solana Kit clients via `codama-renderers-rust-solana-kit`. |
+| `clients.mode`      | no       | `auto`               | Default destination policy for every selected client; see the mode table below.                                                                                                                                                                                       |
+| `clients.scaffold`  | no       | `true`               | Whether missing package-level files (manifests, entrypoints) are initialized around the generated sources.                                                                                                                                                            |
 
 `<target>` in the per-client table below is one of the language names. Dart is the Dart and Flutter target; there is no separate Flutter generator.
 
@@ -93,7 +93,7 @@ Configured IDL and Cargo target directories must stay inside the Git worktree, o
 
 Selecting a CLI target implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`), and projects normally pick one CLI; selecting several prints a warning. CLI apps render into `clients/cli-rust`, `clients/cli-ts`, and `clients/cli-dart` respectively — the Dart CLIs share one package at `cli-dart` with a `bin/<library-name>.dart` executable per program. Override a CLI target under the matching table (`[clients.cli_rust]`, `[clients.cli_ts]`, `[clients.cli_dart]`).
 
-Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client typescript`, `--client dart`, `--client cli-rust`, `--client cli-ts`, or `--client cli-dart` flags.
+Override the selection for one run with repeatable `--client cpi`, `--client rust`, `--client rust-kit`, `--client typescript`, `--client dart`, `--client cli-rust`, `--client cli-ts`, or `--client cli-dart` flags. `rust` and `rust-kit` coexist: the former is the PinaPod / Agave-instruction wire client; the latter is the portable Solana Kit client. There is no `cli-rust-kit`.
 
 ## `[lints]` fields
 
@@ -157,15 +157,16 @@ Every client target separates two kinds of files, and knowing the split tells yo
 - **Renderer-owned files** are rewritten on every generation and must never be hand-edited. Update mode replaces only these.
 - **Scaffolded files** are created once, only when missing, and are yours afterwards. Later runs never rewrite them, so manifests can be renamed, repackaged, or extended freely after the first generation.
 
-| Target       | Renderer-owned (every run)                                          | Scaffolded once (only when missing)                                                       |
-| ------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `rust`       | `src/generated/**` — a `mod.rs`-rooted module tree                  | `Cargo.toml`, `src/lib.rs` (the two-line shim `pub mod generated; pub use generated::*;`) |
-| `cpi`        | `src/generated/**`                                                  | `Cargo.toml`, `src/lib.rs` — the crate name honors the program's Cargo package name       |
-| `typescript` | `src/generated/**`                                                  | `package.json`                                                                            |
-| `dart`       | `lib/src/generated/<program>/**` plus the generated library barrels | `pubspec.yaml`                                                                            |
-| `cli-rust`   | Application sources (`src/**`) and a `.pina-generated` marker       | `Cargo.toml`, `README.md`                                                                 |
-| `cli-ts`     | The complete application, including `package.json`                  | — (everything is renderer-owned)                                                          |
-| `cli-dart`   | Application sources (`lib/src/<program>/**`, `bin/**`, guard files) | `pubspec.yaml`                                                                            |
+| Target       | Renderer-owned (every run)                                          | Scaffolded once (only when missing)                                                                                  |
+| ------------ | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `rust`       | `src/generated/**` — a `mod.rs`-rooted module tree                  | `Cargo.toml`, `src/lib.rs` (the two-line shim `pub mod generated; pub use generated::*;`)                            |
+| `rust-kit`   | `src/generated/**` — flat Kit modules plus `mod.rs`                 | `Cargo.toml` (crates.io `solana_kit_core`), `src/lib.rs` (`#![no_std]` + `pub mod generated; pub use generated::*;`) |
+| `cpi`        | `src/generated/**`                                                  | `Cargo.toml`, `src/lib.rs` — the crate name honors the program's Cargo package name                                  |
+| `typescript` | `src/generated/**`                                                  | `package.json`                                                                                                       |
+| `dart`       | `lib/src/generated/<program>/**` plus the generated library barrels | `pubspec.yaml`                                                                                                       |
+| `cli-rust`   | Application sources (`src/**`) and a `.pina-generated` marker       | `Cargo.toml`, `README.md`                                                                                            |
+| `cli-ts`     | The complete application, including `package.json`                  | — (everything is renderer-owned)                                                                                     |
+| `cli-dart`   | Application sources (`lib/src/<program>/**`, `bin/**`, guard files) | `pubspec.yaml`                                                                                                       |
 
 Set `scaffold = false` to generate only renderer-owned files and never create package-level files — the "files, not the package" mode for embedding generated sources into a crate or package you own. Note that the Rust `src/generated` tree references `crate::<PROGRAM>_PROGRAM_ID` (the upper-snake library name), which the default `lib.rs` shim satisfies by glob re-exporting `generated::*`; an embedded tree needs an equivalent re-export at its host crate root.
 
@@ -173,9 +174,9 @@ An update owns only renderer-owned paths. The Rust and CPI renderers refuse to r
 
 Names are read back from scaffolded manifests on later runs: the Rust CLI derives its dependency path from the crate name in the existing `Cargo.toml`, and the Dart CLI derives its package import from the `name:` in the existing `pubspec.yaml`. Renaming a client in its manifest after first generation is therefore supported and respected.
 
-Because a scaffolded `package.json` is never rewritten, its `@solana/kit` range stays wherever the first generation left it even as the generated sources around it move forward with the renderer toolchain. The same applies to a scaffolded Dart `pubspec.yaml` and its Solana Kit Dart ranges. Hand-editing those ranges is the supported way to move a client between Kit versions: later runs respect whatever is written.
+Because a scaffolded `package.json` is never rewritten, its `@solana/kit` range stays wherever the first generation left it even as the generated sources around it move forward with the renderer toolchain. The same applies to a scaffolded Dart `pubspec.yaml` and its Solana Kit Dart ranges, and to a scaffolded rust-kit `Cargo.toml` and its `solana_kit_core` pin. Hand-editing those ranges is the supported way to move a client between Kit versions: later runs respect whatever is written.
 
-Generation refuses to update a client only when the existing manifest provably cannot resolve the Kit version the generated sources compile against — `@solana/kit` for TypeScript, the `solana_kit_*` packages for Dart, in either the inline or the nested `version:` declaration form. It judges a range by what it can resolve rather than by its first number, so a bounded range like `>=7 <9` or a union like `^8.3.0 || ^7.0.0` passes because npm installs the newer version, while `^7.0.0` fails. The error names the manifest and the range to raise, and `overwrite` mode is the explicit way to start the scaffold over on the current ranges.
+Generation refuses to update a client only when the existing manifest provably cannot resolve the Kit version the generated sources compile against — `@solana/kit` for TypeScript, the `solana_kit_*` packages for Dart, and `solana_kit_core` for rust-kit, in either the inline or the nested `version:` declaration form. It judges a range by what it can resolve rather than by its first number, so a bounded range like `>=7 <9` or a union like `^8.3.0 || ^7.0.0` passes because npm installs the newer version, while `^7.0.0` fails. The error names the manifest and the range to raise, and `overwrite` mode is the explicit way to start the scaffold over on the current ranges.
 
 ## Example configurations
 

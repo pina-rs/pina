@@ -315,10 +315,10 @@ pub(crate) enum Commands {
 		#[arg(long)]
 		no_scaffold: bool,
 
-		/// Executable used to invoke JavaScript or Dart renderers. Defaults to
-		/// npx, which resolves the pinned packages isolated from the project;
-		/// pass a Node executable to resolve packages from the project on
-		/// purpose.
+		/// Executable used to invoke TypeScript, Dart, or rust-kit renderers.
+		/// Defaults to npx, which resolves the pinned packages isolated from
+		/// the project; pass a Node executable to resolve packages from the
+		/// project on purpose.
 		#[arg(
 			long,
 			default_value = "npx",
@@ -1523,6 +1523,9 @@ pub(crate) enum SnapshotViewArg {
 pub(crate) enum ClientArg {
 	Cpi,
 	Rust,
+	/// Off-chain Rust client against Solana Kit (`solana_kit_core`).
+	#[value(name = "rust-kit")]
+	RustKit,
 	Typescript,
 	Dart,
 	/// A clap-based Rust CLI application.

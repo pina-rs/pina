@@ -8,18 +8,19 @@ Refresh the current program's IDL and generate selected client ecosystems.
 pina generate [OPTIONS]
 ```
 
-| Input                 | Default           | Meaning                                                                               |
-| --------------------- | ----------------- | ------------------------------------------------------------------------------------- |
-| `-p, --project <DIR>` | current directory | Start directory for project discovery.                                                |
-| `--client <LANGUAGE>` | `pina.toml`       | `cpi`, `rust`, `typescript`, `dart`, `cli-rust`, `cli-ts`, or `cli-dart`; repeatable. |
-| `-o, --output <DIR>`  | configured output | Override the client output root.                                                      |
-| `--mode <MODE>`       | `pina.toml`       | Override with `auto`, `create`, `update`, or `overwrite`.                             |
-| `--no-scaffold`       | off               | Generate sources without creating manifests or entrypoints.                           |
-| `--npx <COMMAND>`     | `npx`             | Codama runner for TypeScript or Dart.                                                 |
+| Input                 | Default           | Meaning                                                                                           |
+| --------------------- | ----------------- | ------------------------------------------------------------------------------------------------- |
+| `-p, --project <DIR>` | current directory | Start directory for project discovery.                                                            |
+| `--client <LANGUAGE>` | `pina.toml`       | `cpi`, `rust`, `rust-kit`, `typescript`, `dart`, `cli-rust`, `cli-ts`, or `cli-dart`; repeatable. |
+| `-o, --output <DIR>`  | configured output | Override the client output root.                                                                  |
+| `--mode <MODE>`       | `pina.toml`       | Override with `auto`, `create`, `update`, or `overwrite`.                                         |
+| `--no-scaffold`       | off               | Generate sources without creating manifests or entrypoints.                                       |
+| `--npx <COMMAND>`     | `npx`             | Codama runner for TypeScript, Dart, or rust-kit.                                                  |
 
 ```bash
 pina generate
 pina generate --client rust
+pina generate --client rust-kit
 pina generate --client cpi
 pina generate --client typescript --client dart
 pina generate --client cli-rust
@@ -30,7 +31,7 @@ pina generate --mode update --no-scaffold
 pina generate --mode overwrite
 ```
 
-Repeating a language is harmless. Explicit `--client` values replace the configured list for that invocation. CPI-only, Rust-only, and `cli-rust` generation do not invoke Node.js. Each CLI variant implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`); projects normally pick one CLI, and Pina warns when several are selected together.
+Repeating a language is harmless. Explicit `--client` values replace the configured list for that invocation. CPI-only, Rust-only, and `cli-rust` generation do not invoke Node.js. `rust-kit`, TypeScript, and Dart use the pinned Codama Node renderers. Each CLI variant implies its base client (`cli-rust` ⇒ `rust`, `cli-ts` ⇒ `typescript`, `cli-dart` ⇒ `dart`); projects normally pick one CLI, and Pina warns when several are selected together. `rust-kit` does not imply `rust` and there is no `cli-rust-kit`.
 
 `auto` initializes an empty destination and otherwise updates it. Updates replace only renderer-owned generated source, preserving customized manifests and crate/package entrypoints. `create` and `update` enforce the expected destination state. `overwrite` deletes the entire selected client target before regeneration; use it for an intentional clean sweep. Command-line `--mode` and `--no-scaffold` override every selected target for that invocation.
 
@@ -40,6 +41,7 @@ Outputs are grouped by ecosystem:
 clients/
 ├── cpi/<library-name>/
 ├── rust/<library-name>/
+├── rust-kit/<library-name>/
 ├── typescript/<library-name>/
 ├── dart/
 ├── cli-rust/<library-name>/

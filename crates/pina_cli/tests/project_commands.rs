@@ -169,7 +169,7 @@ fi
 
 arguments=("$@")
 for ((index = 0; index < ${#arguments[@]}; index++)); do
-	if [[ "${arguments[$index]}" != "typescript" && "${arguments[$index]}" != "dart" ]]; then
+	if [[ "${arguments[$index]}" != "typescript" && "${arguments[$index]}" != "dart" && "${arguments[$index]}" != "rust-kit" ]]; then
 		continue
 	fi
 
@@ -180,6 +180,14 @@ for ((index = 0; index < ${#arguments[@]}; index++)); do
 	if [[ "$renderer" == "typescript" ]]; then
 		mkdir -p "$output/$name/src/generated"
 		printf '{"name":"%s-client"}\n' "${name//_/-}" > "$output/$name/package.json"
+	elif [[ "$renderer" == "rust-kit" ]]; then
+		mkdir -p "$output/$name/src/generated"
+		printf 'pub mod %s;\n' "$name" > "$output/$name/src/generated/mod.rs"
+		printf '// generated\n' > "$output/$name/src/generated/${name}.rs"
+		if [[ "${arguments[$((index + 4))]}" == "true" ]]; then
+			printf '[package]\nname = "%s-kit-client"\nversion = "0.0.0"\nedition = "2024"\npublish = false\n\n[features]\ndefault = []\npda = ["solana_kit_core/crypto"]\n\n[dependencies]\nsolana_kit_core = { version = "0.2.1", default-features = false }\n\n[workspace]\n' "${name//_/-}" > "$output/$name/Cargo.toml"
+			printf '#![no_std]\n\nextern crate alloc;\n\npub mod generated;\npub use generated::*;\n' > "$output/$name/src/lib.rs"
+		fi
 	else
 		mkdir -p "$output/lib/src/generated/$name"
 		printf '// generated\n' > "$output/lib/src/generated/$name/$name.dart"
@@ -1945,6 +1953,67 @@ fn generate_typescript_uses_custom_library_identity() {
 		fs::read_to_string(project.join("clients/typescript/custom_program/package.json"))
 			.unwrap_or_else(|error| panic!("failed to read TypeScript package: {error}"));
 	assert!(package.contains("custom-program-client"));
+}
+
+#[test]
+fn generate_rust_kit_scaffolds_kit_client_without_touching_rust() {
+	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+	let project = temp.path().join("project");
+	let target = temp.path().join("custom-target");
+	write_project(&project);
+	fs::write(
+		project.join("pina.toml"),
+		"[clients]\nlanguages = [\"rust-kit\"]\n\n[clients.rust_kit]\noutput = \"rust-kit\"\n",
+	)
+	.unwrap_or_else(|error| panic!("failed to configure rust-kit: {error}"));
+	let cargo = fake_cargo(temp.path());
+	let npx = fake_npx(temp.path());
+
+	let output = project_command(&project, &cargo, &target)
+		.args([
+			"generate",
+			"--client",
+			"rust-kit",
+			"--npx",
+			npx.to_string_lossy().as_ref(),
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("failed to run generation: {error}"));
+
+	assert!(
+		output.status.success(),
+		"rust-kit generation failed: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	let kit = project.join("clients/rust-kit/custom_program");
+	assert!(
+		kit.join("src/generated/mod.rs").is_file(),
+		"rust-kit generated sources were missing"
+	);
+	let manifest = fs::read_to_string(kit.join("Cargo.toml"))
+		.unwrap_or_else(|error| panic!("failed to read rust-kit Cargo.toml: {error}"));
+	assert!(
+		manifest.contains("custom-program-kit-client"),
+		"unexpected crate name: {manifest}"
+	);
+	assert!(
+		manifest.contains("solana_kit_core = { version = \"0.2.1\""),
+		"scaffold must pin solana_kit_core 0.2.1: {manifest}"
+	);
+	assert!(
+		kit.join("src/lib.rs").is_file(),
+		"rust-kit lib.rs scaffold was missing"
+	);
+	assert!(
+		!project.join("clients/rust").exists(),
+		"rust-kit generation must not imply the Agave rust client"
+	);
+	let lib = fs::read_to_string(kit.join("src/lib.rs"))
+		.unwrap_or_else(|error| panic!("failed to read rust-kit lib.rs: {error}"));
+	assert!(
+		lib.contains("pub mod generated") && lib.contains("#![no_std]"),
+		"unexpected lib.rs scaffold: {lib}"
+	);
 }
 
 #[test]

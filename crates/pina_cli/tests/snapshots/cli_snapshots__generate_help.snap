@@ -25,6 +25,7 @@ Options:
           Possible values:
           - cpi
           - rust
+          - rust-kit:   Off-chain Rust client against Solana Kit (`solana_kit_core`)
           - typescript
           - dart
           - cli-rust:   A clap-based Rust CLI application
@@ -47,7 +48,7 @@ Options:
           Generate source files without package manifests or crate entrypoints
 
       --npx <COMMAND>
-          Executable used to invoke JavaScript or Dart renderers. Defaults to npx, which resolves the pinned packages isolated from the project; pass a Node executable to resolve packages from the project on purpose
+          Executable used to invoke TypeScript, Dart, or rust-kit renderers. Defaults to npx, which resolves the pinned packages isolated from the project; pass a Node executable to resolve packages from the project on purpose
 
   -h, --help
           Print help (see a summary with '-h')
