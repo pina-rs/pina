@@ -462,7 +462,7 @@ fn cargo_config_target_escape_is_rejected_with_and_without_pina_config() {
 }
 
 #[test]
-fn cargo_target_symlink_is_rejected_before_default_idl_generation() {
+fn cargo_target_symlink_is_accepted_before_default_idl_generation() {
 	let temp = TempDir::new().unwrap();
 	let project = temp.path().join("project");
 	let outside = temp.path().join("outside");
@@ -477,9 +477,40 @@ fn cargo_target_symlink_is_rejected_before_default_idl_generation() {
 		.args(["generate", "--client", "rust"])
 		.output()
 		.unwrap();
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(outside.join("idl/custom_program.json").is_file());
+	assert!(project.join("clients/rust/custom_program").is_dir());
+}
+
+#[test]
+fn configured_idl_symlink_is_rejected_when_cargo_target_is_a_symlink() {
+	let temp = TempDir::new().unwrap();
+	let project = temp.path().join("project");
+	let outside = temp.path().join("outside");
+	write_project(&project);
+	fs::create_dir(&outside).unwrap();
+	std::os::unix::fs::symlink(&outside, project.join("target")).unwrap();
+	std::os::unix::fs::symlink(&outside, project.join("linked-idl")).unwrap();
+	fs::write(
+		project.join("pina.toml"),
+		"[project]\nprogram = \".\"\nidl_dir = \"linked-idl\"\n",
+	)
+	.unwrap();
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &project.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
 	let stderr = String::from_utf8_lossy(&output.stderr);
-	assert!(!output.status.success());
-	assert!(stderr.contains("target_directory"), "{stderr}");
+	assert!(!output.status.success(), "{stderr}");
+	assert!(stderr.contains("project.idl_dir"), "{stderr}");
 	assert!(stderr.contains("symbolic links"), "{stderr}");
 	assert_eq!(fs::read_dir(&outside).unwrap().count(), 0);
 }
