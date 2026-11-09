@@ -362,7 +362,7 @@ pub enum ProjectError {
 	#[error("Configured program directory does not contain Cargo.toml: {path}")]
 	MissingManifest { path: PathBuf },
 
-	#[error("Invalid `{field}` path `{path}` in pina.toml: {reason}")]
+	#[error("Invalid `{field}` path `{path}`: {reason}")]
 	InvalidConfigPath {
 		field: &'static str,
 		path: PathBuf,
@@ -1004,7 +1004,7 @@ fn resolve_build_output_dirs(
 	} else {
 		&output_root
 	};
-	let target_dir = resolve_output_dir(target_root, "target_directory", target)?;
+	let target_dir = resolve_cargo_target_dir(target_root, target)?;
 	let idl_dir = match configured_idl_dir {
 		Some(path) => resolve_output_dir(&output_root, "project.idl_dir", &path)?,
 		None => resolve_output_dir(&target_dir, "project.idl_dir", &target_dir.join("idl"))?,
@@ -1024,20 +1024,50 @@ pub(crate) fn resolve_output_dir(
 	path: &Path,
 ) -> Result<PathBuf, ProjectError> {
 	let raw = path.to_string_lossy();
-	let normalized = normalize_absolute(path, field, &raw)?;
-	let root = normalize_absolute(root, field, &root.to_string_lossy())?;
-
-	let relative = strip_output_root(&root, &normalized).ok_or_else(|| {
+	let normalized = normalize_within(root, field, path)?.ok_or_else(|| {
 		ProjectError::InvalidConfigPath {
 			field,
 			path: path.to_path_buf(),
 			reason: "configured outputs must stay inside the Git worktree or Cargo workspace",
 		}
 	})?;
-	let normalized = root.join(relative);
 
-	PathTemplates::empty(root).reject_symlink_prefix(&normalized, field, &raw)?;
+	PathTemplates::empty(root.to_path_buf()).reject_symlink_prefix(&normalized, field, &raw)?;
 	Ok(normalized)
+}
+
+/// Resolve the target directory Cargo reports.
+///
+/// Cargo owns this path, and a shared build cache commonly redirects `target/`
+/// through a symbolic link (mr boxington, CI caches, tmpfs). The path must
+/// still be lexically contained by `root`, so repository Cargo configuration
+/// cannot name a destination outside the tree, but links along it are Cargo's
+/// choice and are accepted. An operator who wants an external directory sets
+/// `CARGO_TARGET_DIR` explicitly.
+fn resolve_cargo_target_dir(root: &Path, path: &Path) -> Result<PathBuf, ProjectError> {
+	normalize_within(root, "target_directory", path)?.ok_or_else(|| {
+		ProjectError::InvalidConfigPath {
+			field: "target_directory",
+			path: path.to_path_buf(),
+			reason: "Cargo's target directory must stay inside the Git worktree or Cargo workspace; \
+			         set CARGO_TARGET_DIR to build in an external directory",
+		}
+	})
+}
+
+/// Normalize a path and join it beneath `root` when it stays inside it.
+///
+/// Returns `None` when the normalized path leaves `root`, so each caller can
+/// describe where the rejected path came from.
+fn normalize_within(
+	root: &Path,
+	field: &'static str,
+	path: &Path,
+) -> Result<Option<PathBuf>, ProjectError> {
+	let normalized = normalize_absolute(path, field, &path.to_string_lossy())?;
+	let root = normalize_absolute(root, field, &root.to_string_lossy())?;
+
+	Ok(strip_output_root(&root, &normalized).map(|relative| root.join(relative)))
 }
 
 #[cfg(not(windows))]
@@ -2268,6 +2298,44 @@ mode = "overwrite"
 		}
 	}
 
+	#[cfg(unix)]
+	#[test]
+	fn cargo_target_symlinks_are_accepted_without_relaxing_configured_paths() {
+		use std::os::unix::fs::symlink;
+
+		let temp = TempDir::new().expect("temp dir");
+		let root = fs::canonicalize(temp.path())
+			.expect("canonicalizing the temp dir")
+			.join("project");
+		let shared = root.with_file_name("shared-target");
+		write_program(&root, "counter");
+		fs::create_dir(&shared).expect("creating the shared cache");
+		symlink(&shared, root.join("target")).expect("linking the shared cache as target");
+
+		// Cargo reports this link as its `target_directory`; a shared build
+		// cache redirects it, and discovery accepts the path Cargo owns.
+		let project = Project::discover(&root).expect("a symlinked target should resolve");
+		assert_eq!(project.target_dir, root.join("target"));
+		assert_eq!(project.idl_dir, root.join("target/idl"));
+
+		// Only Cargo's own path is exempt: one `pina.toml` configures is still
+		// refused when it crosses a symbolic link.
+		symlink(&shared, root.join("linked-idl")).expect("linking the configured idl dir");
+		fs::write(
+			root.join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\nidl_dir = \"linked-idl\"\n",
+		)
+		.expect("writing the project config");
+
+		assert!(matches!(
+			Project::discover(&root),
+			Err(ProjectError::InvalidConfigPath {
+				field: "project.idl_dir",
+				..
+			})
+		));
+	}
+
 	#[test]
 	fn cargo_metadata_discovers_single_package_without_config() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
@@ -2539,6 +2607,41 @@ mode = "overwrite"
 		}
 
 		assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+	}
+
+	#[test]
+	fn cargo_target_directory_must_still_stay_inside_the_root() {
+		let temp = TempDir::new().unwrap();
+		let root = fs::canonicalize(temp.path()).unwrap();
+
+		assert_eq!(
+			resolve_cargo_target_dir(&root, &root.join("target")).unwrap(),
+			root.join("target")
+		);
+
+		// Cargo may put links along its target directory, but it may not name
+		// one outside the worktree.
+		for path in [
+			root.join("nested/../../outside/target"),
+			root.with_file_name("other").join("target"),
+		] {
+			let error = resolve_cargo_target_dir(&root, &path)
+				.expect_err("Cargo's target directory must stay inside the root");
+			assert!(
+				matches!(
+					error,
+					ProjectError::InvalidConfigPath {
+						field: "target_directory",
+						..
+					}
+				),
+				"{error}"
+			);
+			let message = error.to_string();
+			assert!(message.contains("must stay inside"), "{message}");
+			assert!(message.contains("CARGO_TARGET_DIR"), "{message}");
+			assert!(!message.contains("pina.toml"), "{message}");
+		}
 	}
 
 	#[cfg(unix)]
