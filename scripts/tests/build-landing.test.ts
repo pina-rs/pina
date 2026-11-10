@@ -148,6 +148,11 @@ test("the committed landing page renders from the repository's sources", () => {
 	assert.doesNotMatch(html, /\{\{|<!-- pina:/);
 	assert.match(html, new RegExp(`v${workspaceVersion(read("Cargo.toml"))}`));
 	assert.match(html, /class="matrix"/);
+	assert.match(html, /Pina \(unchecked hello\)/);
+	assert.match(
+		html,
+		/Unchecked Pina hello omits the program ID, signer, and exact payload-length checks/,
+	);
 	assert.ok(
 		readFileSync(join(book, "landing/fonts/inter-latin-wght-normal.woff2"))
 			.length > 0,

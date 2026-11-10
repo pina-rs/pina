@@ -511,6 +511,7 @@ export function renderBenchmarks(
 			${panels}
 			<div class="chart-foot">
 				<span>Bars past a break are drawn to a shortened scale; their full value is printed.</span>
+				<span>Unchecked Pina hello omits the program ID, signer, and exact payload-length checks. The default Pina row retains them.</span>
 				<a href="framework-comparison.html">Methodology and caveats →</a>
 			</div>
 			<details class="chart-table">
