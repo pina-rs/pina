@@ -15,7 +15,7 @@ no-log-ix-name = []
 no-entrypoint = []
 
 [dependencies]
-anchor-lang = "=1.2.1"
+anchor-lang = "=1.2.2"
 
 [lints.rust.unexpected_cfgs]
 level = "allow"

@@ -215,6 +215,13 @@ pub(crate) fn expand(
 		.program_id
 		.clone()
 		.unwrap_or_else(|| syn::parse_quote!(ID));
+	// Keep the parser's discriminator length checks and error mapping. Passing
+	// the same address makes only its program-ID comparison unconditional.
+	let checked_program_id = if args.skip_program_id_check.is_present() {
+		quote!(program_id)
+	} else {
+		quote!(& #program_id)
+	};
 
 	let routes = resolve_routes(item_enum)?;
 
@@ -527,7 +534,7 @@ pub(crate) fn expand(
 				#migrate_prelude
 
 				let instruction: #enum_name =
-					#crate_path::parse_instruction(program_id, & #program_id, data)?;
+					#crate_path::parse_instruction(program_id, #checked_program_id, data)?;
 
 				match instruction {
 					#(#dispatch_arms),*
@@ -535,8 +542,8 @@ pub(crate) fn expand(
 			}
 
 			/// The dispatch-first router behind `dispatch_entrypoint!`: validates
-			/// the program ID and discriminator, then parses only the routed
-			/// struct's accounts from the loader's input.
+			/// the configured program ID policy and discriminator, then parses
+			/// only the routed struct's accounts from the loader's input.
 			#[doc(hidden)]
 			#inline_attribute
 			pub fn __dispatch(
@@ -549,7 +556,7 @@ pub(crate) fn expand(
 				#migrate_dispatch_prelude
 
 				let instruction: #enum_name =
-					#crate_path::parse_instruction(program_id, & #program_id, data)?;
+					#crate_path::parse_instruction(program_id, #checked_program_id, data)?;
 
 				match instruction {
 					#(#dispatch_first_arms),*
@@ -815,6 +822,29 @@ mod tests {
 			.unwrap_or_else(|error| panic!("entrypoint expansion: {error}"));
 
 		squeezed(&expansion.implementation.to_string())
+	}
+
+	#[test]
+	fn program_id_check_is_explicitly_optional_in_both_routers() {
+		let item = quote! {
+			pub enum Instruction {
+				Run = 0,
+			}
+		};
+		let checked = expand_with(quote!(entrypoint, program_id = CUSTOM_ID), item.clone());
+		assert_eq!(
+			checked
+				.matches("parse_instruction(program_id,&CUSTOM_ID,data)")
+				.count(),
+			2
+		);
+		let unchecked = expand_with(quote!(entrypoint, skip_program_id_check), item);
+		assert_eq!(
+			unchecked
+				.matches("parse_instruction(program_id,program_id,data)")
+				.count(),
+			2
+		);
 	}
 
 	#[test]

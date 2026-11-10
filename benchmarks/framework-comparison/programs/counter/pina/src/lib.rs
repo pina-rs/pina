@@ -57,6 +57,11 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 		self.counter.assert_empty()?;
 		self.system_program.assert_address(&system::ID)?;
 
+		// The counter can be funded by anyone before initialization, so the
+		// permissive builder is the production path. It creates both fresh and
+		// pre-funded targets with one SIMD-0312 `CreateAccountAllowPrefund`
+		// call. `invoke_fresh_with` is the smaller opt-in for a program that
+		// intentionally rejects a pre-funded target.
 		CreateProgramAccountWithUncheckedBump {
 			account: self.counter,
 			payer: self.authority,

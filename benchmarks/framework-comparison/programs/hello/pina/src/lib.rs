@@ -6,7 +6,13 @@ use pina::*;
 
 declare_id!("DCF5KBmtQ9ryDC7mQezKLwuJHem6coVUCmKkw37M9J4A");
 
-#[discriminator(entrypoint)]
+// The opt-in measurement removes application checks like the hand-written
+// Pinocchio hello. The ordinary build retains every validation below.
+#[cfg_attr(
+	feature = "benchmark-unchecked",
+	discriminator(entrypoint, skip_program_id_check)
+)]
+#[cfg_attr(not(feature = "benchmark-unchecked"), discriminator(entrypoint))]
 pub enum HelloInstruction {
 	Hello = 0,
 }
@@ -21,8 +27,11 @@ pub struct HelloAccounts<'a> {
 
 impl<'a> ProcessAccountInfos<'a> for HelloAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
+		#[cfg(not(feature = "benchmark-unchecked"))]
 		let _ = HelloInstructionData::try_from_bytes(data)?;
+		#[cfg(not(feature = "benchmark-unchecked"))]
 		self.user.assert_signer()?;
+		let _ = (self, data);
 		log!("Hello, Solana!");
 		Ok(())
 	}

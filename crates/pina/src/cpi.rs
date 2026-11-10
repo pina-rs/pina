@@ -8,6 +8,11 @@
 //!
 //! Seed-based helpers require deterministic seed ordering and consistent
 //! program IDs across derivation and verification.
+//!
+//! PDA allocation and permissive creation require SIMD-0312's
+//! `CreateAccountAllowPrefund` runtime feature, including for a zero-lamport
+//! target. The typed `invoke_fresh_with` methods use the older `CreateAccount`
+//! instruction and reject any pre-funded target instead.
 
 use pinocchio::AccountView;
 use pinocchio::Address;
@@ -20,9 +25,10 @@ use pinocchio::instruction::InstructionAccount;
 use pinocchio::instruction::InstructionView;
 use pinocchio::sysvars::Sysvar;
 use pinocchio::sysvars::rent::Rent;
-use pinocchio_system::instructions::Allocate as SystemAllocate;
-use pinocchio_system::instructions::Assign as SystemAssign;
 use pinocchio_system::instructions::CreateAccount as SystemCreateAccount;
+use pinocchio_system::instructions::CreateAccountAllowPrefund as SystemCreateAccountAllowPrefund;
+use pinocchio_system::instructions::Funding;
+#[cfg(feature = "account-resize")]
 use pinocchio_system::instructions::Transfer as SystemTransfer;
 
 use crate::AccountInfoValidation;
@@ -150,7 +156,7 @@ impl CompactCreationTarget<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.invoke_signed_inner_validated_at_full_capacity(signers, rent)
+		.invoke_signed_inner_validated_at_full_capacity::<false>(signers, rent)
 	}
 }
 
@@ -346,7 +352,7 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	) -> Result<(Address, u8), ProgramError> {
-		self.invoke_signed_inner::<T, _>(signers, None, |state, _bump| initialize(state))
+		self.invoke_signed_inner::<false, T, _>(signers, None, |state, _bump| initialize(state))
 	}
 
 	/// Creates the account and passes the derived canonical bump to the fixed
@@ -371,7 +377,56 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		initialize: impl FnOnce(&mut T::Zc, u8) -> Result<(), PinaPodError>,
 	) -> Result<(Address, u8), ProgramError> {
-		self.invoke_signed_inner::<T, _>(signers, None, initialize)
+		self.invoke_signed_inner::<false, T, _>(signers, None, initialize)
+	}
+
+	/// Creates a fresh account with the canonical bump and rejects a target
+	/// that already holds lamports or nonzero data.
+	///
+	/// Identical to [`Self::invoke_with`] on a zero-lamport target, but the
+	/// rejection path compiles out the `CreateAccountAllowPrefund` fallback,
+	/// so a program that never funds a PDA before creating it carries less
+	/// code. That makes the account cheaper to deploy and is the path to use
+	/// when an attacker funding the address first is not a concern, or when
+	/// the caller already proved the target fresh. Anyone can send one lamport
+	/// to a deterministic PDA and make this path fail; prefer [`Self::invoke_with`]
+	/// when the address must still initialize after a transfer.
+	#[inline(always)]
+	pub fn invoke_fresh_with<T: PinaAccount>(
+		&mut self,
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<true, T, _>(&[], None, |state, _bump| initialize(state))
+	}
+
+	/// [`Self::invoke_fresh_with`] with additional PDA signers.
+	#[inline(always)]
+	pub fn invoke_signed_fresh_with<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<true, T, _>(signers, None, |state, _bump| initialize(state))
+	}
+
+	/// Creates a fresh account with the canonical bump and passes that bump to
+	/// the initializer.
+	#[inline(always)]
+	pub fn invoke_fresh_with_bump<T: PinaAccount>(
+		&mut self,
+		initialize: impl FnOnce(&mut T::Zc, u8) -> Result<(), PinaPodError>,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<true, T, _>(&[], None, initialize)
+	}
+
+	/// [`Self::invoke_fresh_with_bump`] with additional PDA signers.
+	#[inline(always)]
+	pub fn invoke_signed_fresh_with_bump<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		initialize: impl FnOnce(&mut T::Zc, u8) -> Result<(), PinaPodError>,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<true, T, _>(signers, None, initialize)
 	}
 
 	#[cfg(test)]
@@ -381,11 +436,22 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
 	) -> Result<(Address, u8), ProgramError> {
-		self.invoke_signed_inner::<T, _>(signers, Some(rent), |_, _bump| Ok(()))
+		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), |_, _bump| Ok(()))
+	}
+
+	#[cfg(test)]
+	#[inline(always)]
+	fn invoke_signed_with_rent_fresh_bump<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+		initialize: impl FnOnce(&mut T::Zc, u8) -> Result<(), PinaPodError>,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<true, T, _>(signers, Some(rent), initialize)
 	}
 
 	#[inline(always)]
-	fn invoke_signed_inner<T: PinaAccount, F>(
+	fn invoke_signed_inner<const FRESH: bool, T: PinaAccount, F>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
@@ -403,7 +469,9 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump,
 		}
-		.invoke_signed_inner_validated::<T, _>(signers, rent, |state| initialize(state, bump))?;
+		.invoke_signed_inner_validated::<FRESH, T, _>(signers, rent, |state| {
+			initialize(state, bump)
+		})?;
 
 		Ok((address, bump))
 	}
@@ -501,7 +569,31 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	) -> ProgramResult {
-		self.invoke_signed_inner::<T, _>(signers, None, initialize)
+		self.invoke_signed_inner::<false, T, _>(signers, None, initialize)
+	}
+
+	/// Creates a fresh account with the supplied canonical bump and rejects a
+	/// target that already holds lamports or nonzero data.
+	///
+	/// The rejection path compiles out the `CreateAccountAllowPrefund`
+	/// fallback, so this is the smaller path for a program that never funds a
+	/// PDA before creating it. See [`CreateProgramAccount::invoke_fresh_with`].
+	#[inline(always)]
+	pub fn invoke_fresh_with<T: PinaAccount>(
+		&mut self,
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<true, T, _>(&[], None, initialize)
+	}
+
+	/// [`Self::invoke_fresh_with`] with additional PDA signers.
+	#[inline(always)]
+	pub fn invoke_signed_fresh_with<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<true, T, _>(signers, None, initialize)
 	}
 
 	#[cfg(test)]
@@ -511,11 +603,11 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
 	) -> ProgramResult {
-		self.invoke_signed_inner::<T, _>(signers, Some(rent), |_| Ok(()))
+		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), |_| Ok(()))
 	}
 
 	#[inline(always)]
-	fn invoke_signed_inner<T: PinaAccount, F>(
+	fn invoke_signed_inner<const FRESH: bool, T: PinaAccount, F>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
@@ -525,13 +617,13 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
 		canonical_pda(self.account, self.seeds, self.owner, Some(self.bump))?;
-		self.invoke_signed_inner_validated::<T, _>(signers, rent, initialize)
+		self.invoke_signed_inner_validated::<FRESH, T, _>(signers, rent, initialize)
 	}
 
 	#[inline(always)]
 	// Same `[..len + 1]` rationale as `invoke_signed_inner` above.
 	#[allow(clippy::range_plus_one)]
-	fn invoke_signed_inner_validated<T: PinaAccount, F>(
+	fn invoke_signed_inner_validated<const FRESH: bool, T: PinaAccount, F>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
@@ -547,7 +639,12 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.allocate_and_initialize::<T, _>(BumpVerification::Proven, signers, rent, initialize)
+		.allocate_and_initialize::<FRESH, T, _>(
+			BumpVerification::Proven,
+			signers,
+			rent,
+			initialize,
+		)
 	}
 }
 
@@ -660,7 +757,31 @@ impl CreateProgramAccountWithUncheckedBump<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	) -> ProgramResult {
-		self.invoke_signed_inner::<T, _>(signers, None, initialize)
+		self.invoke_signed_inner::<false, T, _>(signers, None, initialize)
+	}
+
+	/// Creates a fresh account at the supplied bump and rejects a target that
+	/// already holds lamports or nonzero data.
+	///
+	/// The rejection path compiles out the `CreateAccountAllowPrefund`
+	/// fallback, so this is the smaller path for a program that never funds a
+	/// PDA before creating it. See [`CreateProgramAccount::invoke_fresh_with`].
+	#[inline(always)]
+	pub fn invoke_fresh_with<T: PinaAccount>(
+		&mut self,
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<true, T, _>(&[], None, initialize)
+	}
+
+	/// [`Self::invoke_fresh_with`] with additional PDA signers.
+	#[inline(always)]
+	pub fn invoke_signed_fresh_with<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<true, T, _>(signers, None, initialize)
 	}
 
 	#[cfg(test)]
@@ -670,11 +791,11 @@ impl CreateProgramAccountWithUncheckedBump<'_, '_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
 	) -> ProgramResult {
-		self.invoke_signed_inner::<T, _>(signers, Some(rent), |_| Ok(()))
+		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), |_| Ok(()))
 	}
 
 	#[inline(always)]
-	fn invoke_signed_inner<T: PinaAccount, F>(
+	fn invoke_signed_inner<const FRESH: bool, T: PinaAccount, F>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
@@ -692,7 +813,7 @@ impl CreateProgramAccountWithUncheckedBump<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump: self.bump,
 		}
-		.allocate_and_initialize::<T, _>(
+		.allocate_and_initialize::<FRESH, T, _>(
 			BumpVerification::DeriveAndCheck,
 			signers,
 			rent,
@@ -738,7 +859,7 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 	/// [`BumpVerification::DeriveAndCheck`] by checking a single derivation —
 	/// and this performs the checked allocate plus initialization.
 	#[inline(always)]
-	fn allocate_and_initialize<T: PinaAccount, F>(
+	fn allocate_and_initialize<const FRESH: bool, T: PinaAccount, F>(
 		&mut self,
 		verification: BumpVerification,
 		signers: &[Signer<'_, '_>],
@@ -748,7 +869,7 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 	where
 		F: FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
 	{
-		self.allocate(verification, size_of::<T::Zc>() as u64, signers, rent)?;
+		self.allocate::<FRESH>(verification, size_of::<T::Zc>() as u64, signers, rent)?;
 
 		let mut data = self.account.try_borrow_mut()?;
 		<T as PinaAccount>::initialize(&mut data, initialize)?;
@@ -771,7 +892,7 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 	/// `initialize`, and single-instantiation programs have no duplicate to
 	/// collapse, so the call boundary only costs.
 	#[inline(always)]
-	fn allocate(
+	fn allocate<const FRESH: bool>(
 		&mut self,
 		verification: BumpVerification,
 		space: u64,
@@ -793,10 +914,10 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 		};
 		match verification {
 			BumpVerification::Proven => {
-				allocate.invoke_signed_inner_validated(signers, rent)?;
+				allocate.invoke_signed_inner_validated::<FRESH>(signers, rent)?;
 			}
 			BumpVerification::DeriveAndCheck => {
-				allocate.invoke_signed_inner(signers, rent)?;
+				allocate.invoke_signed_inner::<FRESH>(signers, rent)?;
 			}
 		}
 
@@ -1153,7 +1274,7 @@ impl AllocateAccount<'_, '_, '_, '_> {
 			seeds: self.seeds,
 			bump,
 		}
-		.invoke_signed_inner_validated(signers, rent)?;
+		.invoke_signed_inner_validated::<false>(signers, rent)?;
 
 		Ok((address, bump))
 	}
@@ -1276,13 +1397,10 @@ impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
 /// address. It verifies the exact address derived from `seeds` and `bump`, but
 /// it does not enforce namespace uniqueness through canonical bump selection.
 ///
-/// Two paths are taken depending on whether the target account already has
-/// lamports:
-///
-/// - **Zero balance** -- a single `CreateAccount` CPI is issued.
-/// - **Non-zero balance** -- a `Transfer` (to top up rent), `Allocate`, and
-///   `Assign` are issued separately. This covers the case where the account was
-///   pre-funded (e.g. by a previous failed transaction).
+/// A single `CreateAccountAllowPrefund` CPI allocates and assigns the target,
+/// transferring only the rent deficit from the payer when needed. Both fresh
+/// and pre-funded targets require a runtime with SIMD-0312 activated. The
+/// system program rejects an existing data allocation or non-system owner.
 ///
 /// <!-- {=pinaPdaSeedContract|trim|linePrefix:"/// ":true} -->
 /// Seed-based APIs require deterministic seed ordering.
@@ -1296,8 +1414,8 @@ impl<'a, const SEEDS: usize> From<[&'a [u8]; SEEDS]> for PdaSigner<'a, SEEDS> {
 /// # Errors
 ///
 /// Returns seed-validation errors, rent sysvar access errors, and any
-/// system-program CPI failure from `CreateAccount`, `Transfer`, `Allocate`, or
-/// `Assign`. `invoke_signed` returns `InvalidArgument` when 16 additional
+/// system-program CPI failure from `CreateAccountAllowPrefund`.
+/// `invoke_signed` returns `InvalidArgument` when 16 additional
 /// signers would exceed the runtime's 16-signer limit after adding the target
 /// PDA signer.
 ///
@@ -1379,17 +1497,21 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	/// other signers required by the CPI, such as seeds for a PDA payer.
 	#[inline(always)]
 	pub fn invoke_signed(&self, signers: &[Signer<'_, '_>]) -> ProgramResult {
-		self.invoke_signed_inner(signers, None)
+		self.invoke_signed_inner::<false>(signers, None)
 	}
 
 	#[cfg(test)]
 	#[inline(always)]
 	fn invoke_signed_with_rent(&self, signers: &[Signer<'_, '_>], rent: Rent) -> ProgramResult {
-		self.invoke_signed_inner(signers, Some(rent))
+		self.invoke_signed_inner::<false>(signers, Some(rent))
 	}
 
 	#[inline(always)]
-	fn invoke_signed_inner(&self, signers: &[Signer<'_, '_>], rent: Option<Rent>) -> ProgramResult {
+	fn invoke_signed_inner<const FRESH: bool>(
+		&self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<Rent>,
+	) -> ProgramResult {
 		if signers.len() >= MAX_CPI_SIGNERS {
 			return Err(ProgramError::InvalidArgument);
 		}
@@ -1399,15 +1521,15 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		}
 
 		if self.seeds.len() < SMALL_SEED_CAPACITY {
-			self.derive_and_allocate::<SMALL_SEED_CAPACITY, { SMALL_SEED_CAPACITY + 2 }>(
+			self.derive_and_allocate::<FRESH, SMALL_SEED_CAPACITY, { SMALL_SEED_CAPACITY + 2 }>(
 				signers, rent,
 			)
 		} else if self.seeds.len() < MEDIUM_SEED_CAPACITY {
-			self.derive_and_allocate::<MEDIUM_SEED_CAPACITY, { MEDIUM_SEED_CAPACITY + 2 }>(
+			self.derive_and_allocate::<FRESH, MEDIUM_SEED_CAPACITY, { MEDIUM_SEED_CAPACITY + 2 }>(
 				signers, rent,
 			)
 		} else {
-			self.derive_and_allocate::<MAX_SEEDS, { MAX_SEEDS + 2 }>(signers, rent)
+			self.derive_and_allocate::<FRESH, MAX_SEEDS, { MAX_SEEDS + 2 }>(signers, rent)
 		}
 	}
 
@@ -1422,7 +1544,7 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	/// with the same seeds and bump, and the runtime refuses to sign for an
 	/// on-curve address.
 	#[inline(always)]
-	fn derive_and_allocate<const CAPACITY: usize, const HASH_INPUTS: usize>(
+	fn derive_and_allocate<const FRESH: bool, const CAPACITY: usize, const HASH_INPUTS: usize>(
 		&self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
@@ -1440,11 +1562,11 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 			return Err(ProgramError::InvalidSeeds);
 		}
 
-		self.allocate_with_seed_capacity::<CAPACITY>(signers, rent)
+		self.allocate_with_seed_capacity::<FRESH, CAPACITY>(signers, rent)
 	}
 
 	#[inline(always)]
-	fn invoke_signed_inner_validated(
+	fn invoke_signed_inner_validated<const FRESH: bool>(
 		&self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
@@ -1458,11 +1580,11 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		}
 
 		if self.seeds.len() < SMALL_SEED_CAPACITY {
-			self.allocate_with_seed_capacity::<SMALL_SEED_CAPACITY>(signers, rent)
+			self.allocate_with_seed_capacity::<FRESH, SMALL_SEED_CAPACITY>(signers, rent)
 		} else if self.seeds.len() < MEDIUM_SEED_CAPACITY {
-			self.allocate_with_seed_capacity::<MEDIUM_SEED_CAPACITY>(signers, rent)
+			self.allocate_with_seed_capacity::<FRESH, MEDIUM_SEED_CAPACITY>(signers, rent)
 		} else {
-			self.allocate_with_seed_capacity::<MAX_SEEDS>(signers, rent)
+			self.allocate_with_seed_capacity::<FRESH, MAX_SEEDS>(signers, rent)
 		}
 	}
 
@@ -1478,7 +1600,7 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	// feature set.
 	#[cfg(any(test, all(feature = "account-resize", feature = "compact")))]
 	#[inline(always)]
-	fn invoke_signed_inner_validated_at_full_capacity(
+	fn invoke_signed_inner_validated_at_full_capacity<const FRESH: bool>(
 		&self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
@@ -1491,17 +1613,22 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 			return Err(ProgramError::InvalidSeeds);
 		}
 
-		self.allocate_with_seed_capacity::<MAX_SEEDS>(signers, rent)
+		self.allocate_with_seed_capacity::<FRESH, MAX_SEEDS>(signers, rent)
 	}
 
 	/// Allocates the target, signing for it with `seeds` plus `bump`. The
 	/// caller guarantees `seeds.len() < CAPACITY` and
 	/// `signers.len() < MAX_CPI_SIGNERS`.
+	///
+	/// `FRESH` selects the zero-lamport path: it rejects a target that already
+	/// holds lamports and creates a fresh one with a single `CreateAccount`
+	/// call. The permissive path uses `CreateAccountAllowPrefund` for both
+	/// account states, so `FRESH` compiles that instruction out.
 	#[inline(always)]
 	// Same `[..len + 1]` rationale as `derive_and_allocate` above; both
 	// guarantees in the doc comment bound the `+ 1`.
 	#[allow(clippy::range_plus_one)]
-	fn allocate_with_seed_capacity<const CAPACITY: usize>(
+	fn allocate_with_seed_capacity<const FRESH: bool, const CAPACITY: usize>(
 		&self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
@@ -1536,45 +1663,61 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		};
 
 		let space = usize::try_from(self.space).map_err(|_| ProgramError::InvalidArgument)?;
+		if FRESH && self.account.lamports() != 0 {
+			return Err(ProgramError::AccountAlreadyInitialized);
+		}
+
 		let rent = if let Some(rent) = rent {
 			rent
 		} else {
 			Rent::get()?
 		};
-		if self.account.lamports() == 0 {
-			SystemCreateAccount {
-				from: self.payer,
-				to: self.account,
-				lamports: rent.try_minimum_balance(space)?,
-				space: self.space,
-				owner: self.owner,
-			}
-			.invoke_signed(all_signers)?;
-
-			return Ok(());
+		if FRESH {
+			return self.create_account(all_signers, space, rent);
 		}
 
 		let rent_exempt_balance = rent
 			.try_minimum_balance(space)?
 			.saturating_sub(self.account.lamports());
 
-		if rent_exempt_balance > 0 {
-			SystemTransfer {
+		// SIMD-0312's `CreateAccountAllowPrefund` funds, allocates, and assigns
+		// in one call, so the target cluster must have that feature active.
+		// The older three-instruction fallback carried three CPI structures
+		// and measured about 1.3 KB more on the counter fixture.
+		let funding = if rent_exempt_balance == 0 {
+			None
+		} else {
+			Some(Funding {
 				from: self.payer,
-				to: self.account,
 				lamports: rent_exempt_balance,
-			}
-			.invoke_signed(all_signers)?;
-		}
+			})
+		};
 
-		SystemAllocate {
-			account: self.account,
+		SystemCreateAccountAllowPrefund {
+			to: self.account,
 			space: self.space,
+			owner: self.owner,
+			funding,
 		}
-		.invoke_signed(all_signers)?;
+		.invoke_signed(all_signers)
+	}
 
-		SystemAssign {
-			account: self.account,
+	/// Creates a zero-lamport target with one `CreateAccount` call.
+	///
+	/// The `FRESH` path takes this branch; the permissive path uses
+	/// `CreateAccountAllowPrefund` for both account states.
+	#[inline(always)]
+	fn create_account(
+		&self,
+		all_signers: &[Signer<'_, '_>],
+		space: usize,
+		rent: Rent,
+	) -> ProgramResult {
+		SystemCreateAccount {
+			from: self.payer,
+			to: self.account,
+			lamports: rent.try_minimum_balance(space)?,
+			space: self.space,
 			owner: self.owner,
 		}
 		.invoke_signed(all_signers)
@@ -2924,11 +3067,15 @@ mod tests {
 			owner: &owner,
 			seeds,
 		}
-		.invoke_signed_inner::<RequiredState, _>(&[], Some(test_rent()), |state, derived_bump| {
-			state.mode = RequiredMode::Ready.into();
-			state.bump = derived_bump;
-			Ok(())
-		})
+		.invoke_signed_inner::<false, RequiredState, _>(
+			&[],
+			Some(test_rent()),
+			|state, derived_bump| {
+				state.mode = RequiredMode::Ready.into();
+				state.bump = derived_bump;
+				Ok(())
+			},
+		)
 		.unwrap_or_else(|error| panic!("initialize required state: {error:?}"));
 		assert_eq!(result, (address, bump));
 
@@ -3698,7 +3845,7 @@ mod tests {
 	}
 
 	#[test]
-	fn prefunded_pda_allocation_runs_transfer_allocate_and_assign() {
+	fn prefunded_pda_allocation_builds_the_prefund_cpi() {
 		let owner = Address::new_from_array([9; 32]);
 		let seeds: &[&[u8]] = &[b"prefunded"];
 		let (address, bump) = crate::try_find_program_address(seeds, &owner)
@@ -3786,7 +3933,7 @@ mod tests {
 					seeds,
 					bump,
 				}
-				.invoke_signed_inner_validated(signers, Some(test_rent()));
+				.invoke_signed_inner_validated::<false>(signers, Some(test_rent()));
 				assert_eq!(result, Ok(()), "allocate {count} proven seeds");
 
 				let mut stored_shared = TestAccount::<8>::new(address, owner, 0, 0);
@@ -3799,7 +3946,10 @@ mod tests {
 					seeds,
 					bump,
 				}
-				.invoke_signed_inner_validated_at_full_capacity(signers, Some(test_rent()));
+				.invoke_signed_inner_validated_at_full_capacity::<false>(
+					signers,
+					Some(test_rent()),
+				);
 				assert_eq!(result, Ok(()), "allocate {count} shared-path seeds");
 
 				let mut stored_mismatch =
@@ -3844,11 +3994,12 @@ mod tests {
 			Err(ProgramError::InvalidSeeds)
 		);
 		assert_eq!(
-			allocate.invoke_signed_inner_validated(&[], Some(test_rent())),
+			allocate.invoke_signed_inner_validated::<false>(&[], Some(test_rent())),
 			Err(ProgramError::InvalidSeeds)
 		);
 		assert_eq!(
-			allocate.invoke_signed_inner_validated_at_full_capacity(&[], Some(test_rent())),
+			allocate
+				.invoke_signed_inner_validated_at_full_capacity::<false>(&[], Some(test_rent())),
 			Err(ProgramError::InvalidSeeds)
 		);
 	}
@@ -3881,11 +4032,14 @@ mod tests {
 			Err(ProgramError::InvalidArgument)
 		);
 		assert_eq!(
-			allocate.invoke_signed_inner_validated(&signers, Some(test_rent())),
+			allocate.invoke_signed_inner_validated::<false>(&signers, Some(test_rent())),
 			Err(ProgramError::InvalidArgument)
 		);
 		assert_eq!(
-			allocate.invoke_signed_inner_validated_at_full_capacity(&signers, Some(test_rent())),
+			allocate.invoke_signed_inner_validated_at_full_capacity::<false>(
+				&signers,
+				Some(test_rent())
+			),
 			Err(ProgramError::InvalidArgument)
 		);
 	}
@@ -3965,5 +4119,160 @@ mod tests {
 		assert_eq!(account.data_len(), 8);
 		assert_eq!(account.lamports() + rent_account.lamports(), initial_total);
 		assert!(rent_account.lamports() > 1);
+	}
+
+	#[test]
+	fn canonical_fresh_builder_passes_the_derived_bump_to_the_initializer() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"canonical-fresh"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner).unwrap();
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let mut stored = TestAccount::<1>::new(address, owner, 0, 1);
+		let mut view = stored.view();
+		let mut seen = None;
+
+		let result = CreateProgramAccount {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+		}
+		.invoke_signed_with_rent_fresh_bump::<TestState>(
+			&[],
+			test_rent(),
+			|_state, derived_bump| {
+				seen = Some(derived_bump);
+				Ok(())
+			},
+		);
+
+		assert!(result.is_ok(), "{result:?}");
+		assert_eq!(seen, Some(bump));
+	}
+
+	#[test]
+	fn permissive_builder_initializes_state_after_the_prefund_cpi_stub() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"prefunded-account"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner).unwrap();
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		// Host CPI stubs cannot allocate or transfer. Preallocate the state to
+		// test the initializer here; the framework verifier checks actual
+		// prefunding, ownership, allocation, and balances in the SBF runtime.
+		let mut stored = TestAccount::<32>::new(address, owner, 1, state_size);
+		stored.data.fill(0);
+		let mut view = stored.view();
+		let result = CreateProgramAccountWithUncheckedBump {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent());
+		assert_eq!(result, Ok(()));
+
+		assert_eq!(stored.data[0], TestState::VALUE);
+
+		// A target that already covers its rent takes the same instruction
+		// without a funding account.
+		let mut stored_enough = TestAccount::<32>::new(address, owner, 1_000, state_size);
+		let mut enough_view = stored_enough.view();
+		let result = CreateProgramAccountWithUncheckedBump {
+			account: &mut enough_view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent::<TestState>(&[], test_rent());
+		assert_eq!(result, Ok(()));
+
+		assert_eq!(stored_enough.data[0], TestState::VALUE);
+	}
+
+	#[expect(
+		clippy::unnecessary_wraps,
+		reason = "the creation callback requires this result type"
+	)]
+	fn initialize_test_state(_: &mut <TestState as PinaPodFixed>::Zc) -> Result<(), PinaPodError> {
+		Ok(())
+	}
+
+	#[test]
+	fn fresh_builder_creates_a_zero_lamport_target() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"fresh-account"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner).unwrap();
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut view = stored.view();
+		let result = CreateProgramAccountWithUncheckedBump {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_inner::<true, TestState, _>(&[], Some(test_rent()), initialize_test_state);
+		assert_eq!(result, Ok(()));
+
+		assert_eq!(stored.data[0], TestState::VALUE);
+	}
+
+	#[test]
+	fn fresh_builder_rejects_a_prefunded_target() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"fresh-funded"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner).unwrap();
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored = TestAccount::<32>::new(address, owner, 1, state_size);
+		let mut view = stored.view();
+		let result = CreateProgramAccountWithUncheckedBump {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_fresh_with::<TestState>(initialize_test_state);
+
+		assert_eq!(result, Err(ProgramError::AccountAlreadyInitialized));
+		assert!(stored.data[..state_size].iter().all(|byte| *byte == 0));
+	}
+
+	#[test]
+	fn fresh_builder_rejects_a_target_holding_data() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"fresh-data"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner).unwrap();
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored = TestAccount::<32>::new(address, owner, 0, state_size);
+		stored.data[0] = 1;
+		let mut view = stored.view();
+		let result = CreateProgramAccountWithUncheckedBump {
+			account: &mut view,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_fresh_with::<TestState>(initialize_test_state);
+
+		assert_eq!(result, Err(ProgramError::AccountAlreadyInitialized));
+		assert_eq!(stored.data[0], 1);
 	}
 }

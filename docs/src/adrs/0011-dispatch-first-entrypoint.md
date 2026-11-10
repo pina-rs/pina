@@ -115,6 +115,8 @@ Accepted. Decisions 1 to 5 and 10 are implemented as described below, which refi
 
 ## Results
 
+> **Amended 2026-11-01.** The comparison now tracks Anchor v1 1.2.2, Anchor v2 2.0.0-rc.2, and Quasar `863ee77` (0.2.0). The proposed raw enum-tag conversion remains rejected because Rust does not guarantee that representation. Entrypoints retain the dependency standard conversion. The current account-creation optimization uses SIMD-0312 `CreateAccountAllowPrefund`, which requires runtime activation and brings the permissive counter to 6,376 bytes. The generated current table and an explicitly unchecked hello variant live in [Framework comparison](../framework-comparison.md).
+
 Measured against `main` after the `sha256` loaders, the creation check, and the capacity fix had merged.
 
 | Fixture                               | Pina before |      Pina after |      Quasar |     Anchor v2 |

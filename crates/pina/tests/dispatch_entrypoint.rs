@@ -292,6 +292,10 @@ fn account_count_precedes_per_account_checks() {
 #[test]
 fn instruction_is_validated_before_the_accounts() {
 	let other_program = Address::new_from_array([9; 32]);
+	assert_eq!(
+		Instruction::process_instruction(&other_program, &mut [], &[0]),
+		Err(ProgramError::IncorrectProgramId)
+	);
 
 	assert_eq!(
 		run_for(&other_program, &[account(1), account(2)], &[0]),
