@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.25.0](https://github.com/pina-rs/pina/releases/tag/v0.25.0) (2026-11-11)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Add additive rust-kit Solana Kit client generation
+
+_Packages:_ 🔴 _pina_cli_, ⚪ _pina_skill_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #704](https://github.com/pina-rs/pina/pull/704)
+
+Opt-in `--client rust-kit` / `[clients.rust_kit]` generates off-chain Rust clients via `codama-renderers-rust-solana-kit@0.2.1` under `src/generated/`, scaffolding `solana_kit_core` 0.2.1 from crates.io. Defaults stay rust + typescript; rust and cli-rust are unchanged; no cli-rust-kit.
+
+Adding `ClientLanguage::RustKit` is a public enum extension (exhaustiveness), so this is a major bump for `pina_cli` even though the CLI surface is additive.
+
+##### User impact
+
+You can add `rust-kit` to `clients.languages` or pass `--client rust-kit` to generate a Solana Kit Rust client beside the existing PinaPod `rust` client. `pina init` defaults are unchanged. Fresh scaffolds pin `solana_kit_core = "0.2.1"` from crates.io and put generated modules under `src/generated/`.
+
+The agent skill's CLI and project-setup references document rust-kit as opt-in Solana Kit Rust client generation.
+
+### Fixes
+
+- **Accept a Cargo target directory that is a symbolic link.** Cargo's own `target_directory` is commonly a symbolic link, as mr boxington, CI caches, and tmpfs layouts arrange. Pina now accepts the path Cargo reports, including links along it, while paths `pina.toml` configures still may not traverse symbolic links. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #705](https://github.com/pina-rs/pina/pull/705)
+
 ## [0.24.0](https://github.com/pina-rs/pina/releases/tag/v0.24.0) (2026-11-05)
 
 Grouped release for `core`.
