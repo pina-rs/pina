@@ -308,7 +308,7 @@ fn audit_sec_16_url_query_credentials_are_never_printed_or_persisted() {
 		let (mut stream, _) = listener
 			.accept()
 			.unwrap_or_else(|error| panic!("accept: {error}"));
-		let _request = read_request_head(&mut stream);
+		let request = read_request_head(&mut stream);
 		let head = format!(
 			"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
 			 {}\r\nconnection: close\r\n\r\n",
@@ -323,6 +323,7 @@ fn audit_sec_16_url_query_credentials_are_never_printed_or_persisted() {
 		let _ = stream.shutdown(std::net::Shutdown::Write);
 		let mut sink = [0_u8; 512];
 		while matches!(stream.read(&mut sink), Ok(read) if read > 0) {}
+		request
 	});
 
 	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
@@ -340,9 +341,14 @@ fn audit_sec_16_url_query_credentials_are_never_printed_or_persisted() {
 		"url import failed: {}",
 		String::from_utf8_lossy(&output.stderr)
 	);
+	let request = server
+		.join()
+		.unwrap_or_else(|_| panic!("the one-shot server thread must not panic"));
+	// Redaction applies only to the copies a person reads: the request itself
+	// must still carry the credential, or authenticated imports would break.
 	assert!(
-		server.join().is_ok(),
-		"the one-shot server thread must not panic"
+		request.starts_with(&format!("GET /vesting.json?token={SENTINEL} ")),
+		"SEC-16: the request must keep the URL query: {request}"
 	);
 
 	let stdout = String::from_utf8_lossy(&output.stdout);
