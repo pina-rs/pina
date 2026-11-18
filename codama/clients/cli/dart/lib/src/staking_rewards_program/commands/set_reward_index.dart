@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/staking_rewards_program.dart';
 
 final class SetRewardIndexCommand extends Command<void> {

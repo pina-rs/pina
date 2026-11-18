@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/role_registry_program.dart';
 
 final class UpdateRoleCommand extends Command<void> {

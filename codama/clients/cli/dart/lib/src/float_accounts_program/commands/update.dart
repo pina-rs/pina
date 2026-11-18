@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/float_accounts_program.dart';
 
 final class UpdateCommand extends Command<void> {

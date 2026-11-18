@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/pina_bpf_program.dart';
 
 final class HelloCommand extends Command<void> {
