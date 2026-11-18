@@ -281,20 +281,18 @@ fn rejects_cluster_fetches_that_cannot_start() {
 // ---------------------------------------------------------------------------
 // Audit regressions (2026-09-22 deep audit, re-verified 2026-09-23)
 //
-// These tests assert the *secure* behavior from the audit report. They fail
-// on the current tree because the finding is still live, and must pass once
-// the corresponding fix lands. Run with:
-//   cargo test -p pina_cli --test import_command -- --ignored audit_sec_
+// These tests assert the *secure* behavior from the audit report. Each one
+// failed while its finding was live and now gates the fix, so they run with
+// the rest of the suite rather than behind `--ignored`.
 // ---------------------------------------------------------------------------
 
-/// SEC-16: the import URL is echoed, stored as provenance, and written into
-/// the generated README verbatim, so credentials carried in the query string
-/// leak into stdout, logs, and version control.
+/// SEC-16: the import URL used to be echoed, stored as provenance, and written
+/// into the generated README verbatim, so credentials carried in the query
+/// string leaked into stdout, logs, and version control.
 ///
-/// Current behavior: the sentinel below reaches stdout and the generated
-/// README, so the assertions fail and the test proves the leak.
+/// The request still carries the full URL; every copy a person reads is
+/// redacted, so the sentinel below must appear nowhere in the output.
 #[test]
-#[ignore = "SEC-16: exploit is live; must pass once URL credentials are redacted"]
 fn audit_sec_16_url_query_credentials_are_never_printed_or_persisted() {
 	const SENTINEL: &str = "PINA_AUDIT_SECRET_84f17";
 
@@ -310,7 +308,7 @@ fn audit_sec_16_url_query_credentials_are_never_printed_or_persisted() {
 		let (mut stream, _) = listener
 			.accept()
 			.unwrap_or_else(|error| panic!("accept: {error}"));
-		let _request = read_request_head(&mut stream);
+		let request = read_request_head(&mut stream);
 		let head = format!(
 			"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
 			 {}\r\nconnection: close\r\n\r\n",
@@ -325,6 +323,7 @@ fn audit_sec_16_url_query_credentials_are_never_printed_or_persisted() {
 		let _ = stream.shutdown(std::net::Shutdown::Write);
 		let mut sink = [0_u8; 512];
 		while matches!(stream.read(&mut sink), Ok(read) if read > 0) {}
+		request
 	});
 
 	let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
@@ -342,9 +341,14 @@ fn audit_sec_16_url_query_credentials_are_never_printed_or_persisted() {
 		"url import failed: {}",
 		String::from_utf8_lossy(&output.stderr)
 	);
+	let request = server
+		.join()
+		.unwrap_or_else(|_| panic!("the one-shot server thread must not panic"));
+	// Redaction applies only to the copies a person reads: the request itself
+	// must still carry the credential, or authenticated imports would break.
 	assert!(
-		server.join().is_ok(),
-		"the one-shot server thread must not panic"
+		request.starts_with(&format!("GET /vesting.json?token={SENTINEL} ")),
+		"SEC-16: the request must keep the URL query: {request}"
 	);
 
 	let stdout = String::from_utf8_lossy(&output.stdout);

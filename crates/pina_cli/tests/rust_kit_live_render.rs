@@ -1,12 +1,60 @@
-//! Live smoke: prepare + `codama-renderers-rust-solana-kit@0.2.1` on a real
-//! Pina IDL. Catches prepare regressions that `fake_npx` cannot see.
+//! Live smoke: `pina generate --client rust-kit` against the published
+//! `codama-renderers-rust-solana-kit@0.2.1`.
+//!
+//! The CLI's own render script runs here, not a copy of it, so the prepare
+//! step, staging, and scaffold publication are all exercised against the real
+//! renderer. `fake_npx` in `project_commands.rs` covers the CLI plumbing but
+//! cannot see any of those.
 
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::process::Output;
+
+const PROGRAM: &str = r#"use pina::*;
+
+declare_id!("11111111111111111111111111111111");
+
+#[discriminator]
+pub enum CounterInstruction {
+	Initialize = 0,
+}
+
+#[instruction(discriminator = CounterInstruction::Initialize)]
+pub struct InitializeInstruction {
+	pub value: u8,
+}
+
+#[derive(Accounts)]
+pub struct InitializeAccounts<'a> {
+	pub payer: &'a AccountView,
+}
+
+impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let _args = InitializeInstruction::try_from_bytes(data)?;
+		self.payer.assert_signer()?;
+		Ok(())
+	}
+}
+
+pub fn process_instruction(
+	program_id: &Address,
+	accounts: &mut [AccountView],
+	data: &[u8],
+) -> ProgramResult {
+	let instruction: CounterInstruction = parse_instruction(program_id, &ID, data)?;
+
+	match instruction {
+		CounterInstruction::Initialize => {
+			InitializeAccounts::try_from((program_id, accounts))?.process(data)
+		}
+	}
+}
+"#;
 
 #[test]
-fn prepare_and_kit_renderer_accept_counter_program_idl() {
+fn generate_renders_and_scaffolds_a_rust_kit_client() {
 	// Windows CI portability runs this crate with the image Node (currently 22).
 	// The Kit renderer package engines field requires >= 24; skip there rather
 	// than fail a Rust-portability job that does not install that toolchain.
@@ -21,36 +69,136 @@ fn prepare_and_kit_renderer_accept_counter_program_idl() {
 	}
 
 	let temp = tempfile::TempDir::new().expect("temp dir");
-	let pkg = temp.path().join("pkg");
-	fs::create_dir_all(&pkg).expect("pkg dir");
-	write_package_json(&pkg);
-	npm_install(&pkg);
+	let project = temp.path().join("project");
+	write_project(&project);
+	npm_install(&project);
 
-	let idl = Path::new(env!("CARGO_MANIFEST_DIR"))
-		.join("../../codama/idls/counter_program.json")
-		.canonicalize()
-		.expect("counter_program.json");
-	// Script must live under `pkg` so Node resolves the installed packages.
-	let script = pkg.join("render.mjs");
-	fs::write(&script, RENDER_SCRIPT).expect("write render script");
+	let tmp = renderer_tmpdir(temp.path());
+	let client = project.join("clients/rust-kit/counter_program");
 
-	let output = Command::new("node")
-		.current_dir(&pkg)
-		.arg(&script)
-		.arg(&idl)
+	let output = generate(&project, temp.path(), &tmp);
+	assert_success(&output);
+	assert!(
+		client.join("src/generated/mod.rs").is_file(),
+		"the renderer must publish generated modules"
+	);
+	let manifest = fs::read_to_string(client.join("Cargo.toml")).expect("scaffold Cargo.toml");
+	assert!(
+		manifest.contains("name = \"counter-program-kit-client\"")
+			&& manifest.contains("solana_kit_core = { version = \"0.2.1\""),
+		"unexpected scaffold manifest:\n{manifest}"
+	);
+	let lib = fs::read_to_string(client.join("src/lib.rs")).expect("scaffold lib.rs");
+	assert!(
+		lib.contains("#![no_std]") && lib.contains("pub mod generated;"),
+		"unexpected scaffold lib.rs:\n{lib}"
+	);
+
+	// Recreating a deleted manifest must not replace a crate root the developer
+	// has since edited.
+	let edited = "#![no_std]\n\nextern crate alloc;\n\npub mod generated;\npub mod extra;\n";
+	fs::write(client.join("src/lib.rs"), edited).expect("edit lib.rs");
+	fs::remove_file(client.join("Cargo.toml")).expect("remove Cargo.toml");
+
+	let output = generate(&project, temp.path(), &tmp);
+	assert_success(&output);
+	assert!(
+		client.join("Cargo.toml").is_file(),
+		"a missing scaffold manifest must be recreated"
+	);
+	assert_eq!(
+		fs::read_to_string(client.join("src/lib.rs")).expect("read lib.rs"),
+		edited,
+		"regeneration must keep an existing lib.rs"
+	);
+}
+
+/// The temporary directory the render script stages under.
+///
+/// On Unix this is reached through a symbolic link, the way macOS hands out
+/// `TMPDIR` beneath `/var` (a link to `/private/var`). The Kit renderer refuses
+/// to write beneath a symlinked ancestor, so this proves the script resolves
+/// its staging directory first.
+fn renderer_tmpdir(root: &Path) -> std::path::PathBuf {
+	let real = root.join("real-tmp");
+	fs::create_dir_all(&real).expect("tmp dir");
+
+	#[cfg(unix)]
+	{
+		let link = root.join("linked-tmp");
+		std::os::unix::fs::symlink(&real, &link).expect("tmp symlink");
+		link
+	}
+
+	#[cfg(not(unix))]
+	{
+		real
+	}
+}
+
+fn generate(project: &Path, root: &Path, tmp: &Path) -> Output {
+	Command::new(env!("CARGO_BIN_EXE_pina"))
+		.current_dir(project)
+		.env("CARGO", env!("CARGO"))
+		.env("CARGO_TARGET_DIR", root.join("target"))
+		.env("TMPDIR", tmp)
+		.env_remove("GIT_DIR")
+		.env_remove("GIT_WORK_TREE")
+		.args(["generate", "--client", "rust-kit", "--npx", "node"])
 		.output()
-		.expect("run live rust-kit render");
+		.expect("run pina generate")
+}
+
+fn assert_success(output: &Output) {
 	assert!(
 		output.status.success(),
-		"live rust-kit render failed:\nstdout:\n{}\nstderr:\n{}",
+		"rust-kit generation failed:\nstdout:\n{}\nstderr:\n{}",
 		String::from_utf8_lossy(&output.stdout),
 		String::from_utf8_lossy(&output.stderr)
 	);
-	let stdout = String::from_utf8_lossy(&output.stdout);
-	assert!(
-		stdout.contains("OK"),
-		"expected OK from renderer, got:\n{stdout}"
-	);
+}
+
+fn write_project(root: &Path) {
+	fs::create_dir_all(root.join("src")).expect("project src dir");
+	fs::write(
+		root.join("Cargo.toml"),
+		r#"[package]
+name = "counter-program"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "counter_program"
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+bpf-entrypoint = []
+"#,
+	)
+	.expect("project Cargo.toml");
+	fs::write(
+		root.join("pina.toml"),
+		"[project]\nprogram = \".\"\n\n[clients]\noutput = \"clients\"\nlanguages = \
+		 [\"rust-kit\"]\n",
+	)
+	.expect("pina.toml");
+	fs::write(root.join("src/lib.rs"), PROGRAM).expect("program source");
+	// `--npx node` resolves the renderer packages from the project on purpose.
+	fs::write(
+		root.join("package.json"),
+		r#"{
+  "name": "pina-rust-kit-live-render",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "codama": "1.11.0",
+    "codama-renderers-rust-solana-kit": "0.2.1"
+  }
+}
+"#,
+	)
+	.expect("package.json");
 }
 
 fn node_major() -> Option<u32> {
@@ -70,23 +218,6 @@ fn node_major() -> Option<u32> {
 		.ok()
 }
 
-fn write_package_json(pkg: &Path) {
-	fs::write(
-		pkg.join("package.json"),
-		r#"{
-  "name": "pina-rust-kit-live-render",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "codama": "1.11.0",
-    "codama-renderers-rust-solana-kit": "0.2.1"
-  }
-}
-"#,
-	)
-	.expect("package.json");
-}
-
 fn npm_install(pkg: &Path) {
 	let output = Command::new("npm")
 		.current_dir(pkg)
@@ -99,130 +230,3 @@ fn npm_install(pkg: &Path) {
 		String::from_utf8_lossy(&output.stderr)
 	);
 }
-
-const RENDER_SCRIPT: &str = r#"
-import { readFileSync, mkdirSync, rmSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { visit } from "codama";
-import renderVisitor from "codama-renderers-rust-solana-kit";
-
-function prepareRustKitRoot(root) {
-	if (root && typeof root === "object" && root.kind === "rootNode" && root.version !== "1.0.0") {
-		root.version = "1.8.0";
-	}
-	return transformRustKitNode(root, "root");
-}
-
-function transformRustKitNode(node, ctx) {
-	if (Array.isArray(node)) {
-		return node.map((item) => transformRustKitNode(item, ctx)).filter((item) => item !== undefined);
-	}
-	if (!node || typeof node !== "object") {
-		return node;
-	}
-	if (node.kind === "pluginNode") {
-		return undefined;
-	}
-	const nextCtx = ["instructionNode", "accountNode", "eventNode"].includes(node.kind)
-		? node.kind
-		: ctx;
-	const out = {};
-	for (const [key, value] of Object.entries(node)) {
-		if (key === "plugins") {
-			continue;
-		}
-		if (
-			node.kind === "structFieldTypeNode"
-			&& (key === "defaultValue" || key === "defaultValueStrategy")
-		) {
-			continue;
-		}
-		if (key === "discriminators" && Array.isArray(value) && nextCtx === "instructionNode") {
-			out[key] = value.map((discriminator) => {
-				if (discriminator?.kind === "constantDiscriminatorNode") {
-					return {
-						kind: "fieldDiscriminatorNode",
-						name: "discriminator",
-						offset: discriminator.offset ?? 0,
-					};
-				}
-				return transformRustKitNode(discriminator, nextCtx);
-			});
-			continue;
-		}
-		if (
-			key === "discriminators"
-			&& Array.isArray(value)
-			&& (nextCtx === "accountNode" || nextCtx === "eventNode")
-		) {
-			out[key] = value.map((discriminator) =>
-				convertNumericAccountDiscriminator(discriminator, nextCtx)
-			);
-			continue;
-		}
-		const transformed = transformRustKitNode(value, nextCtx);
-		if (transformed !== undefined) {
-			out[key] = transformed;
-		}
-	}
-	return out;
-}
-
-function convertNumericAccountDiscriminator(discriminator, ctx) {
-	const constant = discriminator?.constant;
-	const type = constant?.type;
-	if (
-		discriminator?.kind === "constantDiscriminatorNode"
-		&& constant?.kind === "constantValueNode"
-		&& type?.kind === "numberTypeNode"
-		&& constant.value?.kind === "numberValueNode"
-	) {
-		const width = { u8: 1, u16: 2, u32: 4 }[type.format];
-		if (width) {
-			const number = Number(constant.value.number);
-			const bytes = Buffer.alloc(width);
-			const bigEndian = type.endian === "be";
-			if (width === 1) {
-				bytes.writeUInt8(number);
-			} else if (width === 2) {
-				if (bigEndian) {
-					bytes.writeUInt16BE(number);
-				} else {
-					bytes.writeUInt16LE(number);
-				}
-			} else if (bigEndian) {
-				bytes.writeUInt32BE(number);
-			} else {
-				bytes.writeUInt32LE(number);
-			}
-			return {
-				kind: "constantDiscriminatorNode",
-				offset: discriminator.offset ?? 0,
-				constant: {
-					kind: "constantValueNode",
-					type: { kind: "bytesTypeNode" },
-					value: {
-						kind: "bytesValueNode",
-						data: bytes.toString("hex"),
-						encoding: "base16",
-					},
-				},
-			};
-		}
-	}
-	return transformRustKitNode(discriminator, ctx);
-}
-
-const idl = JSON.parse(readFileSync(process.argv[2], "utf8"));
-const prepared = prepareRustKitRoot(structuredClone(idl));
-const out = join(tmpdir(), "pina-rust-kit-live-" + Math.random().toString(16).slice(2));
-rmSync(out, { recursive: true, force: true });
-mkdirSync(out, { recursive: true });
-visit(prepared, renderVisitor(out));
-const files = readdirSync(out);
-if (files.length === 0) {
-	throw new Error("renderer wrote no files");
-}
-console.log("OK", files.length);
-"#;

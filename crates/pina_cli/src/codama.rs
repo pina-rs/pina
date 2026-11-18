@@ -65,6 +65,7 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -139,7 +140,10 @@ if (!renderer || !outputRoot || !clientRoot || !requestedMode || !scaffoldValue)
 
 const scaffold = scaffoldValue === "true";
 const names = idlPaths.map((path) => basename(path, ".json")).sort();
-const stagingRoot = mkdtempSync(join(tmpdir(), "pina-clients-"));
+// Stage under the resolved temporary directory. macOS hands out a `TMPDIR`
+// beneath `/var`, a symbolic link to `/private/var`, and the rust-kit renderer
+// refuses to write beneath any symlinked ancestor.
+const stagingRoot = mkdtempSync(join(realpathSync(tmpdir()), "pina-clients-"));
 const MANIFEST_FILE = ".pina-generated.json";
 const manifests = new Map();
 
@@ -421,12 +425,20 @@ function publishRustKit(name) {
 		join(destination, "src", "generated"),
 	);
 
+	if (!scaffold) {
+		return;
+	}
+
+	// Each scaffold file is written only when it is missing, so recreating a
+	// deleted manifest never replaces a crate root the developer has edited.
 	const manifest = join(destination, "Cargo.toml");
-	if (scaffold && !existsSync(manifest)) {
-		mkdirSync(join(destination, "src"), { recursive: true });
+	if (!existsSync(manifest)) {
 		writeFileSync(manifest, rustKitManifest(name), "utf8");
 		record(destination, manifest);
-		const lib = join(destination, "src", "lib.rs");
+	}
+
+	const lib = join(destination, "src", "lib.rs");
+	if (!existsSync(lib)) {
 		writeFileSync(lib, rustKitLib(), "utf8");
 		record(destination, lib);
 	}

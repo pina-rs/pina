@@ -10,7 +10,7 @@ Use it for experimentation, internal prototyping, education, and controlled test
 - application-level audits are required,
 - framework hardening work is still in progress.
 
-Recently completed hardening work is tracked openly in the repository: the loader-soundness, Miri-regression, adversarial-coverage, and zero-copy-architecture follow-ups (#120, #121, #122, #127, #130) have all landed, and the umbrella effort in #119 remains open until the full baseline is re-verified.
+Hardening work is tracked openly in the repository. The loader-soundness, Miri-regression, adversarial-coverage, and zero-copy-architecture follow-ups (#120, #121, #122, #127, #130) have all landed, and their umbrella issue #119 closed in September 2026. The September 2026 deep audits and their remediation are recorded under [`security/`](security/), and the findings that remain open are tracked as [open `SEC-` issues](https://github.com/pina-rs/pina/issues?q=is%3Aissue%20is%3Aopen%20SEC-).
 
 Supported does **not** mean audited. It only means where security fixes are expected to land.
 
@@ -48,10 +48,11 @@ Recent hardening work has landed in the repository. Completed examples include:
 - adversarial regression coverage for helper and account invariants: `#127`,
 - architecture documentation for zero-copy safety and runtime invariants: `#130`.
 
-The umbrella tracking issue for the remaining baseline re-verification is [`#119`](https://github.com/pina-rs/pina/issues/119).
+The baseline umbrella issue [`#119`](https://github.com/pina-rs/pina/issues/119) closed in September 2026. Later audit findings that are still open, including the CLI host-boundary batch in [`#504`](https://github.com/pina-rs/pina/issues/504), are tracked as [open `SEC-` issues](https://github.com/pina-rs/pina/issues?q=is%3Aissue%20is%3Aopen%20SEC-).
 
 For deeper technical context, see:
 
+- [`security/deep-audit-2026-09-22.md`](security/deep-audit-2026-09-22.md) — the most recent full audit, with each finding's reproduction and remediation status,
 - [`security/loaders-audit.md`](security/loaders-audit.md) — focused audit notes for the account-loader layer,
 - [`security/readme.md`](security/readme.md) — example-driven security guide organized by vulnerability class,
 - [`docs/src/security-model.md`](docs/src/security-model.md) — high-level framework security model and guardrails.
@@ -64,7 +65,7 @@ For deeper technical context, see:
 | Latest published `0.x` | Best effort | Upgrade quickly; prompt backports are not guaranteed.        |
 | Older releases         | Unsupported | No maintenance branches or routine security backport policy. |
 
-Because the project is still unaudited, the safest option is to track the latest code and review the remaining hardening work in [`#119`](https://github.com/pina-rs/pina/issues/119) before any serious deployment decision.
+Because the project is still unaudited, the safest option is to track the latest code and review the [open `SEC-` issues](https://github.com/pina-rs/pina/issues?q=is%3Aissue%20is%3Aopen%20SEC-) before any serious deployment decision.
 
 ## Reporting a vulnerability
 
