@@ -16,6 +16,19 @@ allowBuilds:
 audit:
   level: moderate
 
+# Advisories with no patched release. Each entry needs a reachability note, a
+# review date, and a removal condition; prefer an `overrides` pin to a patched
+# version whenever one exists.
+auditConfig:
+  ignoreGhsas:
+    # GHSA-fc5q-39xc-vjpf: picomatch <=4.0.7 ReDoS through repeated extglobs.
+    # No patched release exists (4.0.7 is the latest). Reached only through
+    # devDependencies (vitest, vite, fdir and tsup in the renderer packages and
+    # the codama e2e test projects); `pnpm audit --prod` reports nothing, so no
+    # published package ships it. Reviewed 2026-11-18. Remove once picomatch
+    # publishes a fix and the `overrides` entry below moves to it.
+    - GHSA-fc5q-39xc-vjpf
+
 minimumReleaseAgeExclude:
   - "@pina-rs/cli-darwin-arm64@0.13.0 || 0.14.0"
   - "@pina-rs/cli-darwin-x64@0.13.0 || 0.14.0"
