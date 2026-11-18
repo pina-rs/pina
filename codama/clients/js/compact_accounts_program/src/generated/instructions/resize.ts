@@ -149,7 +149,9 @@ export async function getResizeInstructionAsync<
 		TAccountJournal,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	ResizeInstruction<
 		TProgramAddress,
@@ -168,8 +170,11 @@ export async function getResizeInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -265,7 +270,9 @@ export function getResizeInstruction<
 		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ResizeInput<TAccountAuthority, TAccountJournal, TAccountSystemProgram>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ResizeInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -282,8 +289,11 @@ export function getResizeInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

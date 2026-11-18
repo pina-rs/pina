@@ -182,7 +182,9 @@ export function getClaimInstruction<
 		TAccountTokenProgram,
 		TAccountClock
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ClaimInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -223,8 +225,11 @@ export function getClaimInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		VESTING_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

@@ -112,7 +112,9 @@ export function getInitializeInstruction<
 		typeof SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeInput<TAccountAuthority, TAccountWallet>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): InitializeInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -125,8 +127,11 @@ export function getInitializeInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		SYSTEM_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

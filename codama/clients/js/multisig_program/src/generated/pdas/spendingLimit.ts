@@ -22,13 +22,17 @@ export type SpendingLimitSeeds = {
 
 export async function findSpendingLimitPda(
 	seeds: SpendingLimitSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc" as Address<
-			"5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc"
-		>,
+		programAddress: programAddressInput =
+			"5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc" as Address<
+				"5BeQ7VMZHYdnUD6PyrMd29WQo2DLfo7N2NDXCDQZ5MQc"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

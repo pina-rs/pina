@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -166,14 +167,17 @@ export type AccountReallocProgramPluginAccounts = {
 export type AccountReallocProgramPluginInstructions = {
 	initialize: (
 		input: InitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	realloc: (
 		input: ReallocAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getReallocInstructionAsync> & SelfPlanAndSendFunctions;
 	realloc2: (
 		input: Realloc2AsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getRealloc2InstructionAsync>
 		& SelfPlanAndSendFunctions;
@@ -186,7 +190,9 @@ export type AccountReallocProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function accountReallocProgramProgram() {
+export function accountReallocProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends AccountReallocProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<
@@ -199,23 +205,38 @@ export function accountReallocProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					realloc: (input) =>
+					realloc: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getReallocInstructionAsync(input),
+							getReallocInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					realloc2: (input) =>
+					realloc2: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRealloc2InstructionAsync(input),
+							getRealloc2InstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
-				pdas: { sample: findSamplePda },
+				pdas: {
+					sample: (seeds, pdaConfig) =>
+						findSamplePda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyAccountReallocProgramAccount,
 				identifyInstruction: identifyAccountReallocProgramInstruction,
 				parseInstruction: parseAccountReallocProgramInstruction,

@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -21,10 +22,13 @@ import {
 	type FixedSizeCodec,
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -100,8 +104,10 @@ export function decodeState<TAddress extends string = string>(
 }
 
 export async function fetchState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<State, TAddress>> {
 	const maybeAccount = await fetchMaybeState(rpc, address, config);
@@ -110,17 +116,25 @@ export async function fetchState<TAddress extends string = string>(
 }
 
 export async function fetchMaybeState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<State, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeState(maybeAccount);
 }
 
 export async function fetchAllState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<State>[]> {
 	const maybeAccounts = await fetchAllMaybeState(rpc, addresses, config);
@@ -129,17 +143,25 @@ export async function fetchAllState(
 }
 
 export async function fetchAllMaybeState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<State>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodeState(maybeAccount));
 }
 
 export async function fetchStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<State>> {
 	const maybeAccount = await fetchMaybeStateFromSeeds(rpc, config);
 	assertAccountExists(maybeAccount);
@@ -147,8 +169,10 @@ export async function fetchStateFromSeeds(
 }
 
 export async function fetchMaybeStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<State>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findStatePda({ programAddress });

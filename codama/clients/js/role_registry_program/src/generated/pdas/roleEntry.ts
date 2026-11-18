@@ -23,13 +23,17 @@ export type RoleEntrySeeds = {
 
 export async function findRoleEntryPda(
 	seeds: RoleEntrySeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX" as Address<
-			"3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX"
-		>,
+		programAddress: programAddressInput =
+			"3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX" as Address<
+				"3B7roNNQLnW43Par9AfTuVzEqZx7yPtXRA9K3Ev7RHyX"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -23,12 +24,15 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	type GetAccountInfoApi,
 	getBytesDecoder,
 	getBytesEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -153,8 +157,10 @@ export function decodeNoteCommitment<TAddress extends string = string>(
 }
 
 export async function fetchNoteCommitment<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<NoteCommitment, TAddress>> {
 	const maybeAccount = await fetchMaybeNoteCommitment(rpc, address, config);
@@ -165,17 +171,25 @@ export async function fetchNoteCommitment<TAddress extends string = string>(
 export async function fetchMaybeNoteCommitment<
 	TAddress extends string = string,
 >(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<NoteCommitment, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeNoteCommitment(maybeAccount);
 }
 
 export async function fetchAllNoteCommitment(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<NoteCommitment>[]> {
 	const maybeAccounts = await fetchAllMaybeNoteCommitment(
@@ -188,20 +202,28 @@ export async function fetchAllNoteCommitment(
 }
 
 export async function fetchAllMaybeNoteCommitment(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<NoteCommitment>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) =>
 		decodeNoteCommitment(maybeAccount)
 	);
 }
 
 export async function fetchNoteCommitmentFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: NoteCommitmentSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<NoteCommitment>> {
 	const maybeAccount = await fetchMaybeNoteCommitmentFromSeeds(
 		rpc,
@@ -213,9 +235,11 @@ export async function fetchNoteCommitmentFromSeeds(
 }
 
 export async function fetchMaybeNoteCommitmentFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: NoteCommitmentSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<NoteCommitment>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findNoteCommitmentPda(seeds, { programAddress });

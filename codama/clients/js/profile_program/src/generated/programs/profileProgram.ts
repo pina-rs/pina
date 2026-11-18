@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -187,19 +188,23 @@ export type ProfileProgramPluginAccounts = {
 export type ProfileProgramPluginInstructions = {
 	initialize: (
 		input: InitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	updateProfile: (
 		input: UpdateProfileAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getUpdateProfileInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	addTag: (
 		input: AddTagAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getAddTagInstructionAsync> & SelfPlanAndSendFunctions;
 	removeTag: (
 		input: RemoveTagAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getRemoveTagInstructionAsync>
 		& SelfPlanAndSendFunctions;
@@ -212,7 +217,9 @@ export type ProfileProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function profileProgramProgram() {
+export function profileProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends ProfileProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { profileProgram: ProfileProgramPlugin }> => {
@@ -224,28 +231,46 @@ export function profileProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					updateProfile: (input) =>
+					updateProfile: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getUpdateProfileInstructionAsync(input),
+							getUpdateProfileInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					addTag: (input) =>
+					addTag: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getAddTagInstructionAsync(input),
+							getAddTagInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					removeTag: (input) =>
+					removeTag: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRemoveTagInstructionAsync(input),
+							getRemoveTagInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
-				pdas: { profile: findProfilePda },
+				pdas: {
+					profile: (seeds, pdaConfig) =>
+						findProfilePda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyProfileProgramAccount,
 				identifyInstruction: identifyProfileProgramInstruction,
 				parseInstruction: parseProfileProgramInstruction,

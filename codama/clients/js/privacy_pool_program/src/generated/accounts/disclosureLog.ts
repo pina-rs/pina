@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -23,14 +24,17 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	type GetAccountInfoApi,
 	getBytesDecoder,
 	getBytesEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU64Decoder,
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -139,8 +143,10 @@ export function decodeDisclosureLog<TAddress extends string = string>(
 }
 
 export async function fetchDisclosureLog<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<DisclosureLog, TAddress>> {
 	const maybeAccount = await fetchMaybeDisclosureLog(rpc, address, config);
@@ -149,17 +155,25 @@ export async function fetchDisclosureLog<TAddress extends string = string>(
 }
 
 export async function fetchMaybeDisclosureLog<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<DisclosureLog, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeDisclosureLog(maybeAccount);
 }
 
 export async function fetchAllDisclosureLog(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<DisclosureLog>[]> {
 	const maybeAccounts = await fetchAllMaybeDisclosureLog(
@@ -172,17 +186,25 @@ export async function fetchAllDisclosureLog(
 }
 
 export async function fetchAllMaybeDisclosureLog(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<DisclosureLog>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodeDisclosureLog(maybeAccount));
 }
 
 export async function fetchDisclosureLogFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<DisclosureLog>> {
 	const maybeAccount = await fetchMaybeDisclosureLogFromSeeds(rpc, config);
 	assertAccountExists(maybeAccount);
@@ -190,8 +212,10 @@ export async function fetchDisclosureLogFromSeeds(
 }
 
 export async function fetchMaybeDisclosureLogFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<DisclosureLog>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findDisclosureLogPda({ programAddress });

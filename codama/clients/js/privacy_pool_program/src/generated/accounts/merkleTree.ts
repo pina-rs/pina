@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -23,8 +24,10 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	type GetAccountInfoApi,
 	getBytesDecoder,
 	getBytesEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU16Decoder,
@@ -33,6 +36,7 @@ import {
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -147,8 +151,10 @@ export function decodeMerkleTree<TAddress extends string = string>(
 }
 
 export async function fetchMerkleTree<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<MerkleTree, TAddress>> {
 	const maybeAccount = await fetchMaybeMerkleTree(rpc, address, config);
@@ -157,17 +163,25 @@ export async function fetchMerkleTree<TAddress extends string = string>(
 }
 
 export async function fetchMaybeMerkleTree<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<MerkleTree, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeMerkleTree(maybeAccount);
 }
 
 export async function fetchAllMerkleTree(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<MerkleTree>[]> {
 	const maybeAccounts = await fetchAllMaybeMerkleTree(rpc, addresses, config);
@@ -176,17 +190,25 @@ export async function fetchAllMerkleTree(
 }
 
 export async function fetchAllMaybeMerkleTree(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<MerkleTree>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodeMerkleTree(maybeAccount));
 }
 
 export async function fetchMerkleTreeFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<MerkleTree>> {
 	const maybeAccount = await fetchMaybeMerkleTreeFromSeeds(rpc, config);
 	assertAccountExists(maybeAccount);
@@ -194,8 +216,10 @@ export async function fetchMerkleTreeFromSeeds(
 }
 
 export async function fetchMaybeMerkleTreeFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<MerkleTree>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findMerkleTreePda({ programAddress });

@@ -116,7 +116,9 @@ export async function getToggleCompletedInstructionAsync<
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ToggleCompletedAsyncInput<TAccountOwner, TAccountTodo>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	ToggleCompletedInstruction<
 		TProgramAddress,
@@ -131,7 +133,11 @@ export async function getToggleCompletedInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddressInput = config?.programAddress ??
+		TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -190,7 +196,9 @@ export function getToggleCompletedInstruction<
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ToggleCompletedInput<TAccountOwner, TAccountTodo>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ToggleCompletedInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -203,7 +211,11 @@ export function getToggleCompletedInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddressInput = config?.programAddress ??
+		TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

@@ -21,13 +21,17 @@ export type NoteCommitmentSeeds = {
 
 export async function findNoteCommitmentPda(
 	seeds: NoteCommitmentSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D" as Address<
-			"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D"
-		>,
+		programAddress: programAddressInput =
+			"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D" as Address<
+				"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

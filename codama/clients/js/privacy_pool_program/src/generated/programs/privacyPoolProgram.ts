@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -450,64 +451,77 @@ export type PrivacyPoolProgramPluginAccounts = {
 export type PrivacyPoolProgramPluginInstructions = {
 	initialize: (
 		input: InitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	setVerificationKey: (
 		input: SetVerificationKeyAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getSetVerificationKeyInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	setCustodians: (
 		input: SetCustodiansAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getSetCustodiansInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	registerRequester: (
 		input: RegisterRequesterAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getRegisterRequesterInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	deposit: (
 		input: DepositAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getDepositInstructionAsync> & SelfPlanAndSendFunctions;
 	withdraw: (
 		input: WithdrawAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getWithdrawInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	transfer: (
 		input: TransferAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getTransferInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	requestDisclosure: (
 		input: RequestDisclosureAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getRequestDisclosureInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	grantDisclosure: (
 		input: GrantDisclosureInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getGrantDisclosureInstruction>
 		& SelfPlanAndSendFunctions;
 	challengeDisclosure: (
 		input: ChallengeDisclosureInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getChallengeDisclosureInstruction>
 		& SelfPlanAndSendFunctions;
 	resolveChallenge: (
 		input: ResolveChallengeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getResolveChallengeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	approveDisclosure: (
 		input: ApproveDisclosureAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getApproveDisclosureInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	cancelDisclosure: (
 		input: CancelDisclosureInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getCancelDisclosureInstruction>
 		& SelfPlanAndSendFunctions;
@@ -531,7 +545,9 @@ export type PrivacyPoolProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function privacyPoolProgramProgram() {
+export function privacyPoolProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends PrivacyPoolProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { privacyPoolProgram: PrivacyPoolProgramPlugin }> => {
@@ -567,83 +583,162 @@ export function privacyPoolProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					setVerificationKey: (input) =>
+					setVerificationKey: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getSetVerificationKeyInstructionAsync(input),
+							getSetVerificationKeyInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					setCustodians: (input) =>
+					setCustodians: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getSetCustodiansInstructionAsync(input),
+							getSetCustodiansInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					registerRequester: (input) =>
+					registerRequester: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRegisterRequesterInstructionAsync(input),
+							getRegisterRequesterInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					deposit: (input) =>
+					deposit: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getDepositInstructionAsync(input),
+							getDepositInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					withdraw: (input) =>
+					withdraw: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getWithdrawInstructionAsync(input),
+							getWithdrawInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					transfer: (input) =>
+					transfer: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getTransferInstructionAsync(input),
+							getTransferInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					requestDisclosure: (input) =>
+					requestDisclosure: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRequestDisclosureInstructionAsync(input),
+							getRequestDisclosureInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					grantDisclosure: (input) =>
+					grantDisclosure: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getGrantDisclosureInstruction(input),
+							getGrantDisclosureInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					challengeDisclosure: (input) =>
+					challengeDisclosure: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getChallengeDisclosureInstruction(input),
+							getChallengeDisclosureInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					resolveChallenge: (input) =>
+					resolveChallenge: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getResolveChallengeInstructionAsync(input),
+							getResolveChallengeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					approveDisclosure: (input) =>
+					approveDisclosure: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getApproveDisclosureInstructionAsync(input),
+							getApproveDisclosureInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					cancelDisclosure: (input) =>
+					cancelDisclosure: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getCancelDisclosureInstruction(input),
+							getCancelDisclosureInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				pdas: {
-					poolConfig: findPoolConfigPda,
-					poolVault: findPoolVaultPda,
-					merkleTree: findMerkleTreePda,
-					nullifierSet: findNullifierSetPda,
-					custodianRegistry: findCustodianRegistryPda,
-					requesterRegistry: findRequesterRegistryPda,
-					noteCommitment: findNoteCommitmentPda,
-					disclosureRequest: findDisclosureRequestPda,
-					disclosureLog: findDisclosureLogPda,
-					verifyingKeyAccount: findVerifyingKeyAccountPda,
+					poolConfig: (pdaConfig) =>
+						findPoolConfigPda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					poolVault: (pdaConfig) =>
+						findPoolVaultPda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					merkleTree: (pdaConfig) =>
+						findMerkleTreePda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					nullifierSet: (pdaConfig) =>
+						findNullifierSetPda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					custodianRegistry: (pdaConfig) =>
+						findCustodianRegistryPda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					requesterRegistry: (pdaConfig) =>
+						findRequesterRegistryPda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					noteCommitment: (seeds, pdaConfig) =>
+						findNoteCommitmentPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					disclosureRequest: (seeds, pdaConfig) =>
+						findDisclosureRequestPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					disclosureLog: (pdaConfig) =>
+						findDisclosureLogPda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					verifyingKeyAccount: (seeds, pdaConfig) =>
+						findVerifyingKeyAccountPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
 				},
 				identifyAccount: identifyPrivacyPoolProgramAccount,
 				identifyInstruction: identifyPrivacyPoolProgramInstruction,

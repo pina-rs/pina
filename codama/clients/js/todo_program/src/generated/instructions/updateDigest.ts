@@ -127,7 +127,9 @@ export async function getUpdateDigestInstructionAsync<
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: UpdateDigestAsyncInput<TAccountOwner, TAccountTodo>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	UpdateDigestInstruction<
 		TProgramAddress,
@@ -142,7 +144,11 @@ export async function getUpdateDigestInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddressInput = config?.programAddress ??
+		TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -207,7 +213,9 @@ export function getUpdateDigestInstruction<
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: UpdateDigestInput<TAccountOwner, TAccountTodo>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): UpdateDigestInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -220,7 +228,11 @@ export function getUpdateDigestInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddressInput = config?.programAddress ??
+		TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

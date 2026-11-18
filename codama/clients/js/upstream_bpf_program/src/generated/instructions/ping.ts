@@ -115,7 +115,9 @@ export function getPingInstruction<
 	TProgramAddress extends Address = typeof UPSTREAM_BPF_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: PingInput<TAccountUser, TAccountClock>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): PingInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -128,8 +130,11 @@ export function getPingInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		UPSTREAM_BPF_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

@@ -21,13 +21,17 @@ export type StoreSeeds = {
 
 export async function findStorePda(
 	seeds: StoreSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci" as Address<
-			"ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci"
-		>,
+		programAddress: programAddressInput =
+			"ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci" as Address<
+				"ccdMMVpwebk8NxwJdY4CndxkLKUTM6fkaFUteAfFeci"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

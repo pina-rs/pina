@@ -114,7 +114,9 @@ export function getTouchInstruction<
 		typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: TouchInput<TAccountAuthority, TAccountStore>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): TouchInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -127,8 +129,11 @@ export function getTouchInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

@@ -128,7 +128,9 @@ export async function getRemoveTagInstructionAsync<
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RemoveTagAsyncInput<TAccountAuthority, TAccountProfile>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	RemoveTagInstruction<
 		TProgramAddress,
@@ -143,8 +145,11 @@ export async function getRemoveTagInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -219,7 +224,9 @@ export function getRemoveTagInstruction<
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RemoveTagInput<TAccountAuthority, TAccountProfile>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): RemoveTagInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -232,8 +239,11 @@ export function getRemoveTagInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

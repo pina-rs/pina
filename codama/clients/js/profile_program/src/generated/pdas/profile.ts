@@ -21,13 +21,17 @@ export type ProfileSeeds = {
 
 export async function findProfilePda(
 	seeds: ProfileSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL" as Address<
-			"6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL"
-		>,
+		programAddress: programAddressInput =
+			"6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL" as Address<
+				"6oW4PDgWpZGWqAEZNvqnAtQi8GotATsxxjCLYQpZJhHL"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

@@ -237,7 +237,9 @@ export async function getMultisigCreateInstructionAsync<
 		TAccountTreasury,
 		TAccountMemberAccounts
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	MultisigCreateInstruction<
 		TProgramAddress,
@@ -272,8 +274,11 @@ export async function getMultisigCreateInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -447,7 +452,9 @@ export function getMultisigCreateInstruction<
 		TAccountTreasury,
 		TAccountMemberAccounts
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): MultisigCreateInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -480,8 +487,11 @@ export function getMultisigCreateInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

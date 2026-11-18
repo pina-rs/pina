@@ -22,13 +22,17 @@ export type PositionSeeds = {
 
 export async function findPositionPda(
 	seeds: PositionSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr" as Address<
-			"9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr"
-		>,
+		programAddress: programAddressInput =
+			"9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr" as Address<
+				"9MBwKBjzTLtLe8PkHVhi5CfGxKo8gCYbMEg5NMt1tcvr"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

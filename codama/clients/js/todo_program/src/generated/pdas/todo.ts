@@ -21,13 +21,17 @@ export type TodoSeeds = {
 
 export async function findTodoPda(
 	seeds: TodoSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd" as Address<
-			"Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd"
-		>,
+		programAddress: programAddressInput =
+			"Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd" as Address<
+				"Fc5A5xvNQ6w7kn2P7FpC18JNpDutLCRa14Q6gttxyPjd"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

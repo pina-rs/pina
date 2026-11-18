@@ -192,7 +192,9 @@ export function getCancelInstruction<
 		TAccountClock,
 		TAccountBeneficiaryAta
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): CancelInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -237,8 +239,11 @@ export function getCancelInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		VESTING_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

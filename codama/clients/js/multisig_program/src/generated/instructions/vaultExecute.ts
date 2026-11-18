@@ -142,7 +142,9 @@ export function getVaultExecuteInstruction<
 		TAccountClock,
 		TAccountMessageAccounts
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): VaultExecuteInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -167,8 +169,11 @@ export function getVaultExecuteInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

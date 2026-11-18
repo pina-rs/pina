@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -215,22 +216,27 @@ export type RoleRegistryProgramPluginAccounts = {
 export type RoleRegistryProgramPluginInstructions = {
 	initialize: (
 		input: InitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	addRole: (
 		input: AddRoleInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getAddRoleInstruction> & SelfPlanAndSendFunctions;
 	updateRole: (
 		input: UpdateRoleInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getUpdateRoleInstruction> & SelfPlanAndSendFunctions;
 	deactivateRole: (
 		input: DeactivateRoleInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getDeactivateRoleInstruction>
 		& SelfPlanAndSendFunctions;
 	rotateAdmin: (
 		input: RotateAdminInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getRotateAdminInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -244,7 +250,9 @@ export type RoleRegistryProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function roleRegistryProgramProgram() {
+export function roleRegistryProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends RoleRegistryProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { roleRegistryProgram: RoleRegistryProgramPlugin }> => {
@@ -260,32 +268,58 @@ export function roleRegistryProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					addRole: (input) =>
-						addSelfPlanAndSendFunctions(client, getAddRoleInstruction(input)),
-					updateRole: (input) =>
+					addRole: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getUpdateRoleInstruction(input),
+							getAddRoleInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					deactivateRole: (input) =>
+					updateRole: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getDeactivateRoleInstruction(input),
+							getUpdateRoleInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					rotateAdmin: (input) =>
+					deactivateRole: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRotateAdminInstruction(input),
+							getDeactivateRoleInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					rotateAdmin: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRotateAdminInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				pdas: {
-					registryConfig: findRegistryConfigPda,
-					roleEntry: findRoleEntryPda,
+					registryConfig: (seeds, pdaConfig) =>
+						findRegistryConfigPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					roleEntry: (seeds, pdaConfig) =>
+						findRoleEntryPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
 				},
 				identifyAccount: identifyRoleRegistryProgramAccount,
 				identifyInstruction: identifyRoleRegistryProgramInstruction,

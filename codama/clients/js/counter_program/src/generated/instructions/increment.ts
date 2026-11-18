@@ -115,7 +115,9 @@ export async function getIncrementInstructionAsync<
 	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: IncrementAsyncInput<TAccountAuthority, TAccountCounter>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	IncrementInstruction<
 		TProgramAddress,
@@ -130,8 +132,11 @@ export async function getIncrementInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		COUNTER_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -200,7 +205,9 @@ export function getIncrementInstruction<
 	TProgramAddress extends Address = typeof COUNTER_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: IncrementInput<TAccountAuthority, TAccountCounter>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): IncrementInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -213,8 +220,11 @@ export function getIncrementInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		COUNTER_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -170,12 +171,15 @@ export type EscrowProgramPluginAccounts = {
 export type EscrowProgramPluginInstructions = {
 	make: (
 		input: MakeInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getMakeInstruction> & SelfPlanAndSendFunctions;
 	take: (
 		input: TakeInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getTakeInstruction> & SelfPlanAndSendFunctions;
 	cancel: (
 		input: CancelInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getCancelInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -186,7 +190,9 @@ export type EscrowProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function escrowProgramProgram() {
+export function escrowProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends EscrowProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { escrowProgram: EscrowProgramPlugin }> => {
@@ -198,14 +204,38 @@ export function escrowProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					make: (input) =>
-						addSelfPlanAndSendFunctions(client, getMakeInstruction(input)),
-					take: (input) =>
-						addSelfPlanAndSendFunctions(client, getTakeInstruction(input)),
-					cancel: (input) =>
-						addSelfPlanAndSendFunctions(client, getCancelInstruction(input)),
+					make: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getMakeInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					take: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getTakeInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					cancel: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getCancelInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
-				pdas: { escrow: findEscrowPda },
+				pdas: {
+					escrow: (seeds, pdaConfig) =>
+						findEscrowPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyEscrowProgramAccount,
 				identifyInstruction: identifyEscrowProgramInstruction,
 				parseInstruction: parseEscrowProgramInstruction,

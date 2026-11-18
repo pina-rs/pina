@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -23,14 +24,17 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	type GetAccountInfoApi,
 	getBytesDecoder,
 	getBytesEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU64Decoder,
 	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -129,8 +133,10 @@ export function decodeNullifierSet<TAddress extends string = string>(
 }
 
 export async function fetchNullifierSet<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<NullifierSet, TAddress>> {
 	const maybeAccount = await fetchMaybeNullifierSet(rpc, address, config);
@@ -139,17 +145,25 @@ export async function fetchNullifierSet<TAddress extends string = string>(
 }
 
 export async function fetchMaybeNullifierSet<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<NullifierSet, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeNullifierSet(maybeAccount);
 }
 
 export async function fetchAllNullifierSet(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<NullifierSet>[]> {
 	const maybeAccounts = await fetchAllMaybeNullifierSet(rpc, addresses, config);
@@ -158,17 +172,25 @@ export async function fetchAllNullifierSet(
 }
 
 export async function fetchAllMaybeNullifierSet(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<NullifierSet>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodeNullifierSet(maybeAccount));
 }
 
 export async function fetchNullifierSetFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<NullifierSet>> {
 	const maybeAccount = await fetchMaybeNullifierSetFromSeeds(rpc, config);
 	assertAccountExists(maybeAccount);
@@ -176,8 +198,10 @@ export async function fetchNullifierSetFromSeeds(
 }
 
 export async function fetchMaybeNullifierSetFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<NullifierSet>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findNullifierSetPda({ programAddress });

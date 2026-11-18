@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -150,9 +151,11 @@ export type FloatAccountsProgramPluginAccounts = {
 export type FloatAccountsProgramPluginInstructions = {
 	create: (
 		input: CreateInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getCreateInstruction> & SelfPlanAndSendFunctions;
 	update: (
 		input: UpdateInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getUpdateInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -161,7 +164,9 @@ export type FloatAccountsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function floatAccountsProgramProgram() {
+export function floatAccountsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends FloatAccountsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<
@@ -179,10 +184,22 @@ export function floatAccountsProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					create: (input) =>
-						addSelfPlanAndSendFunctions(client, getCreateInstruction(input)),
-					update: (input) =>
-						addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)),
+					create: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getCreateInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					update: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getUpdateInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
 				identifyAccount: identifyFloatAccountsProgramAccount,
 				identifyInstruction: identifyFloatAccountsProgramInstruction,

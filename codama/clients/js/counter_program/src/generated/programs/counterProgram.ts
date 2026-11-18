@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -153,11 +154,13 @@ export type CounterProgramPluginAccounts = {
 export type CounterProgramPluginInstructions = {
 	initialize: (
 		input: InitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	increment: (
 		input: IncrementAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getIncrementInstructionAsync>
 		& SelfPlanAndSendFunctions;
@@ -170,7 +173,9 @@ export type CounterProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function counterProgramProgram() {
+export function counterProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends CounterProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { counterProgram: CounterProgramPlugin }> => {
@@ -182,18 +187,30 @@ export function counterProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					increment: (input) =>
+					increment: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getIncrementInstructionAsync(input),
+							getIncrementInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
-				pdas: { counter: findCounterPda },
+				pdas: {
+					counter: (seeds, pdaConfig) =>
+						findCounterPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyCounterProgramAccount,
 				identifyInstruction: identifyCounterProgramInstruction,
 				parseInstruction: parseCounterProgramInstruction,
