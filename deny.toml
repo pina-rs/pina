@@ -116,7 +116,7 @@ ignore = [
 	# solana-runtime → solana-genesis-config. Host/test stack only (via
 	# surfpool and the Agave runtime, not in any runtime crate graph).
 	# Reviewed 2026-11-18. Removable once Surfpool and Agave move off chrono
-	# (the advisory recommends jiff or time).
+	# (the advisory recommends jiff or time) — tracked in #716.
 	"RUSTSEC-2026-0543",
 ]
 
