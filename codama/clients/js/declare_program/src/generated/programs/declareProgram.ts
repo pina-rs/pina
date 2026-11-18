@@ -15,6 +15,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -95,6 +96,7 @@ export type DeclareProgramPlugin = {
 export type DeclareProgramPluginInstructions = {
 	validateExternalProgram: (
 		input: ValidateExternalProgramInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getValidateExternalProgramInstruction>
 		& SelfPlanAndSendFunctions;
@@ -104,17 +106,22 @@ export type DeclareProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function declareProgramProgram() {
+export function declareProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends DeclareProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { declareProgram: DeclareProgramPlugin }> => {
 		return extendClient(client, {
 			declareProgram: <DeclareProgramPlugin> {
 				instructions: {
-					validateExternalProgram: (input) =>
+					validateExternalProgram: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getValidateExternalProgramInstruction(input),
+							getValidateExternalProgramInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				identifyInstruction: identifyDeclareProgramInstruction,

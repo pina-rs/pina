@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -23,12 +24,15 @@ import {
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
 	fixEncoderSize,
+	type GetAccountInfoApi,
 	getBytesDecoder,
 	getBytesEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU8Decoder,
 	getU8Encoder,
+	type HasAddress,
 	type MaybeAccount,
 	type MaybeEncodedAccount,
 	type ReadonlyUint8Array,
@@ -148,8 +152,10 @@ export function decodeRequesterRegistry<TAddress extends string = string>(
 }
 
 export async function fetchRequesterRegistry<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<RequesterRegistry, TAddress>> {
 	const maybeAccount = await fetchMaybeRequesterRegistry(rpc, address, config);
@@ -160,17 +166,25 @@ export async function fetchRequesterRegistry<TAddress extends string = string>(
 export async function fetchMaybeRequesterRegistry<
 	TAddress extends string = string,
 >(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<RequesterRegistry, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeRequesterRegistry(maybeAccount);
 }
 
 export async function fetchAllRequesterRegistry(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<RequesterRegistry>[]> {
 	const maybeAccounts = await fetchAllMaybeRequesterRegistry(
@@ -183,19 +197,27 @@ export async function fetchAllRequesterRegistry(
 }
 
 export async function fetchAllMaybeRequesterRegistry(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<RequesterRegistry>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) =>
 		decodeRequesterRegistry(maybeAccount)
 	);
 }
 
 export async function fetchRequesterRegistryFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<RequesterRegistry>> {
 	const maybeAccount = await fetchMaybeRequesterRegistryFromSeeds(rpc, config);
 	assertAccountExists(maybeAccount);
@@ -203,8 +225,10 @@ export async function fetchRequesterRegistryFromSeeds(
 }
 
 export async function fetchMaybeRequesterRegistryFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<RequesterRegistry>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findRequesterRegistryPda({ programAddress });

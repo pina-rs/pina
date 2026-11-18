@@ -10,17 +10,22 @@ import {
 	type Address,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
+	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
 export async function findAuthorityPda(
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe" as Address<
-			"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe"
-		>,
+		programAddress: programAddressInput =
+			"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe" as Address<
+				"2nYtoevJCC8AFjdsfmkf8y1jN2nN9k4jVtD7G3f5n1Qe"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [getUtf8Encoder().encode("cpi-authority")],

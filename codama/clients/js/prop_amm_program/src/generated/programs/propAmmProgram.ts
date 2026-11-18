@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -167,12 +168,15 @@ export type PropAmmProgramPluginAccounts = {
 export type PropAmmProgramPluginInstructions = {
 	initialize: (
 		input: InitializeInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
 	update: (
 		input: UpdateInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getUpdateInstruction> & SelfPlanAndSendFunctions;
 	rotateAuthority: (
 		input: RotateAuthorityInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getRotateAuthorityInstruction>
 		& SelfPlanAndSendFunctions;
@@ -183,7 +187,9 @@ export type PropAmmProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function propAmmProgramProgram() {
+export function propAmmProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends PropAmmProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { propAmmProgram: PropAmmProgramPlugin }> => {
@@ -195,17 +201,29 @@ export function propAmmProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					update: (input) =>
-						addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)),
-					rotateAuthority: (input) =>
+					update: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRotateAuthorityInstruction(input),
+							getUpdateInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					rotateAuthority: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRotateAuthorityInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				identifyAccount: identifyPropAmmProgramAccount,

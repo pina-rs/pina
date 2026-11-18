@@ -15,6 +15,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -112,9 +113,11 @@ export type UpstreamBpfProgramPlugin = {
 export type UpstreamBpfProgramPluginInstructions = {
 	hello: (
 		input: HelloInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
 	ping: (
 		input: PingInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getPingInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -122,17 +125,31 @@ export type UpstreamBpfProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function upstreamBpfProgramProgram() {
+export function upstreamBpfProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends UpstreamBpfProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { upstreamBpfProgram: UpstreamBpfProgramPlugin }> => {
 		return extendClient(client, {
 			upstreamBpfProgram: <UpstreamBpfProgramPlugin> {
 				instructions: {
-					hello: (input) =>
-						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
-					ping: (input) =>
-						addSelfPlanAndSendFunctions(client, getPingInstruction(input)),
+					hello: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getHelloInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					ping: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getPingInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
 				identifyInstruction: identifyUpstreamBpfProgramInstruction,
 				parseInstruction: parseUpstreamBpfProgramInstruction,

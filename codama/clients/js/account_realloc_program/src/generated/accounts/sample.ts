@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	type Codec,
 	combineCodec,
 	decodeAccount,
@@ -21,10 +22,12 @@ import {
 	type FetchAccountsConfig,
 	fetchEncodedAccount,
 	fetchEncodedAccounts,
+	type GetAccountInfoApi,
 	getAddressDecoder,
 	getAddressEncoder,
 	getArrayDecoder,
 	getArrayEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU16Decoder,
@@ -143,8 +146,10 @@ export function decodeSample<TAddress extends string = string>(
 }
 
 export async function fetchSample<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<Sample, TAddress>> {
 	const maybeAccount = await fetchMaybeSample(rpc, address, config);
@@ -153,17 +158,25 @@ export async function fetchSample<TAddress extends string = string>(
 }
 
 export async function fetchMaybeSample<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<Sample, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeSample(maybeAccount);
 }
 
 export async function fetchAllSample(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<Sample>[]> {
 	const maybeAccounts = await fetchAllMaybeSample(rpc, addresses, config);
@@ -172,18 +185,26 @@ export async function fetchAllSample(
 }
 
 export async function fetchAllMaybeSample(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<Sample>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodeSample(maybeAccount));
 }
 
 export async function fetchSampleFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: SampleSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<Sample>> {
 	const maybeAccount = await fetchMaybeSampleFromSeeds(rpc, seeds, config);
 	assertAccountExists(maybeAccount);
@@ -191,9 +212,11 @@ export async function fetchSampleFromSeeds(
 }
 
 export async function fetchMaybeSampleFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: SampleSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<Sample>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findSamplePda(seeds, { programAddress });

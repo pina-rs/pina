@@ -119,7 +119,9 @@ export function getValidateExternalProgramInstruction<
 		TAccountAuthority,
 		TAccountExternalProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ValidateExternalProgramInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -132,8 +134,11 @@ export function getValidateExternalProgramInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		DECLARE_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

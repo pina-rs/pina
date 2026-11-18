@@ -162,7 +162,9 @@ export function getSetRewardIndexInstruction<
 		TAccountTokenProgram,
 		TAccountRewardVault
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): SetRewardIndexInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -187,8 +189,11 @@ export function getSetRewardIndexInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

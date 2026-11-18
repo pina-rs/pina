@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -429,74 +430,89 @@ export type MultisigProgramPluginAccounts = {
 export type MultisigProgramPluginInstructions = {
 	configInitialize: (
 		input: ConfigInitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getConfigInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	configUpdate: (
 		input: ConfigUpdateAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getConfigUpdateInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	multisigCreate: (
 		input: MultisigCreateAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getMultisigCreateInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	multisigImport: (
 		input: MultisigImportAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getMultisigImportInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	proposalCreate: (
 		input: ProposalCreateInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getProposalCreateInstruction>
 		& SelfPlanAndSendFunctions;
 	proposalActivate: (
 		input: ProposalActivateInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getProposalActivateInstruction>
 		& SelfPlanAndSendFunctions;
 	proposalApprove: (
 		input: ProposalApproveInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getProposalApproveInstruction>
 		& SelfPlanAndSendFunctions;
 	proposalReject: (
 		input: ProposalRejectInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getProposalRejectInstruction>
 		& SelfPlanAndSendFunctions;
 	proposalRevoke: (
 		input: ProposalRevokeInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getProposalRevokeInstruction>
 		& SelfPlanAndSendFunctions;
 	proposalCancel: (
 		input: ProposalCancelInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getProposalCancelInstruction>
 		& SelfPlanAndSendFunctions;
 	vaultExecute: (
 		input: VaultExecuteInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getVaultExecuteInstruction> & SelfPlanAndSendFunctions;
 	configExecute: (
 		input: ConfigExecuteInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getConfigExecuteInstruction>
 		& SelfPlanAndSendFunctions;
 	configAuthorityExecute: (
 		input: ConfigAuthorityExecuteInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getConfigAuthorityExecuteInstruction>
 		& SelfPlanAndSendFunctions;
 	spendingLimitUse: (
 		input: SpendingLimitUseInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getSpendingLimitUseInstruction>
 		& SelfPlanAndSendFunctions;
 	proposalClose: (
 		input: ProposalCloseInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getProposalCloseInstruction>
 		& SelfPlanAndSendFunctions;
@@ -514,7 +530,9 @@ export type MultisigProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function multisigProgramProgram() {
+export function multisigProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends MultisigProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { multisigProgram: MultisigProgramPlugin }> => {
@@ -529,87 +547,148 @@ export function multisigProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					configInitialize: (input) =>
+					configInitialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getConfigInitializeInstructionAsync(input),
+							getConfigInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					configUpdate: (input) =>
+					configUpdate: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getConfigUpdateInstructionAsync(input),
+							getConfigUpdateInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					multisigCreate: (input) =>
+					multisigCreate: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getMultisigCreateInstructionAsync(input),
+							getMultisigCreateInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					multisigImport: (input) =>
+					multisigImport: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getMultisigImportInstructionAsync(input),
+							getMultisigImportInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					proposalCreate: (input) =>
+					proposalCreate: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getProposalCreateInstruction(input),
+							getProposalCreateInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					proposalActivate: (input) =>
+					proposalActivate: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getProposalActivateInstruction(input),
+							getProposalActivateInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					proposalApprove: (input) =>
+					proposalApprove: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getProposalApproveInstruction(input),
+							getProposalApproveInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					proposalReject: (input) =>
+					proposalReject: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getProposalRejectInstruction(input),
+							getProposalRejectInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					proposalRevoke: (input) =>
+					proposalRevoke: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getProposalRevokeInstruction(input),
+							getProposalRevokeInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					proposalCancel: (input) =>
+					proposalCancel: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getProposalCancelInstruction(input),
+							getProposalCancelInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					vaultExecute: (input) =>
+					vaultExecute: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getVaultExecuteInstruction(input),
+							getVaultExecuteInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					configExecute: (input) =>
+					configExecute: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getConfigExecuteInstruction(input),
+							getConfigExecuteInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					configAuthorityExecute: (input) =>
+					configAuthorityExecute: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getConfigAuthorityExecuteInstruction(input),
+							getConfigAuthorityExecuteInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					spendingLimitUse: (input) =>
+					spendingLimitUse: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getSpendingLimitUseInstruction(input),
+							getSpendingLimitUseInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					proposalClose: (input) =>
+					proposalClose: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getProposalCloseInstruction(input),
+							getProposalCloseInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				pdas: {
-					programConfig: findProgramConfigPda,
-					multisig: findMultisigPda,
-					proposal: findProposalPda,
-					spendingLimit: findSpendingLimitPda,
+					programConfig: (pdaConfig) =>
+						findProgramConfigPda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					multisig: (seeds, pdaConfig) =>
+						findMultisigPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					proposal: (seeds, pdaConfig) =>
+						findProposalPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					spendingLimit: (seeds, pdaConfig) =>
+						findSpendingLimitPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
 				},
 				identifyAccount: identifyMultisigProgramAccount,
 				identifyInstruction: identifyMultisigProgramInstruction,

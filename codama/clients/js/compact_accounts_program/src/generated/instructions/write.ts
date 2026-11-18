@@ -133,7 +133,9 @@ export async function getWriteInstructionAsync<
 		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: WriteAsyncInput<TAccountAuthority, TAccountJournal>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	WriteInstruction<
 		TProgramAddress,
@@ -148,8 +150,11 @@ export async function getWriteInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -225,7 +230,9 @@ export function getWriteInstruction<
 		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: WriteInput<TAccountAuthority, TAccountJournal>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): WriteInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -238,8 +245,11 @@ export function getWriteInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

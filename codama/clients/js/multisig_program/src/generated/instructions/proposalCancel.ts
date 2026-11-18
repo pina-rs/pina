@@ -132,7 +132,9 @@ export function getProposalCancelInstruction<
 		TAccountMember,
 		TAccountClock
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ProposalCancelInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -153,8 +155,11 @@ export function getProposalCancelInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		MULTISIG_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

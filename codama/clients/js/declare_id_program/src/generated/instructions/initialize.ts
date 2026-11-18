@@ -77,11 +77,16 @@ export type InitializeInput = {};
 export function getInitializeInstruction<
 	TProgramAddress extends Address = typeof DECLARE_ID_PROGRAM_PROGRAM_ADDRESS,
 >(
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): InitializeInstruction<TProgramAddress> {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		DECLARE_ID_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	return Object.freeze(
 		{

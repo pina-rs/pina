@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -170,16 +171,19 @@ export type TodoProgramPluginAccounts = {
 export type TodoProgramPluginInstructions = {
 	initialize: (
 		input: InitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	toggleCompleted: (
 		input: ToggleCompletedAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getToggleCompletedInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	updateDigest: (
 		input: UpdateDigestAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getUpdateDigestInstructionAsync>
 		& SelfPlanAndSendFunctions;
@@ -192,7 +196,9 @@ export type TodoProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function todoProgramProgram() {
+export function todoProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends TodoProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { todoProgram: TodoProgramPlugin }> => {
@@ -204,23 +210,38 @@ export function todoProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					toggleCompleted: (input) =>
+					toggleCompleted: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getToggleCompletedInstructionAsync(input),
+							getToggleCompletedInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					updateDigest: (input) =>
+					updateDigest: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getUpdateDigestInstructionAsync(input),
+							getUpdateDigestInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
-				pdas: { todo: findTodoPda },
+				pdas: {
+					todo: (seeds, pdaConfig) =>
+						findTodoPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyTodoProgramAccount,
 				identifyInstruction: identifyTodoProgramInstruction,
 				parseInstruction: parseTodoProgramInstruction,

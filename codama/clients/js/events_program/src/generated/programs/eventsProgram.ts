@@ -14,6 +14,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -147,12 +148,15 @@ export type EventsProgramPlugin = {
 export type EventsProgramPluginInstructions = {
 	initialize: (
 		input: InitializeInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
 	testEvent: (
 		input: TestEventInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getTestEventInstruction> & SelfPlanAndSendFunctions;
 	testEventCpi: (
 		input: TestEventCpiInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getTestEventCpiInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -160,24 +164,38 @@ export type EventsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function eventsProgramProgram() {
+export function eventsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends EventsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { eventsProgram: EventsProgramPlugin }> => {
 		return extendClient(client, {
 			eventsProgram: <EventsProgramPlugin> {
 				instructions: {
-					initialize: (input) =>
+					initialize: (_input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					testEvent: (input) =>
-						addSelfPlanAndSendFunctions(client, getTestEventInstruction(input)),
-					testEventCpi: (input) =>
+					testEvent: (_input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getTestEventCpiInstruction(input),
+							getTestEventInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					testEventCpi: (_input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getTestEventCpiInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				identifyInstruction: identifyEventsProgramInstruction,

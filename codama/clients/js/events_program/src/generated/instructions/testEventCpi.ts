@@ -80,11 +80,16 @@ export type TestEventCpiInput = {};
 export function getTestEventCpiInstruction<
 	TProgramAddress extends Address = typeof EVENTS_PROGRAM_PROGRAM_ADDRESS,
 >(
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): TestEventCpiInstruction<TProgramAddress> {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		EVENTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	return Object.freeze(
 		{

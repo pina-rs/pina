@@ -128,7 +128,9 @@ export async function getAddTagInstructionAsync<
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: AddTagAsyncInput<TAccountAuthority, TAccountProfile>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	AddTagInstruction<
 		TProgramAddress,
@@ -143,8 +145,11 @@ export async function getAddTagInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -219,7 +224,9 @@ export function getAddTagInstruction<
 	TProgramAddress extends Address = typeof PROFILE_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: AddTagInput<TAccountAuthority, TAccountProfile>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): AddTagInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -232,8 +239,11 @@ export function getAddTagInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PROFILE_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

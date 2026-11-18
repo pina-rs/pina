@@ -126,7 +126,9 @@ export function getRotateAuthorityInstruction<
 	TProgramAddress extends Address = typeof PROP_AMM_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RotateAuthorityInput<TAccountOracle, TAccountAuthority>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): RotateAuthorityInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -139,8 +141,11 @@ export function getRotateAuthorityInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PROP_AMM_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

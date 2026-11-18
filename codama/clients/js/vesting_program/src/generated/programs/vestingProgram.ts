@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -170,14 +171,17 @@ export type VestingProgramPluginAccounts = {
 export type VestingProgramPluginInstructions = {
 	initialize: (
 		input: InitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	claim: (
 		input: ClaimInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getClaimInstruction> & SelfPlanAndSendFunctions;
 	cancel: (
 		input: CancelInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getCancelInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -188,7 +192,9 @@ export type VestingProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function vestingProgramProgram() {
+export function vestingProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends VestingProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { vestingProgram: VestingProgramPlugin }> => {
@@ -200,17 +206,38 @@ export function vestingProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					claim: (input) =>
-						addSelfPlanAndSendFunctions(client, getClaimInstruction(input)),
-					cancel: (input) =>
-						addSelfPlanAndSendFunctions(client, getCancelInstruction(input)),
+					claim: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getClaimInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					cancel: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getCancelInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
-				pdas: { vesting: findVestingPda },
+				pdas: {
+					vesting: (seeds, pdaConfig) =>
+						findVestingPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyVestingProgramAccount,
 				identifyInstruction: identifyVestingProgramInstruction,
 				parseInstruction: parseVestingProgramInstruction,

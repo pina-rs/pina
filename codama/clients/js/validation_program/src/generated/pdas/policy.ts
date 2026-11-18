@@ -21,13 +21,17 @@ export type PolicySeeds = {
 
 export async function findPolicyPda(
 	seeds: PolicySeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn" as Address<
-			"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
-		>,
+		programAddress: programAddressInput =
+			"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn" as Address<
+				"GKYaKKaAJvuzkH2GKkaEFAqESh9NEobZ3V2Ub7qbpVYn"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

@@ -21,13 +21,17 @@ export type JournalSeeds = {
 
 export async function findJournalPda(
 	seeds: JournalSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn" as Address<
-			"85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn"
-		>,
+		programAddress: programAddressInput =
+			"85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn" as Address<
+				"85qGHkkBAdE61PZSNF9R6UYakqw8d5eonqi4jbFLaSTn"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

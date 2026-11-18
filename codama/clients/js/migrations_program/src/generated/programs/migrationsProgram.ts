@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -195,9 +196,11 @@ export type MigrationsProgramPluginAccounts = {
 export type MigrationsProgramPluginInstructions = {
 	update: (
 		input: UpdateInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getUpdateInstruction> & SelfPlanAndSendFunctions;
 	relay: (
 		input: RelayInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getRelayInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -206,7 +209,9 @@ export type MigrationsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function migrationsProgramProgram() {
+export function migrationsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends MigrationsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { migrationsProgram: MigrationsProgramPlugin }> => {
@@ -220,10 +225,22 @@ export function migrationsProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					update: (input) =>
-						addSelfPlanAndSendFunctions(client, getUpdateInstruction(input)),
-					relay: (input) =>
-						addSelfPlanAndSendFunctions(client, getRelayInstruction(input)),
+					update: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getUpdateInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					relay: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRelayInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
 				identifyAccount: identifyMigrationsProgramAccount,
 				identifyInstruction: identifyMigrationsProgramInstruction,

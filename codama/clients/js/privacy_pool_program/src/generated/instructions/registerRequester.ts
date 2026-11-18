@@ -149,7 +149,9 @@ export async function getRegisterRequesterInstructionAsync<
 		TAccountPoolConfig,
 		TAccountRequesterRegistry
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	RegisterRequesterInstruction<
 		TProgramAddress,
@@ -168,8 +170,11 @@ export async function getRegisterRequesterInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -261,7 +266,9 @@ export function getRegisterRequesterInstruction<
 		TAccountPoolConfig,
 		TAccountRequesterRegistry
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): RegisterRequesterInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -278,8 +285,11 @@ export function getRegisterRequesterInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

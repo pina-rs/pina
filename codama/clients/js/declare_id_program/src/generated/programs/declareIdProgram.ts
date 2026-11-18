@@ -14,6 +14,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -93,6 +94,7 @@ export type DeclareIdProgramPlugin = {
 export type DeclareIdProgramPluginInstructions = {
 	initialize: (
 		input: InitializeInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -100,17 +102,22 @@ export type DeclareIdProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function declareIdProgramProgram() {
+export function declareIdProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends DeclareIdProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { declareIdProgram: DeclareIdProgramPlugin }> => {
 		return extendClient(client, {
 			declareIdProgram: <DeclareIdProgramPlugin> {
 				instructions: {
-					initialize: (input) =>
+					initialize: (_input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				identifyInstruction: identifyDeclareIdProgramInstruction,

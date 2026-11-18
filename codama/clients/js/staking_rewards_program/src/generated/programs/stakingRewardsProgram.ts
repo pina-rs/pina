@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -232,23 +233,29 @@ export type StakingRewardsProgramPluginAccounts = {
 export type StakingRewardsProgramPluginInstructions = {
 	initializePool: (
 		input: InitializePoolAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializePoolInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	openPosition: (
 		input: OpenPositionInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getOpenPositionInstruction> & SelfPlanAndSendFunctions;
 	deposit: (
 		input: DepositInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getDepositInstruction> & SelfPlanAndSendFunctions;
 	withdraw: (
 		input: WithdrawInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getWithdrawInstruction> & SelfPlanAndSendFunctions;
 	claim: (
 		input: ClaimInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getClaimInstruction> & SelfPlanAndSendFunctions;
 	setRewardIndex: (
 		input: SetRewardIndexInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getSetRewardIndexInstruction>
 		& SelfPlanAndSendFunctions;
@@ -264,7 +271,9 @@ export type StakingRewardsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function stakingRewardsProgramProgram() {
+export function stakingRewardsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends StakingRewardsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<
@@ -280,29 +289,67 @@ export function stakingRewardsProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initializePool: (input) =>
+					initializePool: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializePoolInstructionAsync(input),
+							getInitializePoolInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					openPosition: (input) =>
+					openPosition: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getOpenPositionInstruction(input),
+							getOpenPositionInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					deposit: (input) =>
-						addSelfPlanAndSendFunctions(client, getDepositInstruction(input)),
-					withdraw: (input) =>
-						addSelfPlanAndSendFunctions(client, getWithdrawInstruction(input)),
-					claim: (input) =>
-						addSelfPlanAndSendFunctions(client, getClaimInstruction(input)),
-					setRewardIndex: (input) =>
+					deposit: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getSetRewardIndexInstruction(input),
+							getDepositInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					withdraw: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getWithdrawInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					claim: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getClaimInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					setRewardIndex: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getSetRewardIndexInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
-				pdas: { pool: findPoolPda, position: findPositionPda },
+				pdas: {
+					pool: (seeds, pdaConfig) =>
+						findPoolPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					position: (seeds, pdaConfig) =>
+						findPositionPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyStakingRewardsProgramAccount,
 				identifyInstruction: identifyStakingRewardsProgramInstruction,
 				parseInstruction: parseStakingRewardsProgramInstruction,

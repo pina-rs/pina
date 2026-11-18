@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -191,15 +192,19 @@ export type OptionalAccountsProgramPluginAccounts = {
 export type OptionalAccountsProgramPluginInstructions = {
 	init: (
 		input: InitAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getInitInstructionAsync> & SelfPlanAndSendFunctions;
 	touch: (
 		input: TouchInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getTouchInstruction> & SelfPlanAndSendFunctions;
 	inspect: (
 		input: InspectInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getInspectInstruction> & SelfPlanAndSendFunctions;
 	note: (
 		input: NoteInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getNoteInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -210,7 +215,9 @@ export type OptionalAccountsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function optionalAccountsProgramProgram() {
+export function optionalAccountsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends OptionalAccountsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<
@@ -225,16 +232,46 @@ export function optionalAccountsProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					init: (input) =>
-						addSelfPlanAndSendFunctions(client, getInitInstructionAsync(input)),
-					touch: (input) =>
-						addSelfPlanAndSendFunctions(client, getTouchInstruction(input)),
-					inspect: (input) =>
-						addSelfPlanAndSendFunctions(client, getInspectInstruction(input)),
-					note: (input) =>
-						addSelfPlanAndSendFunctions(client, getNoteInstruction(input)),
+					init: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInitInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					touch: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getTouchInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					inspect: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getInspectInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					note: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getNoteInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
-				pdas: { store: findStorePda },
+				pdas: {
+					store: (seeds, pdaConfig) =>
+						findStorePda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyOptionalAccountsProgramAccount,
 				identifyInstruction: identifyOptionalAccountsProgramInstruction,
 				parseInstruction: parseOptionalAccountsProgramInstruction,

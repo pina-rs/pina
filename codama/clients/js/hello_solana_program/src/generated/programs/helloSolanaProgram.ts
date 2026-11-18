@@ -15,6 +15,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -95,6 +96,7 @@ export type HelloSolanaProgramPlugin = {
 export type HelloSolanaProgramPluginInstructions = {
 	hello: (
 		input: HelloInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -102,15 +104,23 @@ export type HelloSolanaProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function helloSolanaProgramProgram() {
+export function helloSolanaProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends HelloSolanaProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { helloSolanaProgram: HelloSolanaProgramPlugin }> => {
 		return extendClient(client, {
 			helloSolanaProgram: <HelloSolanaProgramPlugin> {
 				instructions: {
-					hello: (input) =>
-						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
+					hello: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getHelloInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
 				identifyInstruction: identifyHelloSolanaProgramInstruction,
 				parseInstruction: parseHelloSolanaProgramInstruction,

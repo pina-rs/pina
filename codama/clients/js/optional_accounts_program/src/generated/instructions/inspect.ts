@@ -123,7 +123,9 @@ export function getInspectInstruction<
 		typeof OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InspectInput<TAccountAuthority, TAccountStore, TAccountWitness>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): InspectInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -140,8 +142,11 @@ export function getInspectInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		OPTIONAL_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

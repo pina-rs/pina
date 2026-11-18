@@ -111,7 +111,9 @@ export function getAllowsDuplicateReadonlyInstruction<
 		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: AllowsDuplicateReadonlyInput<TAccountAccount1, TAccountAccount2>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): AllowsDuplicateReadonlyInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -124,8 +126,11 @@ export function getAllowsDuplicateReadonlyInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
