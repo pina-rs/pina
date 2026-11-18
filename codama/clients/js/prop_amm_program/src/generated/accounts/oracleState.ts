@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -21,8 +22,10 @@ import {
 	type FixedSizeCodec,
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
+	type GetAccountInfoApi,
 	getAddressDecoder,
 	getAddressEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU64Decoder,
@@ -117,8 +120,10 @@ export function decodeOracleState<TAddress extends string = string>(
 }
 
 export async function fetchOracleState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<OracleState, TAddress>> {
 	const maybeAccount = await fetchMaybeOracleState(rpc, address, config);
@@ -127,17 +132,25 @@ export async function fetchOracleState<TAddress extends string = string>(
 }
 
 export async function fetchMaybeOracleState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<OracleState, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeOracleState(maybeAccount);
 }
 
 export async function fetchAllOracleState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<OracleState>[]> {
 	const maybeAccounts = await fetchAllMaybeOracleState(rpc, addresses, config);
@@ -146,11 +159,17 @@ export async function fetchAllOracleState(
 }
 
 export async function fetchAllMaybeOracleState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<OracleState>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodeOracleState(maybeAccount));
 }
 

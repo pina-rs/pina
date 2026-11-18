@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -185,17 +186,21 @@ export type CompactAccountsProgramPluginAccounts = {
 export type CompactAccountsProgramPluginInstructions = {
 	initialize: (
 		input: InitializeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializeInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	resize: (
 		input: ResizeAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getResizeInstructionAsync> & SelfPlanAndSendFunctions;
 	write: (
 		input: WriteAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getWriteInstructionAsync> & SelfPlanAndSendFunctions;
 	rename: (
 		input: RenameAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getRenameInstructionAsync> & SelfPlanAndSendFunctions;
 };
 
@@ -208,7 +213,9 @@ export type CompactAccountsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function compactAccountsProgramProgram() {
+export function compactAccountsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends CompactAccountsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<
@@ -221,28 +228,46 @@ export function compactAccountsProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstructionAsync(input),
+							getInitializeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					resize: (input) =>
+					resize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getResizeInstructionAsync(input),
+							getResizeInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					write: (input) =>
+					write: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getWriteInstructionAsync(input),
+							getWriteInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					rename: (input) =>
+					rename: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRenameInstructionAsync(input),
+							getRenameInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
-				pdas: { journal: findJournalPda },
+				pdas: {
+					journal: (seeds, pdaConfig) =>
+						findJournalPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyCompactAccountsProgramAccount,
 				identifyInstruction: identifyCompactAccountsProgramInstruction,
 				parseInstruction: parseCompactAccountsProgramInstruction,

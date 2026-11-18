@@ -185,7 +185,9 @@ export async function getInitializePoolInstructionAsync<
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	InitializePoolInstruction<
 		TProgramAddress,
@@ -228,8 +230,11 @@ export async function getInitializePoolInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -419,7 +424,9 @@ export function getInitializePoolInstruction<
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): InitializePoolInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -460,8 +467,11 @@ export function getInitializePoolInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		STAKING_REWARDS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

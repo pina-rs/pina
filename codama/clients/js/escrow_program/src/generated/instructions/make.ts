@@ -207,7 +207,9 @@ export function getMakeInstruction<
 		TAccountSystemProgram,
 		TAccountTokenProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): MakeInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -248,8 +250,11 @@ export function getMakeInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		ESCROW_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

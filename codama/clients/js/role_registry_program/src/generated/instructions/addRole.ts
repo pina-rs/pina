@@ -166,7 +166,9 @@ export function getAddRoleInstruction<
 		TAccountRoleEntry,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): AddRoleInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -191,8 +193,11 @@ export function getAddRoleInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

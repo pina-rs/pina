@@ -113,11 +113,16 @@ export function getFillInstruction<
 	TProgramAddress extends Address = typeof HEAP_ALLOC_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: FillInput,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): FillInstruction<TProgramAddress> {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		HEAP_ALLOC_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Original args.
 	const args = { ...input };

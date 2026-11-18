@@ -150,7 +150,9 @@ export async function getInitializeInstructionAsync<
 		TAccountTodo,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	InitializeInstruction<
 		TProgramAddress,
@@ -169,7 +171,11 @@ export async function getInitializeInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddressInput = config?.programAddress ??
+		TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -255,7 +261,9 @@ export function getInitializeInstruction<
 	TProgramAddress extends Address = typeof TODO_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: InitializeInput<TAccountOwner, TAccountTodo, TAccountSystemProgram>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): InitializeInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -272,7 +280,11 @@ export function getInitializeInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ?? TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddressInput = config?.programAddress ??
+		TODO_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

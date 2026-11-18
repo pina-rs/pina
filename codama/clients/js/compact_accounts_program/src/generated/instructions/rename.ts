@@ -156,7 +156,9 @@ export async function getRenameInstructionAsync<
 		TAccountJournal,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	RenameInstruction<
 		TProgramAddress,
@@ -175,8 +177,11 @@ export async function getRenameInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -272,7 +277,9 @@ export function getRenameInstruction<
 		typeof COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: RenameInput<TAccountAuthority, TAccountJournal, TAccountSystemProgram>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): RenameInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -289,8 +296,11 @@ export function getRenameInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		COMPACT_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

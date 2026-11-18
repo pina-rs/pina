@@ -106,7 +106,9 @@ export function getHelloInstruction<
 	TProgramAddress extends Address = typeof HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: HelloInput<TAccountUser>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): HelloInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -115,8 +117,11 @@ export function getHelloInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		HELLO_SOLANA_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

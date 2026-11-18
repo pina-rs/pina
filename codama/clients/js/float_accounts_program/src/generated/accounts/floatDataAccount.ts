@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -21,8 +22,10 @@ import {
 	type FixedSizeCodec,
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
+	type GetAccountInfoApi,
 	getAddressDecoder,
 	getAddressEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU32Decoder,
@@ -132,8 +135,10 @@ export function decodeFloatDataAccount<TAddress extends string = string>(
 }
 
 export async function fetchFloatDataAccount<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<FloatDataAccount, TAddress>> {
 	const maybeAccount = await fetchMaybeFloatDataAccount(rpc, address, config);
@@ -144,17 +149,25 @@ export async function fetchFloatDataAccount<TAddress extends string = string>(
 export async function fetchMaybeFloatDataAccount<
 	TAddress extends string = string,
 >(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<FloatDataAccount, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeFloatDataAccount(maybeAccount);
 }
 
 export async function fetchAllFloatDataAccount(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<FloatDataAccount>[]> {
 	const maybeAccounts = await fetchAllMaybeFloatDataAccount(
@@ -167,11 +180,17 @@ export async function fetchAllFloatDataAccount(
 }
 
 export async function fetchAllMaybeFloatDataAccount(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<FloatDataAccount>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) =>
 		decodeFloatDataAccount(maybeAccount)
 	);

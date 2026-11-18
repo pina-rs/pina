@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	combineCodec,
 	decodeAccount,
 	type EncodedAccount,
@@ -21,8 +22,10 @@ import {
 	type FixedSizeCodec,
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
+	type GetAccountInfoApi,
 	getAddressDecoder,
 	getAddressEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU64Decoder,
@@ -134,8 +137,10 @@ export function decodePositionState<TAddress extends string = string>(
 }
 
 export async function fetchPositionState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<PositionState, TAddress>> {
 	const maybeAccount = await fetchMaybePositionState(rpc, address, config);
@@ -144,17 +149,25 @@ export async function fetchPositionState<TAddress extends string = string>(
 }
 
 export async function fetchMaybePositionState<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<PositionState, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodePositionState(maybeAccount);
 }
 
 export async function fetchAllPositionState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<PositionState>[]> {
 	const maybeAccounts = await fetchAllMaybePositionState(
@@ -167,18 +180,26 @@ export async function fetchAllPositionState(
 }
 
 export async function fetchAllMaybePositionState(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<PositionState>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodePositionState(maybeAccount));
 }
 
 export async function fetchPositionStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: PositionSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<PositionState>> {
 	const maybeAccount = await fetchMaybePositionStateFromSeeds(
 		rpc,
@@ -190,9 +211,11 @@ export async function fetchPositionStateFromSeeds(
 }
 
 export async function fetchMaybePositionStateFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: PositionSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<PositionState>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findPositionPda(seeds, { programAddress });

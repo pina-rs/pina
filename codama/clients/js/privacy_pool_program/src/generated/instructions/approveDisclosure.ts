@@ -168,7 +168,9 @@ export async function getApproveDisclosureInstructionAsync<
 		TAccountDisclosureLog,
 		TAccountClock
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	ApproveDisclosureInstruction<
 		TProgramAddress,
@@ -199,8 +201,11 @@ export async function getApproveDisclosureInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -336,7 +341,9 @@ export function getApproveDisclosureInstruction<
 		TAccountDisclosureLog,
 		TAccountClock
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ApproveDisclosureInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -365,8 +372,11 @@ export function getApproveDisclosureInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

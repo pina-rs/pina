@@ -144,7 +144,9 @@ export async function getSetCustodiansInstructionAsync<
 		TAccountPoolConfig,
 		TAccountCustodianRegistry
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	SetCustodiansInstruction<
 		TProgramAddress,
@@ -163,8 +165,11 @@ export async function getSetCustodiansInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -255,7 +260,9 @@ export function getSetCustodiansInstruction<
 		TAccountPoolConfig,
 		TAccountCustodianRegistry
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): SetCustodiansInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -272,8 +279,11 @@ export function getSetCustodiansInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

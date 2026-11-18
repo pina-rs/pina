@@ -15,6 +15,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -142,16 +143,19 @@ export type DuplicateMutableAccountsProgramPlugin = {
 export type DuplicateMutableAccountsProgramPluginInstructions = {
 	failsDuplicateMutable: (
 		input: FailsDuplicateMutableInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getFailsDuplicateMutableInstruction>
 		& SelfPlanAndSendFunctions;
 	allowsDuplicateMutable: (
 		input: AllowsDuplicateMutableInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getAllowsDuplicateMutableInstruction>
 		& SelfPlanAndSendFunctions;
 	allowsDuplicateReadonly: (
 		input: AllowsDuplicateReadonlyInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getAllowsDuplicateReadonlyInstruction>
 		& SelfPlanAndSendFunctions;
@@ -161,7 +165,9 @@ export type DuplicateMutableAccountsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function duplicateMutableAccountsProgramProgram() {
+export function duplicateMutableAccountsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends DuplicateMutableAccountsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<
@@ -171,20 +177,29 @@ export function duplicateMutableAccountsProgramProgram() {
 		return extendClient(client, {
 			duplicateMutableAccountsProgram: <DuplicateMutableAccountsProgramPlugin> {
 				instructions: {
-					failsDuplicateMutable: (input) =>
+					failsDuplicateMutable: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getFailsDuplicateMutableInstruction(input),
+							getFailsDuplicateMutableInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					allowsDuplicateMutable: (input) =>
+					allowsDuplicateMutable: (_input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getAllowsDuplicateMutableInstruction(input),
+							getAllowsDuplicateMutableInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					allowsDuplicateReadonly: (input) =>
+					allowsDuplicateReadonly: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getAllowsDuplicateReadonlyInstruction(input),
+							getAllowsDuplicateReadonlyInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				identifyInstruction: identifyDuplicateMutableAccountsProgramInstruction,

@@ -239,7 +239,9 @@ export async function getTransferInstructionAsync<
 		TAccountNoteCommitment,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	TransferInstruction<
 		TProgramAddress,
@@ -274,8 +276,11 @@ export async function getTransferInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -441,7 +446,9 @@ export function getTransferInstruction<
 		TAccountNoteCommitment,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): TransferInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -474,8 +481,11 @@ export function getTransferInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

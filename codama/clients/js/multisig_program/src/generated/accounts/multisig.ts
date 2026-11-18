@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	type Codec,
 	combineCodec,
 	decodeAccount,
@@ -21,10 +22,12 @@ import {
 	type FetchAccountsConfig,
 	fetchEncodedAccount,
 	fetchEncodedAccounts,
+	type GetAccountInfoApi,
 	getAddressDecoder,
 	getAddressEncoder,
 	getArrayDecoder,
 	getArrayEncoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU16Decoder,
@@ -328,8 +331,10 @@ export function decodeMultisig<TAddress extends string = string>(
 }
 
 export async function fetchMultisig<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<Multisig, TAddress>> {
 	const maybeAccount = await fetchMaybeMultisig(rpc, address, config);
@@ -338,17 +343,25 @@ export async function fetchMultisig<TAddress extends string = string>(
 }
 
 export async function fetchMaybeMultisig<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<Multisig, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeMultisig(maybeAccount);
 }
 
 export async function fetchAllMultisig(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<Multisig>[]> {
 	const maybeAccounts = await fetchAllMaybeMultisig(rpc, addresses, config);
@@ -357,18 +370,26 @@ export async function fetchAllMultisig(
 }
 
 export async function fetchAllMaybeMultisig(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<Multisig>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodeMultisig(maybeAccount));
 }
 
 export async function fetchMultisigFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: MultisigSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<Multisig>> {
 	const maybeAccount = await fetchMaybeMultisigFromSeeds(rpc, seeds, config);
 	assertAccountExists(maybeAccount);
@@ -376,9 +397,11 @@ export async function fetchMultisigFromSeeds(
 }
 
 export async function fetchMaybeMultisigFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: MultisigSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<Multisig>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findMultisigPda(seeds, { programAddress });

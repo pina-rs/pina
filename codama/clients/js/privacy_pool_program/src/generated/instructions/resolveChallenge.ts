@@ -145,7 +145,9 @@ export async function getResolveChallengeInstructionAsync<
 		TAccountPoolConfig,
 		TAccountDisclosureRequest
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	ResolveChallengeInstruction<
 		TProgramAddress,
@@ -164,8 +166,11 @@ export async function getResolveChallengeInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -251,7 +256,9 @@ export function getResolveChallengeInstruction<
 		TAccountPoolConfig,
 		TAccountDisclosureRequest
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ResolveChallengeInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -268,8 +275,11 @@ export function getResolveChallengeInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

@@ -208,7 +208,9 @@ export async function getSetVerificationKeyInstructionAsync<
 		TAccountVerifyingKeyAccount,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	SetVerificationKeyInstruction<
 		TProgramAddress,
@@ -231,8 +233,11 @@ export async function getSetVerificationKeyInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -343,7 +348,9 @@ export function getSetVerificationKeyInstruction<
 		TAccountVerifyingKeyAccount,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): SetVerificationKeyInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -364,8 +371,11 @@ export function getSetVerificationKeyInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

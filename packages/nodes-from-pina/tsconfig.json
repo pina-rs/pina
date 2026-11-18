@@ -8,9 +8,5 @@
 		"skipLibCheck": true,
 		"types": ["node", "vitest/globals"]
 	},
-	"include": [
-		"src/**/*.ts",
-		"test/**/*.ts",
-		"../../codama/clients/js/solana-kit-compat.d.ts"
-	]
+	"include": ["src/**/*.ts", "test/**/*.ts"]
 }

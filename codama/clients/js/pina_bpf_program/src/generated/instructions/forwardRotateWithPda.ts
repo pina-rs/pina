@@ -142,7 +142,9 @@ export async function getForwardRotateWithPdaInstructionAsync<
 		TAccountAuthority,
 		TAccountPropAmmProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	ForwardRotateWithPdaInstruction<
 		TProgramAddress,
@@ -161,8 +163,11 @@ export async function getForwardRotateWithPdaInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PINA_BPF_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -245,7 +250,9 @@ export function getForwardRotateWithPdaInstruction<
 		TAccountAuthority,
 		TAccountPropAmmProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ForwardRotateWithPdaInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -262,8 +269,11 @@ export function getForwardRotateWithPdaInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PINA_BPF_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

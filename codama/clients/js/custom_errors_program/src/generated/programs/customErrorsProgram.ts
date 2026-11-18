@@ -14,6 +14,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -189,24 +190,31 @@ export type CustomErrorsProgramPlugin = {
 export type CustomErrorsProgramPluginInstructions = {
 	hello: (
 		input: HelloInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
 	helloNoMsg: (
 		input: HelloNoMsgInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getHelloNoMsgInstruction> & SelfPlanAndSendFunctions;
 	helloNext: (
 		input: HelloNextInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getHelloNextInstruction> & SelfPlanAndSendFunctions;
 	requireEq: (
 		input: RequireEqInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getRequireEqInstruction> & SelfPlanAndSendFunctions;
 	requireNeq: (
 		input: RequireNeqInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getRequireNeqInstruction> & SelfPlanAndSendFunctions;
 	requireGt: (
 		input: RequireGtInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getRequireGtInstruction> & SelfPlanAndSendFunctions;
 	requireGte: (
 		input: RequireGteInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getRequireGteInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -214,35 +222,70 @@ export type CustomErrorsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function customErrorsProgramProgram() {
+export function customErrorsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends CustomErrorsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { customErrorsProgram: CustomErrorsProgramPlugin }> => {
 		return extendClient(client, {
 			customErrorsProgram: <CustomErrorsProgramPlugin> {
 				instructions: {
-					hello: (input) =>
-						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
-					helloNoMsg: (input) =>
+					hello: (_input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getHelloNoMsgInstruction(input),
+							getHelloInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					helloNext: (input) =>
-						addSelfPlanAndSendFunctions(client, getHelloNextInstruction(input)),
-					requireEq: (input) =>
-						addSelfPlanAndSendFunctions(client, getRequireEqInstruction(input)),
-					requireNeq: (input) =>
+					helloNoMsg: (_input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRequireNeqInstruction(input),
+							getHelloNoMsgInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					requireGt: (input) =>
-						addSelfPlanAndSendFunctions(client, getRequireGtInstruction(input)),
-					requireGte: (input) =>
+					helloNext: (_input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getRequireGteInstruction(input),
+							getHelloNextInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					requireEq: (_input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRequireEqInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					requireNeq: (_input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRequireNeqInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					requireGt: (_input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRequireGtInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					requireGte: (_input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getRequireGteInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				identifyInstruction: identifyCustomErrorsProgramInstruction,

@@ -8,6 +8,7 @@
 
 import {
 	type Address,
+	type HasAddress,
 	isProgramError,
 	type SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM,
 	type SolanaError,
@@ -83,13 +84,19 @@ export function isCustomErrorsProgramError<
 		instructions: Record<number, { programAddress: Address }>;
 	},
 	code?: TProgramErrorCode,
+	config: { programAddress?: Address | HasAddress } = {},
 ): error is
 	& SolanaError<typeof SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM>
 	& Readonly<{ context: Readonly<{ code: TProgramErrorCode }> }> {
+	const programAddressInput = config.programAddress ??
+		CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return isProgramError<TProgramErrorCode>(
 		error,
 		transactionMessage,
-		CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
+		programAddress,
 		code,
 	);
 }

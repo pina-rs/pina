@@ -23,13 +23,17 @@ export type EscrowSeeds = {
 
 export async function findEscrowPda(
 	seeds: EscrowSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT" as Address<
-			"4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT"
-		>,
+		programAddress: programAddressInput =
+			"4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT" as Address<
+				"4ibrEMW5F6hKnkW4jVedswYv6H6VtwPN6ar6dvXDN1nT"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

@@ -115,7 +115,9 @@ export function getSysvarsInstruction<
 		typeof SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: SysvarsInput<TAccountClock, TAccountRent, TAccountStakeHistory>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): SysvarsInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -132,8 +134,11 @@ export function getSysvarsInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		SYSVAR_CHECKS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

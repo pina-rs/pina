@@ -15,6 +15,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -95,6 +96,7 @@ export type SysvarChecksProgramPlugin = {
 export type SysvarChecksProgramPluginInstructions = {
 	sysvars: (
 		input: SysvarsInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getSysvarsInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -102,15 +104,23 @@ export type SysvarChecksProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function sysvarChecksProgramProgram() {
+export function sysvarChecksProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends SysvarChecksProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { sysvarChecksProgram: SysvarChecksProgramPlugin }> => {
 		return extendClient(client, {
 			sysvarChecksProgram: <SysvarChecksProgramPlugin> {
 				instructions: {
-					sysvars: (input) =>
-						addSelfPlanAndSendFunctions(client, getSysvarsInstruction(input)),
+					sysvars: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getSysvarsInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
 				identifyInstruction: identifySysvarChecksProgramInstruction,
 				parseInstruction: parseSysvarChecksProgramInstruction,

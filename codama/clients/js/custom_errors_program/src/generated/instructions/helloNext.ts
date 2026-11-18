@@ -78,11 +78,16 @@ export function getHelloNextInstruction<
 	TProgramAddress extends Address =
 		typeof CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS,
 >(
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): HelloNextInstruction<TProgramAddress> {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		CUSTOM_ERRORS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	return Object.freeze(
 		{

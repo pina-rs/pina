@@ -23,13 +23,17 @@ export type VestingSeeds = {
 
 export async function findVestingPda(
 	seeds: VestingSeeds,
-	config: { programAddress?: Address | undefined } = {},
+	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
-		programAddress = "FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh" as Address<
-			"FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh"
-		>,
+		programAddress: programAddressInput =
+			"FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh" as Address<
+				"FEa5fqN6NACrhWUZSBdGKybJKNxkdw8cdLvRvTARsFHh"
+			>,
 	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [

@@ -15,21 +15,14 @@ allowBuilds:
 
 audit:
   level: moderate
-
-# Advisories with no patched release. Each entry needs a reachability note, a
-# review date, and a removal condition; prefer an `overrides` pin to a patched
-# version whenever one exists.
-auditConfig:
-  ignoreGhsas:
-    # GHSA-fc5q-39xc-vjpf: picomatch <=4.0.7 ReDoS through repeated extglobs.
-    # No patched release exists (4.0.7 is the latest). Reached only through
-    # devDependencies (vitest, vite, fdir and tsup in the renderer packages and
-    # the codama e2e test projects): `pnpm why -r --prod picomatch` and
-    # `pnpm ls -r --prod --depth Infinity` find no picomatch, so no published
-    # package's runtime graph includes it. Reviewed 2026-11-18. Once picomatch
-    # publishes a fix, widen the `overrides` selector below to cover every
-    # affected version (it stops at <4.0.4 today), regenerate pnpm-lock.yaml,
-    # confirm no version <=4.0.7 remains, and then remove this entry.
+  # GHSA-fc5q-39xc-vjpf: picomatch <=4.0.7 ReDoS (CVE-2026-112366). No patched
+  # release exists (latest is 4.0.7). Dev-only, reached through vitest, vite,
+  # and fdir: `pnpm why -r --prod picomatch` finds nothing. Reviewed
+  # 2026-11-18. Once a patched picomatch is published, widen the `overrides`
+  # selector below to cover every affected version (it stops at <4.0.4),
+  # regenerate pnpm-lock.yaml, confirm no version <=4.0.7 remains, and then
+  # remove this entry.
+  ignore:
     - GHSA-fc5q-39xc-vjpf
 
 minimumReleaseAgeExclude:

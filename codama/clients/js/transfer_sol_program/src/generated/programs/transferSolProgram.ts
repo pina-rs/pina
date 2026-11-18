@@ -15,6 +15,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -112,9 +113,11 @@ export type TransferSolProgramPlugin = {
 export type TransferSolProgramPluginInstructions = {
 	cpiTransfer: (
 		input: CpiTransferInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getCpiTransferInstruction> & SelfPlanAndSendFunctions;
 	directTransfer: (
 		input: DirectTransferInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getDirectTransferInstruction>
 		& SelfPlanAndSendFunctions;
@@ -124,22 +127,30 @@ export type TransferSolProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function transferSolProgramProgram() {
+export function transferSolProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends TransferSolProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { transferSolProgram: TransferSolProgramPlugin }> => {
 		return extendClient(client, {
 			transferSolProgram: <TransferSolProgramPlugin> {
 				instructions: {
-					cpiTransfer: (input) =>
+					cpiTransfer: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getCpiTransferInstruction(input),
+							getCpiTransferInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					directTransfer: (input) =>
+					directTransfer: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getDirectTransferInstruction(input),
+							getDirectTransferInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				identifyInstruction: identifyTransferSolProgramInstruction,

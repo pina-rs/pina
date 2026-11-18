@@ -127,7 +127,9 @@ export function getCancelDisclosureInstruction<
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: CancelDisclosureInput<TAccountRequester, TAccountDisclosureRequest>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): CancelDisclosureInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -140,8 +142,11 @@ export function getCancelDisclosureInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

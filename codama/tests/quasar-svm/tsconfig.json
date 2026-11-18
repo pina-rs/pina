@@ -8,8 +8,5 @@
 		"skipLibCheck": true,
 		"types": ["node"]
 	},
-	"include": [
-		"src/**/*.ts",
-		"../../clients/js/solana-kit-compat.d.ts"
-	]
+	"include": ["src/**/*.ts"]
 }

@@ -138,7 +138,9 @@ export async function getReallocInstructionAsync<
 		TAccountSample,
 		TAccountSystemProgram
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): Promise<
 	ReallocInstruction<
 		TProgramAddress,
@@ -157,8 +159,11 @@ export async function getReallocInstructionAsync<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
@@ -252,7 +257,9 @@ export function getReallocInstruction<
 		typeof ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: ReallocInput<TAccountAuthority, TAccountSample, TAccountSystemProgram>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): ReallocInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -269,8 +276,11 @@ export function getReallocInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		ACCOUNT_REALLOC_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

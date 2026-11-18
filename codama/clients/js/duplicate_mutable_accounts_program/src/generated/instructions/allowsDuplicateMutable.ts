@@ -82,11 +82,16 @@ export function getAllowsDuplicateMutableInstruction<
 	TProgramAddress extends Address =
 		typeof DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS,
 >(
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): AllowsDuplicateMutableInstruction<TProgramAddress> {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		DUPLICATE_MUTABLE_ACCOUNTS_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	return Object.freeze(
 		{

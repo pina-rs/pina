@@ -11,6 +11,7 @@ import {
 	type Address,
 	assertAccountExists,
 	assertAccountsExist,
+	type ClientWithRpc,
 	type Codec,
 	combineCodec,
 	decodeAccount,
@@ -21,12 +22,14 @@ import {
 	type FetchAccountsConfig,
 	fetchEncodedAccount,
 	fetchEncodedAccounts,
+	type GetAccountInfoApi,
 	getAddressDecoder,
 	getAddressEncoder,
 	getArrayDecoder,
 	getArrayEncoder,
 	getI64Decoder,
 	getI64Encoder,
+	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
 	getU16Decoder,
@@ -282,8 +285,10 @@ export function decodeSpendingLimit<TAddress extends string = string>(
 }
 
 export async function fetchSpendingLimit<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<Account<SpendingLimit, TAddress>> {
 	const maybeAccount = await fetchMaybeSpendingLimit(rpc, address, config);
@@ -292,17 +297,25 @@ export async function fetchSpendingLimit<TAddress extends string = string>(
 }
 
 export async function fetchMaybeSpendingLimit<TAddress extends string = string>(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
-	address: Address<TAddress>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<SpendingLimit, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(rpc, address, config);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
 	return decodeSpendingLimit(maybeAccount);
 }
 
 export async function fetchAllSpendingLimit(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<Account<SpendingLimit>[]> {
 	const maybeAccounts = await fetchAllMaybeSpendingLimit(
@@ -315,18 +328,26 @@ export async function fetchAllSpendingLimit(
 }
 
 export async function fetchAllMaybeSpendingLimit(
-	rpc: Parameters<typeof fetchEncodedAccounts>[0],
-	addresses: Array<Address>,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<SpendingLimit>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(rpc, addresses, config);
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
 	return maybeAccounts.map((maybeAccount) => decodeSpendingLimit(maybeAccount));
 }
 
 export async function fetchSpendingLimitFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: SpendingLimitSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<SpendingLimit>> {
 	const maybeAccount = await fetchMaybeSpendingLimitFromSeeds(
 		rpc,
@@ -338,9 +359,11 @@ export async function fetchSpendingLimitFromSeeds(
 }
 
 export async function fetchMaybeSpendingLimitFromSeeds(
-	rpc: Parameters<typeof fetchEncodedAccount>[0],
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
 	seeds: SpendingLimitSeeds,
-	config: FetchAccountConfig & { programAddress?: Address } = {},
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<SpendingLimit>> {
 	const { programAddress, ...fetchConfig } = config;
 	const [address] = await findSpendingLimitPda(seeds, { programAddress });

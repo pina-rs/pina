@@ -15,6 +15,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -95,6 +96,7 @@ export type SystemAccountsProgramPlugin = {
 export type SystemAccountsProgramPluginInstructions = {
 	initialize: (
 		input: InitializeInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getInitializeInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -102,7 +104,9 @@ export type SystemAccountsProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function systemAccountsProgramProgram() {
+export function systemAccountsProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends SystemAccountsProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<
@@ -112,10 +116,13 @@ export function systemAccountsProgramProgram() {
 		return extendClient(client, {
 			systemAccountsProgram: <SystemAccountsProgramPlugin> {
 				instructions: {
-					initialize: (input) =>
+					initialize: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializeInstruction(input),
+							getInitializeInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
 				identifyInstruction: identifySystemAccountsProgramInstruction,

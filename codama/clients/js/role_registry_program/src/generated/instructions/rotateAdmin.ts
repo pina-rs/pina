@@ -125,7 +125,9 @@ export function getRotateAdminInstruction<
 		TAccountNewAdmin,
 		TAccountRegistryConfig
 	>,
-	config?: { programAddress?: TProgramAddress },
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
 ): RotateAdminInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
@@ -142,8 +144,11 @@ export function getRotateAdminInstruction<
 	>
 > {
 	// Program address.
-	const programAddress = config?.programAddress ??
+	const programAddressInput = config?.programAddress ??
 		ROLE_REGISTRY_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
 
 	// Account meta helper.
 	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");

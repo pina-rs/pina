@@ -14,6 +14,7 @@ import {
 	extendClient,
 	type ExtendedClient,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -109,9 +110,11 @@ export type HeapAllocProgramPlugin = {
 export type HeapAllocProgramPluginInstructions = {
 	allocate: (
 		input: AllocateInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getAllocateInstruction> & SelfPlanAndSendFunctions;
 	fill: (
 		input: FillInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getFillInstruction> & SelfPlanAndSendFunctions;
 };
 
@@ -119,17 +122,31 @@ export type HeapAllocProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function heapAllocProgramProgram() {
+export function heapAllocProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends HeapAllocProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { heapAllocProgram: HeapAllocProgramPlugin }> => {
 		return extendClient(client, {
 			heapAllocProgram: <HeapAllocProgramPlugin> {
 				instructions: {
-					allocate: (input) =>
-						addSelfPlanAndSendFunctions(client, getAllocateInstruction(input)),
-					fill: (input) =>
-						addSelfPlanAndSendFunctions(client, getFillInstruction(input)),
+					allocate: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getAllocateInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					fill: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getFillInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
 				},
 				identifyInstruction: identifyHeapAllocProgramInstruction,
 				parseInstruction: parseHeapAllocProgramInstruction,

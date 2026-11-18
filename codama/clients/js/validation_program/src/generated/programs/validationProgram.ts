@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -170,11 +171,13 @@ export type ValidationProgramPluginAccounts = {
 export type ValidationProgramPluginInstructions = {
 	initializePolicy: (
 		input: InitializePolicyAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getInitializePolicyInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	checkPolicy: (
 		input: CheckPolicyAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getCheckPolicyInstructionAsync>
 		& SelfPlanAndSendFunctions;
@@ -187,7 +190,9 @@ export type ValidationProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function validationProgramProgram() {
+export function validationProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends ValidationProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { validationProgram: ValidationProgramPlugin }> => {
@@ -199,18 +204,30 @@ export function validationProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initializePolicy: (input) =>
+					initializePolicy: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getInitializePolicyInstructionAsync(input),
+							getInitializePolicyInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					checkPolicy: (input) =>
+					checkPolicy: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getCheckPolicyInstructionAsync(input),
+							getCheckPolicyInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
-				pdas: { policy: findPolicyPda },
+				pdas: {
+					policy: (seeds, pdaConfig) =>
+						findPolicyPda(seeds, {
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyValidationProgramAccount,
 				identifyInstruction: identifyValidationProgramInstruction,
 				parseInstruction: parseValidationProgramInstruction,

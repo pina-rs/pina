@@ -18,6 +18,7 @@ import {
 	type GetAccountInfoApi,
 	type GetMultipleAccountsApi,
 	getU8Encoder,
+	type HasAddress,
 	type Instruction,
 	type InstructionWithData,
 	type ReadonlyUint8Array,
@@ -182,19 +183,23 @@ export type PinaBpfProgramPluginAccounts = {
 export type PinaBpfProgramPluginInstructions = {
 	hello: (
 		input: HelloInput,
+		config?: { programAddress?: Address | HasAddress },
 	) => ReturnType<typeof getHelloInstruction> & SelfPlanAndSendFunctions;
 	forwardRotateWithSigner: (
 		input: ForwardRotateWithSignerInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getForwardRotateWithSignerInstruction>
 		& SelfPlanAndSendFunctions;
 	forwardRotateWithPda: (
 		input: ForwardRotateWithPdaAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getForwardRotateWithPdaInstructionAsync>
 		& SelfPlanAndSendFunctions;
 	createPda: (
 		input: CreatePdaAsyncInput,
+		config?: { programAddress?: Address | HasAddress },
 	) =>
 		& ReturnType<typeof getCreatePdaInstructionAsync>
 		& SelfPlanAndSendFunctions;
@@ -210,7 +215,9 @@ export type PinaBpfProgramPluginRequirements =
 	& ClientWithTransactionPlanning
 	& ClientWithTransactionSending;
 
-export function pinaBpfProgramProgram() {
+export function pinaBpfProgramProgram(
+	config: { programAddress?: Address | HasAddress } = {},
+) {
 	return <T extends PinaBpfProgramPluginRequirements>(
 		client: T,
 	): ExtendedClient<T, { pinaBpfProgram: PinaBpfProgramPlugin }> => {
@@ -220,25 +227,51 @@ export function pinaBpfProgramProgram() {
 				instructions: {
 					migrate: (input: MigrateInput) =>
 						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					hello: (input) =>
-						addSelfPlanAndSendFunctions(client, getHelloInstruction(input)),
-					forwardRotateWithSigner: (input) =>
+					hello: (_input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getForwardRotateWithSignerInstruction(input),
+							getHelloInstruction({
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					forwardRotateWithPda: (input) =>
+					forwardRotateWithSigner: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getForwardRotateWithPdaInstructionAsync(input),
+							getForwardRotateWithSignerInstruction(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
-					createPda: (input) =>
+					forwardRotateWithPda: (input, instructionConfig) =>
 						addSelfPlanAndSendFunctions(
 							client,
-							getCreatePdaInstructionAsync(input),
+							getForwardRotateWithPdaInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
+						),
+					createPda: (input, instructionConfig) =>
+						addSelfPlanAndSendFunctions(
+							client,
+							getCreatePdaInstructionAsync(input, {
+								programAddress: instructionConfig?.programAddress ??
+									config.programAddress,
+							}),
 						),
 				},
-				pdas: { state: findStatePda, authority: findAuthorityPda },
+				pdas: {
+					state: (pdaConfig) =>
+						findStatePda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+					authority: (pdaConfig) =>
+						findAuthorityPda({
+							programAddress: pdaConfig?.programAddress ??
+								config.programAddress,
+						}),
+				},
 				identifyAccount: identifyPinaBpfProgramAccount,
 				identifyInstruction: identifyPinaBpfProgramInstruction,
 				parseInstruction: parsePinaBpfProgramInstruction,
