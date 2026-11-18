@@ -237,9 +237,27 @@ impl DeployProject {
 	/// A remote cluster where this project's program is deployed and the
 	/// counter's captured traffic is its history.
 	fn remote(&self) -> FakeRpcServer {
-		FakeRpcServer::start(remote_handler_for(&Fixtures::load(), &self.program_id))
+		local_cluster(remote_handler_for(&Fixtures::load(), &self.program_id))
 	}
 }
+
+/// Serve `cluster` on a loopback port that identifies itself as a private
+/// validator, the way `solana-test-validator` does. `pina deploy` asks a
+/// loopback endpoint for its genesis hash and version before anything else, and
+/// deploys to a private validator without confirmation.
+fn local_cluster(cluster: impl Fn(&str, &Value) -> Reply + Send + Sync + 'static) -> FakeRpcServer {
+	FakeRpcServer::start(move |method, params| {
+		match method {
+			"getGenesisHash" => Reply::Result(json!("11111111111111111111111111111111")),
+			"getVersion" => Reply::Result(json!({ "solana-core": "3.0.0", "feature-set": 1 })),
+			_ => cluster(method, params),
+		}
+	})
+}
+
+/// The deployment's identity probe comes first, so the rehearsal's own
+/// requests start after it.
+const PROBE_REQUESTS: usize = 2;
 
 /// Write an owner-only keypair from `seed` and return its address.
 fn write_keypair(path: &Path, seed: u8) -> String {
@@ -477,7 +495,7 @@ fn deploy_rehearsal_stops_a_changed_upgrade_before_anything_is_sent() {
 	assert!(stderr.contains("--allow-rehearsal-changes"), "{stderr}");
 	assert_eq!(project.deployed(), None);
 	assert_eq!(
-		remote.requests()[1].1[1]["limit"],
+		remote.requests()[PROBE_REQUESTS + 1].1[1]["limit"],
 		25,
 		"the default limit matches `pina rehearse`"
 	);
@@ -533,7 +551,7 @@ fn deploy_rehearsal_that_compares_nothing_never_deploys() {
 		.cloned()
 		.collect();
 	let history = remote_handler_for(&fixtures, &project.program_id);
-	let remote = FakeRpcServer::start(move |method, params| {
+	let remote = local_cluster(move |method, params| {
 		if method == "getSignaturesForAddress" {
 			Reply::Result(json!(only_initialize))
 		} else {
@@ -559,7 +577,7 @@ fn deploy_rehearsal_that_compares_nothing_never_deploys() {
 	);
 	assert!(stderr.contains("--rehearse-limit"), "{stderr}");
 	assert_eq!(project.deployed(), None);
-	assert_eq!(remote.requests()[1].1[1]["limit"], 1);
+	assert_eq!(remote.requests()[PROBE_REQUESTS + 1].1[1]["limit"], 1);
 }
 
 #[test]
@@ -567,7 +585,7 @@ fn deploy_rehearsal_cannot_verify_a_first_deployment() {
 	let harness = Harness::new();
 	let project = harness.deploy_project("first", Binary::Deployed);
 	// The captured cluster has the counter program, not this one.
-	let remote = FakeRpcServer::start(remote_handler(&Fixtures::load()));
+	let remote = local_cluster(remote_handler(&Fixtures::load()));
 	let output = harness.deploy(&project, &remote, &["--rehearse"]);
 	let stdout = stdout(&output, &remote);
 	let stderr = stderr(&output);
@@ -587,7 +605,10 @@ fn deploy_rehearsal_cannot_verify_a_first_deployment() {
 	assert!(!stderr.contains("Starting a Surfpool fork"), "{stderr}");
 	assert!(stdout.starts_with("Deployment plan\n"), "{stdout}");
 	assert!(!stdout.contains("Rehearsal of "), "{stdout}");
-	assert_eq!(remote.methods(), ["getAccountInfo"]);
+	assert_eq!(
+		remote.methods(),
+		["getGenesisHash", "getVersion", "getAccountInfo"]
+	);
 	assert_eq!(project.deployed(), None);
 }
 

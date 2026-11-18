@@ -105,6 +105,23 @@ fn verifies_finalized_program_bytes_with_zero_padding() {
 }
 
 #[test]
+fn refuses_a_loopback_endpoint_that_changed_cluster_since_planning() {
+	let (_temp, mut plan, accounts) = fixture();
+	let server = server(accounts);
+	plan.target.rpc_url.clone_from(&server.url);
+	plan.target.genesis_hash = Some(identity::DEVNET_GENESIS.to_owned());
+
+	let error = plan.verify_publication().unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("does not match the selected cluster"),
+		"{error}"
+	);
+	assert_eq!(server.methods(), ["getGenesisHash"]);
+}
+
+#[test]
 fn refuses_missing_malformed_foreign_or_unfinalized_program_state() {
 	let (_temp, mut plan, approved) = fixture();
 	let mut cases = vec![
@@ -210,10 +227,31 @@ fn pins_named_cluster_genesis_and_rejects_unreadable_inputs() {
 			"5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
 		),
 	] {
-		verify_genesis(Some(cluster), &json!(expected)).unwrap();
-		assert!(verify_genesis(Some(cluster), &json!("11111111111111111111111111111111")).is_err());
+		verify_genesis(Some(cluster), None, &json!(expected)).unwrap();
+		assert!(
+			verify_genesis(
+				Some(cluster),
+				None,
+				&json!("11111111111111111111111111111111")
+			)
+			.is_err()
+		);
 	}
-	verify_genesis(None, &json!("11111111111111111111111111111111")).unwrap();
+	verify_genesis(None, None, &json!("11111111111111111111111111111111")).unwrap();
+	verify_genesis(
+		Some(Cluster::Localnet),
+		None,
+		&json!("11111111111111111111111111111111"),
+	)
+	.unwrap();
+
+	// A loopback endpoint must still report the hash it reported at planning,
+	// whether it was named `localnet` or given as a URL.
+	let pinned = "11111111111111111111111111111111";
+	for cluster in [Some(Cluster::Localnet), None] {
+		verify_genesis(cluster, Some(pinned), &json!(pinned)).unwrap();
+		assert!(verify_genesis(cluster, Some(pinned), &json!(identity::MAINNET_GENESIS)).is_err());
+	}
 	let (_temp, mut plan, _) = fixture();
 	fs::write(plan.program(), b"changed").unwrap();
 	assert!(plan.verify_publication().is_err());
