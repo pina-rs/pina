@@ -109,6 +109,17 @@ ignore = [
 	# Reviewed 2026-10-24. Remove when the Surfpool/BIP32 and Solana recovery
 	# dependency trains both resolve crypto-bigint >=0.7.6 — tracked in #654.
 	"RUSTSEC-2026-0387",
+	# RUSTSEC-2026-0543: chrono is unmaintained, and the advisory lists no
+	# patched release. Reached through `pina_test` → surfpool (`surfpool-db` →
+	# diesel, plus `surfpool-core`, `surfpool-sdk`, and `surfpool-types`) and
+	# through surfpool → `solana-runtime` → `agave-snapshots` →
+	# `solana-genesis-config`. Host/test stack only: `pina`, `pina_abi`,
+	# `pina_macros`, `pina_cli`, and `pina_profile` do not depend on it, and
+	# normal or build edges of the on-chain examples do not either (the only
+	# example edge is a dev-dependency on `pina_test`). Reviewed 2026-11-18.
+	# Remove when Surfpool and Solana stop pulling chrono. A tracking issue
+	# still needs to be filed.
+	"RUSTSEC-2026-0543",
 ]
 
 [licenses]
