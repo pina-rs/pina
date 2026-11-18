@@ -85,7 +85,7 @@ jobs:
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
       - name: run changeset policy
         if: ${{ env.VALIDATE == 'true' }}
-        uses: monochange/actions/changeset-policy@77fe97c0119e8c16e429d6f5cf94859b097cdcf8 # v0.10.1
+        uses: monochange/actions/changeset-policy@104b58f3ff8b6d3a6153a87a553a2bdaaa42a78f # v0.12.0
         with:
           # Coverage-based verification: every changed package must be covered
           # by a changeset. Passing explicit changed paths instead of `from`
