@@ -83,16 +83,56 @@ fi
 # Login shells source /etc/profile.d. Non-login shells do not, so wrappers in
 # /usr/local/bin (on the default PATH) source the Nix profile and exec the
 # real binaries. That covers `bash -c` as well as `bash -lc`.
+#
+# The profile binary is preferred. When it is missing — Nix was already on
+# PATH from somewhere else, so the installer above skipped it — the wrapper
+# execs the executable that was on PATH at install time. That path is not the
+# wrapper itself, so a second run cannot record the wrapper as its own
+# fallback and then fail `devenv shell` because the profile target is absent.
+wrapper_dir="${NIX_WRAPPER_DIR:-/usr/local/bin}"
+
+existing_executable() {
+	local name="$1"
+	local dir
+	local IFS=:
+	for dir in $PATH; do
+		if [[ -z "$dir" || "$dir" == "$wrapper_dir" ]]; then
+			continue
+		fi
+		if [[ -x "${dir}/${name}" && ! -d "${dir}/${name}" ]]; then
+			printf '%s\n' "${dir}/${name}"
+			return 0
+		fi
+	done
+}
+
 install_wrapper() {
 	local name="$1"
-	sudo tee "/usr/local/bin/${name}" >/dev/null <<EOF
+	local fallback=""
+	fallback="$(existing_executable "$name" || true)"
+	# The path is copied into a root-owned script. Only a plain absolute path
+	# is embedded, so a PATH entry cannot break out of the generated quotes.
+	if [[ -n "$fallback" && ! "$fallback" =~ ^/[A-Za-z0-9._+/-]+$ ]]; then
+		echo "Ignoring fallback for ${name}; path is not safe to embed: ${fallback}" >&2
+		fallback=""
+	fi
+
+	sudo mkdir -p "$wrapper_dir"
+	sudo tee "${wrapper_dir}/${name}" >/dev/null <<EOF
 #!/bin/sh
 if [ -n "\${HOME-}" ] && [ -f "\${HOME}/.nix-profile/etc/profile.d/nix.sh" ]; then
 	. "\${HOME}/.nix-profile/etc/profile.d/nix.sh"
 fi
-exec "\${HOME}/.nix-profile/bin/${name}" "\$@"
+if [ -x "\${HOME}/.nix-profile/bin/${name}" ]; then
+	exec "\${HOME}/.nix-profile/bin/${name}" "\$@"
+fi
+if [ -n "${fallback}" ] && [ -x "${fallback}" ]; then
+	exec "${fallback}" "\$@"
+fi
+echo "${name}: Nix profile binary is missing and no pre-existing executable was recorded" >&2
+exit 127
 EOF
-	sudo chmod 755 "/usr/local/bin/${name}"
+	sudo chmod 755 "${wrapper_dir}/${name}"
 }
 
 install_wrapper nix
