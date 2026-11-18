@@ -39,7 +39,7 @@ With `--dry-run`, a rehearsal reports what the deployment would do and exits wit
 
 ## Safe planning
 
-Review a deployment without building, contacting an RPC endpoint (unless `--rehearse` replays its traffic), or invoking the Solana CLI:
+Review a deployment without building or invoking the Solana CLI. A dry run contacts an RPC endpoint only to identify a loopback target (see [Targets and confirmation](#targets-and-confirmation)) and when `--rehearse` replays its traffic:
 
 ```bash
 pina deploy \
@@ -96,9 +96,9 @@ A loopback endpoint is `localnet` or a URL whose parsed host is a loopback addre
 - An endpoint that reports the devnet, testnet, or mainnet-beta genesis hash gets that cluster's safeguards, and the plan warns that it is not a local validator.
 - Surfpool reports the genesis hash of the cluster it forks, but it runs every transaction locally. Its `getVersion` answer carries a `surfnet-version`, so a Surfpool endpoint is local whatever genesis hash it reports.
 - Any other genesis hash, such as the one `solana-test-validator` creates, belongs to a local validator.
-- An endpoint that does not answer, or answers with an invalid hash, is treated as an unknown cluster that may be mainnet, and the plan says why. Start the validator before deploying to it.
+- An endpoint that does not answer both requests, or answers with an invalid hash, is treated as an unknown cluster that may be mainnet, and the plan says why. Start the validator before deploying to it.
 
-The probe catches a forwarded port, not a hostile endpoint: whatever listens on the port can answer anything. Publication verification requires the endpoint to report the same genesis hash after the deployment.
+The plan pins the answer. A rehearsal or a confirmation prompt can take minutes, so right before it reserves publication and starts the deploy program, Pina asks again and stops if the genesis hash or the Surfpool answer changed. Publication verification asks once more before it reads the deployed accounts. The probe catches a forwarded port, not a hostile endpoint: whatever listens on the port can answer anything.
 
 ## Build and external requirements
 

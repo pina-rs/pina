@@ -46,11 +46,25 @@ pub(super) fn verify(plan: &DeploymentPlan) -> Result<(), DeployError> {
 		plan.target.loopback,
 	);
 	let genesis = genesis(&client)?;
+	let pinned = plan.target.identity.as_ref();
 	verify_genesis(
 		plan.target.named,
-		plan.target.genesis_hash.as_deref(),
+		pinned.map(|identity| identity.genesis_hash.as_str()),
 		&genesis,
 	)?;
+	// A Surfpool fork reports the genesis hash of the cluster it forks, so
+	// only `getVersion` tells it apart from a port now forwarding to that
+	// cluster.
+	if let Some(Ok(surfpool)) = pinned.map(|identity| &identity.surfpool) {
+		let version = client
+			.call("getVersion", &json!([]))
+			.map_err(|_| PublicationUnverified("could not read the RPC version"))?;
+		if identity::is_surfpool(&version) != *surfpool {
+			return Err(PublicationUnverified(
+				"RPC endpoint changed between Surfpool and another validator since planning",
+			));
+		}
+	}
 	let result = client
 		.call(
 			"getMultipleAccounts",

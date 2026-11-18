@@ -1006,7 +1006,7 @@ Safety:
   Mainnet and custom remote deployment additionally require --allow-mainnet.
   A loopback endpoint may forward to a live cluster, so Pina asks it for its genesis hash: a
   public cluster's hash gets that cluster's safeguards, and an endpoint that does not answer
-  needs --allow-mainnet.
+  needs --allow-mainnet. Pina asks again just before launch and stops if the answer changed.
   --dry-run never builds or deploys and --json is available only with --dry-run.
   --upgrade-only upgrades the program already deployed at the declared program ID and never
   reads a program keypair, so automation need not hold the key that owns the address on
@@ -1073,8 +1073,8 @@ Rehearsal:
 		yes: bool,
 
 		/// Acknowledge that mainnet-beta, a custom remote endpoint, or a loopback
-		/// endpoint that is not identified as a local validator can affect real
-		/// assets.
+		/// endpoint that reports mainnet-beta or cannot be identified can affect
+		/// real assets.
 		#[arg(long, conflicts_with = "dry_run")]
 		allow_mainnet: bool,
 
