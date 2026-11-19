@@ -47,7 +47,7 @@ See `pina init --help` for options like `--path` and `--force`. The [CLI referen
 
 For agent-assisted project work, install the [Pina skill](./agent-skill.md).
 
-If `pnpm-workspace.yaml` sets `useNodeVersion`, `devenv shell` activates the matching pnpm-managed `node`/`npm`/`npx`/`corepack` toolchain automatically.
+pnpm is pinned by the root `package.json` `packageManager` field. `devenv shell` provides Node.js 24.
 
 ### Build and test
 
