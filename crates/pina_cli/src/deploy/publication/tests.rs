@@ -105,6 +105,93 @@ fn verifies_finalized_program_bytes_with_zero_padding() {
 }
 
 #[test]
+fn refuses_a_loopback_endpoint_that_changed_cluster_since_planning() {
+	let (_temp, mut plan, accounts) = fixture();
+	let server = server(accounts);
+	plan.target.rpc_url.clone_from(&server.url);
+	plan.target.identity = Some(identity::Identity {
+		genesis_hash: identity::DEVNET_GENESIS.to_owned(),
+		surfpool: Ok(false),
+	});
+
+	let error = plan.verify_publication().unwrap_err();
+	assert!(
+		error
+			.to_string()
+			.contains("does not match the selected cluster"),
+		"{error}"
+	);
+	assert_eq!(server.methods(), ["getGenesisHash"]);
+}
+
+/// A Surfpool fork of mainnet and a port forwarding to mainnet report the same
+/// genesis hash, so publication also compares the `getVersion` answer.
+#[test]
+fn refuses_a_loopback_endpoint_that_changed_between_surfpool_and_a_validator() {
+	let (_temp, mut plan, accounts) = fixture();
+	let endpoint = |version: Option<bool>| {
+		let accounts = accounts.clone();
+		fakes::FakeRpcServer::start(move |method, _| {
+			match (method, version) {
+				("getGenesisHash", _) => fakes::Reply::Result(json!(identity::MAINNET_GENESIS)),
+				("getVersion", Some(true)) => {
+					fakes::Reply::Result(json!({ "surfnet-version": "1.7.0" }))
+				}
+				("getVersion", Some(false)) => {
+					fakes::Reply::Result(json!({ "solana-core": "3.0.0" }))
+				}
+				("getVersion", None) => fakes::Reply::Error(-32601, "not found".to_owned()),
+				_ => fakes::Reply::Result(accounts.clone()),
+			}
+		})
+	};
+	let mut verify = |planned: Result<bool, String>, server: &fakes::FakeRpcServer| {
+		plan.target.rpc_url.clone_from(&server.url);
+		plan.target.identity = Some(identity::Identity {
+			genesis_hash: identity::MAINNET_GENESIS.to_owned(),
+			surfpool: planned,
+		});
+		plan.verify_publication().map_err(|error| error.to_string())
+	};
+
+	for (planned, served) in [(true, false), (false, true)] {
+		let server = endpoint(Some(served));
+		let error = verify(Ok(planned), &server).unwrap_err();
+		assert!(
+			error.ends_with(
+				"RPC endpoint changed between Surfpool and another validator since planning"
+			),
+			"{error}"
+		);
+		assert_eq!(server.methods(), ["getGenesisHash", "getVersion"]);
+	}
+
+	let server = endpoint(None);
+	let error = verify(Ok(true), &server).unwrap_err();
+	assert!(error.ends_with("could not read the RPC version"), "{error}");
+
+	let server = endpoint(Some(true));
+	verify(Ok(true), &server).unwrap();
+	assert_eq!(
+		server.methods(),
+		[
+			"getGenesisHash",
+			"getVersion",
+			"getMultipleAccounts",
+			"getGenesisHash"
+		]
+	);
+
+	// A plan that never read the version compares only the hash.
+	let server = endpoint(None);
+	verify(Err("timed out".to_owned()), &server).unwrap();
+	assert_eq!(
+		server.methods(),
+		["getGenesisHash", "getMultipleAccounts", "getGenesisHash"]
+	);
+}
+
+#[test]
 fn refuses_missing_malformed_foreign_or_unfinalized_program_state() {
 	let (_temp, mut plan, approved) = fixture();
 	let mut cases = vec![
@@ -210,10 +297,31 @@ fn pins_named_cluster_genesis_and_rejects_unreadable_inputs() {
 			"5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
 		),
 	] {
-		verify_genesis(Some(cluster), &json!(expected)).unwrap();
-		assert!(verify_genesis(Some(cluster), &json!("11111111111111111111111111111111")).is_err());
+		verify_genesis(Some(cluster), None, &json!(expected)).unwrap();
+		assert!(
+			verify_genesis(
+				Some(cluster),
+				None,
+				&json!("11111111111111111111111111111111")
+			)
+			.is_err()
+		);
 	}
-	verify_genesis(None, &json!("11111111111111111111111111111111")).unwrap();
+	verify_genesis(None, None, &json!("11111111111111111111111111111111")).unwrap();
+	verify_genesis(
+		Some(Cluster::Localnet),
+		None,
+		&json!("11111111111111111111111111111111"),
+	)
+	.unwrap();
+
+	// A loopback endpoint must still report the hash it reported at planning,
+	// whether it was named `localnet` or given as a URL.
+	let pinned = "11111111111111111111111111111111";
+	for cluster in [Some(Cluster::Localnet), None] {
+		verify_genesis(cluster, Some(pinned), &json!(pinned)).unwrap();
+		assert!(verify_genesis(cluster, Some(pinned), &json!(identity::MAINNET_GENESIS)).is_err());
+	}
 	let (_temp, mut plan, _) = fixture();
 	fs::write(plan.program(), b"changed").unwrap();
 	assert!(plan.verify_publication().is_err());

@@ -13,9 +13,12 @@ use tempfile::TempDir;
 #[cfg(unix)]
 mod support;
 
-#[cfg(unix)]
 #[path = "support/rehearse.rs"]
 mod rpc_support;
+
+/// What `solana-test-validator` reports: a genesis hash no public cluster has.
+const PRIVATE_GENESIS: &str = "11111111111111111111111111111111";
+const MAINNET_GENESIS: &str = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 
 struct ProjectFixture {
 	_temp: TempDir,
@@ -25,7 +28,11 @@ struct ProjectFixture {
 	program_id: String,
 	authority: PathBuf,
 	payer: PathBuf,
+	/// A loopback endpoint that identifies as a private validator, so a
+	/// deployment to it is local. `localnet` would ask whatever listens on this
+	/// machine's port 8899 instead.
 	rpc_url: String,
+	_validator: rpc_support::FakeRpcServer,
 }
 
 impl ProjectFixture {
@@ -56,6 +63,7 @@ impl ProjectFixture {
 			format!("use pina::prelude::*;\ndeclare_id!(\"{program_id}\");\n"),
 		)
 		.unwrap_or_else(|error| panic!("write fixture source: {error}"));
+		let validator = loopback_validator(PRIVATE_GENESIS, false);
 
 		Self {
 			_temp: temp,
@@ -65,7 +73,8 @@ impl ProjectFixture {
 			program_id,
 			authority,
 			payer,
-			rpc_url: "http://127.0.0.1:1".to_owned(),
+			rpc_url: validator.url.clone(),
+			_validator: validator,
 		}
 	}
 
@@ -126,6 +135,31 @@ fn make_keypair_private(path: &Path) {
 #[cfg(not(unix))]
 fn make_keypair_private(_: &Path) {}
 
+/// A loopback endpoint that answers only the identity probe: its genesis hash,
+/// and a `getVersion` that names Surfpool when `surfpool` is set.
+fn loopback_validator(genesis_hash: &'static str, surfpool: bool) -> rpc_support::FakeRpcServer {
+	rpc_support::FakeRpcServer::start(move |method, _| {
+		identity_reply(method, genesis_hash, surfpool)
+	})
+}
+
+fn identity_reply(method: &str, genesis_hash: &str, surfpool: bool) -> rpc_support::Reply {
+	use serde_json::json;
+
+	match method {
+		"getGenesisHash" => rpc_support::Reply::Result(json!(genesis_hash)),
+		"getVersion" if surfpool => {
+			rpc_support::Reply::Result(
+				json!({ "surfnet-version": "1.7.0", "solana-core": "3.0.0" }),
+			)
+		}
+		"getVersion" => {
+			rpc_support::Reply::Result(json!({ "solana-core": "3.0.0", "feature-set": 1 }))
+		}
+		_ => rpc_support::Reply::Error(-32601, format!("method {method} not found")),
+	}
+}
+
 fn canonical(path: &Path) -> String {
 	fs::canonicalize(path)
 		.unwrap_or_else(|error| panic!("canonicalize {}: {error}", path.display()))
@@ -176,7 +210,7 @@ fn dry_run_json_is_machine_readable_and_starts_no_child() {
 		.arg(&fixture.program_keypair)
 		.arg("--payer")
 		.arg(&fixture.payer)
-		.args(["--cluster", "localnet", "--dry-run"])
+		.args(["--cluster", &fixture.rpc_url, "--dry-run"])
 		.output()
 		.unwrap_or_else(|error| panic!("run self-authority dry deployment: {error}"));
 	assert!(output.status.success());
@@ -185,6 +219,112 @@ fn dry_run_json_is_machine_readable_and_starts_no_child() {
 	assert!(
 		stdout.contains("also the upgrade authority"),
 		"stdout: {stdout}"
+	);
+}
+
+/// SEC-13: the audit deployed through an explicit `127.0.0.1` URL without a
+/// terminal, `--yes`, or `--allow-mainnet`. A loopback port can forward to a
+/// live cluster, so the endpoint's own answer now decides its safeguards.
+#[test]
+fn audit_sec_13_a_loopback_endpoint_reporting_mainnet_needs_mainnet_safeguards() {
+	let fixture = ProjectFixture::new();
+	let marker = fixture.root.join("unexpected-deploy.txt");
+	let marker_command = "echo started > unexpected-deploy.txt";
+	let tunnel = loopback_validator(MAINNET_GENESIS, false);
+
+	let output = fixture
+		.command()
+		.args(["--cluster", &tunnel.url, "--dry-run", "--json"])
+		.output()
+		.unwrap_or_else(|error| panic!("plan a deployment through the tunnel: {error}"));
+	assert!(output.status.success());
+	let plan = serde_json::from_slice::<serde_json::Value>(&output.stdout)
+		.unwrap_or_else(|error| panic!("parse deployment JSON: {error}"));
+	assert_eq!(plan["is_local"], false);
+	assert_eq!(plan["requires_mainnet_acknowledgement"], true);
+	assert!(
+		plan["warnings"].as_array().is_some_and(|warnings| {
+			warnings.iter().any(|warning| {
+				warning.as_str().is_some_and(|warning| {
+					warning.contains("reports the mainnet-beta genesis hash")
+				})
+			})
+		}),
+		"{plan}"
+	);
+
+	for flags in [&[][..], &["--yes"][..]] {
+		let output = fixture
+			.command()
+			.args(["--cluster", &tunnel.url, "--remote-command", marker_command])
+			.args(flags)
+			.output()
+			.unwrap_or_else(|error| panic!("deploy through the tunnel: {error}"));
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		assert!(!output.status.success());
+		assert!(stderr.contains("require --allow-mainnet"), "{stderr}");
+		assert!(!marker.exists(), "the deployment child must not run");
+	}
+
+	// A Surfpool fork reports the genesis hash of the cluster it forks, but
+	// runs every transaction locally, so it deploys without any prompt.
+	let surfnet = loopback_validator(MAINNET_GENESIS, true);
+	let output = fixture
+		.command()
+		.args([
+			"--cluster",
+			&surfnet.url,
+			"--remote-command",
+			marker_command,
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("deploy to Surfpool: {error}"));
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(marker.exists());
+
+	// A tunnel that takes a private validator's port after planning is refused
+	// before the deployment child starts.
+	fs::remove_file(&marker).unwrap_or_else(|error| panic!("reset the marker: {error}"));
+	let answers = std::sync::atomic::AtomicUsize::new(0);
+	let swapped = rpc_support::FakeRpcServer::start(move |method, _| {
+		let genesis = if method == "getGenesisHash"
+			&& answers.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0
+		{
+			MAINNET_GENESIS
+		} else {
+			PRIVATE_GENESIS
+		};
+		identity_reply(method, genesis, false)
+	});
+	let output = fixture
+		.command()
+		.args([
+			"--cluster",
+			&swapped.url,
+			"--remote-command",
+			marker_command,
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("deploy through a swapped port: {error}"));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success());
+	assert!(
+		stderr.contains("no longer identifies as the cluster it reported"),
+		"{stderr}"
+	);
+	assert!(!marker.exists(), "the deployment child must not run");
+	assert_eq!(
+		swapped.methods(),
+		[
+			"getGenesisHash",
+			"getVersion",
+			"getGenesisHash",
+			"getVersion"
+		]
 	);
 }
 
@@ -197,7 +337,7 @@ fn upgrade_only_rejects_a_declared_keypair_path_before_planning_or_execution() {
 		.command()
 		.args([
 			"--cluster",
-			"localnet",
+			&fixture.rpc_url,
 			"--upgrade-only",
 			"--remote-command",
 			marker_command,
@@ -299,7 +439,7 @@ fn upgrade_only_execution_passes_the_declared_id_to_solana() {
 			.unwrap_or_else(|error| panic!("construct test PATH: {error}"));
 	let output = fixture
 		.command()
-		.args(["--cluster", "localnet", "--upgrade-only"])
+		.args(["--cluster", &fixture.rpc_url, "--upgrade-only"])
 		.env("PATH", joined_path)
 		.env("PINA_DEPLOY_TEST_LOG", &log)
 		.output()
@@ -595,7 +735,7 @@ fn local_deployment_passes_verified_snapshots_and_modeled_arguments_to_solana() 
 		std::env::join_paths(paths).unwrap_or_else(|error| panic!("construct test PATH: {error}"));
 	let output = fixture
 		.command()
-		.args(["--cluster", "localnet"])
+		.args(["--cluster", &fixture.rpc_url])
 		.env("PATH", joined_path)
 		.env("PINA_DEPLOY_TEST_CWD", fixture.root.join("solana-cwd.txt"))
 		.env("PINA_DEPLOY_TEST_LOG", &log)
@@ -634,7 +774,7 @@ fn local_deployment_passes_verified_snapshots_and_modeled_arguments_to_solana() 
 			"--upgrade-authority",
 			"--fee-payer",
 			"--url",
-			"http://127.0.0.1:8899",
+			&format!("{}/", fixture.rpc_url),
 		]
 	);
 	// The fee payer doubles as the default signer, so no Solana CLI config is read.
@@ -696,7 +836,7 @@ fn solana_child_receives_eof_while_pina_stdin_remains_open() {
 		std::env::join_paths(paths).unwrap_or_else(|error| panic!("construct test PATH: {error}"));
 	let mut child = fixture
 		.command()
-		.args(["--cluster", "localnet"])
+		.args(["--cluster", &fixture.rpc_url])
 		.env("PATH", joined_path)
 		.env("PINA_DEPLOY_STDIN_MARKER", &marker)
 		.stdin(Stdio::piped())
@@ -951,9 +1091,7 @@ fn publication_rpc(fixture: &ProjectFixture) -> rpc_support::FakeRpcServer {
 	let program_id = fixture.program_id.clone();
 	rpc_support::FakeRpcServer::start(move |method, params| {
 		match method {
-			"getGenesisHash" => {
-				rpc_support::Reply::Result(json!("11111111111111111111111111111111"))
-			}
+			"getGenesisHash" | "getVersion" => identity_reply(method, PRIVATE_GENESIS, false),
 			"getMultipleAccounts" => {
 				assert_eq!(params[0], json!([program_id, programdata.to_string()]));
 				assert_eq!(
