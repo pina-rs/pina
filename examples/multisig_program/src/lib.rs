@@ -1625,6 +1625,7 @@ pub struct ProposalCancelAccounts<'a> {
 #[derive(Accounts)]
 pub struct VaultExecuteAccounts<'a> {
 	pub multisig: &'a AccountView,
+	#[pina(unique)]
 	pub proposal: &'a mut AccountView,
 	pub member: &'a AccountView,
 	pub clock: &'a AccountView,

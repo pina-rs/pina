@@ -30,7 +30,7 @@ pub enum Instruction {
 pub struct SweepAccounts<'a> {
 	pub first: &'a mut AccountView,
 	#[pina(remaining)]
-	pub rest: &'a [AccountView],
+	pub rest: &'a mut [AccountView],
 }
 
 /// A required account and an optional one the caller may omit.

@@ -33,9 +33,9 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 				format!(
 					"could not parse the `#[derive(Accounts)]` input: {reason} Struct options are \
 					 `crate = path` and `validate(with = function)`. Field options are \
-					 `remaining`, `distinct`, and `validate(...)`; account validation rules are \
-					 `signer`, `writable`, `executable`, `address`, `addresses`, `owner`, \
-					 `owners`, `program`, `sysvar`, `empty`, `not_empty`, `data_len`, \
+					 `remaining`, `distinct`, `unique`, and `validate(...)`; account validation \
+					 rules are `signer`, `writable`, `executable`, `address`, `addresses`, \
+					 `owner`, `owners`, `program`, `sysvar`, `empty`, `not_empty`, `data_len`, \
 					 `distinct_from`, and `error`"
 				),
 			)
@@ -120,6 +120,14 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			.unwrap_or_else(|| panic!("internal error: `Accounts` field without an ident"));
 
 		if field.remaining.is_present() {
+			if field.unique.is_present() {
+				return syn::Error::new_spanned(
+					&field.ident,
+					"`#[pina(unique)]` cannot be applied to a `remaining` account slice; mutable \
+					 remaining slices already enforce distinctness by default",
+				)
+				.to_compile_error();
+			}
 			if !field.validate.is_empty() {
 				return syn::Error::new_spanned(
 					&field.ident,
@@ -157,6 +165,14 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			Ok(kind) => kind,
 			Err(error) => return error.to_compile_error(),
 		};
+		if field.unique.is_present() && field_kind == AccountFieldKind::Nested {
+			return syn::Error::new_spanned(
+				&field.ident,
+				"`#[pina(unique)]` cannot be applied to a nested accounts struct; place \
+				 `#[pina(unique)]` on the individual `AccountView` fields inside that struct",
+			)
+			.to_compile_error();
+		}
 		let parse_field = match field_kind {
 			AccountFieldKind::Mutable => quote! { let #ident = cursor.next_mut()?; },
 			AccountFieldKind::Immutable => quote! { let #ident = cursor.next()?; },
@@ -247,11 +263,7 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 	#[cfg(not(feature = "validation"))]
 	let validate_accounts = quote! {};
 
-	let finish_exact = remaining_field.is_none().then(|| {
-		quote! {
-			cursor.finish_exact()?;
-		}
-	});
+	let finish_exact_const = remaining_field.is_none();
 	let remaining_binding = remaining_field.map(|(field, is_mut, is_distinct)| {
 		if is_mut && is_distinct {
 			quote! { let #field = cursor.remaining_mut_distinct()?; }
@@ -332,10 +344,160 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			quote! { #required #(#nested_minimums)* }
 		};
 
+		let alias_layout_steps = field_kinds
+			.iter()
+			.enumerate()
+			.map(|(index, (field, kind))| {
+				let is_last = index + 1 == field_kinds.len() && remaining_field.is_none();
+				let is_unique = field.unique.is_present();
+				let mark_unique = is_unique.then(|| {
+					quote! {
+						any_unique = true;
+						unique_mask = #crate_path::__mask256_with_bit(unique_mask, offset);
+					}
+				});
+
+				match kind {
+					AccountFieldKind::Immutable => {
+						quote! {
+							if offset >= 256 {
+								static_layout = false;
+							}
+							#mark_unique
+							offset += 1;
+						}
+					}
+					AccountFieldKind::Mutable => {
+						quote! {
+							if offset >= 256 {
+								static_layout = false;
+							}
+							mut_mask = #crate_path::__mask256_with_bit(mut_mask, offset);
+							#mark_unique
+							offset += 1;
+						}
+					}
+					AccountFieldKind::OptionalImmutable => {
+						quote! {
+							if offset >= 256 {
+								static_layout = false;
+							}
+							optional_mask = #crate_path::__mask256_with_bit(optional_mask, offset);
+							#mark_unique
+							offset += 1;
+						}
+					}
+					AccountFieldKind::OptionalMutable => {
+						quote! {
+							if offset >= 256 {
+								static_layout = false;
+							}
+							mut_mask = #crate_path::__mask256_with_bit(mut_mask, offset);
+							optional_mask = #crate_path::__mask256_with_bit(optional_mask, offset);
+							#mark_unique
+							offset += 1;
+						}
+					}
+					AccountFieldKind::Nested => {
+						let ty = &field.ty;
+						quote! {
+							{
+								let nested_layout = <#ty as #crate_path::ParseAccounts #ty_generics>::ALIAS_LAYOUT;
+								let nested_min = <#ty as #crate_path::ParseAccounts #ty_generics>::ACCOUNT_MINIMUM;
+								let nested_limit = <#ty as #crate_path::ParseAccounts #ty_generics>::ACCOUNT_LIMIT;
+								let nested_fixed = nested_min == nested_limit && nested_limit < 256;
+								if #crate_path::__mask256_any(nested_layout.unique_mask) {
+									any_unique = true;
+								}
+								if static_layout && nested_layout.static_layout && (nested_fixed || #is_last) {
+									mut_mask = #crate_path::__mask256_or_shifted(
+										mut_mask,
+										nested_layout.mut_mask,
+										offset,
+									);
+									optional_mask = #crate_path::__mask256_or_shifted(
+										optional_mask,
+										nested_layout.optional_mask,
+										offset,
+									);
+									unique_mask = #crate_path::__mask256_or_shifted(
+										unique_mask,
+										nested_layout.unique_mask,
+										offset,
+									);
+									if nested_layout.remaining_mut_start != usize::MAX {
+										remaining_mut_start = offset + nested_layout.remaining_mut_start;
+										remaining_mut_distinct = nested_layout.remaining_mut_distinct;
+									}
+									if nested_fixed {
+										offset += nested_limit;
+										if offset > 256 {
+											static_layout = false;
+										}
+									} else if nested_limit != <#ty as #crate_path::ParseAccounts #ty_generics>::UNBOUNDED {
+										if offset.saturating_add(nested_limit) > 256 {
+											static_layout = false;
+										}
+									} else if offset
+										.saturating_add(<#ty as #crate_path::ParseAccounts #ty_generics>::ACCOUNT_BOUND)
+										> 256
+									{
+										static_layout = false;
+									}
+								} else {
+									static_layout = false;
+								}
+							}
+						}
+					}
+				}
+			});
+
+		let remaining_alias_step = remaining_field.and_then(|(_, is_mut, is_distinct)| {
+			is_mut.then(|| {
+				quote! {
+					if static_layout {
+						remaining_mut_start = offset;
+						remaining_mut_distinct = #is_distinct;
+					}
+				}
+			})
+		});
+
 		quote! {
 			const ACCOUNT_BOUND: usize = #positional #(#nested)*;
 			const ACCOUNT_LIMIT: usize = #limit;
 			const ACCOUNT_MINIMUM: usize = #minimum;
+			#[allow(unused_assignments, unused_mut)]
+			const ALIAS_LAYOUT: #crate_path::__AliasLayout = {
+				let mut static_layout = true;
+				let mut mut_mask = [0_u64; 4];
+				let mut optional_mask = [0_u64; 4];
+				let mut unique_mask = [0_u64; 4];
+				let mut remaining_mut_start = usize::MAX;
+				let mut remaining_mut_distinct = true;
+				let mut offset = 0_usize;
+				let mut any_unique = false;
+
+				#(#alias_layout_steps)*
+				#remaining_alias_step
+
+				assert!(
+					!any_unique || static_layout,
+					"`#[pina(unique)]` requires a statically known account layout; avoid placing \
+					 `#[pina(unique)]` alongside hand-written or variable-length nested \
+					 `ParseAccounts` fields before other fields",
+				);
+
+				#crate_path::__AliasLayout {
+					static_layout,
+					mut_mask,
+					optional_mask,
+					unique_mask,
+					remaining_mut_start,
+					remaining_mut_distinct,
+				}
+			};
 		}
 	};
 
@@ -343,6 +505,7 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 		impl #impl_generics #crate_path::ParseAccounts #ty_generics for #struct_name #ty_generics #where_clause {
 			#account_bound
 
+			#[inline(always)]
 			fn parse_accounts(
 				cursor: &mut #crate_path::AccountsCursor<#lifetime>,
 			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
@@ -359,13 +522,27 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 		}
 
 		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
+			#[inline(always)]
 			fn try_from_account_infos(
 				program_id: &#crate_path::Address,
 				accounts: & #lifetime mut [#crate_path::AccountView],
 			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
-				let mut cursor = #crate_path::AccountsCursor::new(*program_id, accounts);
-				let parsed = <Self as #crate_path::ParseAccounts>::parse_accounts(&mut cursor)?;
-				#finish_exact
+				let parsed = #crate_path::__parse_derived_accounts::<Self, #finish_exact_const>(
+					program_id,
+					accounts,
+				)?;
+				#validate_parsed
+
+				Ok(parsed)
+			}
+
+			#[inline(always)]
+			fn try_from_route(
+				program_id: &#crate_path::Address,
+				route: #crate_path::RouteAccounts<#lifetime>,
+			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
+				let parsed =
+					#crate_path::__parse_derived_route::<Self, #finish_exact_const>(program_id, route)?;
 				#validate_parsed
 
 				Ok(parsed)
@@ -993,5 +1170,62 @@ mod tests {
 				.contains("cannot be followed by positional account"),
 			"a trailing remaining slice must stay allowed"
 		);
+	}
+
+	#[test]
+	fn unique_attribute_rejects_remaining_and_nested_fields() {
+		let on_remaining = expand(quote! {
+			#[derive(Accounts)]
+			struct BadRemaining<'a> {
+				authority: &'a AccountView,
+				#[pina(remaining, unique)]
+				rest: &'a [AccountView],
+			}
+		})
+		.to_string();
+		assert!(
+			on_remaining.contains("`#[pina(unique)]` cannot be applied to a `remaining`"),
+			"expected error for unique on remaining, got: {on_remaining}"
+		);
+
+		let on_nested = expand(quote! {
+			#[derive(Accounts)]
+			struct BadNested<'a> {
+				#[pina(unique)]
+				inner: NestedGroup<'a>,
+			}
+		})
+		.to_string();
+		assert!(
+			on_nested.contains("`#[pina(unique)]` cannot be applied to a nested accounts struct"),
+			"expected error for unique on nested, got: {on_nested}"
+		);
+
+		let valid = expand(quote! {
+			#[derive(Accounts)]
+			struct GoodUnique<'a> {
+				#[pina(unique)]
+				authority: &'a AccountView,
+				#[pina(unique)]
+				vault: &'a mut AccountView,
+				#[pina(unique)]
+				opt: Option<&'a AccountView>,
+				#[pina(unique)]
+				opt_mut: Option<&'a mut AccountView>,
+			}
+		})
+		.to_string();
+		assert!(valid.contains("__mask256_with_bit"));
+		assert!(!valid.contains("compile_error"));
+
+		let unknown_option = expand(quote! {
+			#[derive(Accounts)]
+			struct UnknownOpt<'a> {
+				#[pina(not_a_real_option)]
+				authority: &'a AccountView,
+			}
+		})
+		.to_string();
+		assert!(unknown_option.contains("`unique`"));
 	}
 }

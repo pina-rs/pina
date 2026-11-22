@@ -6,7 +6,7 @@ expression: stdout(&text)
 Transaction 5cbMxLNKqbHvV8SBoe9Z1g9HeoZSk8LiDoauGrfqU3X5wDHb3GZRe12e6m8ySpPHH4HaZNZEbXfZTBnrMGFsB6zt (slot 66, from file)
 Instruction #0 failed: initialize_policy (InitializeAccounts) in validation_program
 Error: PinaProgramError::DuplicateMutableAccount (custom error 0xFFFFFFF9)
-  Two mutable account fields point at the same runtime account.
+  Two mutable account fields (or a `#[pina(unique)]` field and another present account field) point at the same runtime account.
 
 Most likely cause:
   authority: distinct mutable account [confirmed] at src/lib.rs:194

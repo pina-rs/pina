@@ -131,7 +131,7 @@ fn remap_custom_error(code: u32) -> ProgramError {
 /// let result = pina::assert(false, ProgramError::InvalidArgument, "amount is zero");
 /// assert_eq!(result, Err(ProgramError::InvalidArgument));
 /// ```
-#[track_caller]
+#[cfg_attr(feature = "verbose-logs", track_caller)]
 #[inline(always)]
 pub fn assert(v: bool, err: impl Into<ProgramError>, msg: &str) -> ProgramResult {
 	if v {

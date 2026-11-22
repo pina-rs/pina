@@ -324,11 +324,11 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::proce
                 let mut slots = [const {
                     ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
                 }; SLOTS];
-                let accounts = input
-                    .parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-                let __pina_accounts = <InitializeAccounts as ::core::convert::TryFrom<
-                    (&::pina::Address, &mut [::pina::AccountView]),
-                >>::try_from((program_id, accounts))?;
+                let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+                let __pina_accounts = <InitializeAccounts as ::pina::TryFromAccountInfos>::try_from_route(
+                    program_id,
+                    route,
+                )?;
                 <InitializeAccounts as ::pina::ProcessAccountInfos>::process(
                     __pina_accounts,
                     data,
@@ -368,11 +368,11 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::proce
                 let mut slots = [const {
                     ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
                 }; SLOTS];
-                let accounts = input
-                    .parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-                let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
-                    (&::pina::Address, &mut [::pina::AccountView]),
-                >>::try_from((program_id, accounts))?;
+                let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+                let __pina_accounts = <IncrementAccounts as ::pina::TryFromAccountInfos>::try_from_route(
+                    program_id,
+                    route,
+                )?;
                 <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
                     __pina_accounts,
                     data,
@@ -706,11 +706,11 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::proc
                 let mut slots = [const {
                     ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
                 }; SLOTS];
-                let accounts = input
-                    .parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-                let __pina_accounts = <IncrementAccounts as ::core::convert::TryFrom<
-                    (&::pina::Address, &mut [::pina::AccountView]),
-                >>::try_from((program_id, accounts))?;
+                let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+                let __pina_accounts = <IncrementAccounts as ::pina::TryFromAccountInfos>::try_from_route(
+                    program_id,
+                    route,
+                )?;
                 <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
                     __pina_accounts,
                     data,
@@ -750,11 +750,11 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::proc
                 let mut slots = [const {
                     ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
                 }; SLOTS];
-                let accounts = input
-                    .parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-                let __pina_accounts = <UntouchedAccounts as ::core::convert::TryFrom<
-                    (&::pina::Address, &mut [::pina::AccountView]),
-                >>::try_from((program_id, accounts))?;
+                let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+                let __pina_accounts = <UntouchedAccounts as ::pina::TryFromAccountInfos>::try_from_route(
+                    program_id,
+                    route,
+                )?;
                 <UntouchedAccounts as ::pina::ProcessAccountInfos>::process(
                     __pina_accounts,
                     data,
@@ -773,6 +773,48 @@ impl<'a> pina::ParseAccounts<'a> for InitializeAccounts<'a> {
     const ACCOUNT_BOUND: usize = 3usize;
     const ACCOUNT_LIMIT: usize = 3usize;
     const ACCOUNT_MINIMUM: usize = 3usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        mut_mask = pina::__mask256_with_bit(mut_mask, offset);
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -791,13 +833,21 @@ impl<'a> pina::ParseAccounts<'a> for InitializeAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for InitializeAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
-        cursor.finish_exact()?;
+        let parsed = pina::__parse_derived_accounts::<Self, true>(program_id, accounts)?;
+        <InitializeAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, true>(program_id, route)?;
         <InitializeAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
@@ -842,6 +892,44 @@ impl<'a> pina::ParseAccounts<'a> for IncrementAccounts<'a> {
     const ACCOUNT_BOUND: usize = 2usize;
     const ACCOUNT_LIMIT: usize = 2usize;
     const ACCOUNT_MINIMUM: usize = 2usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        mut_mask = pina::__mask256_with_bit(mut_mask, offset);
+        offset += 1;
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -855,13 +943,21 @@ impl<'a> pina::ParseAccounts<'a> for IncrementAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for IncrementAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
-        cursor.finish_exact()?;
+        let parsed = pina::__parse_derived_accounts::<Self, true>(program_id, accounts)?;
+        <IncrementAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, true>(program_id, route)?;
         <IncrementAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }

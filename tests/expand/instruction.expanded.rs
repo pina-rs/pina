@@ -325,9 +325,15 @@ where
     [u8; InstructionDisc::BYTES]: pina::pinapod::ZcField,
     <[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -755,9 +761,19 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -1165,9 +1181,16 @@ where
     PodU64: pina::pinapod::ZcField,
     <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -1540,9 +1563,17 @@ where
     [u8; 32]: pina::pinapod::ZcField,
     <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -2024,9 +2055,19 @@ where
     [u8; 4]: pina::pinapod::ZcField,
     <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 4] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; InstructionDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;

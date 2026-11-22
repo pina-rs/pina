@@ -56,6 +56,11 @@ fn ui_deny_colliding_account_discriminators() {
 }
 
 #[test]
+fn ui_deny_readonly_account_copy_escalation() {
+	run_ui_tests("deny_readonly_account_copy_escalation");
+}
+
+#[test]
 fn ui_deny_unchecked_remaining_mut() {
 	run_ui_tests("deny_unchecked_remaining_mut");
 }

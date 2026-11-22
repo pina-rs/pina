@@ -86,6 +86,8 @@ pub use entry::ROUTE_BOUNDED;
 pub use entry::ROUTE_EXACT;
 #[doc(hidden)]
 pub use entry::ROUTE_UNBOUNDED;
+#[doc(hidden)]
+pub use entry::RouteAccounts;
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.
 #[cfg(feature = "derive")]

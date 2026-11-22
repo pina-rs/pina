@@ -78,6 +78,7 @@ pub static LINTS: &[&rustc_lint::Lint] = &[
 	lints::deny_account_borrows_across_cpi::DENY_ACCOUNT_BORROWS_ACROSS_CPI,
 	lints::deny_colliding_account_discriminators::DENY_COLLIDING_ACCOUNT_DISCRIMINATORS,
 	lints::deny_heap_allocations_in_onchain_instruction_handlers::DENY_HEAP_ALLOCATIONS_IN_ONCHAIN_INSTRUCTION_HANDLERS,
+	lints::deny_readonly_account_copy_escalation::DENY_READONLY_ACCOUNT_COPY_ESCALATION,
 	lints::deny_unchecked_remaining_mut::DENY_UNCHECKED_REMAINING_MUT,
 	lints::deny_unused_account_borrow_guards::DENY_UNUSED_ACCOUNT_BORROW_GUARDS,
 	lints::require_bounded_remaining_accounts::REQUIRE_BOUNDED_REMAINING_ACCOUNTS,
@@ -103,6 +104,7 @@ pub const LINT_NAMES: &[&str] = &[
 	"deny_account_borrows_across_cpi",
 	"deny_colliding_account_discriminators",
 	"deny_heap_allocations_in_onchain_instruction_handlers",
+	"deny_readonly_account_copy_escalation",
 	"deny_unchecked_remaining_mut",
 	"deny_unused_account_borrow_guards",
 	"require_bounded_remaining_accounts",
@@ -201,6 +203,16 @@ fn register_one_lint(name: &str, lint_store: &mut rustc_lint::LintStore) {
 			lint_store.register_late_lint_pass(Box::new(|_| {
 				Box::new(
 					lints::deny_heap_allocations_in_onchain_instruction_handlers::DenyHeapAllocationsInOnchainInstructionHandlers,
+				)
+			}));
+		}
+		"deny_readonly_account_copy_escalation" => {
+			lint_store.register_lints(&[
+				lints::deny_readonly_account_copy_escalation::DENY_READONLY_ACCOUNT_COPY_ESCALATION,
+			]);
+			lint_store.register_late_lint_pass(Box::new(|_| {
+				Box::new(
+					lints::deny_readonly_account_copy_escalation::DenyReadonlyAccountCopyEscalation,
 				)
 			}));
 		}

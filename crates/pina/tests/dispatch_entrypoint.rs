@@ -35,7 +35,7 @@ pub struct InitializeAccounts<'a> {
 #[derive(Accounts)]
 pub struct CloseAccounts<'a> {
 	pub state: &'a mut AccountView,
-	pub recipient: Option<&'a AccountView>,
+	pub recipient: Option<&'a mut AccountView>,
 }
 
 #[derive(Accounts)]
@@ -54,7 +54,9 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 impl<'a> ProcessAccountInfos<'a> for CloseAccounts<'a> {
 	fn process(self, data: &[u8]) -> ProgramResult {
 		let mut accounts = std::vec![&*self.state];
-		accounts.extend(self.recipient);
+		if let Some(recipient) = self.recipient {
+			accounts.push(&*recipient);
+		}
 
 		handle(&accounts, data)
 	}
@@ -260,12 +262,17 @@ fn unbounded_route_sees_every_account() {
 }
 
 /// The routed struct's own checks still run over the dispatch walk: a
-/// read-only alias of a mutable account and a read-only mutable field fail.
+/// duplicate mutable account and a read-only mutable field fail, while a
+/// mutable + read-only alias is accepted symmetrically.
 #[test]
 fn routed_struct_checks_still_run() {
 	assert_eq!(
 		run(&[account(1), Slot::Duplicate(0)], &[1]),
 		(status(PinaProgramError::DuplicateMutableAccount), None)
+	);
+	assert_eq!(
+		run(&[account(1), Slot::Duplicate(0)], &[0]),
+		(SUCCESS, Some(std::vec![1, 1]))
 	);
 	assert_eq!(
 		run(&[read_only(1), account(2)], &[0]),

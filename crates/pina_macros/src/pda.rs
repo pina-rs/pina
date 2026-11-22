@@ -498,6 +498,32 @@ pub(crate) fn expand(
 		})
 	});
 
+	let all_constant_seeds = !args
+		.seeds
+		.iter()
+		.any(|seed| matches!(seed, PdaSeedArg::Variable { .. }));
+	let const_pda_helpers = all_constant_seeds.then(|| {
+		quote! {
+			/// Derive this singleton PDA and canonical bump at compile time.
+			///
+			/// Prefer this in `const` items so programs with all-constant seeds pay
+			/// 0 compute units for PDA derivation at runtime.
+			pub const fn try_find_pda_const(
+				program_id: &#crate_path::Address,
+			) -> ::core::option::Option<(#crate_path::Address, u8)> {
+				#crate_path::try_find_program_address_const(&[#(#seed_slice_exprs,)*], program_id)
+			}
+
+			/// Derive this singleton PDA and canonical bump at compile time,
+			/// panicking during compilation if no valid PDA exists.
+			pub const fn find_pda_const(
+				program_id: &#crate_path::Address,
+			) -> (#crate_path::Address, u8) {
+				#crate_path::find_program_address_const(&[#(#seed_slice_exprs,)*], program_id)
+			}
+		}
+	});
+
 	let generated = quote! {
 		#[doc = #seeds_doc]
 		#[derive(Clone, Copy)]
@@ -538,6 +564,7 @@ pub(crate) fn expand(
 					.unwrap_or_else(|| panic!("could not find program address from seeds"))
 			}
 
+			#const_pda_helpers
 			#assert_seeds
 			#assert_stored_bump
 			#load_pda

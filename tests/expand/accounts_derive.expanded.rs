@@ -9,6 +9,47 @@ impl<'a> pina::ParseAccounts<'a> for InitAccounts<'a> {
     const ACCOUNT_BOUND: usize = 3usize;
     const ACCOUNT_LIMIT: usize = 3usize;
     const ACCOUNT_MINIMUM: usize = 3usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -27,13 +68,21 @@ impl<'a> pina::ParseAccounts<'a> for InitAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for InitAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
-        cursor.finish_exact()?;
+        let parsed = pina::__parse_derived_accounts::<Self, true>(program_id, accounts)?;
+        <InitAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, true>(program_id, route)?;
         <InitAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
@@ -81,6 +130,47 @@ impl<'a> pina::ParseAccounts<'a> for TransferAccounts<'a> {
     const ACCOUNT_BOUND: usize = 4usize;
     const ACCOUNT_LIMIT: usize = <Self as pina::ParseAccounts<'a>>::UNBOUNDED;
     const ACCOUNT_MINIMUM: usize = 3usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -101,12 +191,24 @@ impl<'a> pina::ParseAccounts<'a> for TransferAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for TransferAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        let parsed = pina::__parse_derived_accounts::<
+            Self,
+            false,
+        >(program_id, accounts)?;
+        <TransferAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, false>(program_id, route)?;
         <TransferAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
@@ -154,6 +256,44 @@ impl<'a> pina::ParseAccounts<'a> for MutableTransferAccounts<'a> {
     const ACCOUNT_BOUND: usize = 2usize;
     const ACCOUNT_LIMIT: usize = <Self as pina::ParseAccounts<'a>>::UNBOUNDED;
     const ACCOUNT_MINIMUM: usize = 1usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        mut_mask = pina::__mask256_with_bit(mut_mask, offset);
+        offset += 1;
+        if static_layout {
+            remaining_mut_start = offset;
+            remaining_mut_distinct = true;
+        }
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -167,12 +307,24 @@ impl<'a> pina::ParseAccounts<'a> for MutableTransferAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for MutableTransferAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        let parsed = pina::__parse_derived_accounts::<
+            Self,
+            false,
+        >(program_id, accounts)?;
+        <MutableTransferAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, false>(program_id, route)?;
         <MutableTransferAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
@@ -217,6 +369,43 @@ impl<'a> pina::ParseAccounts<'a> for DuplicateMutableRemainingAccounts<'a> {
     const ACCOUNT_BOUND: usize = 2usize;
     const ACCOUNT_LIMIT: usize = <Self as pina::ParseAccounts<'a>>::UNBOUNDED;
     const ACCOUNT_MINIMUM: usize = 1usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if static_layout {
+            remaining_mut_start = offset;
+            remaining_mut_distinct = false;
+        }
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -230,12 +419,26 @@ impl<'a> pina::ParseAccounts<'a> for DuplicateMutableRemainingAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for DuplicateMutableRemainingAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
+        let parsed = pina::__parse_derived_accounts::<
+            Self,
+            false,
+        >(program_id, accounts)?;
+        <DuplicateMutableRemainingAccounts<
+            'a,
+        > as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, false>(program_id, route)?;
         <DuplicateMutableRemainingAccounts<
             'a,
         > as pina::PinaValidate>::validate(&parsed)?;
@@ -279,6 +482,39 @@ impl<'a> pina::ParseAccounts<'a> for SingleAccount<'a> {
     const ACCOUNT_BOUND: usize = 1usize;
     const ACCOUNT_LIMIT: usize = 1usize;
     const ACCOUNT_MINIMUM: usize = 1usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -291,13 +527,21 @@ impl<'a> pina::ParseAccounts<'a> for SingleAccount<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for SingleAccount<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
-        cursor.finish_exact()?;
+        let parsed = pina::__parse_derived_accounts::<Self, true>(program_id, accounts)?;
+        <SingleAccount<'a> as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, true>(program_id, route)?;
         <SingleAccount<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
@@ -345,6 +589,71 @@ impl<'a> pina::ParseAccounts<'a> for EscrowAccounts<'a> {
     const ACCOUNT_BOUND: usize = 9usize;
     const ACCOUNT_LIMIT: usize = 9usize;
     const ACCOUNT_MINIMUM: usize = 9usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -375,13 +684,21 @@ impl<'a> pina::ParseAccounts<'a> for EscrowAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
-        cursor.finish_exact()?;
+        let parsed = pina::__parse_derived_accounts::<Self, true>(program_id, accounts)?;
+        <EscrowAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, true>(program_id, route)?;
         <EscrowAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
@@ -443,6 +760,43 @@ impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
     const ACCOUNT_BOUND: usize = 2usize;
     const ACCOUNT_LIMIT: usize = 2usize;
     const ACCOUNT_MINIMUM: usize = 2usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: ::pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        ::pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut ::pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
@@ -456,13 +810,24 @@ impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
     }
 }
 impl<'a> ::pina::TryFromAccountInfos<'a> for DefaultCrateAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &::pina::Address,
         accounts: &'a mut [::pina::AccountView],
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
-        let mut cursor = ::pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as ::pina::ParseAccounts>::parse_accounts(&mut cursor)?;
-        cursor.finish_exact()?;
+        let parsed = ::pina::__parse_derived_accounts::<
+            Self,
+            true,
+        >(program_id, accounts)?;
+        <DefaultCrateAccounts<'a> as ::pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &::pina::Address,
+        route: ::pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        let parsed = ::pina::__parse_derived_route::<Self, true>(program_id, route)?;
         <DefaultCrateAccounts<'a> as ::pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }
@@ -510,6 +875,55 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
     const ACCOUNT_BOUND: usize = 4usize;
     const ACCOUNT_LIMIT: usize = 4usize;
     const ACCOUNT_MINIMUM: usize = 2usize;
+    #[allow(unused_assignments, unused_mut)]
+    const ALIAS_LAYOUT: pina::__AliasLayout = {
+        let mut static_layout = true;
+        let mut mut_mask = [0_u64; 4];
+        let mut optional_mask = [0_u64; 4];
+        let mut unique_mask = [0_u64; 4];
+        let mut remaining_mut_start = usize::MAX;
+        let mut remaining_mut_distinct = true;
+        let mut offset = 0_usize;
+        let mut any_unique = false;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        mut_mask = pina::__mask256_with_bit(mut_mask, offset);
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        mut_mask = pina::__mask256_with_bit(mut_mask, offset);
+        optional_mask = pina::__mask256_with_bit(optional_mask, offset);
+        offset += 1;
+        if offset >= 256 {
+            static_layout = false;
+        }
+        optional_mask = pina::__mask256_with_bit(optional_mask, offset);
+        offset += 1;
+        if !(!any_unique || static_layout) {
+            {
+                ::core::panicking::panic_fmt(
+                    format_args!(
+                        "`#[pina(unique)]` requires a statically known account layout; avoid placing `#[pina(unique)]` alongside hand-written or variable-length nested `ParseAccounts` fields before other fields",
+                    ),
+                );
+            }
+        }
+        pina::__AliasLayout {
+            static_layout,
+            mut_mask,
+            optional_mask,
+            unique_mask,
+            remaining_mut_start,
+            remaining_mut_distinct,
+        }
+    };
+    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -530,13 +944,21 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for MakeAccounts<'a> {
+    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
     ) -> ::core::result::Result<Self, pina::ProgramError> {
-        let mut cursor = pina::AccountsCursor::new(*program_id, accounts);
-        let parsed = <Self as pina::ParseAccounts>::parse_accounts(&mut cursor)?;
-        cursor.finish_exact()?;
+        let parsed = pina::__parse_derived_accounts::<Self, true>(program_id, accounts)?;
+        <MakeAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
+        Ok(parsed)
+    }
+    #[inline(always)]
+    fn try_from_route(
+        program_id: &pina::Address,
+        route: pina::RouteAccounts<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
+        let parsed = pina::__parse_derived_route::<Self, true>(program_id, route)?;
         <MakeAccounts<'a> as pina::PinaValidate>::validate(&parsed)?;
         Ok(parsed)
     }

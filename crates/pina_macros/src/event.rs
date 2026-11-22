@@ -121,7 +121,7 @@ pub(crate) fn expand(
 	let migration_impl = migration.as_ref().map(|migration| {
 		migration.implementation(&crate_path, &struct_name, &discriminator, &variant)
 	});
-	let emit_helper = generate_emit_helper(&crate_path);
+	let emit_helper = generate_emit_helper(&crate_path, migration.as_ref());
 	// `emit` materializes the complete record in one stack frame, so an
 	// oversized schema would exhaust the 4 KiB SBF stack at runtime instead of
 	// failing here. The bound is a public constant so the number a caller reads
@@ -165,21 +165,38 @@ pub(crate) fn expand(
 
 /// Generate the `emit` helper for one event struct.
 ///
-/// The record is built through the same generated [`initialize`] used by
-/// `try_from_bytes`, so emission writes the discriminant, any migration
-/// version envelope, and the payload through one validated path. Callers
-/// cannot emit a record that the generated decoders would reject.
+/// The record is built through the same validated path as [`initialize`],
+/// writing the discriminant, any migration version envelope, and the payload
+/// into a pre-zeroed stack buffer without a redundant second zeroing pass.
+/// Callers cannot emit a record that the generated decoders would reject.
 ///
 /// [`initialize`]: https://docs.rs/pina/latest/pina/
-fn generate_emit_helper(crate_path: &syn::Path) -> proc_macro2::TokenStream {
+fn generate_emit_helper(
+	crate_path: &syn::Path,
+	migration: Option<&MigrationExpansion>,
+) -> proc_macro2::TokenStream {
+	let write_version = migration.map(MigrationExpansion::write_zc_version);
+	#[cfg(feature = "validation")]
+	let validate_initialized = quote! {
+		if let Err(error) =
+			<<Self as #crate_path::PinaPodFixed>::Zc as #crate_path::PinaValidate>::validate(value)
+		{
+			#crate_path::__clear_zc(value);
+			return Err(error);
+		}
+	};
+	#[cfg(not(feature = "validation"))]
+	let validate_initialized = quote! {};
+
 	quote! {
 		/// Build this event's complete record and emit it to the transaction log.
 		///
 		/// This is the on-chain producer for the `Program data:` records that
 		/// generated Rust, TypeScript, and Dart clients decode. The record is
-		/// built by [`Self::initialize`], so it carries the discriminator and
-		/// any schema version envelope and passes the same structural and
-		/// application validation that [`Self::try_from_bytes`] enforces.
+		/// built through the same validated initialization contract as
+		/// [`Self::initialize`], so it carries the discriminator and any schema
+		/// version envelope and passes the same structural and application
+		/// validation that [`Self::try_from_bytes`] enforces.
 		///
 		/// Emission is a log write, so an emitted event is observable to
 		/// clients but does not affect program state. Propagate the returned
@@ -198,7 +215,19 @@ fn generate_emit_helper(crate_path: &syn::Path) -> proc_macro2::TokenStream {
 			) -> Result<(), #crate_path::PinaPodError>,
 		) -> Result<(), #crate_path::ProgramError> {
 			let mut record = [0u8; Self::SIZE];
-			let _ = Self::initialize(&mut record, initialize)?;
+			let value = <Self as #crate_path::PinaPodFixed>::initialize_zeroed(
+				&mut record,
+				|value| {
+					<Self as #crate_path::HasDiscriminator>::write_discriminator(
+						&mut value.discriminator,
+					);
+					#write_version
+					initialize(value)
+				},
+			)
+			.map_err(|_| #crate_path::ProgramError::InvalidInstructionData)?;
+			#validate_initialized
+			let _ = value;
 
 			#crate_path::emit_event(&record)
 		}

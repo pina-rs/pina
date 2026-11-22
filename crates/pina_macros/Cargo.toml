@@ -16,6 +16,7 @@ proc-macro = true
 default = []
 compact = []
 validation = []
+verbose-logs = []
 
 [dependencies]
 darling = { workspace = true, default-features = true }

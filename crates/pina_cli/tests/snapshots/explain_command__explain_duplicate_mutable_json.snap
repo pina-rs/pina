@@ -47,7 +47,7 @@ expression: document
     "cpi": null,
     "error": {
       "code": 4294967289,
-      "description": "Two mutable account fields point at the same runtime account.",
+      "description": "Two mutable account fields (or a `#[pina(unique)]` field and another present account field) point at the same runtime account.",
       "kind": "pina",
       "name": "PinaProgramError::DuplicateMutableAccount"
     },

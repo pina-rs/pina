@@ -394,9 +394,17 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -770,7 +778,6 @@ impl pina::HasDiscriminator for CounterState {
     const VALUE: Self::Type = PdaDisc::CounterState;
 }
 impl pina::AccountValidation for CounterStateZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -782,7 +789,6 @@ impl pina::AccountValidation for CounterStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -796,7 +802,6 @@ impl pina::AccountValidation for CounterStateZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -808,7 +813,6 @@ impl pina::AccountValidation for CounterStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -1281,9 +1285,22 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 8] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU16 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU32 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -1876,7 +1893,6 @@ impl pina::HasDiscriminator for AllSeedState {
     const VALUE: Self::Type = PdaDisc::AllSeedState;
 }
 impl pina::AccountValidation for AllSeedStateZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1888,7 +1904,6 @@ impl pina::AccountValidation for AllSeedStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1902,7 +1917,6 @@ impl pina::AccountValidation for AllSeedStateZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1914,7 +1928,6 @@ impl pina::AccountValidation for AllSeedStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -2351,9 +2364,17 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; PdaDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -2728,7 +2749,6 @@ impl pina::HasDiscriminator for TodoState {
     const VALUE: Self::Type = PdaDisc::TodoState;
 }
 impl pina::AccountValidation for TodoStateZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2740,7 +2760,6 @@ impl pina::AccountValidation for TodoStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2754,7 +2773,6 @@ impl pina::AccountValidation for TodoStateZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2766,7 +2784,6 @@ impl pina::AccountValidation for TodoStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -2939,7 +2956,15 @@ mod __pinapod_compact_CompactState {
         <Address as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
         <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
     {
+        const TRIVIALLY_VALID: ::core::primitive::bool = true
+            && <[<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES] as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+            && <<Address as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+            && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+        #[inline(always)]
         fn validate_ref(value: &Self) -> Result<(), pina::pinapod::PinaPodError> {
+            if Self::TRIVIALLY_VALID {
+                return Ok(());
+            }
             <[<u8 as pina::pinapod::ZcField>::Pod; PdaDisc::BYTES] as pina::pinapod::ZcValidate>::validate_ref(
                 &value.discriminator,
             )?;
@@ -3059,9 +3084,6 @@ mod __pinapod_compact_CompactState {
             let __elem_size = core::mem::size_of::<
                 <u64 as pina::pinapod::ZcField>::Pod,
             >();
-            if __elem_size == 0 {
-                return Err(pina::pinapod::PinaPodError::InvalidLength);
-            }
             let __byte_len = __values_len
                 * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
             let __tail_end = __tail_offset + __byte_len;
@@ -3091,9 +3113,6 @@ mod __pinapod_compact_CompactState {
             let __elem_size = core::mem::size_of::<
                 <u64 as pina::pinapod::ZcField>::Pod,
             >();
-            if __elem_size == 0 {
-                return Err(pina::pinapod::PinaPodError::InvalidLength);
-            }
             let __byte_len = __values_len
                 * core::mem::size_of::<<u64 as pina::pinapod::ZcField>::Pod>();
             let __tail_end = __tail_offset + __byte_len;
@@ -3625,14 +3644,16 @@ mod __pinapod_compact_CompactState {
             }
             Ok(initialized_len)
         }
-        /// Apply the patch in place and return the new encoded length.
-        pub fn update(
+        /// Apply the patch in place when `data` is large enough, or return
+        /// `Ok(Err(required_len))` without mutating `data` when `data` must
+        /// grow first.
+        pub fn try_update_or_len(
             &self,
             data: &mut [u8],
-        ) -> Result<usize, pina::pinapod::PinaPodError> {
+        ) -> Result<Result<usize, usize>, pina::pinapod::PinaPodError> {
             let expected_len = self.updated_len(data)?;
             if expected_len > data.len() {
-                return Err(pina::pinapod::PinaPodError::BufferTooSmall);
+                return Ok(Err(expected_len));
             }
             let mut writer = unsafe { <CompactStateMut<'_>>::new_unchecked(data) };
             if let Some(value) = self.values {
@@ -3648,7 +3669,17 @@ mod __pinapod_compact_CompactState {
             if encoded_len != expected_len {
                 return Err(pina::pinapod::PinaPodError::InvalidLength);
             }
-            Ok(encoded_len)
+            Ok(Ok(encoded_len))
+        }
+        /// Apply the patch in place and return the new encoded length.
+        pub fn update(
+            &self,
+            data: &mut [u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            match self.try_update_or_len(data)? {
+                Ok(encoded_len) => Ok(encoded_len),
+                Err(_) => Err(pina::pinapod::PinaPodError::BufferTooSmall),
+            }
         }
         fn try_initialize(
             &self,
@@ -3686,6 +3717,19 @@ mod __pinapod_compact_CompactState {
             }
             Ok(encoded_len)
         }
+        /// Write the patch into an already-zeroed allocation and return the
+        /// encoded length. A failure leaves the destination zeroed rather
+        /// than partially patched.
+        pub fn initialize_zeroed(
+            &self,
+            data: &mut [u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            let result = self.try_initialize(data);
+            if result.is_err() {
+                data.fill(0);
+            }
+            result
+        }
         /// Write the patch into a fresh or zeroed allocation and return the
         /// encoded length. A failure leaves the destination zeroed rather
         /// than partially patched.
@@ -3694,11 +3738,7 @@ mod __pinapod_compact_CompactState {
             data: &mut [u8],
         ) -> Result<usize, pina::pinapod::PinaPodError> {
             data.fill(0);
-            let result = self.try_initialize(data);
-            if result.is_err() {
-                data.fill(0);
-            }
-            result
+            self.initialize_zeroed(data)
         }
     }
     impl<'__pinapod_patch> pina::pinapod::PinaPodPatch<CompactState>
@@ -3723,6 +3763,18 @@ mod __pinapod_compact_CompactState {
             data: &mut [u8],
         ) -> Result<usize, pina::pinapod::PinaPodError> {
             <CompactStatePatch<'__pinapod_patch>>::initialize(self, data)
+        }
+        fn try_update_or_len(
+            &self,
+            data: &mut [u8],
+        ) -> Result<Result<usize, usize>, pina::pinapod::PinaPodError> {
+            <CompactStatePatch<'__pinapod_patch>>::try_update_or_len(self, data)
+        }
+        fn initialize_zeroed(
+            &self,
+            data: &mut [u8],
+        ) -> Result<usize, pina::pinapod::PinaPodError> {
+            <CompactStatePatch<'__pinapod_patch>>::initialize_zeroed(self, data)
         }
     }
     impl CompactState
@@ -3778,14 +3830,6 @@ mod __pinapod_compact_CompactState {
             let __elem_size = core::mem::size_of::<
                 <u64 as pina::pinapod::ZcField>::Pod,
             >();
-            if __elem_size == 0 {
-                return Err(
-                    pina::pinapod::Diagnostic::new(
-                        "values",
-                        pina::pinapod::PinaPodError::InvalidLength,
-                    ),
-                );
-            }
             let __byte_len = __pinapod_checked_mul(__count, __elem_size)
                 .map_err(|error| pina::pinapod::Diagnostic::new("values", error))?;
             let __end = __pinapod_checked_add(__tail_offset, __byte_len)
@@ -4196,27 +4240,50 @@ impl CompactState {
         data: &mut [u8],
         patch: &CompactStatePatch<'_>,
     ) -> Result<usize, pina::ProgramError> {
+        match Self::__try_update_or_len(data, patch)? {
+            Ok(encoded_len) => Ok(encoded_len),
+            Err(_) => Err(pina::ProgramError::InvalidAccountData),
+        }
+    }
+    #[doc(hidden)]
+    pub fn __try_update_or_len(
+        data: &mut [u8],
+        patch: &CompactStatePatch<'_>,
+    ) -> Result<Result<usize, usize>, pina::ProgramError> {
         <Self as pina::PinaPodCompact>::validate_storage_len(data.len())
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
         if !<Self as pina::HasDiscriminator>::matches_discriminator(data) {
             return Err(pina::ProgramError::InvalidAccountData);
         }
-        let encoded_len = patch
-            .update(data)
-            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
-        <Self as pina::HasDiscriminator>::write_discriminator(data);
-        let value = CompactStateRef::new(&data[..encoded_len])
-            .map_err(|_| pina::ProgramError::InvalidAccountData)?;
-        <CompactStateRef<'_> as pina::PinaValidate>::validate(&value)?;
-        Ok(encoded_len)
+        match patch
+            .try_update_or_len(data)
+            .map_err(|_| pina::ProgramError::InvalidAccountData)?
+        {
+            Ok(encoded_len) => {
+                <Self as pina::HasDiscriminator>::write_discriminator(data);
+                let value = CompactStateRef::new(&data[..encoded_len])
+                    .map_err(|_| pina::ProgramError::InvalidAccountData)?;
+                <CompactStateRef<'_> as pina::PinaValidate>::validate(&value)?;
+                Ok(Ok(encoded_len))
+            }
+            Err(required_len) => Ok(Err(required_len)),
+        }
     }
     /// Initialize compact account storage from one complete patch.
     pub fn initialize(
         data: &mut [u8],
         patch: &CompactStatePatch<'_>,
     ) -> Result<usize, pina::ProgramError> {
+        data.fill(0);
+        Self::__initialize_zeroed(data, patch)
+    }
+    #[doc(hidden)]
+    pub fn __initialize_zeroed(
+        data: &mut [u8],
+        patch: &CompactStatePatch<'_>,
+    ) -> Result<usize, pina::ProgramError> {
         let encoded_len = patch
-            .initialize(data)
+            .initialize_zeroed(data)
             .map_err(|_| pina::ProgramError::InvalidAccountData)?;
         <Self as pina::HasDiscriminator>::write_discriminator(data);
         let value = CompactStateRef::new(&data[..encoded_len])
@@ -4235,7 +4302,6 @@ impl pina::HasDiscriminator for CompactState {
     const VALUE: Self::Type = PdaDisc::Compact;
 }
 impl pina::AccountValidation for CompactStateHeader {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -4247,7 +4313,6 @@ impl pina::AccountValidation for CompactStateHeader {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -4261,7 +4326,6 @@ impl pina::AccountValidation for CompactStateHeader {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -4273,7 +4337,6 @@ impl pina::AccountValidation for CompactStateHeader {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -4324,6 +4387,18 @@ impl pina::PinaCompactAccount for CompactState {
         patch: &Self::Patch<'_>,
     ) -> Result<usize, pina::ProgramError> {
         Self::initialize(data, patch)
+    }
+    fn __try_update_or_len(
+        data: &mut [u8],
+        patch: &Self::Patch<'_>,
+    ) -> Result<Result<usize, usize>, pina::ProgramError> {
+        Self::__try_update_or_len(data, patch)
+    }
+    fn __initialize_zeroed(
+        data: &mut [u8],
+        patch: &Self::Patch<'_>,
+    ) -> Result<usize, pina::ProgramError> {
+        Self::__initialize_zeroed(data, patch)
     }
 }
 impl<'__pina_patch> pina::PinaCompactPatch<CompactState>
@@ -4382,6 +4457,20 @@ impl AuthorityState {
                     format_args!("could not find program address from seeds"),
                 );
             })
+    }
+    /// Derive this singleton PDA and canonical bump at compile time.
+    ///
+    /// Prefer this in `const` items so programs with all-constant seeds pay
+    /// 0 compute units for PDA derivation at runtime.
+    pub const fn try_find_pda_const(
+        program_id: &pina::Address,
+    ) -> ::core::option::Option<(pina::Address, u8)> {
+        pina::try_find_program_address_const(&[b"authority"], program_id)
+    }
+    /// Derive this singleton PDA and canonical bump at compile time,
+    /// panicking during compilation if no valid PDA exists.
+    pub const fn find_pda_const(program_id: &pina::Address) -> (pina::Address, u8) {
+        pina::find_program_address_const(&[b"authority"], program_id)
     }
 }
 impl<'a> AuthorityStateSeeds<'a> {

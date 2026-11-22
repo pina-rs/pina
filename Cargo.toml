@@ -279,7 +279,10 @@ paste = { default-features = false, version = "^1" }
 # first release binding the generated modules' prelude names to `core`, so a
 # schema module cannot rebind the constructors the generated code spells, and
 # the first whose wincode writers validate stored content at the boundary.
-pinapod = { version = "0.4.9", default-features = false, features = ["solana-address", "solana-program-error"] }
+pinapod = { default-features = false, features = [
+	"solana-address",
+	"solana-program-error",
+], git = "https://github.com/pina-rs/pinapod.git", rev = "a535b405934ca00434c7826611c9453a43db9197", version = "0.4.9" }
 pinocchio = { default-features = false, version = "^0.11", features = ["cpi"] }
 pinocchio-associated-token-account = { default-features = false, version = "^0.4" }
 pinocchio-memo = { default-features = false, version = "^0.4" }
