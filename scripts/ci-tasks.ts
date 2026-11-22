@@ -3,6 +3,8 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+	accessSync,
+	constants as fsConstants,
 	existsSync,
 	lstatSync,
 	mkdirSync,
@@ -16,7 +18,7 @@ import {
 	unlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { findExecutable } from "./find-executable.ts";
@@ -222,7 +224,8 @@ export function parseAdvisoryIgnores(denyToml: string): string[] {
 	let inAdvisories = false;
 	let inIgnore = false;
 
-	for (const line of denyToml.split(/\r?\n/u)) {
+	for (const rawLine of denyToml.split(/\r?\n/u)) {
+		const line = rawLine.replace(/#.*$/u, "");
 		if (/^\[advisories\]/u.test(line)) {
 			inAdvisories = true;
 			inIgnore = false;
@@ -251,7 +254,7 @@ export function parseAdvisoryIgnores(denyToml: string): string[] {
 					ignores.push(match[1]);
 				}
 			}
-			if (/^\s*\]/u.test(line)) {
+			if (line.includes("]")) {
 				inIgnore = false;
 			}
 		}
@@ -263,7 +266,10 @@ export function parseAdvisoryIgnores(denyToml: string): string[] {
 /** Return true when `candidate` is located inside (or equal to) `directory`. */
 export function isPathInside(directory: string, candidate: string): boolean {
 	const rel = relative(resolve(directory), resolve(candidate));
-	return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+	return (
+		rel === "" ||
+		(rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))
+	);
 }
 
 function ensureHomeOutsideRepo(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -277,7 +283,8 @@ function ensureHomeOutsideRepo(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 		return env;
 	}
 
-	const createdHome = mkdtempSync(join(tmpdir(), "pina-home-"));
+	const baseTmp = isPathInside(REPO_ROOT, tmpdir()) ? "/tmp" : tmpdir();
+	const createdHome = mkdtempSync(join(baseTmp, "pina-home-"));
 	mkdirSync(createdHome, { recursive: true });
 	return { ...env, HOME: createdHome };
 }
@@ -316,11 +323,26 @@ function isSymlink(path: string): boolean {
 	}
 }
 
+function isExecutableFile(path: string): boolean {
+	if (!existsSync(path)) {
+		return false;
+	}
+	try {
+		accessSync(path, fsConstants.X_OK);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 function hasCompletePreinstalledPlatformTools(
 	env: NodeJS.ProcessEnv,
 	toolsVersion: string,
 ): boolean {
-	if (env.PINA_PLATFORM_TOOLS_PREINSTALLED === "1") {
+	if (
+		env.PINA_PLATFORM_TOOLS_PREINSTALLED === "1" &&
+		(env.SBF_TOOLS_VERSION ?? SBF_TOOLS_VERSION_DEFAULT) === toolsVersion
+	) {
 		return true;
 	}
 
@@ -337,7 +359,7 @@ function hasCompletePreinstalledPlatformTools(
 		if (isSymlink(ptDir)) {
 			continue;
 		}
-		if (existsSync(join(ptDir, "rust", "bin", "rustc"))) {
+		if (isExecutableFile(join(ptDir, "rust", "bin", "rustc"))) {
 			return true;
 		}
 	}

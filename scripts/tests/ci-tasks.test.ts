@@ -45,6 +45,12 @@ ignore = ["RUSTSEC-9999-9999"]
 	const inlineSample = `[advisories]\nignore = ["RUSTSEC-2026-0042"]\n`;
 	assert.deepEqual(parseAdvisoryIgnores(inlineSample), ["RUSTSEC-2026-0042"]);
 
+	const commentBracketSample =
+		`[advisories]\nignore = [ # see [notes]\n  "RUSTSEC-2026-0099",\n]\n`;
+	assert.deepEqual(parseAdvisoryIgnores(commentBracketSample), [
+		"RUSTSEC-2026-0099",
+	]);
+
 	// Verify the repository's real deny.toml parses cleanly.
 	const realDeny = readFileSync(join(REPO_ROOT, "deny.toml"), "utf8");
 	const realIgnores = parseAdvisoryIgnores(realDeny);
@@ -71,6 +77,7 @@ test("workspace package discovery finds generated clients, examples, and secure 
 test("isPathInside distinguishes workspace-internal and external directories", () => {
 	assert.equal(isPathInside("/work/pina", "/work/pina"), true);
 	assert.equal(isPathInside("/work/pina", "/work/pina/.cargo"), true);
+	assert.equal(isPathInside("/work/pina", "/work/pina/..cache"), true);
 	assert.equal(isPathInside("/work/pina", "/home/runner/.cargo"), false);
 	assert.equal(isPathInside("/work/pina", "/work/pina-other"), false);
 });

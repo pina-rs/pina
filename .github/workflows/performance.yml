@@ -212,13 +212,15 @@ jobs:
         uses: $/.github/actions/setup-sbf
 
       # Recorded instruction CUs are deterministic per base commit, so reuse
-      # the base measurement across concurrent PRs sharing the same `main` SHA.
-      - name: cache base instruction compute units
+      # the base measurement across pushes sharing the same `main` SHA. Restore
+      # first and save only when the base report is complete (no failed batches
+      # or missing cases).
+      - name: restore base instruction compute units
         id: base-cu-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/performance/instructions/runtime-base.json
-          key: ${{ runner.os }}-perf-instructions-base-v1-${{ github.event.pull_request.base.sha }}
+          key: ${{ runner.os }}-perf-instructions-base-v1-${{ github.event.pull_request.base.sha }}-${{ hashFiles('scripts/measure-example-compute-units.ts', 'scripts/compute-unit-policy.json') }}
 
       - name: create base worktree
         if: ${{ steps.base-cu-cache.outputs.cache-hit != 'true' }}
@@ -248,6 +250,7 @@ jobs:
         shell: bash
 
       - name: measure base and head instructions
+        id: measure-instructions
         # Surfpool test binaries can hang indefinitely (the SDK's startup wait
         # has no timeout). The measure script terminates an individual batch
         # after 30 minutes; this bounds the whole step for hangs the watchdog
@@ -257,6 +260,7 @@ jobs:
           BASE_CACHE_HIT: ${{ steps.base-cu-cache.outputs.cache-hit }}
         run: |
           set -euo pipefail
+          base_complete=false
           if [[ "$BASE_CACHE_HIT" != "true" ]]; then
             node "$GITHUB_WORKSPACE/scripts/measure-example-compute-units.ts" \
               "$GITHUB_WORKSPACE/../pina-performance-base" \
@@ -264,7 +268,12 @@ jobs:
               "$GITHUB_WORKSPACE/target/performance-build/instructions/base" \
               "$GITHUB_WORKSPACE/target/performance/instructions/runtime-base.json" \
               --allow-incomplete
+            if jq -e '(.cases | length > 0) and (.missingCases | length == 0) and (.testFailures | length == 0) and (.unavailablePrograms | length == 0)' \
+              "$GITHUB_WORKSPACE/target/performance/instructions/runtime-base.json" >/dev/null; then
+              base_complete=true
+            fi
           fi
+          echo "base_complete=${base_complete}" >> "$GITHUB_OUTPUT"
 
           node ./scripts/measure-example-compute-units.ts \
             "$GITHUB_WORKSPACE" \
@@ -272,6 +281,13 @@ jobs:
             "$GITHUB_WORKSPACE/target/performance-build/instructions/head" \
             "$GITHUB_WORKSPACE/target/performance/instructions/runtime-head.json"
         shell: bash
+
+      - name: save complete base instruction compute units
+        if: ${{ steps.base-cu-cache.outputs.cache-hit != 'true' && steps.measure-instructions.outputs.base_complete == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/performance/instructions/runtime-base.json
+          key: ${{ runner.os }}-perf-instructions-base-v1-${{ github.event.pull_request.base.sha }}-${{ hashFiles('scripts/measure-example-compute-units.ts', 'scripts/compute-unit-policy.json') }}
 
       - name: compare instruction reports
         env:
@@ -373,7 +389,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/performance/token-loader/exact-runtime-base.json
-          key: ${{ runner.os }}-perf-token-loader-base-v1-${{ github.event.pull_request.base.sha }}-${{ hashFiles('tests/fixtures/token_loader_cu_program/**') }}
+          key: ${{ runner.os }}-perf-token-loader-base-v1-${{ github.event.pull_request.base.sha }}-${{ hashFiles('tests/fixtures/token_loader_cu_program/**', 'tests/compute_units.rs', 'scripts/measure-runtime-compute-units.ts') }}
 
       - name: create base worktree
         if: ${{ steps.base-token-loader-cache.outputs.cache-hit != 'true' }}

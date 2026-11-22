@@ -77,7 +77,10 @@ runs:
       uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
       with:
         toolchain: ${{ inputs.toolchain }}
-        components: ${{ inputs.components }}
+        # `rustc_private` binaries (such as `pina_lint_driver`) link against the
+        # target `libLLVM-*.so` shipped inside `llvm-tools`, so always pair
+        # `llvm-tools` with `rustc-dev`.
+        components: ${{ contains(inputs.components, 'rustc-dev') && !contains(inputs.components, 'llvm-tools') && format('{0},llvm-tools', inputs.components) || inputs.components }}
 
     - name: install secondary Rust toolchain
       if: ${{ inputs.extra-toolchain != '' }}

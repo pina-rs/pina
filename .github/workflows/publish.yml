@@ -385,7 +385,7 @@ jobs:
       - name: setup Rust for publish
         uses: $/.github/actions/setup-rust
         with:
-          components: rustc-dev
+          components: rustc-dev,llvm-tools
           cache-key: none
           use-mold: "false"
           use-sccache: "false"

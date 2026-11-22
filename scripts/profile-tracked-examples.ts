@@ -86,21 +86,62 @@ function main(): number {
 		);
 	}
 
-	const cliBuild = command(
+	const cliBuild = spawnSync(
 		"cargo",
-		["build", "--quiet", "--locked", "-p", "pina_cli", "--bin", "pina"],
-		{ cwd: workspaceRoot },
+		[
+			"build",
+			"--quiet",
+			"--locked",
+			"-p",
+			"pina_cli",
+			"--bin",
+			"pina",
+			"--message-format=json-render-diagnostics",
+		],
+		{
+			cwd: workspaceRoot,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "inherit"],
+			maxBuffer: 32 * 1024 * 1024,
+		},
 	);
-	if (cliBuild.status !== 0) {
-		throw new Error(`failed to build pina_cli (status ${cliBuild.status})`);
+	if (cliBuild.error !== undefined) {
+		throw cliBuild.error;
 	}
-	const targetDirectory = process.env.CARGO_TARGET_DIR ??
-		join(workspaceRoot, "target");
-	const pinaBinary = join(
-		targetDirectory,
-		"debug",
-		process.platform === "win32" ? "pina.exe" : "pina",
-	);
+	let pinaBinary: string | undefined;
+	if (cliBuild.status === 0) {
+		for (const line of (cliBuild.stdout ?? "").split(/\r?\n/u)) {
+			if (!line.startsWith("{")) {
+				continue;
+			}
+			try {
+				const message = JSON.parse(line) as {
+					reason?: string;
+					target?: { name?: string };
+					executable?: string | null;
+				};
+				if (
+					message.reason === "compiler-artifact" &&
+					message.target?.name === "pina" &&
+					typeof message.executable === "string"
+				) {
+					pinaBinary = message.executable;
+				}
+			} catch {
+				// Ignore non-JSON lines.
+			}
+		}
+		if (pinaBinary === undefined) {
+			const targetDirectory = process.env.CARGO_TARGET_DIR ??
+				process.env.CARGO_BUILD_TARGET_DIR ??
+				join(workspaceRoot, "target");
+			pinaBinary = join(
+				targetDirectory,
+				"debug",
+				process.platform === "win32" ? "pina.exe" : "pina",
+			);
+		}
+	}
 
 	const results: Record<string, ProfileResult> = {};
 	for (const program of trackedPrograms) {
@@ -116,6 +157,13 @@ function main(): number {
 			continue;
 		}
 		copyFileSync(artifact, join(outputDirectory, `${program.name}.so`));
+		if (pinaBinary === undefined) {
+			results[program.name] = {
+				status: "unavailable",
+				detail: `pina_cli build exited with status ${cliBuild.status ?? 1}`,
+			};
+			continue;
+		}
 		process.stdout.write(`Profiling ${program.name} from ${artifact}\n`);
 		const profile = command(
 			pinaBinary,

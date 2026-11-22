@@ -44,7 +44,7 @@ jobs:
       - name: setup Rust
         uses: $/.github/actions/setup-rust
         with:
-          components: rustc-dev
+          components: rustc-dev,llvm-tools
           cache-key: host
           sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
           sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}

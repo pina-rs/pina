@@ -23,8 +23,22 @@ pnpm --dir "$ROOT" run build:codama-renderer-cli
 
 # Build the CLI binary once so each example only pays the generation cost
 # instead of re-entering Cargo 28 times.
-cargo build --locked --quiet -p pina_cli --bin pina
-PINA_BIN="${CARGO_TARGET_DIR:-$ROOT/target}/debug/pina"
+PINA_BIN="$(
+	cargo build --locked --quiet -p pina_cli --bin pina --message-format=json-render-diagnostics |
+		node -e '
+			const fs = require("node:fs");
+			for (const line of fs.readFileSync(0, "utf8").split(/\r?\n/)) {
+				if (!line.startsWith("{")) continue;
+				const msg = JSON.parse(line);
+				if (msg.reason === "compiler-artifact" && msg.target?.name === "pina" && typeof msg.executable === "string") {
+					process.stdout.write(msg.executable);
+				}
+			}
+		'
+)"
+if [ -z "$PINA_BIN" ]; then
+	PINA_BIN="${CARGO_TARGET_DIR:-${CARGO_BUILD_TARGET_DIR:-$ROOT/target}}/debug/pina"
+fi
 
 for program_dir in "${EXAMPLES[@]}"; do
 	program_name="$(basename "$program_dir")"

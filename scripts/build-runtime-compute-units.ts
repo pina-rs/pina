@@ -2,6 +2,8 @@
 
 import { spawnSync } from "node:child_process";
 import {
+	accessSync,
+	constants as fsConstants,
 	copyFileSync,
 	cpSync,
 	existsSync,
@@ -225,8 +227,19 @@ function main(): number {
 	const ptCacheRoot = env.SOLANA_PLATFORM_TOOLS_DIR ??
 		join(home, ".cache", "solana");
 	const ptDir = join(ptCacheRoot, TOOLS_VERSION, "platform-tools");
-	const hasPreinstalledTools = env.PINA_PLATFORM_TOOLS_PREINSTALLED === "1" ||
-		(!isSymlink(ptDir) && existsSync(join(ptDir, "rust", "bin", "rustc")));
+	const rustcPath = join(ptDir, "rust", "bin", "rustc");
+	let hasExecutableRustc = false;
+	if (!isSymlink(ptDir) && existsSync(rustcPath)) {
+		try {
+			accessSync(rustcPath, fsConstants.X_OK);
+			hasExecutableRustc = true;
+		} catch {
+			hasExecutableRustc = false;
+		}
+	}
+	const hasPreinstalledTools = (env.PINA_PLATFORM_TOOLS_PREINSTALLED === "1" &&
+		(env.SBF_TOOLS_VERSION ?? TOOLS_VERSION) === TOOLS_VERSION) ||
+		hasExecutableRustc;
 	let installTools = linux && !hasPreinstalledTools;
 
 	for (let index = 0; index < values.length; index += 2) {
