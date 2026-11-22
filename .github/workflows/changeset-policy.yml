@@ -25,9 +25,8 @@ concurrency:
   cancel-in-progress: true
 
 # The policy check must run on every pull request (its whole purpose is
-# catching missing changesets), so it is the one devenv job without path
-# gating. Change classification was folded into this job so a pull request
-# pays for the nix/devenv setup once instead of twice.
+# catching missing changesets), so it installs only the pinned monochange
+# binary and runs change classification in the same job.
 jobs:
   check:
     # `check` is a required status, and a skipped job satisfies one, so an edit
@@ -60,24 +59,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup devenv
+      - name: install monochange
         if: ${{ env.VALIDATE == 'true' }}
-        uses: $/.github/actions/devenv
+        uses: $/.github/actions/install-tools
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          monochange: "true"
 
-      - name: add devenv monochange to PATH
+      - name: verify monochange version
         if: ${{ env.VALIDATE == 'true' }}
-        run: |
-          set -euo pipefail
-          profile="$(devenv shell -- bash -c 'printf %s "${DEVENV_PROFILE:-}"')"
-          if [[ -z "$profile" ]]; then
-            echo "devenv profile was not resolved." >&2
-            exit 1
-          fi
-          echo "$profile/bin" >> "$GITHUB_PATH"
-          "$profile/bin/monochange" --version
         shell: bash
+        run: monochange --version
 
       - name: collect changed files
         if: ${{ env.VALIDATE == 'true' }}

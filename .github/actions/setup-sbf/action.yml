@@ -1,0 +1,124 @@
+name: setup-sbf
+description: "Install and cache pinned Agave cargo-build-sbf v4.2.2 and platform-tools v1.54 without Nix"
+inputs:
+  cache-version:
+    description: "Cache key version for SBF tools"
+    required: false
+    default: "v1"
+
+runs:
+  using: composite
+  steps:
+    - name: restore cached Agave and platform-tools
+      id: sbf-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.local/share/pina-sbf/agave-4.2.2
+          ~/.cache/solana/v1.54/platform-tools
+        key: ${{ runner.os }}-${{ runner.arch }}-sbf-agave-4.2.2-pt-v1.54-${{ inputs.cache-version }}
+
+    - name: install Agave v4.2.2 and platform-tools v1.54
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
+          echo "::error::setup-sbf currently supports Linux x86_64 only." >&2
+          exit 1
+        fi
+
+        agave_root="$HOME/.local/share/pina-sbf/agave-4.2.2"
+        agave_bin="$agave_root/bin"
+        pt_dir="$HOME/.cache/solana/v1.54/platform-tools"
+        cargo_bin="${CARGO_HOME:-$HOME/.cargo}/bin"
+        mkdir -p "$cargo_bin"
+
+        download_verified() {
+          local url="$1"
+          local expected_sha256="$2"
+          local dest="$3"
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --retry 5 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            --output "$dest" \
+            "$url"
+
+          printf '%s  %s\n' "$expected_sha256" "$dest" | sha256sum --check --status - || {
+            echo "::error::SHA256 verification failed for $url" >&2
+            exit 1
+          }
+        }
+
+        if [[ ! -x "$agave_bin/cargo-build-sbf" ]]; then
+          rm -rf "$agave_root"
+          mkdir -p "$agave_bin"
+          tmp_agave="$(mktemp -d)"
+
+          download_verified \
+            "https://github.com/anza-xyz/agave/releases/download/v4.2.2/solana-release-x86_64-unknown-linux-gnu.tar.bz2" \
+            "5fc8684f7430038105fde953d4308ed56addf627f658daa61709f345448247ee" \
+            "$tmp_agave/agave.tar.bz2"
+
+          tar -xjf "$tmp_agave/agave.tar.bz2" -C "$tmp_agave"
+          for tool in cargo-build-sbf cargo-test-sbf solana-keygen solana; do
+            if [[ -f "$tmp_agave/solana-release/bin/$tool" ]]; then
+              install -m 0755 "$tmp_agave/solana-release/bin/$tool" "$agave_bin/$tool"
+            fi
+          done
+          rm -rf "$tmp_agave"
+        fi
+
+        for tool in cargo-build-sbf cargo-test-sbf solana-keygen solana; do
+          if [[ -x "$agave_bin/$tool" ]]; then
+            ln -sf "$agave_bin/$tool" "$cargo_bin/$tool"
+          fi
+        done
+
+        if [[ ! -x "$pt_dir/rust/bin/rustc" ]]; then
+          rm -rf "$pt_dir"
+          mkdir -p "$(dirname "$pt_dir")"
+          tmp_pt="$(mktemp -d)"
+
+          download_verified \
+            "https://github.com/anza-xyz/platform-tools/releases/download/v1.54/platform-tools-linux-x86_64.tar.bz2" \
+            "fcc41631c7f77561bf5412218bf297501dccf0305ea280f338f0ace2aab9f31e" \
+            "$tmp_pt/platform-tools.tar.bz2"
+
+          mkdir -p "$tmp_pt/extract"
+          tar -xjf "$tmp_pt/platform-tools.tar.bz2" -C "$tmp_pt/extract"
+
+          # Handle both flat archives (rust/, llvm/) and single-wrapper archives.
+          if [[ -x "$tmp_pt/extract/rust/bin/rustc" ]]; then
+            mv "$tmp_pt/extract" "$pt_dir"
+          else
+            rustc_bin="$(find "$tmp_pt/extract" -maxdepth 4 -type f -path '*/rust/bin/rustc' -print -quit)"
+            if [[ -z "$rustc_bin" ]]; then
+              echo "::error::Unpacked platform-tools archive is missing rust/bin/rustc" >&2
+              rm -rf "$tmp_pt"
+              exit 1
+            fi
+            nested_root="$(dirname "$(dirname "$(dirname "$rustc_bin")")")"
+            mv "$nested_root" "$pt_dir"
+          fi
+
+          # Strip unused lldb artifacts to keep the cached bundle compact.
+          rm -rf \
+            "$pt_dir/llvm/bin/lldb"* \
+            "$pt_dir/llvm/bin/solana-lldb" \
+            "$pt_dir/llvm/lib/liblldb"* \
+            "$pt_dir/llvm/lib/python"*
+          rm -rf "$tmp_pt"
+        fi
+
+        # Write static SBF environment markers without dynamic shell expansion.
+        cat <<'EOF' >> "$GITHUB_ENV"
+        SBF_TOOLS_VERSION=v1.54
+        PINA_PLATFORM_TOOLS_PREINSTALLED=1
+        EOF

@@ -41,14 +41,28 @@ fi
 mkdir -p "$OUT_DIR"
 tools_install=--force-tools-install
 
+# When Linux has complete, non-Nix platform-tools already unpacked (for example
+# from CI's setup-sbf cache), skip the forced 508 MB re-download.
+if [[ "$(uname -s)" == "Linux" ]]; then
+	if [[ "${PINA_PLATFORM_TOOLS_PREINSTALLED:-0}" == "1" ]]; then
+		tools_install=--skip-tools-install
+	else
+		pt_cache_root="${SOLANA_PLATFORM_TOOLS_DIR:-${HOME:?}/.cache/solana}"
+		pt_dir="$pt_cache_root/$TOOLS_VERSION/platform-tools"
+		if [[ ! -L "$pt_dir" && -x "$pt_dir/rust/bin/rustc" ]]; then
+			tools_install=--skip-tools-install
+		fi
+	fi
+fi
+
 # On macOS the nix agave package that provides cargo-build-sbf re-seeds the
 # platform-tools cache symlink from its read-only store bundle before every
 # invocation, so a forced install can only download the full asset over that
 # bundle — and a truncated download fails the whole run. When the resolved
 # binary is that bundled wrapper, trust the pinned bundle from the first
 # build on, after confirming its platform-tools version is the one this
-# script pins. Linux keeps the forced first install: its bundled sysroot is
-# incomplete (no liballoc), so the full pinned toolchain must be fetched.
+# script pins. Linux keeps the forced first install only when no complete
+# non-Nix platform-tools bundle is already installed.
 if [[ "$(uname -s)" != "Linux" ]]; then
 	case "$cargo_build_sbf" in
 	/nix/store/*/bin/cargo-build-sbf)

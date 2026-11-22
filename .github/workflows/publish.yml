@@ -375,23 +375,28 @@ jobs:
           sparse-checkout: scripts/release-assets.ts
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: install monochange
+        uses: $/.github/actions/install-tools
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          monochange: "true"
       - name: get crates oidc auth token
         uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
         id: crates-oidc
-      - name: setup cargo stable for publish
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+      - name: setup Rust for publish
+        uses: $/.github/actions/setup-rust
         with:
-          toolchain: stable
+          components: rustc-dev
+          cache-key: none
+          use-mold: "false"
+          use-sccache: "false"
+      - name: setup pnpm for publish
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - name: setup node for publish
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          # Use the Node/npm pair from devenv. npm discovers the GitHub OIDC
-          # credentials itself; replacing it with a prefixed npm can bypass
-          # trusted publishing and fail with ENEEDAUTH.
+          # npm discovers the GitHub OIDC credentials itself; keep the runner's
+          # Node/npm pair clean without a prefixed npm that can bypass trusted
+          # publishing and fail with ENEEDAUTH.
           node-version: 24
           package-manager-cache: false
       - name: download sealed release by immutable ID
@@ -509,7 +514,7 @@ jobs:
                 exit 1
               }
           done
-        shell: devenv shell -- bash -e {0}
+        shell: bash
       - name: check publish readiness
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
@@ -520,7 +525,7 @@ jobs:
             --from HEAD \
             --output "$RUNNER_TEMP/publish-readiness.json" \
             --format json
-        shell: devenv shell -- bash -e {0}
+        shell: bash
       - name: publish packages with monochange
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-oidc.outputs.token }}
@@ -535,7 +540,7 @@ jobs:
             --all \
             --output "$RUNNER_TEMP/publish-result.json" \
             --format json
-        shell: devenv shell -- bash -e {0}
+        shell: bash
       - name: publish draft release
         shell: bash
         run: |

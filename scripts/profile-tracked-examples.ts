@@ -86,6 +86,22 @@ function main(): number {
 		);
 	}
 
+	const cliBuild = command(
+		"cargo",
+		["build", "--quiet", "--locked", "-p", "pina_cli", "--bin", "pina"],
+		{ cwd: workspaceRoot },
+	);
+	if (cliBuild.status !== 0) {
+		throw new Error(`failed to build pina_cli (status ${cliBuild.status})`);
+	}
+	const targetDirectory = process.env.CARGO_TARGET_DIR ??
+		join(workspaceRoot, "target");
+	const pinaBinary = join(
+		targetDirectory,
+		"debug",
+		process.platform === "win32" ? "pina.exe" : "pina",
+	);
+
 	const results: Record<string, ProfileResult> = {};
 	for (const program of trackedPrograms) {
 		rmSync(join(outputDirectory, `${program.name}.json`), { force: true });
@@ -102,14 +118,8 @@ function main(): number {
 		copyFileSync(artifact, join(outputDirectory, `${program.name}.so`));
 		process.stdout.write(`Profiling ${program.name} from ${artifact}\n`);
 		const profile = command(
-			"cargo",
+			pinaBinary,
 			[
-				"run",
-				"--quiet",
-				"--locked",
-				"-p",
-				"pina_cli",
-				"--",
 				"profile",
 				artifact,
 				"--json",

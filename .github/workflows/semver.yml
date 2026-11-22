@@ -54,10 +54,20 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: install cargo-semver-checks
+        uses: $/.github/actions/install-tools
+        with:
+          tools: cargo-semver-checks@0.50.0
 
       - name: run semver-checks
         id: semver
@@ -66,8 +76,8 @@ jobs:
         # with "not found in registry (crates.io)", which the evaluate step
         # misreads as breaking changes. Exclude it until the crate publishes
         # and its baseline exists, matching the temporary pina_test pattern.
-        run: cargo semver-checks check-release --workspace --exclude pina_cpi_renderer
-        shell: devenv shell -c -- bash -e {0}
+        run: cargo-semver-checks semver-checks check-release --workspace --exclude pina_cpi_renderer
+        shell: bash
 
       - name: evaluate semver results
         if: steps.semver.outcome == 'failure'

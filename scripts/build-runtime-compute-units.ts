@@ -222,7 +222,12 @@ function main(): number {
 	const env: NodeJS.ProcessEnv = { ...process.env, HOME: home };
 	const linux = process.platform === "linux";
 	const executable = linux ? prepareLinuxTools(env) : findCargoBuildSbf(env);
-	let installTools = linux;
+	const ptCacheRoot = env.SOLANA_PLATFORM_TOOLS_DIR ??
+		join(home, ".cache", "solana");
+	const ptDir = join(ptCacheRoot, TOOLS_VERSION, "platform-tools");
+	const hasPreinstalledTools = env.PINA_PLATFORM_TOOLS_PREINSTALLED === "1" ||
+		(!isSymlink(ptDir) && existsSync(join(ptDir, "rust", "bin", "rustc")));
+	let installTools = linux && !hasPreinstalledTools;
 
 	for (let index = 0; index < values.length; index += 2) {
 		const workspace = realpathSync(values[index] ?? ".");

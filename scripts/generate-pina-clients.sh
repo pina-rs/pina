@@ -21,11 +21,16 @@ fi
 # package, so its bundle has to exist before generation runs.
 pnpm --dir "$ROOT" run build:codama-renderer-cli
 
+# Build the CLI binary once so each example only pays the generation cost
+# instead of re-entering Cargo 28 times.
+cargo build --locked --quiet -p pina_cli --bin pina
+PINA_BIN="${CARGO_TARGET_DIR:-$ROOT/target}/debug/pina"
+
 for program_dir in "${EXAMPLES[@]}"; do
 	program_name="$(basename "$program_dir")"
 
 	echo "Generating clients for $program_name"
 	# `--npx node` uses the workspace-installed renderers directly instead of
 	# downloading them, which keeps generation offline and version-pinned.
-	cargo run -p pina_cli --quiet -- generate --project "$program_dir" --npx node
+	"$PINA_BIN" generate --project "$program_dir" --npx node
 done

@@ -430,47 +430,7 @@ in
     "test:all" = {
       exec = ''
         set -euo pipefail
-        # Pina refuses a repository root that contains the user's home.
-        # A clean CI shell's temporary home must therefore sit outside it.
-        if [ -z "''${HOME:-}" ]; then
-          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
-        fi
-        mkdir -p "$HOME"
-        # The raw Anchor CPI integration test invokes the pinned local converter.
-        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
-        # The `pina generate` CLI tests render the TypeScript/Dart CLI clients
-        # through this workspace package, so its bundle has to exist before the
-        # Rust suite runs. `dist` is not committed.
-        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
-        # Ensure cargo-expand is available for macrotest expansion snapshots.
-        if ! command -v cargo-expand &>/dev/null; then
-          cargo install --locked --version 1.0.111 cargo-expand
-        fi
-        # Two tiers. The workspace sweep reaches every member with its default
-        # features: the generated clients under `codama/`, `pina`'s
-        # integration suites, the examples, and the security crates. It cannot
-        # go stale the way the old hand-maintained `-p` list did, which never
-        # compiled a generated client's `tests/` directory. `--all-features`
-        # stays package-scoped because workspace-wide it would enable
-        # `bpf-entrypoint` on every example, and the host linker then rejects
-        # the duplicated `entrypoint` symbol when `pina_root` links several
-        # example programs into one test binary (macOS ld tolerates the
-        # duplicates; Linux rust-lld does not).
-        cargo test --workspace --locked
-        cargo test --all-features --locked
-        cargo test --locked --all-features \
-          -p pina_abi \
-          -p pina_cli \
-          -p pina_cli_renderer \
-          -p pina_codama_renderer \
-          -p pina_cpi_renderer
-        cargo check \
-          --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
-          --all-targets \
-          --locked
-        pnpm run check:scripts
-        pnpm run test:compute-units
-        test:npm-packages
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" test:all
       '';
       description = "Run workspace tests, compile fuzz targets, and verify npm packages.";
       binary = "bash";
@@ -527,24 +487,15 @@ in
     "verify:pina-test" = {
       exec = ''
         set -euo pipefail
-        build:pina-test
-        test:pina-test
-        lint:pina-test
-        doc:pina-test
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" verify:pina-test
       '';
-      description = "Run locked check, test, Clippy, and documentation gates for pina_test.";
+      description = "Run locked test, Clippy, and documentation gates for pina_test.";
       binary = "bash";
     };
     "test:npm-packages" = {
       exec = ''
         set -euo pipefail
-        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
-        pnpm --dir "$DEVENV_ROOT" run build:codama-nodes
-        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cpi
-        pnpm --dir "$DEVENV_ROOT" run check:npm-packages
-        pnpm --dir "$DEVENV_ROOT" run test:npm-packages
-        pnpm --dir "$DEVENV_ROOT" run test:codama-renderer-cpi
-        pnpm --dir "$DEVENV_ROOT" run test:codama-renderer-cli
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" test:npm-packages
       '';
       description = "Verify npm metadata, platform launchers, the CPI visitor, the skill installer, and release packaging scripts.";
       binary = "bash";
@@ -719,169 +670,7 @@ in
     "test:program-e2e" = {
       exec = ''
         set -euo pipefail
-
-        # Run unit and parity tests for all example programs.
-        cargo test --locked \
-          -p declare_id_program \
-          -p declare_program \
-          -p duplicate_mutable_accounts_program \
-          -p custom_errors_program \
-          -p events_program \
-          -p float_accounts_program \
-          -p account_realloc_program \
-          -p compact_accounts_program \
-          -p system_accounts_program \
-          -p sysvar_checks_program \
-          -p escrow_program \
-          -p optional_accounts_program \
-          -p heap_alloc_program \
-          -p pina_bpf_program \
-          -p profile_program \
-          -p validation_program
-
-        if [ -z "''${HOME:-}" ]; then
-          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
-        fi
-        mkdir -p "$HOME"
-        if [ "$(uname -s)" = "Linux" ]; then
-          # The Nix wrapper seeds cargo-build-sbf's cache with its bundled
-          # sysroot before forwarding arguments. Bypass that wrapper so the
-          # first real build can fetch the complete pinned toolchain, including
-          # liballoc. cargo-build-sbf detects NixOS itself; forcing its Nix
-          # patcher on Ubuntu can fail before the program build starts.
-          cargo_build_sbf="$(command -v cargo-build-sbf)"
-          cargo_build_sbf_resolved="$(${pkgs.coreutils}/bin/readlink -f "$cargo_build_sbf")"
-          cargo_build_sbf_real="$(dirname "$cargo_build_sbf_resolved")/.cargo-build-sbf-wrapped"
-          if [ ! -x "$cargo_build_sbf_real" ]; then
-            cargo_build_sbf_real="$cargo_build_sbf"
-          fi
-
-          # A previous wrapper invocation may already have installed its
-          # read-only Nix-store bundle as cargo-build-sbf's cache symlink.
-          # Remove only that exact derived symlink so the forced download can
-          # replace it; refuse to touch any user-managed target.
-          platform_tools_links=(
-            "''${HOME:?}/.cache/solana/v1.54/platform-tools"
-            "''${XDG_CACHE_HOME:-$HOME/.cache}/solana/v1.54/platform-tools"
-          )
-          for platform_tools_link in "''${platform_tools_links[@]}"; do
-            [ -L "$platform_tools_link" ] || continue
-            platform_tools_target="$(readlink "$platform_tools_link")"
-            case "$platform_tools_target" in
-              /nix/store/*/lib/platform-tools) unlink "$platform_tools_link" ;;
-              *)
-                echo "refusing to replace unexpected platform-tools link: $platform_tools_target" >&2
-                exit 1
-                ;;
-            esac
-          done
-
-          "$cargo_build_sbf_real" \
-            --force-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/pina_bpf_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint,cpi-runtime-tests
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/heap_alloc_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/escrow_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/migrations_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/optional_accounts_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/profile_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/role_registry_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/staking_rewards_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint
-          "$cargo_build_sbf_real" \
-            --skip-tools-install \
-            --tools-version v1.54 \
-            --manifest-path examples/vesting_program/Cargo.toml \
-            --sbf-out-dir target/deploy \
-            --features bpf-entrypoint
-        else
-          cargo build-pina-bpf-program
-          cargo build-heap-alloc-program
-          cargo build-escrow-program
-          cargo build-migrations-program
-          cargo build-optional-accounts-program
-          cargo build-profile-program
-          cargo build-role-registry-program
-          cargo build-staking-rewards-program
-          cargo build-vesting-program
-        fi
-        cargo test --locked -p pina_bpf_program sbf_build_ -- --ignored
-
-        # Run mollusk-svm e2e tests against the compiled SBF binaries.
-        # These verify that generated clients produce valid instructions
-        # that the on-chain programs accept and process correctly.
-        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
-          cargo test --locked \
-            -p heap_alloc_program --test heap_frames \
-            -p migrations_program --test e2e \
-            -p profile_program --test e2e \
-            -p role_registry_program --test e2e \
-            -p staking_rewards_program --test e2e \
-            -p vesting_program --test e2e \
-            -- --include-ignored --nocapture
-        SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
-          cargo test --locked \
-            -p optional_accounts_program --test on_chain \
-            -- --include-ignored --nocapture
-
-        # Run LiteSVM e2e tests with the generated TypeScript clients.
-        # These verify that TS instruction builders with pina's discriminator
-        # model produce transactions the on-chain programs accept.
-        litesvm_dir="$DEVENV_ROOT/codama/tests/litesvm"
-        pnpm --dir "$litesvm_dir" install --frozen-lockfile
-        (
-          cd "$litesvm_dir"
-          SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
-            node "$litesvm_dir/node_modules/vitest/vitest.mjs" run --pool threads
-        )
-
-        # Run Quasar SVM tests alongside LiteSVM. These execute generated
-        # instructions directly against the compiled program ELF in-process,
-        # which is useful for fast instruction/account-cycle validation
-        # without a validator.
-        quasar_svm_dir="$DEVENV_ROOT/codama/tests/quasar-svm"
-        pnpm --dir "$quasar_svm_dir" install --frozen-lockfile
-        (
-          cd "$quasar_svm_dir"
-          SBF_OUT_DIR="$DEVENV_ROOT/target/deploy" \
-            node "$quasar_svm_dir/node_modules/vitest/vitest.mjs" run --pool threads
-        )
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" test:program-e2e
       '';
       description = "Build SBF binaries and run end-to-end program tests including mollusk-svm integration.";
       binary = "bash";
@@ -1006,90 +795,7 @@ in
     "test:surfpool" = {
       exec = ''
         set -euo pipefail
-        if [ -z "''${HOME:-}" ]; then
-          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
-        fi
-        mkdir -p "$HOME"
-
-        # The test script installs the pinned SDK during its first real build,
-        # then reuses it for every other example. A missing program artifact is
-        # a hard failure in both local runs and CI.
-        pnpm install --frozen-lockfile
-        "$DEVENV_ROOT/scripts/build-surfpool-examples.sh"
-        # Reuse the built program to reject copied transfer proofs that alter
-        # successor disclosure metadata.
-        SBF_OUT_DIR="''${SBF_OUT_DIR:-$DEVENV_ROOT/target/surfpool/examples}" cargo test \
-          --locked \
-          -p privacy_pool_program \
-          --features prover \
-          --test e2e \
-          copied_transfer_cannot_replace_successor_disclosure_metadata \
-          -- \
-          --exact \
-          --ignored
-        pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test:types
-        pnpm --dir "$DEVENV_ROOT/codama/tests/surfpool" run test
-        cargo test \
-          --locked \
-          -p pina_cli \
-          --test generated_surfpool \
-          -- \
-          --ignored \
-          --nocapture
-        # The generated compute unit limit, sent through the generated Rust
-        # client and the generated CLI against the deployed counter. Neither
-        # runs inside the suites `pina test --record-compute-units` measures, so
-        # a limit the program has outgrown fails here instead of blocking the
-        # recording that would fix it.
-        PINA_SBF_ARTIFACT="''${SBF_OUT_DIR:-$DEVENV_ROOT/target/surfpool/examples}/counter_program.so" cargo test \
-          --locked \
-          -p counter-program-surfpool-tests \
-          --test compute_unit_budget \
-          -- \
-          --ignored \
-          --nocapture
-        cargo test \
-          --locked \
-          -p counter_program_cli \
-          --test surfpool \
-          -- \
-          --ignored \
-          --nocapture
-        # `pina rehearse` replays real counter traffic between two Surfpool
-        # instances, using the counter and its rehearsal variant built above.
-        cargo test \
-          --locked \
-          -p pina_cli \
-          --test rehearse_surfpool \
-          -- \
-          --ignored \
-          --nocapture
-        # The hand-written migrations suite is not driven by `pina test`, so it
-        # needs the artifact path the build script just produced.
-        migrations_out="''${SBF_OUT_DIR:-$DEVENV_ROOT/target/surfpool/examples}"
-        migrations_artifact=""
-        for candidate in "$migrations_out/migrations_program.so" "$migrations_out/libmigrations_program.so"; do
-          if [ -f "$candidate" ]; then
-            migrations_artifact="$candidate"
-            break
-          fi
-        done
-        if [ -z "$migrations_artifact" ]; then
-          echo "missing migrations_program SBF artifact under $migrations_out" >&2
-          exit 1
-        fi
-        PINA_SBF_ARTIFACT="$migrations_artifact" cargo test \
-          --locked \
-          -p migrations-surfpool-tests \
-          -- \
-          --ignored \
-          --nocapture
-        PINA_SBF_ARTIFACT="$migrations_artifact" PINA_COMPATIBILITY=1 cargo test \
-          --locked \
-          -p migrations-surfpool-tests \
-          -- \
-          --ignored \
-          --nocapture
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" test:surfpool
       '';
       description = "Build, deploy, and adversarially exercise every SBF example through the Surfpool SDK.";
       binary = "bash";
@@ -1097,70 +803,7 @@ in
     "walkthrough:migrations" = {
       exec = ''
         set -euo pipefail
-
-        # `cargo-build-sbf` resolves its platform-tools cache through `$HOME`,
-        # which the nix shell does not export on every runner. The stand-in
-        # sits outside the repository: `pina generate` keeps configured outputs
-        # inside the Git worktree and refuses a worktree that holds the home
-        # directory. `TMPDIR` may point inside the repository, so use `/tmp`.
-        if [ -z "''${HOME:-}" ]; then
-          HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
-          export HOME
-        fi
-        mkdir -p "$HOME"
-
-        # The walkthrough runs `cargo run -p pina_cli`, then spends most of its
-        # time in the SBF toolchain, so the platform-tools cache has to be the
-        # pinned v1.54 toolchain the rest of the repository builds with.
-        #
-        # On Linux the nix wrapper seeds that cache with its bundled sysroot,
-        # which is incomplete (no liballoc for the sbpf targets), so the first
-        # build has to reach the unwrapped binary and install the real
-        # toolchain. The walkthrough shells out to `cargo build-sbf` with fixed
-        # arguments, so the unwrapped binary has to be reachable *by name*:
-        # cargo resolves the subcommand from PATH, and the unwrapped file is
-        # dot-prefixed and therefore not name-addressable. Shimming it into a
-        # private directory keeps the fixed arguments untouched.
-        if [ "$(uname -s)" = "Linux" ]; then
-          cargo_build_sbf="$(command -v cargo-build-sbf)"
-          cargo_build_sbf_resolved="$(${pkgs.coreutils}/bin/readlink -f "$cargo_build_sbf")"
-          cargo_build_sbf_real="$(dirname "$cargo_build_sbf_resolved")/.cargo-build-sbf-wrapped"
-          if [ -x "$cargo_build_sbf_real" ]; then
-            sbf_shim="$(mktemp -d)"
-            trap 'rm -rf "$sbf_shim"' EXIT
-            ln -s "$cargo_build_sbf_real" "$sbf_shim/cargo-build-sbf"
-            export PATH="$sbf_shim''${PATH:+:$PATH}"
-          fi
-
-          # A previous wrapper invocation may already have installed its
-          # read-only Nix-store bundle as cargo-build-sbf's cache symlink.
-          # Remove only that exact derived symlink so the real toolchain can be
-          # installed over it; refuse to touch any user-managed target.
-          platform_tools_links=(
-            "''${HOME:?}/.cache/solana/''${SBF_TOOLS_VERSION}/platform-tools"
-            "''${XDG_CACHE_HOME:-$HOME/.cache}/solana/''${SBF_TOOLS_VERSION}/platform-tools"
-          )
-          for platform_tools_link in "''${platform_tools_links[@]}"; do
-            [ -L "$platform_tools_link" ] || continue
-            platform_tools_target="$(readlink "$platform_tools_link")"
-            case "$platform_tools_target" in
-              /nix/store/*/lib/platform-tools) unlink "$platform_tools_link" ;;
-              *)
-                echo "refusing to replace unexpected platform-tools link: $platform_tools_target" >&2
-                exit 1
-                ;;
-            esac
-          done
-        fi
-
-        # The walkthrough regenerates every client through `pina generate`, which
-        # resolves the TypeScript/Dart/CLI renderers from this workspace's
-        # `node_modules`. `dist` is not committed, so the CLI renderer has to be
-        # built before the first `pina generate` runs.
-        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
-        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
-
-        pnpm --dir "$DEVENV_ROOT" exec tsx "$DEVENV_ROOT/scripts/migrations-walkthrough.ts" "$@"
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" walkthrough:migrations "$@"
       '';
       description = "Run the ten-deployment migration walkthrough end to end.";
       binary = "bash";
@@ -1168,69 +811,7 @@ in
     "coverage:all" = {
       exec = ''
         set -euo pipefail
-        if [ -z "''${HOME:-}" ]; then
-          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
-        fi
-        mkdir -p "$HOME"
-        # The raw Anchor CPI integration test invokes the pinned local converter.
-        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
-        # The `pina generate` CLI tests render the TypeScript/Dart CLI clients
-        # through this workspace package, so its bundle has to exist before the
-        # Rust suite runs. `dist` is not committed.
-        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
-        # Ensure cargo-expand is available for macrotest expansion snapshots.
-        if ! command -v cargo-expand &>/dev/null; then
-          cargo install --locked --version 1.0.111 cargo-expand
-        fi
-        mkdir -p "$DEVENV_ROOT/target/coverage"
-        rm -rf "$DEVENV_ROOT/target/llvm-cov-target"
-        # This suite is the pull request's Rust gate, so it covers every package
-        # `test:all` covers: `pina_abi` is tested nowhere else, and `pina_root`
-        # hosts the root integration suites (`tests/ui.rs`, `tests/expand.rs`,
-        # `tests/compute_units.rs`) that exercise the proc-macro API.
-        cargo llvm-cov \
-          --all-features \
-          --locked \
-          -p pina \
-          -p pina_abi \
-          -p pina_cli \
-          -p pina_cli_renderer \
-          -p pina_codama_renderer \
-          -p pina_cpi_renderer \
-          -p pina_macros \
-          -p pina_lints \
-          -p pina_profile \
-          -p pina_root \
-          -p prop_amm_program \
-          -p profile_program \
-          -p profile-program-client \
-          --lcov \
-          --output-path "$DEVENV_ROOT/target/coverage/lcov.info"
-        coverage:pina-test
-        # `tests/ui.rs` opts out of instrumentation, so the instrumented run
-        # above skips it. This non-instrumented invocation keeps it in the
-        # pull-request gate without putting its fixtures into the lcov report.
-        #
-        # The registry is deliberately redirected outside the workspace for the
-        # same reason: trybuild's `$CARGO` normalizer only rewrites the absolute
-        # `/registry/src/{name}-{hash}/` form, and rustc renders a registry path
-        # under the workspace relative to the working directory — so two
-        # snapshots that mention `solana-address` mismatched on CI while passing
-        # locally, where the registry sits under `~/.cargo`.
-        rm -rf "$DEVENV_ROOT/target/ui-llvm-cov-target"
-        CARGO_TARGET_DIR="$DEVENV_ROOT/target/ui-llvm-cov-target" \
-          CARGO_HOME="''${CARGO_HOME:-/tmp/pina-ui-cargo-home}" \
-          cargo test \
-          --locked \
-          -p pina_root \
-          --test ui
-        cargo check \
-          --manifest-path ${lib.escapeShellArg "${currentDir}/crates/pina_fuzz/fuzz/Cargo.toml"} \
-          --all-targets \
-          --locked
-        pnpm run check:scripts
-        pnpm run test:compute-units
-        test:npm-packages
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" coverage:all
       '';
       description = "Run the full test suite under coverage and generate lcov reports.";
       binary = "bash";
@@ -1238,14 +819,7 @@ in
     "coverage:pina-test" = {
       exec = ''
         set -euo pipefail
-        mkdir -p "$DEVENV_ROOT/target/coverage"
-        rm -rf "$DEVENV_ROOT/target/pina-test-llvm-cov-target"
-        CARGO_TARGET_DIR="$DEVENV_ROOT/target/pina-test-llvm-cov-target" cargo llvm-cov \
-          --manifest-path "$DEVENV_ROOT/crates/pina_test/Cargo.toml" \
-          --all-targets \
-          --locked \
-          --lcov \
-          --output-path "$DEVENV_ROOT/target/coverage/pina-test.info"
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" coverage:pina-test
       '';
       description = "Generate coverage for the isolated pina_test package.";
       binary = "bash";
@@ -1273,56 +847,7 @@ in
     "mutants:run" = {
       exec = ''
         set -euo pipefail
-        # Features, `--locked`, exclusions, and the timeout floor come from
-        # `.cargo/mutants.toml`, which cargo-mutants loads by default.
-        # Tests expect a home directory, which a clean CI shell may not set;
-        # `test:all` uses the same fallback.
-        if [ -z "''${HOME:-}" ]; then
-          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
-        fi
-        mkdir -p "$HOME"
-
-        # cargo-mutants exits 0 when its filters leave nothing to mutate, which
-        # reads as a passing run. List first and refuse an empty selection,
-        # except where nothing to mutate is a real answer: an `--in-diff` run
-        # whose diff touches no mutable code, or packages that are all outside
-        # the nightly inventory, such as `pina_sdk_ids`, which holds only
-        # constants.
-        mutant_count=$(cargo mutants --list "$@" | wc -l)
-        if [ "$mutant_count" -eq 0 ]; then
-          empty_allowed=0
-          case " $* " in
-            *" --in-diff "* | *" --in-diff="*) empty_allowed=1 ;;
-          esac
-          if [ "$empty_allowed" -eq 0 ]; then
-            inventory=$(mutants:packages)
-            previous=""
-            for arg in "$@"; do
-              case "$previous" in
-                -p | --package)
-                  if grep -qxF -- "$arg" <<<"$inventory"; then
-                    empty_allowed=0
-                    break
-                  fi
-                  empty_allowed=1
-                  ;;
-              esac
-              previous="$arg"
-            done
-          fi
-          if [ "$empty_allowed" -eq 1 ]; then
-            echo "The selection contains no mutants; nothing to test."
-            exit 0
-          fi
-          echo "cargo-mutants found no mutants for: $*" >&2
-          echo "A run that tests nothing is not a pass; check .cargo/mutants.toml and the package selection." >&2
-          exit 1
-        fi
-        echo "Testing $mutant_count mutants."
-        mkdir -p "$DEVENV_ROOT/target/mutants"
-        status=0
-        cargo mutants --output "$DEVENV_ROOT/target/mutants" "$@" || status=$?
-        exit "$status"
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" mutants:run "$@"
       '';
       description = "Run cargo-mutants with the given arguments, failing when they select no mutants.";
       binary = "bash";
@@ -1330,27 +855,14 @@ in
     "mutants:prepare" = {
       exec = ''
         set -euo pipefail
-        # `pina_cli`'s tests need what `test:all` sets up first: the pinned
-        # Anchor converter in `node_modules` and the CLI renderer bundle.
-        # cargo-mutants does not copy either into a scratch tree, so pair this
-        # with `--in-place`.
-        if [ -z "''${HOME:-}" ]; then
-          export HOME="$(mktemp -d /tmp/pina-home-XXXXXX)"
-        fi
-        mkdir -p "$HOME"
-        pnpm --dir "$DEVENV_ROOT" install --frozen-lockfile
-        pnpm --dir "$DEVENV_ROOT" run build:codama-renderer-cli
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" mutants:prepare
       '';
       description = "Install the npm packages and renderer bundle that pina_cli's tests need under mutation testing.";
       binary = "bash";
     };
     "mutants:packages" = {
       exec = ''
-        # The core crates the nightly mutation run covers, each of which must
-        # yield mutants. `.cargo/mutants.toml` has no package selector, so the
-        # inventory lives here. `pina_sdk_ids` is left out: it holds only
-        # constants, so it yields no mutants.
-        printf '%s\n' pina pina_cli pina_codama_renderer pina_macros pina_profile
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" mutants:packages
       '';
       description = "Print the crates covered by nightly mutation testing, one per line.";
       binary = "bash";
@@ -1358,11 +870,7 @@ in
     "mutants:all" = {
       exec = ''
         set -euo pipefail
-        pkg_args=()
-        while read -r package; do
-          pkg_args+=("-p" "$package")
-        done < <(mutants:packages)
-        mutants:run "''${pkg_args[@]}" "$@"
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" mutants:all "$@"
       '';
       description = "Run mutation testing across all core workspace crates.";
       binary = "bash";
@@ -1419,19 +927,7 @@ in
     "mutants:crate" = {
       exec = ''
         set -euo pipefail
-        if [ $# -eq 0 ]; then
-          echo "Usage: mutants:crate <package-name> [cargo-mutants args...]" >&2
-          exit 1
-        fi
-        if ! cargo metadata --no-deps --format-version 1 |
-          jq -e --arg package "$1" '.packages[] | select(.name == $package)' >/dev/null
-        then
-          echo "Package '$1' does not belong to the root workspace." >&2
-          exit 1
-        fi
-        package="$1"
-        shift
-        mutants:run -p "$package" "$@"
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" mutants:crate "$@"
       '';
       description = "Run mutation testing on a single workspace crate; extra arguments go to cargo-mutants.";
       binary = "bash";
@@ -1450,8 +946,7 @@ in
     "fix:format" = {
       exec = ''
         set -euo pipefail
-        dprint fmt --config "$DEVENV_ROOT/dprint.json"
-        docs:sync
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" fix:format
       '';
       description = "Format files with dprint, then re-sync mdt-managed docs.";
       binary = "bash";
@@ -1481,60 +976,7 @@ in
     "security:pina-lint" = {
       exec = ''
         set -euo pipefail
-
-        repo_root=${lib.escapeShellArg currentDir}
-
-        # Build the workspace driver once; every fixture check reuses it. The
-        # driver statically links the lints, so it only needs the pinned
-        # nightly toolchain and its rustc-dev component.
-        driver="$repo_root/target/debug/pina_lint_driver"
-        cargo build -p pina_lints --bin pina_lint_driver
-
-        mapfile -t target_manifests < <(
-          find "$repo_root/examples" -mindepth 2 -maxdepth 2 -name Cargo.toml | sort
-          find "$repo_root/security" -mindepth 3 -maxdepth 3 -path '*/secure/Cargo.toml' | sort
-        )
-
-        package_args=()
-        for manifest in "''${target_manifests[@]}"; do
-          package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
-          if [ -n "$package_name" ]; then
-            package_args+=(--package "$package_name")
-          fi
-        done
-
-        if [ "''${#package_args[@]}" -eq 0 ]; then
-          echo "Could not discover any example or security packages to lint." >&2
-          exit 1
-        fi
-
-        # Run every library fixture through the driver exactly the way
-        # `pina lint` does: cargo check with the driver as a workspace wrapper and
-        # linting restricted to the primary package. Insecure fixtures are
-        # intentionally excluded because they demonstrate rejected patterns.
-        export PINA_LINT_NO_DEPS=1
-        export PINA_LINT_DRIVER_BUILD="$(sha256sum "$driver" | cut -d ' ' -f 1)"
-        export RUSTC_WORKSPACE_WRAPPER="$driver"
-
-        # The driver loads the toolchain's librustc_driver through its baked
-        # rpath; point the dynamic-library search at the sysroot so the check
-        # still runs when a relocatable toolchain moved underneath that rpath.
-        sysroot="$(rustc --print sysroot)"
-        export DYLD_LIBRARY_PATH="$sysroot/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-        export LD_LIBRARY_PATH="$sysroot/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-
-        # Command-line config outranks project [env], even force=true entries.
-        # Pin relative=false as well: expanding "0" into a path enables list mode.
-        cargo check --locked "''${package_args[@]}" \
-          --config 'env.PINA_LINT_LIST.value="0"' \
-          --config env.PINA_LINT_LIST.force=true \
-          --config env.PINA_LINT_LIST.relative=false \
-          --config 'env.PINA_LINT_ONLY.value=""' \
-          --config env.PINA_LINT_ONLY.force=true \
-          --config env.PINA_LINT_ONLY.relative=false \
-          --config 'env.PINA_LINT_LEVELS.value=""' \
-          --config env.PINA_LINT_LEVELS.force=true \
-          --config env.PINA_LINT_LEVELS.relative=false
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" security:pina-lint
       '';
       description = "Run Pina's security lints (pina_lint_driver) against the example and security program crates.";
       binary = "bash";
@@ -1542,27 +984,7 @@ in
     "security:deny" = {
       exec = ''
         set -euo pipefail
-        # cargo-deny 0.20+ auto-discovers deny.toml from the working directory;
-        # the --config flag was removed from the CLI.
-        #
-        # Advisories run with --workspace. A virtual manifest roots cargo-deny's
-        # default graph at the workspace members' normal dependencies, which
-        # omits the dev/test stack (surfpool, litesvm, mollusk, solana-runtime)
-        # where every advisory deny.toml suppresses actually lives. Without
-        # --workspace the advisories check cannot see them at all, so an
-        # unreviewed advisory in that stack would pass unnoticed.
-        # A cached target/ can carry an advisory database that a previously
-        # failed fetch left empty; cargo-deny sees the directory, skips the
-        # fetch, and then fails to load any advisory from it. Discard a
-        # database that has no advisory crates in it so the fetch re-runs.
-        if [ -d target/advisory-db ] && [ ! -d target/advisory-db/crates ]; then
-          rm -rf target/advisory-db
-        fi
-        cargo-deny --workspace check advisories
-        # bans/licenses/sources keep the default scope: rooting them at every
-        # workspace member reports the dev/test stack's duplicate versions and
-        # unpublished crates, which are not what this gate is for.
-        cargo-deny check bans licenses sources
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" security:deny
       '';
       description = "Run cargo-deny checks (advisories, bans, licenses, sources).";
       binary = "bash";
@@ -1570,38 +992,7 @@ in
     "security:audit" = {
       exec = ''
         set -euo pipefail
-        # The advisory DB lives inside the cached target dir; a stale or
-        # partial clone from a cache restore makes cargo-audit refuse to
-        # (re)initialize it. Remove it so the clone always starts fresh.
-        rm -rf "$DEVENV_ROOT/target/advisory-db-audit"
-        # deny.toml is the single source of advisory policy. cargo-audit has no
-        # config-file support for suppressions, so its --ignore flags are read
-        # out of deny.toml's [advisories] ignore array rather than kept as a
-        # second list that can drift from it. Every id there carries a
-        # reachability justification; anything not listed fails this task.
-        audit_ignores=()
-        while IFS= read -r advisory_id; do
-          audit_ignores+=(--ignore "$advisory_id")
-        done < <(awk '
-          /^\[advisories\]/ { in_advisories = 1; next }
-          /^\[/             { in_advisories = 0; in_ignore = 0 }
-          in_advisories && /^ignore[ \t]*=[ \t]*\[/ { in_ignore = 1; next }
-          in_ignore && /^\]/ { in_ignore = 0 }
-          in_ignore {
-            line = $0
-            while (match(line, /"RUSTSEC-[0-9]+-[0-9]+"/)) {
-              printf "%s\n", substr(line, RSTART + 1, RLENGTH - 2)
-              line = substr(line, RSTART + RLENGTH)
-            }
-          }
-        ' "$DEVENV_ROOT/deny.toml")
-
-        cargo-audit audit \
-          --db "$DEVENV_ROOT/target/advisory-db-audit" \
-          --url "https://github.com/RustSec/advisory-db.git" \
-          --deny yanked \
-          "''${audit_ignores[@]}" \
-          --file "$DEVENV_ROOT/Cargo.lock"
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" security:audit
       '';
       description = "Run RustSec advisory audit using deny.toml's ignore policy.";
       binary = "bash";
@@ -1706,8 +1097,7 @@ in
     "docs:build" = {
       exec = ''
         set -euo pipefail
-        mdbook build "$DEVENV_ROOT/docs"
-        node "$DEVENV_ROOT/scripts/docs/build-landing.ts" "$DEVENV_ROOT/docs/book"
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" docs:build
       '';
       description = "Build the mdBook documentation and the pina.rs landing page.";
       binary = "bash";
@@ -1739,20 +1129,7 @@ in
     "verify:docs" = {
       exec = ''
         set -euo pipefail
-        ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/docs:check"}
-        [ -f ${lib.escapeShellArg "${currentDir}/docs/book.toml"} ]
-        [ -f ${lib.escapeShellArg "${currentDir}/docs/src/SUMMARY.md"} ]
-        ${pkgs.mdbook}/bin/mdbook build ${lib.escapeShellArg "${currentDir}/docs"} -d ${lib.escapeShellArg "${currentDir}/target/mdbook"}
-        node ${lib.escapeShellArg "${currentDir}/scripts/docs/build-landing.ts"} ${lib.escapeShellArg "${currentDir}/target/mdbook"}
-        ${lib.escapeShellArg "${currentDir}/.devenv/profile/bin/docs:api"}
-        node ${lib.escapeShellArg "${currentDir}/scripts/check-migration-docs.mjs"}
-        # The agent skill ships inside the CLI binary (`pina skill read`), so a
-        # skill edit without a matching committed copy would serve stale text.
-        node ${lib.escapeShellArg "${currentDir}/scripts/docs/sync-skill.mjs"} --check
-        # The lint reference page is generated from the CLI's lint table, so a
-        # lint added or reworded without regenerating the page fails here rather
-        # than shipping docs that contradict `pina lint --explain`.
-        ${pkgs.python3}/bin/python3 ${lib.escapeShellArg "${currentDir}/scripts/docs/generate-lint-reference.py"} --check
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" verify:docs
       '';
       description = "Verify docs folder structure, build mdBook, and check API docs.";
       binary = "bash";
@@ -1760,23 +1137,7 @@ in
     "docs:api" = {
       exec = ''
         set -euo pipefail
-
-        mapfile -t generated_client_manifests < <(find ${lib.escapeShellArg "${currentDir}/codama/clients/rust"} -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
-        exclude_args=()
-        for manifest in "''${generated_client_manifests[@]}"; do
-          package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
-          if [ -n "$package_name" ]; then
-            exclude_args+=(--exclude "$package_name")
-          fi
-        done
-
-        RUSTDOCFLAGS="-D warnings" cargo doc \
-          --workspace \
-          --all-features \
-          --no-deps \
-          --locked \
-          --document-private-items \
-          ''${exclude_args[@]}
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" docs:api
       '';
       description = "Build API documentation and fail on broken doc links.";
       binary = "bash";
@@ -1784,17 +1145,7 @@ in
     "lint:clippy" = {
       exec = ''
         set -euo pipefail
-
-        mapfile -t generated_client_manifests < <(find ${lib.escapeShellArg "${currentDir}/codama/clients/rust"} -mindepth 2 -maxdepth 2 -name Cargo.toml | sort)
-        exclude_args=()
-        for manifest in "''${generated_client_manifests[@]}"; do
-          package_name="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$manifest" | head -n 1)"
-          if [ -n "$package_name" ]; then
-            exclude_args+=(--exclude "$package_name")
-          fi
-        done
-
-        cargo clippy --workspace --all-features --locked ''${exclude_args[@]} -- -D warnings
+        node "$DEVENV_ROOT/scripts/ci-tasks.ts" lint:clippy
       '';
       description = "Check that all rust lints are passing.";
       binary = "bash";

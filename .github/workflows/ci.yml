@@ -23,7 +23,6 @@ concurrency:
 # filters because every job here is a required status check: a skipped job
 # reports "Skipped", which branch protection treats as success, while a
 # workflow that never runs leaves the check in "Expected" and blocks merging.
-# Skipped jobs are also far cheaper: they never check out or set up devenv.
 #
 # Add the `ci-full` label to a pull request to run every tier, including the
 # main-only jobs, before merging.
@@ -114,12 +113,13 @@ jobs:
               - devenv.nix
               - devenv.lock
               - devenv.yaml
-              - .github/actions/devenv/**
+              - .github/actions/**
+              - scripts/ci-tasks.ts
             workflows:
               - .github/**
 
   lint:
-    timeout-minutes: 40
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     needs: changes
     # The status functions are required: without one, a skipped `changes`
@@ -131,50 +131,85 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust (format-only)
+        if: ${{ !(github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustfmt
+          cache-key: none
+          use-mold: "false"
+          use-sccache: "false"
+
+      - name: setup Rust (clippy and docs)
+        if: ${{ github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+        uses: $/.github/actions/setup-rust
+        with:
+          components: rustfmt,clippy,rustc-dev
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: install lint and formatting tools
+        uses: $/.github/actions/install-tools
+        with:
+          tools: dprint@0.64.1,shfmt@3.14.1,mdbook@0.5.4
+          mdt: "true"
+          monochange: "true"
+          nixfmt: "true"
+
+      - name: setup pnpm
+        if: ${{ github.event_name == 'push' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        if: ${{ github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
 
       # Formatting and doc-block sync apply to every file type, so they run on
       # every pull request. The heavy compilers only run when the change can
       # affect them.
       - name: lint format
-        run: lint:format
-        shell: devenv shell -c -- bash -e {0}
+        run: dprint check
+        shell: bash
 
       - name: check synced docs blocks
-        run: docs:check
-        shell: devenv shell -c -- bash -e {0}
+        run: mdt check --path .
+        shell: bash
 
       - name: lint monochange
-        run: lint:monochange
-        shell: devenv shell -c -- bash -e {0}
+        run: monochange check
+        shell: bash
 
       - name: lint rust
         if: ${{ github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
-        run: lint:clippy
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts lint:clippy
+        shell: bash
 
       - name: verify docs
         if: ${{ github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
-        run: verify:docs
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts verify:docs
+        shell: bash
 
       - name: install js dependencies
         if: ${{ github.event_name == 'push' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
         run: pnpm install --frozen-lockfile --ignore-scripts
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
       - name: type-check scripts and js clients
         if: ${{ github.event_name == 'push' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full') }}
         run: |
           pnpm run check:scripts
           pnpm run check:js
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
   security:
-    timeout-minutes: 30
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.js == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -184,25 +219,45 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustc-dev
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: install cargo-audit
+        uses: $/.github/actions/install-tools
+        with:
+          tools: cargo-audit@0.22.2
 
       - name: run Pina security lints
-        run: security:pina-lint
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts security:pina-lint
+        shell: bash
 
       - name: audit Rust dependencies
-        run: security:audit
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts security:audit
+        shell: bash
 
       - name: audit npm dependencies
-        run: security:npm-audit
-        shell: devenv shell -c -- bash -e {0}
+        run: pnpm audit
+        shell: bash
 
   cargo-deny:
-    timeout-minutes: 20
+    timeout-minutes: 15
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.rust == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -212,17 +267,27 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          node-version: 24
+          package-manager-cache: false
+
+      - name: install cargo-deny
+        uses: $/.github/actions/install-tools
+        with:
+          tools: cargo-deny@0.20.2
 
       - name: check dependency policy
-        run: security:deny
-        shell: devenv shell -c -- bash -e {0}
+        env:
+          # cargo-deny only invokes `cargo metadata`; use the runner's
+          # preinstalled stable toolchain instead of downloading nightly.
+          RUSTUP_TOOLCHAIN: stable
+        run: node scripts/ci-tasks.ts security:deny
+        shell: bash
 
   zizmor:
-    timeout-minutes: 15
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.workflows == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -232,29 +297,35 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          node-version: 24
+          package-manager-cache: false
+
+      - name: install zizmor
+        uses: $/.github/actions/install-tools
+        with:
+          tools: zizmor@1.31.1
 
       - name: audit GitHub Actions
-        run: security:zizmor
-        shell: devenv shell -c -- bash -e {0}
+        run: zizmor --no-online-audits --no-progress .github
+        shell: bash
 
       - name: test privileged workflow provenance
         run: node --test .github/tests/workflow-provenance.test.ts
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
   test:
     # `test:all` sweeps every workspace member, so allow the same headroom as
     # the `program-e2e` job.
-    timeout-minutes: 60
+    timeout-minutes: 45
     runs-on: ubuntu-24.04
     needs: changes
     # `coverage` runs this same suite on pull requests under a profiling build,
-    # so running it here too would duplicate ~10 minutes of work for no extra
-    # signal. Pushes to `main` and the `ci-full` label still run it, which keeps
-    # a second, non-instrumented execution of the suite.
+    # so running it here too would duplicate work for no extra signal. Pushes
+    # to `main` and the `ci-full` label still run it, which keeps a second,
+    # non-instrumented execution of the suite.
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
@@ -262,16 +333,36 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustc-dev
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: install cargo-expand
+        uses: $/.github/actions/install-tools
+        with:
+          cargo-expand: "true"
 
       - name: run tests
         run: |
           sudo prlimit --pid $$ --nofile=1000000:1000000
-          test:all
-        shell: devenv shell -- bash -e {0}
+          node scripts/ci-tasks.ts test:all
+        shell: bash
 
   windows-cli:
     name: windows CLI
@@ -290,11 +381,20 @@ jobs:
         with:
           toolchain: nightly-2026-02-20
 
+      - name: cache Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: windows-cli
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
       - name: test CLI portability
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
+          CARGO_PROFILE_TEST_DEBUG: "0"
         run: cargo test --locked --all-features -p pina_cli
 
   pina-test:
-    timeout-minutes: 30
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.pina_test == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -304,17 +404,29 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: clippy
+          cache-key: surfpool
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
 
       - name: verify isolated Surfpool test support
-        run: verify:pina-test
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts verify:pina-test
+        shell: bash
 
   fuzz:
-    timeout-minutes: 20
+    timeout-minutes: 15
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.core == 'true' || needs.changes.outputs.fuzz == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -324,14 +436,22 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: fuzz
+          workspaces: "crates/pina_fuzz/fuzz -> target"
+          use-mold: "false"
+          use-sccache: "false"
+
+      - name: install cargo-fuzz
+        uses: $/.github/actions/install-tools
+        with:
+          cargo-fuzz: "true"
 
       - name: replay corpus and fuzz for a bounded duration
-        run: test:fuzz:smoke
-        shell: devenv shell -c -- bash -e {0}
+        run: bash scripts/run-fuzz-smoke.sh
+        shell: bash
 
       - name: upload fuzz artifacts
         if: failure()
@@ -342,7 +462,7 @@ jobs:
           if-no-files-found: ignore
 
   miri:
-    timeout-minutes: 25
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -352,14 +472,29 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust with Miri
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          toolchain: nightly-2026-02-20
+          components: rust-src,miri
+          cache-key: miri
+          use-mold: "false"
+          use-sccache: "false"
 
       - name: run miri zero-copy regressions
-        run: test:miri
-        shell: devenv shell -c -- bash -e {0}
+        env:
+          MIRIFLAGS: "-Zmiri-tree-borrows -Zmiri-symbolic-alignment-check"
+        run: |
+          set -euo pipefail
+          cargo miri setup
+          cargo miri test --locked -p pina --test miri_loader_guards --all-features
+          cargo miri test --locked -p pina --test schema_boundary --all-features
+          # The entrypoint deserializes the loader's raw input through `unsafe`;
+          # its tests build that input byte for byte.
+          cargo miri test --locked -p pina --lib --all-features entry::
+          # `dispatch_entrypoint!` programs walk that input from generated code.
+          cargo miri test --locked -p pina --test dispatch_entrypoint --all-features
+        shell: bash
 
   kani-quick:
     name: kani (quick)
@@ -367,8 +502,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: changes
     # The Kani version and the harness filter live in this workflow file, so a
-    # change to either has to re-run the proofs. The `toolchain` output covered
-    # that while the pin lived in devenv.nix.
+    # change to either has to re-run the proofs.
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || needs.changes.outputs.workflows == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
       - name: checkout repository
@@ -377,11 +511,6 @@ jobs:
           persist-credentials: false
 
       - name: run fast kani proofs
-        # Kani carries its own compiler toolchain and the proofs need nothing
-        # else from devenv, so skipping the nix setup saves roughly five
-        # minutes per job. The version is pinned so a new Kani release cannot
-        # silently change what the proofs were verified against.
-        #
         # The flags mirror the `test:kani:quick` devenv task; change both
         # together. `cargo-kani` is invoked as a binary rather than through
         # `cargo kani`, because `.cargo/config.toml` aliases `kani` to
@@ -414,7 +543,7 @@ jobs:
           command: cargo-kani -p pina --lib --no-default-features --features compact --output-format terse --harness compact_
 
   feature-matrix:
-    timeout-minutes: 30
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     needs: changes
     # The job itself must always run so the matrix expands: required status
@@ -427,46 +556,54 @@ jobs:
       matrix:
         include:
           - label: default
-            build_task: build:pina:default
-            test_task: test:pina:default
-            doc_task: ""
-            # `default` and `all-features` duplicate what the `test` job
-            # already covers on pull requests; they still run on `main`.
+            check_args: "-p pina --locked"
+            test_args: "-p pina --lib --locked"
+            extra_test_args: ""
+            doc_args: ""
+            # `default` and `all-features` duplicate what the `coverage`/`test`
+            # jobs already cover on pull requests; they still run on `main`.
             pr_run: false
           - label: no-default
-            build_task: build:pina:no-default-only
-            test_task: test:pina:no-default
-            doc_task: doc:pina:no-default
+            check_args: "-p pina --no-default-features --locked"
+            test_args: "-p pina --no-default-features --lib --locked"
+            extra_test_args: ""
+            doc_args: "-p pina --no-default-features --no-deps --locked"
             pr_run: true
           - label: token-only
-            build_task: build:pina:token-only
-            test_task: test:pina:token-only
-            doc_task: ""
+            check_args: "-p pina --no-default-features --features token --locked"
+            test_args: "-p pina --no-default-features --features token --lib --locked"
+            extra_test_args: ""
+            doc_args: ""
             pr_run: true
           - label: compact-only
-            build_task: build:pina:compact-only
-            test_task: test:pina:compact-only
-            doc_task: doc:pina:compact-only
+            check_args: "-p pina --no-default-features --features compact --locked"
+            test_args: "-p pina --no-default-features --features compact --lib --test compact_account --test cpi_ui --locked"
+            extra_test_args: ""
+            doc_args: "-p pina --no-default-features --features compact --no-deps --locked"
             pr_run: true
           - label: floats-only
-            build_task: build:pina:floats-only
-            test_task: test:pina:floats-only
-            doc_task: ""
+            check_args: "-p pina --no-default-features --features floats --locked"
+            test_args: "-p pina --no-default-features --features floats --lib --test floats --locked"
+            extra_test_args: ""
+            doc_args: ""
             pr_run: true
           - label: fixed-only
-            build_task: build:pina:fixed-only
-            test_task: test:pina:fixed-only
-            doc_task: ""
+            check_args: "-p pina --no-default-features --features fixed --locked"
+            test_args: "-p pina --no-default-features --features fixed --lib --test fixed --locked"
+            extra_test_args: ""
+            doc_args: ""
             pr_run: true
           - label: account-resize-only
-            build_task: build:pina:account-resize-only
-            test_task: test:pina:account-resize-only
-            doc_task: ""
+            check_args: "-p pina --no-default-features --features account-resize --locked"
+            test_args: "-p pina --no-default-features --features account-resize,derive --lib --test cpi_helpers --locked"
+            extra_test_args: "-p pina_macros --no-default-features --lib --locked"
+            doc_args: ""
             pr_run: true
           - label: all-features
-            build_task: build:pina:all-features
-            test_task: test:pina:all-features
-            doc_task: ""
+            check_args: "-p pina --all-features --locked"
+            test_args: "-p pina --all-features --lib --locked"
+            extra_test_args: ""
+            doc_args: ""
             pr_run: false
     name: feature-matrix (${{ matrix.label }})
     steps:
@@ -476,32 +613,57 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
+      - name: setup Rust
         if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
-        uses: $/.github/actions/devenv
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: feature-matrix
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
 
       - name: build `pina` for ${{ matrix.label }}
         if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
-        run: ${{ matrix.build_task }}
-        shell: devenv shell -c -- bash -e {0}
+        env:
+          CHECK_ARGS: ${{ matrix.check_args }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          cargo check $CHECK_ARGS
+        shell: bash
 
       - name: test `pina` for ${{ matrix.label }}
         if: ${{ github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full'))) }}
-        run: ${{ matrix.test_task }}
-        shell: devenv shell -c -- bash -e {0}
+        env:
+          TEST_ARGS: ${{ matrix.test_args }}
+          EXTRA_TEST_ARGS: ${{ matrix.extra_test_args }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          cargo test $TEST_ARGS
+          if [[ -n "$EXTRA_TEST_ARGS" ]]; then
+            # shellcheck disable=SC2086
+            cargo test $EXTRA_TEST_ARGS
+          fi
+        shell: bash
 
       - name: build `pina` docs for ${{ matrix.label }}
-        if: ${{ (github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')))) && matrix.doc_task != '' }}
-        run: ${{ matrix.doc_task }}
-        shell: devenv shell -c -- bash -e {0}
+        if: ${{ (github.event_name == 'push' || ((matrix.pr_run || contains(github.event.pull_request.labels.*.name, 'ci-full')) && (needs.changes.outputs.core == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')))) && matrix.doc_args != '' }}
+        env:
+          DOC_ARGS: ${{ matrix.doc_args }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          cargo doc $DOC_ARGS
+        shell: bash
 
   # The SBF example programs are exercised on pull requests by the surfpool
   # workflow; the mollusk/LiteSVM/Quasar tier runs after merge on `main`.
   # Label a pull request `ci-full` to run it before merging.
   program-e2e:
-    timeout-minutes: 60
+    timeout-minutes: 45
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -513,43 +675,86 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: surfpool
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: setup SBF toolchain
+        uses: $/.github/actions/setup-sbf
 
       - name: run program e2e tests
-        run: test:program-e2e
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts test:program-e2e
+        shell: bash
 
   idl:
-    timeout-minutes: 30
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || needs.changes.outputs.idl == 'true' || needs.changes.outputs.toolchain == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     steps:
-      # The hosted image's unused SDKs compete with the restored Rust cache
-      # and Nix closure for disk space before client generation can start.
-      - name: free disk space
-        run: |
-          df -h /
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          df -h /
-        shell: bash
-
       - name: checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustfmt
+          extra-toolchain: nightly-2025-11-20
+          extra-components: rust-src
+          cache-key: idl
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: setup Dart SDK
+        uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1.8.2
+        with:
+          sdk: "3.13.0"
+
+      - name: cache Dart pub packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-cache-${{ hashFiles('codama/clients/dart/pubspec.lock', 'codama/clients/cli/dart/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-cache-
+
+      - name: install dprint and shfmt
+        uses: $/.github/actions/install-tools
+        with:
+          tools: dprint@0.64.1,shfmt@3.14.1
 
       - name: verify generated clients
-        run: test:idl
-        shell: devenv shell -c -- bash -e {0}
+        run: bash scripts/verify-pina-clients.sh
+        shell: bash
 
       - name: show generated client diff on failure
         if: failure()
@@ -561,12 +766,12 @@ jobs:
           git --no-pager diff -- codama/
         shell: bash
 
-  # The workspace build is fully covered on pull requests by the `test` and
+  # The workspace build is fully covered on pull requests by the `coverage` and
   # `lint` jobs, which compile every crate; this dedicated build-only pass
   # runs after merge on `main`. Label a pull request `ci-full` to run it
   # before merging.
   build:
-    timeout-minutes: 40
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -576,25 +781,31 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustc-dev
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
 
       - name: build workspace default features
-        run: build:default
-        shell: devenv shell -c -- bash -e {0}
+        run: cargo build --locked
+        shell: bash
 
       - name: build workspace all features
-        run: build:all
-        shell: devenv shell -c -- bash -e {0}
+        run: cargo build --all-features --locked
+        shell: bash
 
   release-publish:
     name: release-publish
     if: ${{ !failure() && !cancelled() && github.event_name == 'pull_request' && (needs.changes.outputs.changesets == 'true' || contains(github.event.pull_request.labels.*.name, 'release') || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
     permissions:
       contents: read
-    timeout-minutes: 30
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
     needs: changes
     steps:
@@ -604,10 +815,33 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustfmt,rustc-dev
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: install release and formatting tools
+        uses: $/.github/actions/install-tools
+        with:
+          tools: dprint@0.64.1,shfmt@3.14.1
+          mdt: "true"
+          monochange: "true"
+          nixfmt: "true"
 
       - name: configure local release identity
         run: |
@@ -644,7 +878,7 @@ jobs:
 
           echo "current_release=${current_release}" >> "$GITHUB_OUTPUT"
           echo "has_changesets=${has_changesets}" >> "$GITHUB_OUTPUT"
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: create local release commit
         id: release_commit
@@ -682,7 +916,7 @@ jobs:
             --format json \
             --jq '.resolved_commit == .record_commit' | grep -qx true
           echo "created=true" >> "$GITHUB_OUTPUT"
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: check registry publication readiness
         if: steps.release_state.outputs.current_release == 'true' || steps.release_commit.outputs.created == 'true'
@@ -701,7 +935,7 @@ jobs:
               (.packages | length > 0) and
               all(.packages[]; .status == "ready")
           ' "$result" >/dev/null
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: dry-run release publication
         if: steps.release_state.outputs.current_release == 'true' || steps.release_commit.outputs.created == 'true'
@@ -737,8 +971,9 @@ jobs:
                 .[1].package_publish.summary.not_attempted] | add) > 0 and
               .[1].package_publish.summary.failed == 0
           ' "$RUNNER_TEMP/publish-readiness.json" "$report" >/dev/null
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: skip publish dry-run without a release
         if: steps.release_state.outputs.current_release != 'true' && steps.release_commit.outputs.created != 'true'
         run: echo "This pull request does not produce a publishable release."
+        shell: bash

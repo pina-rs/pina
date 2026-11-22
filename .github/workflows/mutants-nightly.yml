@@ -41,10 +41,30 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustc-dev
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: install cargo-mutants
+        uses: $/.github/actions/install-tools
+        with:
+          tools: cargo-mutants@27.1.0
 
       - name: choose the shard
         id: shard
@@ -63,28 +83,28 @@ jobs:
           shard=$(( (first + LANE) % MUTANTS_SHARDS ))
           echo "shard=$shard/$MUTANTS_SHARDS" >> "$GITHUB_OUTPUT"
           echo "Testing mutants shard $shard of $MUTANTS_SHARDS (0-based)." >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
 
       - name: prepare the mutation baseline
-        run: mutants:prepare
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts mutants:prepare
+        shell: bash
 
       # `--in-place` mutates this disposable checkout instead of a copy, which
       # keeps what `mutants:prepare` installed and the git worktree that
-      # `pina.toml`'s `{{root}}` anchor resolves through. The exit status is
-      # kept in a file because the clean devenv shell does not see
-      # `GITHUB_OUTPUT`. cargo-mutants exits 2 for missed mutants and 3 for
-      # timeouts; anything else is a setup or baseline failure.
+      # `pina.toml`'s `{{root}}` anchor resolves through. cargo-mutants exits 2
+      # for missed mutants and 3 for timeouts; anything else is a setup or
+      # baseline failure.
       - name: run mutation tests
         env:
           MUTANTS_SHARD: ${{ steps.shard.outputs.shard }}
         run: |
           status=0
-          mutants:all --shard "$MUTANTS_SHARD" --in-place || status=$?
+          node scripts/ci-tasks.ts mutants:all --shard "$MUTANTS_SHARD" --in-place || status=$?
           mkdir -p target/mutants
           echo "$status" > target/mutants/exit-status
           echo "$MUTANTS_SHARD" > target/mutants/shard
           exit "$status"
-        shell: devenv shell -c MUTANTS_SHARD -- bash -e {0}
+        shell: bash
 
       - name: upload mutants report
         if: always()

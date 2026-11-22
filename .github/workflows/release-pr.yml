@@ -41,10 +41,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: install monochange
+        uses: $/.github/actions/install-tools
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          monochange: "true"
 
       - name: refresh tags from origin
         run: git fetch --force --tags origin
@@ -70,7 +70,7 @@ jobs:
           fi
 
           echo "is_release_commit=false" >> "$GITHUB_OUTPUT"
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: detect pending changesets
         id: pending_changesets
@@ -83,6 +83,34 @@ jobs:
           fi
           echo "has_changesets=${has_changesets}" >> "$GITHUB_OUTPUT"
         shell: bash
+
+      - name: setup Rust for release lockfiles and formatting
+        if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
+        uses: $/.github/actions/setup-rust
+        with:
+          components: rustfmt
+          cache-key: none
+          use-mold: "false"
+          use-sccache: "false"
+
+      - name: setup pnpm for release preparation
+        if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node for release preparation
+        if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: install formatting tools for release preparation
+        if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets == 'true'
+        uses: $/.github/actions/install-tools
+        with:
+          tools: dprint@0.64.1,shfmt@3.14.1
+          mdt: "true"
+          nixfmt: "true"
 
       - name: refresh release pull request
         id: refresh
@@ -116,7 +144,7 @@ jobs:
           fi
           printf '%s\n' "$output"
           echo "created=true" >> "$GITHUB_OUTPUT"
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: dispatch publish dry run
         if: steps.release_record.outputs.is_release_commit != 'true' && steps.refresh.outputs.created == 'true'
@@ -150,7 +178,7 @@ jobs:
             -f "tag=$tag" \
             -f "checkout_ref=$release_sha" \
             -f "dry_run=true"
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: skip refresh without changesets
         if: steps.release_record.outputs.is_release_commit != 'true' && steps.pending_changesets.outputs.has_changesets != 'true'
@@ -179,10 +207,10 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: install monochange
+        uses: $/.github/actions/install-tools
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          monochange: "true"
 
       - name: configure release git credentials
         run: |
@@ -235,7 +263,7 @@ jobs:
           fi
           echo "Waiting for the publish dry run $dry_run_id..."
           gh run watch "$dry_run_id" --exit-status --interval 30
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: create release tags
         env:
@@ -243,7 +271,7 @@ jobs:
         run: |
           set -euo pipefail
           monochange --log-level=debug step tag-release --from HEAD --push=true --format json | tee /tmp/tag-report.json
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: create draft releases
         env:
@@ -251,7 +279,7 @@ jobs:
         run: |
           set -euo pipefail
           monochange --log-level=debug step publish-release --from-ref="HEAD" --draft --format json
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       # A tag pushed with GITHUB_TOKEN does not trigger another workflow. Use
       # workflow_dispatch loads publish.yml from main and carries the exact
@@ -312,7 +340,7 @@ jobs:
                 --field "checkout_ref=$(git rev-parse HEAD)"
             fi
           done
-        shell: devenv shell -- bash -e {0}
+        shell: bash
 
       - name: comment on released issues
         env:
@@ -320,4 +348,4 @@ jobs:
         run: |
           set -euo pipefail
           monochange --log-level=debug step comment-released-issues --from-ref="HEAD" --auto-close-issues
-        shell: devenv shell -- bash -e {0}
+        shell: bash
