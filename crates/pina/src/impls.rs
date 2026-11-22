@@ -298,7 +298,7 @@ fn validate_owner(account: AccountView, owner: &Address) -> ProgramResult {
 fn owner_matches(account: AccountView, owner: &Address) -> bool {
 	let account_owner = account.owner();
 
-	if account_owner == owner {
+	if pinocchio::hint::likely(account_owner == owner) {
 		return true;
 	}
 
@@ -353,6 +353,7 @@ fn validate_address(account: AccountView, addr: &Address) -> ProgramResult {
 	Err(ProgramError::InvalidAccountData)
 }
 
+#[cfg(feature = "logs")]
 #[cold]
 #[inline(never)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
@@ -375,13 +376,13 @@ fn log_invalid_address(account: AccountView, addr: &Address) {
 /// conversion can see which error it holds.
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn address_matches(account: AccountView, addr: &Address) -> bool {
-	if pinocchio::hint::likely(account.address() == addr) {
-		return true;
+	let matches = account.address() == addr;
+	#[cfg(feature = "logs")]
+	if pinocchio::hint::unlikely(!matches) {
+		log_invalid_address(account, addr);
 	}
 
-	log_invalid_address(account, addr);
-
-	false
+	matches
 }
 
 #[inline(always)]
@@ -442,13 +443,13 @@ fn seeds_with_bump_match(account: AccountView, seeds: &[&[u8]], program_id: &Add
 		}
 	};
 
-	if pinocchio::hint::likely(account.address() == &pda) {
-		return true;
+	let matches = account.address() == &pda;
+	#[cfg(feature = "logs")]
+	if pinocchio::hint::unlikely(!matches) {
+		log_invalid_address(account, &pda);
 	}
 
-	log_invalid_address(account, &pda);
-
-	false
+	matches
 }
 
 const INVALID_CANONICAL_BUMP: u16 = u16::MAX;
@@ -485,6 +486,7 @@ fn canonical_bump_matches(account: AccountView, seeds: &[&[u8]], program_id: &Ad
 		return u16::from(bump);
 	}
 
+	#[cfg(feature = "logs")]
 	log_invalid_address(account, &pda);
 
 	INVALID_CANONICAL_BUMP
@@ -621,7 +623,6 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
-			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError> {
 				validate_owner(*self, owner)?;
