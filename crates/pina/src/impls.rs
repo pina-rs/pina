@@ -37,21 +37,26 @@ const SYSVAR_ID: Address = crate::address!("Sysvar111111111111111111111111111111
 /// which names the account involved. Messages that disambiguate a shared error
 /// code, such as the several causes of `InvalidAccountData`, use
 /// [`log_failure!`] and are always logged.
+#[cfg(feature = "verbose-logs")]
 macro_rules! log_restated_failure {
 	($message:literal, $($arg:tt)*) => {{
-		if crate::VERBOSE_LOGS_ENABLED {
-			log_failure!($message, $($arg)*);
-		} else {
-			let _ = ($($arg)*);
-		}
+		log_failure!($message, $($arg)*);
+	}};
+}
+
+#[cfg(not(feature = "verbose-logs"))]
+macro_rules! log_restated_failure {
+	($message:literal, $($arg:tt)*) => {{
+		let _ = ($($arg)*);
 	}};
 }
 
 // `AccountView` is a pointer-sized `Copy` handle. Passing it by value through
 // these private validators copies only that handle, never the account data.
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_signer(account: AccountView) -> ProgramResult {
-	if !account.is_signer() {
+	if pinocchio::hint::unlikely(!account.is_signer()) {
 		log_restated_failure!(
 			"account is missing a required signature",
 			"address: {}",
@@ -87,7 +92,7 @@ fn log_not_writable(account: AccountView) {
 #[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 pub(crate) fn validate_writable(account: AccountView) -> ProgramResult {
-	if account.is_writable() {
+	if pinocchio::hint::likely(account.is_writable()) {
 		return Ok(());
 	}
 
@@ -97,41 +102,62 @@ pub(crate) fn validate_writable(account: AccountView) -> ProgramResult {
 	Err(ProgramError::InvalidAccountData)
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_executable(account: AccountView) -> ProgramResult {
-	if !account.executable() {
-		log_failure!(
-			"account is not executable",
-			"address: {}",
-			account.address().as_ref()
-		);
-		log_caller();
-
-		return Err(ProgramError::InvalidAccountData);
+	if pinocchio::hint::likely(executable_matches(account)) {
+		return Ok(());
 	}
 
-	Ok(())
+	Err(ProgramError::InvalidAccountData)
 }
 
+#[cfg_attr(feature = "verbose-logs", track_caller)]
+fn executable_matches(account: AccountView) -> bool {
+	if account.executable() {
+		return true;
+	}
+
+	log_failure!(
+		"account is not executable",
+		"address: {}",
+		account.address().as_ref()
+	);
+	log_caller();
+
+	false
+}
+
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_data_len(account: AccountView, len: usize) -> ProgramResult {
-	if account.data_len() != len {
-		log_failure!(
-			"account has an incorrect length",
-			"address: {}",
-			account.address().as_ref()
-		);
-		log_caller();
-
-		return Err(ProgramError::InvalidAccountData);
+	if pinocchio::hint::likely(data_len_matches(account, len)) {
+		return Ok(());
 	}
 
-	Ok(())
+	Err(ProgramError::InvalidAccountData)
 }
 
 #[cfg_attr(feature = "verbose-logs", track_caller)]
+fn data_len_matches(account: AccountView, len: usize) -> bool {
+	if account.data_len() == len {
+		return true;
+	}
+
+	log_failure!(
+		"account has an incorrect length",
+		"address: {}",
+		account.address().as_ref()
+	);
+	log_caller();
+
+	false
+}
+
+#[inline(always)]
+#[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_fixed_account_size(account: AccountView, len: usize) -> ProgramResult {
-	if account.data_len() != len {
+	if pinocchio::hint::unlikely(account.data_len() != len) {
 		log_restated_failure!(
 			"account has an invalid data length for the fixed account type",
 			"address: {}",
@@ -145,9 +171,10 @@ fn validate_fixed_account_size(account: AccountView, len: usize) -> ProgramResul
 	Ok(())
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_empty(account: AccountView) -> ProgramResult {
-	if !account.is_data_empty() {
+	if pinocchio::hint::unlikely(!account.is_data_empty()) {
 		log_restated_failure!(
 			"account is not empty",
 			"address: {}",
@@ -161,9 +188,10 @@ fn validate_empty(account: AccountView) -> ProgramResult {
 	Ok(())
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_not_empty(account: AccountView) -> ProgramResult {
-	if account.is_data_empty() {
+	if pinocchio::hint::unlikely(account.is_data_empty()) {
 		log_restated_failure!(
 			"account is empty",
 			"address: {}",
@@ -177,6 +205,7 @@ fn validate_not_empty(account: AccountView) -> ProgramResult {
 	Ok(())
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_program(account: AccountView, program_id: &Address) -> ProgramResult {
 	validate_address(account, program_id)?;
@@ -248,38 +277,59 @@ fn validate_compact_type<T: PinaCompactAccount>(
 	T::validate_account_data(&data)
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_sysvar(account: AccountView, sysvar_id: &Address) -> ProgramResult {
 	validate_owner(account, &SYSVAR_ID)?;
 	validate_address(account, sysvar_id)
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_owner(account: AccountView, owner: &Address) -> ProgramResult {
-	let account_owner = account.owner();
-
-	if account_owner.ne(owner) {
-		log_restated_failure!(
-			"account has an invalid owner",
-			"address: {} has invalid owner: {}, required: {}",
-			account.address().as_ref(),
-			account_owner.as_ref(),
-			owner.as_ref()
-		);
-		log_caller();
-
-		return Err(ProgramError::InvalidAccountOwner);
+	if pinocchio::hint::likely(owner_matches(account, owner)) {
+		return Ok(());
 	}
 
-	Ok(())
+	Err(ProgramError::InvalidAccountOwner)
 }
 
 #[cfg_attr(feature = "verbose-logs", track_caller)]
+fn owner_matches(account: AccountView, owner: &Address) -> bool {
+	let account_owner = account.owner();
+
+	if account_owner == owner {
+		return true;
+	}
+
+	log_restated_failure!(
+		"account has an invalid owner",
+		"address: {} has invalid owner: {}, required: {}",
+		account.address().as_ref(),
+		account_owner.as_ref(),
+		owner.as_ref()
+	);
+	log_caller();
+
+	false
+}
+
+#[inline(always)]
+#[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_owners(account: AccountView, owners: &[Address]) -> ProgramResult {
+	if pinocchio::hint::likely(owners_match(account, owners)) {
+		return Ok(());
+	}
+
+	Err(ProgramError::InvalidAccountOwner)
+}
+
+#[cfg_attr(feature = "verbose-logs", track_caller)]
+fn owners_match(account: AccountView, owners: &[Address]) -> bool {
 	let account_owner = account.owner();
 
 	if owners.contains(account_owner) {
-		return Ok(());
+		return true;
 	}
 
 	log_restated_failure!(
@@ -290,17 +340,30 @@ fn validate_owners(account: AccountView, owners: &[Address]) -> ProgramResult {
 	);
 	log_caller();
 
-	Err(ProgramError::InvalidAccountOwner)
+	false
 }
 
 #[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_address(account: AccountView, addr: &Address) -> ProgramResult {
-	if address_matches(account, addr) {
+	if pinocchio::hint::likely(address_matches(account, addr)) {
 		return Ok(());
 	}
 
 	Err(ProgramError::InvalidAccountData)
+}
+
+#[cold]
+#[inline(never)]
+#[cfg_attr(feature = "verbose-logs", track_caller)]
+fn log_invalid_address(account: AccountView, addr: &Address) {
+	log_failure!(
+		"account address is invalid",
+		"address: {} is invalid, expected: {}",
+		account.address().as_ref(),
+		addr.as_ref()
+	);
+	log_caller();
 }
 
 /// Compares `account`'s address with `addr` and logs a mismatch.
@@ -312,25 +375,29 @@ fn validate_address(account: AccountView, addr: &Address) -> ProgramResult {
 /// conversion can see which error it holds.
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn address_matches(account: AccountView, addr: &Address) -> bool {
-	if account.address() == addr {
+	if pinocchio::hint::likely(account.address() == addr) {
 		return true;
 	}
 
-	log_failure!(
-		"account address is invalid",
-		"address: {} is invalid, expected: {}",
-		account.address().as_ref(),
-		addr.as_ref()
-	);
-	log_caller();
+	log_invalid_address(account, addr);
 
 	false
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_addresses(account: AccountView, addresses: &[Address]) -> ProgramResult {
-	if addresses.contains(account.address()) {
+	if pinocchio::hint::likely(addresses_match(account, addresses)) {
 		return Ok(());
+	}
+
+	Err(ProgramError::InvalidAccountData)
+}
+
+#[cfg_attr(feature = "verbose-logs", track_caller)]
+fn addresses_match(account: AccountView, addresses: &[Address]) -> bool {
+	if addresses.contains(account.address()) {
+		return true;
 	}
 
 	log_failure!(
@@ -340,51 +407,69 @@ fn validate_addresses(account: AccountView, addresses: &[Address]) -> ProgramRes
 	);
 	log_caller();
 
-	Err(ProgramError::InvalidAccountData)
+	false
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_seeds(account: AccountView, seeds: &[&[u8]], program_id: &Address) -> ProgramResult {
 	validate_canonical_bump(account, seeds, program_id).map(|_| ())
 }
 
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_seeds_with_bump(
 	account: AccountView,
 	seeds: &[&[u8]],
 	program_id: &Address,
 ) -> ProgramResult {
+	if pinocchio::hint::likely(seeds_with_bump_match(account, seeds, program_id)) {
+		return Ok(());
+	}
+
+	Err(ProgramError::InvalidSeeds)
+}
+
+#[cfg_attr(feature = "verbose-logs", track_caller)]
+fn seeds_with_bump_match(account: AccountView, seeds: &[&[u8]], program_id: &Address) -> bool {
 	let pda = match crate::create_program_address(seeds, program_id) {
 		Ok(pda) => pda,
 		Err(_error) => {
 			log_failure!("could not create a PDA for the provided seeds and bump");
 			log_caller();
 
-			return Err(ProgramError::InvalidSeeds);
+			return false;
 		}
 	};
 
-	if &pda != account.address() {
-		log_failure!(
-			"account address is invalid",
-			"address: {} is invalid, expected pda: {}",
-			account.address().as_ref(),
-			pda.as_ref()
-		);
-		log_caller();
-
-		return Err(ProgramError::InvalidSeeds);
+	if pinocchio::hint::likely(account.address() == &pda) {
+		return true;
 	}
 
-	Ok(())
+	log_invalid_address(account, &pda);
+
+	false
 }
 
+const INVALID_CANONICAL_BUMP: u16 = u16::MAX;
+
+#[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_canonical_bump(
 	account: AccountView,
 	seeds: &[&[u8]],
 	program_id: &Address,
 ) -> Result<u8, ProgramError> {
+	let bump = canonical_bump_matches(account, seeds, program_id);
+	if pinocchio::hint::unlikely(bump == INVALID_CANONICAL_BUMP) {
+		return Err(ProgramError::InvalidSeeds);
+	}
+
+	Ok(bump as u8)
+}
+
+#[cfg_attr(feature = "verbose-logs", track_caller)]
+fn canonical_bump_matches(account: AccountView, seeds: &[&[u8]], program_id: &Address) -> u16 {
 	let Some((pda, bump)) = crate::try_find_program_address(seeds, program_id) else {
 		log_failure!(
 			"could not find a program address from the provided seeds",
@@ -393,22 +478,16 @@ fn validate_canonical_bump(
 		);
 		log_caller();
 
-		return Err(ProgramError::InvalidSeeds);
+		return INVALID_CANONICAL_BUMP;
 	};
 
-	if pda.eq(account.address()) {
-		return Ok(bump);
+	if pinocchio::hint::likely(account.address() == &pda) {
+		return u16::from(bump);
 	}
 
-	log_failure!(
-		"account address is invalid",
-		"address: {} is invalid, expected pda: {}",
-		account.address().as_ref(),
-		pda.as_ref()
-	);
-	log_caller();
+	log_invalid_address(account, &pda);
 
-	Err(ProgramError::InvalidSeeds)
+	INVALID_CANONICAL_BUMP
 }
 
 #[cfg(feature = "token")]
@@ -452,6 +531,7 @@ fn validate_associated_token_address(
 macro_rules! impl_account_info_validation {
 	($type:ty) => {
 		impl<'a> AccountInfoValidation for $type {
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_signer(self) -> Result<Self, ProgramError> {
 				validate_signer(*self)?;
@@ -459,6 +539,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_writable(self) -> Result<Self, ProgramError> {
 				validate_writable(*self)?;
@@ -466,6 +547,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_executable(self) -> Result<Self, ProgramError> {
 				validate_executable(*self)?;
@@ -473,6 +555,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_data_len(self, len: usize) -> Result<Self, ProgramError> {
 				validate_data_len(*self, len)?;
@@ -480,6 +563,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_empty(self) -> Result<Self, ProgramError> {
 				validate_empty(*self)?;
@@ -487,6 +571,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_not_empty(self) -> Result<Self, ProgramError> {
 				validate_not_empty(*self)?;
@@ -504,6 +589,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_program(self, program_id: &Address) -> Result<Self, ProgramError> {
 				validate_program(*self, program_id)?;
@@ -511,6 +597,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_sysvar(self, sysvar_id: &Address) -> Result<Self, ProgramError> {
 				validate_sysvar(*self, sysvar_id)?;
@@ -526,6 +613,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_addresses(self, addresses: &[Address]) -> Result<Self, ProgramError> {
 				validate_addresses(*self, addresses)?;
@@ -533,6 +621,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_owner(self, owner: &Address) -> Result<Self, ProgramError> {
 				validate_owner(*self, owner)?;
@@ -540,6 +629,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_owners(self, owners: &[Address]) -> Result<Self, ProgramError> {
 				validate_owners(*self, owners)?;
@@ -547,6 +637,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_seeds(
 				self,
@@ -558,6 +649,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_seeds_with_bump(
 				self,
@@ -569,6 +661,7 @@ macro_rules! impl_account_info_validation {
 				Ok(self)
 			}
 
+			#[inline(always)]
 			#[cfg_attr(feature = "verbose-logs", track_caller)]
 			fn assert_canonical_bump(
 				self,

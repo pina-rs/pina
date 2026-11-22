@@ -19,10 +19,14 @@ const STATIC_ACCOUNT_DATA: usize = size_of::<RuntimeAccount>() + MAX_PERMITTED_D
 /// Alignment the loader pads every serialized account record to.
 const RECORD_ALIGNMENT: usize = 8;
 
-/// Shared-walk return codes fitting in a single SBF register.
-const WALK_OK_UNIQUE: u8 = 0;
-const WALK_OK_HAS_DUPLICATES: u8 = 1;
-const WALK_ERR_INVALID_DATA: u8 = 2;
+/// Bit flag set when the loader walk observed at least one duplicate marker
+/// referencing a writable account.
+pub(crate) const DUP_WRITABLE_MASK: u8 = 1;
+/// Bit flag set when the loader walk observed at least one duplicate marker.
+pub(crate) const DUP_ANY_MASK: u8 = 2;
+
+/// Shared-walk error sentinel outside the two duplicate bit flags.
+const WALK_ERR_INVALID_DATA: u8 = 4;
 
 /// Sealed account slice returned by [`EntrypointInput::parse_route`].
 ///
@@ -32,13 +36,13 @@ const WALK_ERR_INVALID_DATA: u8 = 2;
 #[doc(hidden)]
 pub struct RouteAccounts<'a> {
 	accounts: &'a mut [AccountView],
-	may_have_duplicates: bool,
+	dup_flags: u8,
 }
 
 impl<'a> RouteAccounts<'a> {
 	#[inline(always)]
-	pub(crate) fn into_parts(self) -> (&'a mut [AccountView], bool) {
-		(self.accounts, self.may_have_duplicates)
+	pub(crate) fn into_parts(self) -> (&'a mut [AccountView], u8) {
+		(self.accounts, self.dup_flags)
 	}
 
 	#[inline(always)]
@@ -83,11 +87,11 @@ impl EntrypointInput {
 	) -> Result<RouteAccounts<'_>, ProgramError> {
 		// SAFETY: `self` holds the loader's input and has not been walked.
 		unsafe {
-			let (accounts, may_have_duplicates) = match MODE {
+			let (accounts, dup_flags) = match MODE {
 				ROUTE_EXACT => {
-					let (accounts, may_have_duplicates) =
+					let (accounts, dup_flags) =
 						parse_exact_accounts::<SLOTS, SHARED>(self.input, slots)?;
-					(accounts.as_mut_slice(), may_have_duplicates)
+					(accounts.as_mut_slice(), dup_flags)
 				}
 				ROUTE_BOUNDED => parse_bounded_accounts::<SLOTS, SHARED>(self.input, slots)?,
 				_ => parse_leading_accounts::<SLOTS, SHARED>(self.input, slots)?,
@@ -95,7 +99,7 @@ impl EntrypointInput {
 
 			Ok(RouteAccounts {
 				accounts,
-				may_have_duplicates,
+				dup_flags,
 			})
 		}
 	}
@@ -208,7 +212,7 @@ pub const ROUTE_UNBOUNDED: u8 = 2;
 unsafe fn parse_exact_accounts<const N: usize, const SHARED: bool>(
 	input: *mut u8,
 	slots: &mut [MaybeUninit<AccountView>; N],
-) -> Result<(&mut [AccountView; N], bool), ProgramError> {
+) -> Result<(&mut [AccountView; N], u8), ProgramError> {
 	// SAFETY: the input begins with the account count as an aligned `u64`.
 	let count = unsafe { *input.cast::<u64>() } as usize;
 	if count < N {
@@ -219,18 +223,17 @@ unsafe fn parse_exact_accounts<const N: usize, const SHARED: bool>(
 	}
 
 	// SAFETY: the input holds `N` records, and `slots` has `N` slots.
-	let may_have_duplicates =
-		unsafe { walk::<SHARED>(input, slots.as_mut_ptr().cast::<AccountView>(), N)? };
+	let dup_flags = unsafe { walk::<SHARED>(input, slots.as_mut_ptr().cast::<AccountView>(), N)? };
 
 	// SAFETY: the walk initialized all `N` slots.
 	Ok((
 		unsafe { &mut *slots.as_mut_ptr().cast::<[AccountView; N]>() },
-		may_have_duplicates,
+		dup_flags,
 	))
 }
 
 /// Walks the loader's serialized accounts into `slots` when the input holds at
-/// most `N`, and returns them alongside whether any duplicate marker was seen.
+/// most `N`, and returns them alongside the duplicate bit flags observed.
 ///
 /// `dispatch_entrypoint!` calls this for a route whose accounts struct reads at
 /// most `N` accounts but accepts fewer, because it ends with optional fields.
@@ -257,7 +260,7 @@ unsafe fn parse_exact_accounts<const N: usize, const SHARED: bool>(
 unsafe fn parse_bounded_accounts<const N: usize, const SHARED: bool>(
 	input: *mut u8,
 	slots: &mut [MaybeUninit<AccountView>; N],
-) -> Result<(&mut [AccountView], bool), ProgramError> {
+) -> Result<(&mut [AccountView], u8), ProgramError> {
 	// SAFETY: the input begins with the account count as an aligned `u64`.
 	let count = unsafe { *input.cast::<u64>() } as usize;
 	if count > N {
@@ -266,12 +269,12 @@ unsafe fn parse_bounded_accounts<const N: usize, const SHARED: bool>(
 
 	let views = slots.as_mut_ptr().cast::<AccountView>();
 	// SAFETY: the input holds `count` records, and `count <= N` slots exist.
-	let may_have_duplicates = unsafe { walk::<SHARED>(input, views, count)? };
+	let dup_flags = unsafe { walk::<SHARED>(input, views, count)? };
 
 	// SAFETY: the walk initialized the first `count` slots.
 	Ok((
 		unsafe { core::slice::from_raw_parts_mut(views, count) },
-		may_have_duplicates,
+		dup_flags,
 	))
 }
 
@@ -292,23 +295,24 @@ unsafe fn walk<const SHARED: bool>(
 	input: *mut u8,
 	views: *mut AccountView,
 	count: usize,
-) -> Result<bool, ProgramError> {
+) -> Result<u8, ProgramError> {
 	if !SHARED {
 		// SAFETY: the caller upholds `walk_accounts`'s contract.
 		return unsafe { walk_accounts(input, views, count) };
 	}
 
 	// SAFETY: the caller upholds `walk_accounts`'s contract.
-	match unsafe { walk_accounts_shared(input, views, count) } {
-		WALK_OK_UNIQUE => Ok(false),
-		WALK_OK_HAS_DUPLICATES => Ok(true),
-		_ => Err(ProgramError::InvalidAccountData),
+	let status = unsafe { walk_accounts_shared(input, views, count) };
+	if status == WALK_ERR_INVALID_DATA {
+		return Err(ProgramError::InvalidAccountData);
 	}
+
+	Ok(status)
 }
 
 /// [`walk_accounts`] as the one out-of-line copy every route of a program
-/// calls. It returns a status code in a single register (`0` = ok with no
-/// duplicates, `1` = ok with duplicates, `2` = `InvalidAccountData`).
+/// calls. It returns either the duplicate bit flags (`0`, `2`, or `3`) or
+/// [`WALK_ERR_INVALID_DATA`] (`4`) in a single register.
 ///
 /// # Safety
 ///
@@ -318,14 +322,13 @@ unsafe fn walk<const SHARED: bool>(
 unsafe fn walk_accounts_shared(input: *mut u8, views: *mut AccountView, count: usize) -> u8 {
 	// SAFETY: the caller upholds `walk_accounts`'s contract.
 	match unsafe { walk_accounts(input, views, count) } {
-		Ok(false) => WALK_OK_UNIQUE,
-		Ok(true) => WALK_OK_HAS_DUPLICATES,
+		Ok(dup_flags) => dup_flags,
 		Err(_) => WALK_ERR_INVALID_DATA,
 	}
 }
 
 /// Writes a view of each of the first `count` serialized accounts to `views`
-/// and returns whether any duplicate marker was encountered.
+/// and returns the duplicate bit flags (`DUP_WRITABLE_MASK` / `DUP_ANY_MASK`).
 ///
 /// A duplicate marker copies the earlier view, as
 /// `pinocchio::entrypoint::deserialize` does. A marker that does not name an
@@ -342,11 +345,11 @@ unsafe fn walk_accounts(
 	input: *mut u8,
 	views: *mut AccountView,
 	count: usize,
-) -> Result<bool, ProgramError> {
+) -> Result<u8, ProgramError> {
 	// SAFETY: the first record follows the eight-byte account count.
 	let mut cursor = unsafe { input.add(size_of::<u64>()) };
 	let mut index = 0;
-	let mut saw_duplicate = false;
+	let mut dup_flags = 0_u8;
 
 	while index < count {
 		let account = cursor.cast::<RuntimeAccount>();
@@ -369,7 +372,6 @@ unsafe fn walk_accounts(
 					.map_addr(|address| (address + RECORD_ALIGNMENT - 1) & !(RECORD_ALIGNMENT - 1));
 			}
 		} else {
-			saw_duplicate = true;
 			let original = usize::from(marker);
 			if original >= index {
 				return Err(ProgramError::InvalidAccountData);
@@ -377,7 +379,10 @@ unsafe fn walk_accounts(
 			// SAFETY: slot `original` is below `index`, so it was written above,
 			// and a duplicate record is eight bytes long.
 			unsafe {
-				views.add(index).write(*views.add(original));
+				let view = *views.add(original);
+				dup_flags |= DUP_ANY_MASK;
+				dup_flags |= u8::from(view.is_writable());
+				views.add(index).write(view);
 				cursor = cursor.add(size_of::<u64>());
 			}
 		}
@@ -385,12 +390,12 @@ unsafe fn walk_accounts(
 		index += 1;
 	}
 
-	Ok(saw_duplicate)
+	Ok(dup_flags)
 }
 
 /// Walks the first `MAX_ACCOUNTS` of the loader's serialized accounts into
-/// `slots`, ignoring any past them, and returns them alongside whether any
-/// duplicate marker was encountered.
+/// `slots`, ignoring any past them, and returns them alongside the duplicate
+/// bit flags observed.
 ///
 /// `dispatch_entrypoint!` calls this for a route whose parser has no account
 /// limit, such as one with a `#[pina(remaining)]` slice, and for the reserved
@@ -417,19 +422,19 @@ unsafe fn walk_accounts(
 unsafe fn parse_leading_accounts<const MAX_ACCOUNTS: usize, const SHARED: bool>(
 	input: *mut u8,
 	slots: &mut [MaybeUninit<AccountView>; MAX_ACCOUNTS],
-) -> Result<(&mut [AccountView], bool), ProgramError> {
+) -> Result<(&mut [AccountView], u8), ProgramError> {
 	// SAFETY: the input begins with the account count as an aligned `u64`.
 	let count = (unsafe { *input.cast::<u64>() } as usize).min(MAX_ACCOUNTS);
 
 	let views = slots.as_mut_ptr().cast::<AccountView>();
 	// SAFETY: the input holds at least `count` records, and `count <=
 	// MAX_ACCOUNTS` slots exist.
-	let may_have_duplicates = unsafe { walk::<SHARED>(input, views, count)? };
+	let dup_flags = unsafe { walk::<SHARED>(input, views, count)? };
 
 	// SAFETY: the walk initialized the first `count` slots.
 	Ok((
 		unsafe { core::slice::from_raw_parts_mut(views, count) },
-		may_have_duplicates,
+		dup_flags,
 	))
 }
 
@@ -488,8 +493,10 @@ mod tests {
 	/// One account slot in a serialized loader input.
 	#[derive(Clone, Copy, Debug)]
 	enum Slot {
-		/// A distinct account with this address and data length.
+		/// A distinct read-only account with this address and data length.
 		Account { address: u8, data_len: u8 },
+		/// A distinct writable account with this address and data length.
+		WritableAccount { address: u8, data_len: u8 },
 		/// A duplicate of the account at this index.
 		Duplicate(u8),
 	}
@@ -504,9 +511,12 @@ mod tests {
 
 		for slot in slots {
 			match slot {
-				Slot::Account { address, data_len } => {
+				Slot::Account { address, data_len }
+				| Slot::WritableAccount { address, data_len } => {
+					let writable = matches!(slot, Slot::WritableAccount { .. });
 					let mut header = [0_u8; size_of::<RuntimeAccount>()];
 					header[0] = NON_DUP_MARKER;
+					header[2] = u8::from(writable);
 					header[8..40].fill(*address);
 					header[80..88].copy_from_slice(&u64::from(*data_len).to_le_bytes());
 					bytes.extend_from_slice(&header);
@@ -695,7 +705,7 @@ mod tests {
 			.iter()
 			.map(|slot| {
 				match slot {
-					Slot::Account { data_len, .. } => {
+					Slot::Account { data_len, .. } | Slot::WritableAccount { data_len, .. } => {
 						size_of::<RuntimeAccount>()
 							+ (usize::from(*data_len)
 								+ MAX_PERMITTED_DATA_INCREASE
@@ -751,7 +761,7 @@ mod tests {
 			let accounts = parse_exact_accounts::<3, false>(input, &mut exact);
 			assert_eq!(
 				accounts.map(|(accounts, dup)| (addresses(accounts), dup)),
-				Ok((std::vec![1, 2, 3], false))
+				Ok((std::vec![1, 2, 3], 0))
 			);
 
 			let mut wider = slots::<4>();
@@ -779,7 +789,7 @@ mod tests {
 			let accounts = parse_bounded_accounts::<5, false>(input, &mut wider);
 			assert_eq!(
 				accounts.map(|(accounts, dup)| (addresses(accounts), dup)),
-				Ok((std::vec![1, 2, 3], false))
+				Ok((std::vec![1, 2, 3], 0))
 			);
 
 			let mut narrower = slots::<2>();
@@ -796,15 +806,16 @@ mod tests {
 			unsafe { parse_bounded_accounts::<2, false>(empty.as_mut_ptr().cast(), &mut none) };
 		assert_eq!(
 			accounts.map(|(accounts, dup)| (accounts.len(), dup)),
-			Ok((0, false))
+			Ok((0, 0))
 		);
 	}
 
 	/// A duplicate marker resolves to the view of the slot it names, in both
-	/// walks, and a marker naming the current or a later slot is rejected.
+	/// walks, distinguishes read-only vs writable duplicates, and rejects a
+	/// marker naming the current or a later slot.
 	#[test]
 	fn walks_resolve_duplicates_and_reject_forward_markers() {
-		let mut input = serialize(
+		let mut readonly_dup_input = serialize(
 			&[
 				Slot::Account {
 					address: 1,
@@ -818,32 +829,131 @@ mod tests {
 			],
 			&[],
 		);
-		let input = input.as_mut_ptr().cast::<u8>();
+		let readonly_dup = readonly_dup_input.as_mut_ptr().cast::<u8>();
 
-		// SAFETY: `input` is a complete loader input built by `serialize`.
+		let mut writable_dup_input = serialize(
+			&[
+				Slot::WritableAccount {
+					address: 1,
+					data_len: 2,
+				},
+				Slot::Duplicate(0),
+				Slot::Account {
+					address: 2,
+					data_len: 0,
+				},
+			],
+			&[],
+		);
+		let writable_dup = writable_dup_input.as_mut_ptr().cast::<u8>();
+
+		// SAFETY: both buffers are complete loader inputs built by `serialize`.
 		unsafe {
 			let mut exact = slots::<3>();
-			let aliases =
-				parse_exact_accounts::<3, false>(input, &mut exact).map(|(accounts, dup)| {
-					(accounts[0] == accounts[1], accounts[0] == accounts[2], dup)
-				});
-			assert_eq!(aliases, Ok((true, false, true)));
+			let aliases = parse_exact_accounts::<3, false>(readonly_dup, &mut exact).map(
+				|(accounts, dup)| (accounts[0] == accounts[1], accounts[0] == accounts[2], dup),
+			);
+			assert_eq!(aliases, Ok((true, false, DUP_ANY_MASK)));
 
 			let mut shared = slots::<3>();
-			let shared_route =
-				EntrypointInput { input }.parse_route::<3, ROUTE_EXACT, true>(&mut shared);
+			let shared_route = EntrypointInput {
+				input: readonly_dup,
+			}
+			.parse_route::<3, ROUTE_EXACT, true>(&mut shared);
 			assert_eq!(
 				shared_route.map(|route| {
 					let (accounts, dup) = route.into_parts();
 					(addresses(accounts), dup)
 				}),
-				Ok((std::vec![1, 1, 2], true))
+				Ok((std::vec![1, 1, 2], DUP_ANY_MASK))
 			);
 
 			let mut bounded = slots::<4>();
-			let accounts = parse_bounded_accounts::<4, false>(input, &mut bounded)
+			let accounts = parse_bounded_accounts::<4, false>(readonly_dup, &mut bounded)
 				.map(|(accounts, dup)| (addresses(accounts), dup));
-			assert_eq!(accounts, Ok((std::vec![1, 1, 2], true)));
+			assert_eq!(accounts, Ok((std::vec![1, 1, 2], DUP_ANY_MASK)));
+
+			let mut exact_w = slots::<3>();
+			let aliases_w = parse_exact_accounts::<3, false>(writable_dup, &mut exact_w).map(
+				|(accounts, dup)| (accounts[0].is_writable(), accounts[0] == accounts[1], dup),
+			);
+			assert_eq!(
+				aliases_w,
+				Ok((true, true, DUP_ANY_MASK | DUP_WRITABLE_MASK))
+			);
+
+			let mut shared_w = slots::<3>();
+			let shared_route_w = EntrypointInput {
+				input: writable_dup,
+			}
+			.parse_route::<3, ROUTE_EXACT, true>(&mut shared_w);
+			assert_eq!(
+				shared_route_w.map(|route| {
+					let (accounts, dup) = route.into_parts();
+					(addresses(accounts), dup)
+				}),
+				Ok((std::vec![1, 1, 2], DUP_ANY_MASK | DUP_WRITABLE_MASK))
+			);
+
+			// Multiple duplicates accumulate bits monotonically (never toggling
+			// or clearing `DUP_WRITABLE_MASK` on subsequent read-only duplicates).
+			let mut two_ro = serialize(
+				&[
+					Slot::Account {
+						address: 1,
+						data_len: 0,
+					},
+					Slot::Duplicate(0),
+					Slot::Duplicate(0),
+				],
+				&[],
+			);
+			let mut s3 = slots::<3>();
+			assert_eq!(
+				parse_exact_accounts::<3, false>(two_ro.as_mut_ptr().cast(), &mut s3)
+					.map(|(_, dup)| dup),
+				Ok(DUP_ANY_MASK)
+			);
+
+			let mut two_wr = serialize(
+				&[
+					Slot::WritableAccount {
+						address: 1,
+						data_len: 0,
+					},
+					Slot::Duplicate(0),
+					Slot::Duplicate(0),
+				],
+				&[],
+			);
+			let mut s3 = slots::<3>();
+			assert_eq!(
+				parse_exact_accounts::<3, false>(two_wr.as_mut_ptr().cast(), &mut s3)
+					.map(|(_, dup)| dup),
+				Ok(DUP_ANY_MASK | DUP_WRITABLE_MASK)
+			);
+
+			let mut wr_then_ro = serialize(
+				&[
+					Slot::WritableAccount {
+						address: 1,
+						data_len: 0,
+					},
+					Slot::Account {
+						address: 2,
+						data_len: 0,
+					},
+					Slot::Duplicate(0),
+					Slot::Duplicate(1),
+				],
+				&[],
+			);
+			let mut s4 = slots::<4>();
+			assert_eq!(
+				parse_exact_accounts::<4, false>(wr_then_ro.as_mut_ptr().cast(), &mut s4)
+					.map(|(_, dup)| dup),
+				Ok(DUP_ANY_MASK | DUP_WRITABLE_MASK)
+			);
 		}
 
 		for forward in [1, 2] {
@@ -907,7 +1017,7 @@ mod tests {
 				let (accounts, dup) = route.into_parts();
 				(accounts.len(), dup)
 			}),
-			Ok((3, false))
+			Ok((3, 0))
 		);
 
 		let mut exact_mismatch = slots::<4>();
@@ -953,7 +1063,7 @@ mod tests {
 				let (accounts, dup) = route.into_parts();
 				(addresses(accounts), dup)
 			}),
-			Ok((std::vec![1, 2, 3], false))
+			Ok((std::vec![1, 2, 3], 0))
 		);
 		let mut bounded = slots::<4>();
 		let accounts = token().parse_route::<4, ROUTE_BOUNDED, true>(&mut bounded);
@@ -1042,15 +1152,25 @@ mod tests {
 		use proptest::strategy::Strategy;
 
 		proptest::collection::vec(
-			(proptest::bool::ANY, 0_u8..24, proptest::num::u8::ANY),
+			(
+				proptest::bool::ANY,
+				proptest::bool::ANY,
+				0_u8..24,
+				proptest::num::u8::ANY,
+			),
 			0..=8,
 		)
 		.prop_map(|layout| {
 			(0_u8..)
 				.zip(layout)
-				.map(|(position, (duplicate, data_len, pick))| {
+				.map(|(position, (duplicate, writable, data_len, pick))| {
 					if duplicate && position > 0 {
 						Slot::Duplicate(pick % position)
+					} else if writable {
+						Slot::WritableAccount {
+							address: position,
+							data_len,
+						}
 					} else {
 						Slot::Account {
 							address: position,
@@ -1060,6 +1180,22 @@ mod tests {
 				})
 				.collect()
 		})
+	}
+
+	fn expected_dup_flags(layout: &[Slot]) -> u8 {
+		let mut flags = 0_u8;
+		for slot in layout {
+			if let Slot::Duplicate(mut original) = *slot {
+				flags |= DUP_ANY_MASK;
+				while let Slot::Duplicate(prev) = layout[usize::from(original)] {
+					original = prev;
+				}
+				if matches!(layout[usize::from(original)], Slot::WritableAccount { .. }) {
+					flags |= DUP_WRITABLE_MASK;
+				}
+			}
+		}
+		flags
 	}
 
 	/// Each view's byte offset into the input it was walked from.
@@ -1144,7 +1280,7 @@ mod tests {
 			let bounded = unsafe { parse_bounded_accounts::<3, false>(base.cast(), &mut views) }
 				.map(|(accounts, dup)| (offsets(accounts, base), dup));
 			if layout.len() <= 3 {
-				let expected_dup = layout.iter().any(|slot| matches!(slot, Slot::Duplicate(_)));
+				let expected_dup = expected_dup_flags(&layout);
 				proptest::prop_assert_eq!(bounded, Ok((expected, expected_dup)));
 			} else {
 				proptest::prop_assert_eq!(bounded, Err(PinaProgramError::TooManyAccountKeys.into()));

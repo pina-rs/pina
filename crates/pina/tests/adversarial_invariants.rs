@@ -1126,6 +1126,36 @@ fn non_canonical_pda_requires_explicit_bump_verification() {
 		account_views[0].assert_canonical_bump(canonical_seeds, &TEST_PROGRAM_ID),
 		Err(ProgramError::InvalidSeeds)
 	);
+	// Exceeding MAX_SEEDS / MAX_SEEDS - 1 triggers the derivation-failure paths.
+	let too_many_seeds: [&[u8]; 17] = [b"s"; 17];
+	assert_eq!(
+		account_views[0].assert_seeds_with_bump(&too_many_seeds, &TEST_PROGRAM_ID),
+		Err(ProgramError::InvalidSeeds)
+	);
+	assert_eq!(
+		account_views[0].assert_canonical_bump(&too_many_seeds[..16], &TEST_PROGRAM_ID),
+		Err(ProgramError::InvalidSeeds)
+	);
+	// Valid bump seeds deriving a different address reject with `InvalidSeeds`.
+	let other_bump = [canonical_bump];
+	let other_seeds_with_bump: &[&[u8]] = &[b"noncanonical", &seed_bytes, &other_bump];
+	assert_eq!(
+		account_views[0].assert_seeds_with_bump(other_seeds_with_bump, &TEST_PROGRAM_ID),
+		Err(ProgramError::InvalidSeeds)
+	);
+	// Mismatched data length, non-executable, and sysvar owner/address fail with the expected errors.
+	assert_eq!(
+		account_views[0].assert_data_len(4),
+		Err(ProgramError::InvalidAccountData)
+	);
+	assert_eq!(
+		account_views[0].assert_executable(),
+		Err(ProgramError::InvalidAccountData)
+	);
+	assert_eq!(
+		account_views[0].assert_sysvar(&non_canonical_address),
+		Err(ProgramError::InvalidAccountOwner)
+	);
 	assert_ne!(canonical_bump, non_canonical_bump);
 }
 

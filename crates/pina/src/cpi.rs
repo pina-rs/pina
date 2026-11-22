@@ -2029,10 +2029,11 @@ impl ReallocPlan {
 #[cfg(feature = "account-resize")]
 #[inline(always)]
 fn validate_realloc_size(current_size: usize, target_size: usize) -> ProgramResult {
-	if target_size
-		.checked_sub(current_size)
-		.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
-	{
+	if pinocchio::hint::unlikely(
+		target_size
+			.checked_sub(current_size)
+			.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE),
+	) {
 		return Err(ProgramError::InvalidRealloc);
 	}
 
@@ -2136,7 +2137,7 @@ impl ReallocAccount<'_, '_, '_> {
 			self.rent_account,
 			self.program_id,
 			signers,
-			Some(rent),
+			Some(&rent),
 		)
 	}
 }
@@ -2215,7 +2216,7 @@ impl ReallocAccountZeroed<'_, '_, '_> {
 			self.rent_account,
 			self.program_id,
 			signers,
-			Some(rent),
+			Some(&rent),
 		)
 	}
 }
@@ -2244,6 +2245,7 @@ pub struct UpdateResizableAccount<'account, 'rent, 'address, P> {
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 	/// Applies the patch and adjusts the account to its resulting encoded size.
+	#[inline(always)]
 	pub fn invoke<T>(&mut self) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
@@ -2253,6 +2255,7 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 	}
 
 	/// Applies the patch with additional signer seeds for rent adjustment.
+	#[inline(always)]
 	pub fn invoke_signed<T>(&mut self, signers: &[Signer<'_, '_>]) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
@@ -2263,6 +2266,7 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 
 	/// Applies the patch with additional signer seeds and a caller-supplied
 	/// [`Rent`] value, avoiding an extra `Rent` sysvar syscall.
+	#[inline(always)]
 	pub fn invoke_signed_with_rent<T>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
@@ -2272,13 +2276,13 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 		T: PinaCompactAccount,
 		P: PinaCompactPatch<T>,
 	{
-		self.invoke_signed_inner::<T>(signers, Some(rent))
+		self.invoke_signed_inner::<T>(signers, Some(&rent))
 	}
 
 	fn invoke_signed_inner<T>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
-		rent: Option<Rent>,
+		rent: Option<&Rent>,
 	) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
@@ -2289,66 +2293,43 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 			.assert_owner(self.program_id)?;
 
 		let current_size = self.account.data_len();
-		let mut grew = false;
-
-		loop {
-			let outcome = {
-				let mut data = self.account.try_borrow_mut()?;
-				// Single-pass preflight + in-place update: enforces the storage
-				// length, discriminator, migration envelope, and structural
-				// bounds once, committing directly when the result fits in the
-				// current allocation (same-size or shrink) and returning
-				// `Ok(Err(target_size))` without mutating `data` when the
-				// account must grow first.
-				T::__try_update_or_len(&mut data, self.patch.as_pina_patch())?
-			};
-
-			let (target_size, needs_commit) = match outcome {
-				Ok(encoded_len) => {
-					if grew {
-						// The preflight and the writer must agree on the
-						// encoded size: a divergence would resize the account
-						// to the preflight's target while the writer produced a
-						// different length.
-						if encoded_len != self.account.data_len() {
-							return Err(ProgramError::InvalidAccountData);
-						}
-
-						return Ok(encoded_len);
-					}
-
-					if encoded_len >= current_size {
-						T::validate_size(encoded_len)?;
-
-						return Ok(encoded_len);
-					}
-
-					(encoded_len, false)
+		// Single-pass preflight + in-place update: enforces the storage
+		// length, discriminator, migration envelope, and structural bounds
+		// once, committing directly when the result fits in the current
+		// allocation (same-size or shrink) and returning
+		// `Ok(Err(target_size))` without mutating `data` when the account
+		// must grow first.
+		let target_size = match {
+			let mut data = self.account.try_borrow_mut()?;
+			T::__try_update_or_len(&mut data, self.patch.as_pina_patch())?
+		} {
+			Ok(encoded_len) => {
+				T::validate_size(encoded_len)?;
+				if encoded_len < current_size {
+					realloc_shrink_validated(self.account, encoded_len, self.rent_account, rent)?;
 				}
-				Err(target_size) => {
-					if grew {
-						return Err(ProgramError::InvalidAccountData);
-					}
 
-					(target_size, true)
-				}
-			};
-
-			T::validate_size(target_size)?;
-			realloc_validated_account_inner_with_rent(
-				self.account,
-				target_size,
-				self.rent_account,
-				signers,
-				rent,
-			)?;
-
-			if !needs_commit {
-				return Ok(target_size);
+				return Ok(encoded_len);
 			}
+			Err(target_size) => target_size,
+		};
 
-			grew = true;
+		T::validate_size(target_size)?;
+		validate_realloc_size(current_size, target_size)?;
+		realloc_grow_validated(self.account, target_size, self.rent_account, signers, rent)?;
+
+		let encoded_len = {
+			let mut data = self.account.try_borrow_mut()?;
+			T::update(&mut data, self.patch.as_pina_patch())?
+		};
+		// The preflight and the writer must agree on the encoded size: a
+		// divergence would resize the account to the preflight's target while
+		// the writer produced a different length.
+		if pinocchio::hint::unlikely(encoded_len != target_size) {
+			return Err(ProgramError::InvalidAccountData);
 		}
+
+		Ok(encoded_len)
 	}
 }
 
@@ -2392,13 +2373,13 @@ impl ReallocCompactAccount<'_, '_, '_> {
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
 	) -> ProgramResult {
-		self.invoke_signed_inner::<T>(signers, Some(rent))
+		self.invoke_signed_inner::<T>(signers, Some(&rent))
 	}
 
 	fn invoke_signed_inner<T: PinaCompactAccount>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
-		rent: Option<Rent>,
+		rent: Option<&Rent>,
 	) -> ProgramResult {
 		self.account
 			.assert_writable()?
@@ -2451,7 +2432,7 @@ fn realloc_account_inner_with_rent(
 	rent_account: &mut AccountView,
 	program_id: &Address,
 	signers: &[Signer<'_, '_>],
-	rent: Option<Rent>,
+	rent: Option<&Rent>,
 ) -> ProgramResult {
 	use crate::AccountInfoValidation;
 
@@ -2466,13 +2447,12 @@ fn realloc_account_inner_with_rent(
 /// properties before they call this helper. Keeping the resize work separate
 /// prevents duplicate owner checks in those hot paths.
 #[cfg(feature = "account-resize")]
-#[inline(always)]
 fn realloc_validated_account_inner_with_rent(
 	account: &mut AccountView,
 	target_size: usize,
 	rent_account: &mut AccountView,
 	signers: &[Signer<'_, '_>],
-	rent: Option<Rent>,
+	rent: Option<&Rent>,
 ) -> ProgramResult {
 	let current_size = account.data_len();
 
@@ -2485,39 +2465,64 @@ fn realloc_validated_account_inner_with_rent(
 	// serialized length is not exposed, so cumulative growth is still checked by
 	// the runtime and its error must be propagated by callers.
 	account.check_borrow_mut()?;
-	validate_realloc_size(current_size, target_size)?;
 
-	let rent = if let Some(rent) = rent {
-		rent
+	if target_size > current_size {
+		validate_realloc_size(current_size, target_size)?;
+		realloc_grow_validated(account, target_size, rent_account, signers, rent)
 	} else {
-		Rent::get()?
-	};
-	let target_minimum_balance = rent.try_minimum_balance(target_size)?;
-	let current_lamports = account.lamports();
-	let plan = ReallocPlan::from_valid_size(
-		current_size,
-		target_size,
-		current_lamports,
-		target_minimum_balance,
-	);
+		realloc_shrink_validated(account, target_size, rent_account, rent)
+	}
+}
 
-	match plan.adjustment {
-		RentAdjustment::Fund { lamports } => {
-			SystemTransfer {
-				from: rent_account,
-				to: account,
-				lamports,
-			}
-			.invoke_signed(signers)?;
+#[cfg(feature = "account-resize")]
+#[inline(always)]
+fn realloc_minimum_balance(target_size: usize, rent: Option<&Rent>) -> Result<u64, ProgramError> {
+	if let Some(rent) = rent {
+		rent.try_minimum_balance(target_size)
+	} else {
+		Rent::get()?.try_minimum_balance(target_size)
+	}
+}
+
+#[cfg(feature = "account-resize")]
+fn realloc_grow_validated(
+	account: &mut AccountView,
+	target_size: usize,
+	rent_account: &mut AccountView,
+	signers: &[Signer<'_, '_>],
+	rent: Option<&Rent>,
+) -> ProgramResult {
+	let target_minimum_balance = realloc_minimum_balance(target_size, rent)?;
+	let lamports = target_minimum_balance.saturating_sub(account.lamports());
+
+	if lamports > 0 {
+		SystemTransfer {
+			from: rent_account,
+			to: account,
+			lamports,
 		}
-		RentAdjustment::Refund { lamports } => {
-			crate::impls::send_lamports_after_owner_check(account, lamports, rent_account)?;
-		}
-		RentAdjustment::None => {}
+		.invoke_signed(signers)?;
 	}
 
 	// Resize the account data. The runtime zero-initializes new bytes.
-	account.resize(plan.target_size)
+	account.resize(target_size)
+}
+
+#[cfg(feature = "account-resize")]
+fn realloc_shrink_validated(
+	account: &mut AccountView,
+	target_size: usize,
+	rent_account: &mut AccountView,
+	rent: Option<&Rent>,
+) -> ProgramResult {
+	let target_minimum_balance = realloc_minimum_balance(target_size, rent)?;
+	let lamports = account.lamports().saturating_sub(target_minimum_balance);
+
+	if lamports > 0 {
+		crate::impls::send_lamports_after_owner_check(account, lamports, rent_account)?;
+	}
+
+	account.resize(target_size)
 }
 
 /// Closes an account and returns its remaining lamports to a recipient.
@@ -3932,33 +3937,19 @@ mod tests {
 
 		/// A patch newtype delegating to the generated patch, retargeted to
 		/// [`MisPredictingState`].
-		struct MisPredictingPatch<'a> {
-			inner: TestCompactStatePatch<'a>,
-			calls: core::cell::Cell<u8>,
-			mode: u8,
-		}
-
-		impl<'a> MisPredictingPatch<'a> {
-			fn new(inner: TestCompactStatePatch<'a>, mode: u8) -> Self {
-				Self {
-					inner,
-					calls: core::cell::Cell::new(0),
-					mode,
-				}
-			}
-		}
+		struct MisPredictingPatch<'a>(TestCompactStatePatch<'a>);
 
 		impl PinaPodPatch<MisPredictingState> for MisPredictingPatch<'_> {
 			fn updated_len(&self, data: &[u8]) -> Result<usize, PinaPodError> {
-				self.inner.updated_len(data)
+				self.0.updated_len(data)
 			}
 
 			fn update(&self, data: &mut [u8]) -> Result<usize, PinaPodError> {
-				self.inner.update(data)
+				self.0.update(data)
 			}
 
 			fn initialize(&self, data: &mut [u8]) -> Result<usize, PinaPodError> {
-				self.inner.initialize(data)
+				self.0.initialize(data)
 			}
 		}
 
@@ -4005,40 +3996,17 @@ mod tests {
 				// One full tail slot more than the commit will produce: an
 				// invalid-size lie would be caught by the size gate before the
 				// disagreement guard runs.
-				TestCompactState::updated_len(data, &patch.inner)
+				TestCompactState::updated_len(data, &patch.0)
 					.map(|length| length + usize::from(TestCompactState::TAIL_ALIGNMENT))
 					.map_err(|_| ProgramError::InvalidAccountData)
 			}
 
 			fn update(data: &mut [u8], patch: &Self::Patch<'_>) -> Result<usize, ProgramError> {
-				TestCompactState::update(data, &patch.inner)
+				TestCompactState::update(data, &patch.0)
 			}
 
 			fn initialize(data: &mut [u8], patch: &Self::Patch<'_>) -> Result<usize, ProgramError> {
-				TestCompactState::initialize(data, &patch.inner)
-			}
-
-			fn __try_update_or_len(
-				data: &mut [u8],
-				patch: &Self::Patch<'_>,
-			) -> Result<Result<usize, usize>, ProgramError> {
-				let step = usize::from(TestCompactState::TAIL_ALIGNMENT);
-				let call = patch.calls.get();
-				patch.calls.set(call + 1);
-				if patch.mode == 0 {
-					let target_size = Self::updated_len(data, patch)?;
-					if target_size > data.len() {
-						return Ok(Err(target_size));
-					}
-					return Ok(Ok(Self::update(data, patch)?));
-				}
-				if call == 0 {
-					return Ok(Err(TestCompactState::MIN_SIZE + 2 * step));
-				}
-				if patch.mode == 1 {
-					return Ok(Ok(TestCompactState::MIN_SIZE + step));
-				}
-				Ok(Err(TestCompactState::MIN_SIZE + 3 * step))
+				TestCompactState::initialize(data, &patch.0)
 			}
 		}
 
@@ -4049,56 +4017,51 @@ mod tests {
 		}
 
 		let owner = Address::new_from_array([9; 32]);
-		for mode in [0_u8, 1, 2] {
-			let mut stored_account = TestAccount::<64>::new(
-				Address::new_from_array([1; 32]),
-				owner,
-				1_000,
-				TestCompactState::MIN_SIZE,
-			);
-			let mut stored_rent_account =
-				TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1_000, 0);
-			let mut account = stored_account.view();
-			let mut rent_account = stored_rent_account.view();
-			{
-				let mut data = account.try_borrow_mut().expect("borrow compact state");
-				TestCompactState::initialize(&mut data, &TestCompactStatePatch::new())
-					.expect("initialize compact state");
-			}
-			// The prediction rounds the appended item up one extra tail slot, so
-			// the account is grown to a size the commit never fills and the
-			// preflight-versus-commit guard must refuse the whole update.
-			let items = [crate::PodU64::from(8)];
-			let result = UpdateResizableAccount {
-				account: &mut account,
-				rent_account: &mut rent_account,
-				program_id: &owner,
-				patch: MisPredictingPatch::new(
-					TestCompactStatePatch::new().replace_items(&items),
-					mode,
-				),
-			}
-			.invoke_signed_with_rent::<MisPredictingState>(&[], test_rent());
-
-			// The guard is the last line of defense: the account was already grown
-			// to the predicted size and the commit wrote its shorter encoding, so
-			// a host fixture keeps the intermediate state instead of rolling it
-			// back. The returned error is what fails the instruction, and Solana
-			// rolls the realloc and the patch back with the rest of the
-			// transaction — the allocation sized for the prediction is exactly
-			// what the runtime undoes.
-			assert_eq!(result, Err(ProgramError::InvalidAccountData));
-			assert_eq!(
-				account.data_len(),
-				TestCompactState::MIN_SIZE + 2 * usize::from(TestCompactState::TAIL_ALIGNMENT),
-				"the account grew to the predicted size before the guard refused it"
-			);
+		let mut stored_account = TestAccount::<64>::new(
+			Address::new_from_array([1; 32]),
+			owner,
+			1_000,
+			TestCompactState::MIN_SIZE,
+		);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1_000, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+		{
+			let mut data = account.try_borrow_mut().expect("borrow compact state");
+			TestCompactState::initialize(&mut data, &TestCompactStatePatch::new())
+				.expect("initialize compact state");
 		}
+		// The prediction rounds the appended item up one extra tail slot, so
+		// the account is grown to a size the commit never fills and the
+		// preflight-versus-commit guard must refuse the whole update.
+		let items = [crate::PodU64::from(8)];
+		let result = UpdateResizableAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			program_id: &owner,
+			patch: MisPredictingPatch(TestCompactStatePatch::new().replace_items(&items)),
+		}
+		.invoke_signed_with_rent::<MisPredictingState>(&[], test_rent());
+
+		// The guard is the last line of defense: the account was already grown
+		// to the predicted size and the commit wrote its shorter encoding, so
+		// a host fixture keeps the intermediate state instead of rolling it
+		// back. The returned error is what fails the instruction, and Solana
+		// rolls the realloc and the patch back with the rest of the
+		// transaction — the allocation sized for the prediction is exactly
+		// what the runtime undoes.
+		assert_eq!(result, Err(ProgramError::InvalidAccountData));
+		assert_eq!(
+			account.data_len(),
+			TestCompactState::MIN_SIZE + 2 * usize::from(TestCompactState::TAIL_ALIGNMENT),
+			"the account grew to the predicted size before the guard refused it"
+		);
 
 		// Exercise the delegation surface the builder path does not reach, so
 		// the wrapper stays honest about forwarding every trait method to the
 		// generated account it stands in for.
-		let patch = MisPredictingPatch::new(TestCompactStatePatch::new().value(3), 0);
+		let patch = MisPredictingPatch(TestCompactStatePatch::new().value(3));
 		let mut stored = TestAccount::<64>::new(
 			Address::new_from_array([3; 32]),
 			owner,
@@ -4362,7 +4325,7 @@ mod tests {
 			&mut rent_account,
 			&owner,
 			&[],
-			Some(test_rent()),
+			Some(&test_rent()),
 		)
 		.unwrap_or_else(|error| panic!("grow account: {error:?}"));
 
@@ -4386,7 +4349,7 @@ mod tests {
 			&mut rent_account,
 			&owner,
 			&[],
-			Some(test_rent()),
+			Some(&test_rent()),
 		)
 		.unwrap_or_else(|error| panic!("grow prefunded account: {error:?}"));
 
@@ -4413,13 +4376,39 @@ mod tests {
 			&mut rent_account,
 			&owner,
 			&[],
-			Some(test_rent()),
+			Some(&test_rent()),
 		)
 		.unwrap_or_else(|error| panic!("shrink account: {error:?}"));
 
 		assert_eq!(account.data_len(), 8);
 		assert_eq!(account.lamports() + rent_account.lamports(), initial_total);
 		assert!(rent_account.lamports() > 1);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn realloc_shrink_without_excess_rent_resizes_without_moving_lamports() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 1, 16);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+
+		realloc_account_inner_with_rent(
+			&mut account,
+			8,
+			&mut rent_account,
+			&owner,
+			&[],
+			Some(&test_rent()),
+		)
+		.expect("shrink account without excess rent");
+
+		assert_eq!(account.data_len(), 8);
+		assert_eq!(account.lamports(), 1);
+		assert_eq!(rent_account.lamports(), 1);
 	}
 
 	#[test]

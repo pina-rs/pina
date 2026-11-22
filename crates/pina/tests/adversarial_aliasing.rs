@@ -893,6 +893,14 @@ fn anchor_v2_sentinel_bug_immunity_omitted_optionals_never_conflict() {
 		&[ro(1), rw(2), Slot::Duplicate(1)],
 		&dup,
 	);
+	// Read-only duplicates on present optional mutable slots skip static
+	// aliasing checks (`DUP_WRITABLE_MASK == 0`) and still fail with
+	// `InvalidAccountData` during `next_mut_opt` writability enforcement.
+	assert_both_reject(
+		AliasInstruction::OptionalMutPair,
+		&[ro(1), ro(2), Slot::Duplicate(1)],
+		&ProgramError::InvalidAccountData,
+	);
 	assert_both_reject(
 		AliasInstruction::UniqueOptionalPair,
 		&[ro(1), rw(2), Slot::Duplicate(1)],
@@ -990,6 +998,14 @@ fn non_static_dynamic_layout_fails_closed_on_duplicates_and_passes_on_unique_inp
 		AliasInstruction::DynamicWithManualParser,
 		&[rw(1), Slot::Duplicate(0)],
 		&dup,
+	);
+
+	// Read-only duplicates on dynamic mutable slots still fail with
+	// `InvalidAccountData` on both paths.
+	assert_both_reject(
+		AliasInstruction::DynamicWithManualParser,
+		&[ro(1), Slot::Duplicate(0)],
+		&ProgramError::InvalidAccountData,
 	);
 
 	// Manual `TryFromAccountInfos` inherits the default fail-closed

@@ -98,36 +98,37 @@ fn sbf_derive_pda(
 	program_id: &Address,
 	search_bump: bool,
 	out: &mut core::mem::MaybeUninit<[u8; crate::ADDRESS_BYTES]>,
-) -> Option<u8> {
+) -> u8 {
 	let max_seeds = if search_bump {
 		crate::MAX_SEEDS - 1
 	} else {
 		crate::MAX_SEEDS
 	};
 	let seeds_len = seeds.len();
-	if seeds_len > max_seeds {
-		return None;
+	if pinocchio::hint::unlikely(seeds_len > max_seeds) {
+		return 0;
 	}
 
-	// When `search_bump` is false, starting at `1` makes `wrapping_sub(1) == 0`
-	// exit after a single hash with zero extra branch inside the hot loop.
-	let mut bump_seed = [if search_bump { u8::MAX } else { 1 }];
+	// When `search_bump` is false, starting at `1` makes `bump <= 1` exit after
+	// a single hash with zero extra branch inside the hot loop.
+	let mut bump = if search_bump { u8::MAX } else { 1 };
+	let mut bump_seed = [bump];
 	let bump_ptr = bump_seed.as_mut_ptr();
 	let mut inputs = [const { core::mem::MaybeUninit::<SolBytes>::uninit() }; crate::MAX_SEEDS + 2];
 
 	// SAFETY: `seeds_len <= MAX_SEEDS` (and `<= MAX_SEEDS - 1` when
 	// `search_bump` is true), so every write at `0..count` stays strictly
-	// within `inputs[0..MAX_SEEDS + 2]`. `bump_seed` is read and updated
-	// exclusively through `bump_ptr` to preserve strict provenance across loop
-	// iterations, and `sol_sha256` initializes all 32 bytes of `out`.
+	// within `inputs[0..MAX_SEEDS + 2]`. `bump_seed` is updated exclusively
+	// through `bump_ptr` to preserve strict provenance across loop iterations,
+	// and `sol_sha256` initializes all 32 bytes of `out`.
 	unsafe {
 		let dst = inputs.as_mut_ptr();
 		let mut i = 0;
 
 		while i < seeds_len {
 			let seed = *seeds.get_unchecked(i);
-			if seed.len() > crate::MAX_SEED_LEN {
-				return None;
+			if pinocchio::hint::unlikely(seed.len() > crate::MAX_SEED_LEN) {
+				return 0;
 			}
 			(*dst.add(i)).write(SolBytes {
 				addr: seed.as_ptr(),
@@ -161,14 +162,14 @@ fn sbf_derive_pda(
 		loop {
 			solana_sha256_hasher::sol_sha256(dst.cast::<u8>(), count, out_ptr);
 			if !solana_address::bytes_are_curve_point(out.assume_init_ref()) {
-				return Some(*bump_ptr);
+				return bump;
 			}
 
-			let next = (*bump_ptr).wrapping_sub(1);
-			if next == 0 {
-				return None;
+			if bump <= 1 {
+				return 0;
 			}
-			*bump_ptr = next;
+			bump -= 1;
+			*bump_ptr = bump;
 		}
 	}
 }
@@ -204,8 +205,11 @@ pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Address) -> Option
 	#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 	{
 		let mut out = core::mem::MaybeUninit::<[u8; crate::ADDRESS_BYTES]>::uninit();
-		let bump = sbf_derive_pda(seeds, program_id, true, &mut out)?;
-		// SAFETY: `sbf_derive_pda` only returns `Some` after `sol_sha256`
+		let bump = sbf_derive_pda(seeds, program_id, true, &mut out);
+		if bump == 0 {
+			return None;
+		}
+		// SAFETY: `sbf_derive_pda` only returns non-zero after `sol_sha256`
 		// initialized all 32 bytes of `out`.
 		Some((Address::new_from_array(unsafe { out.assume_init() }), bump))
 	}
@@ -265,8 +269,10 @@ pub fn create_program_address(
 	#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 	{
 		let mut out = core::mem::MaybeUninit::<[u8; crate::ADDRESS_BYTES]>::uninit();
-		sbf_derive_pda(seeds, program_id, false, &mut out).ok_or(ProgramError::InvalidSeeds)?;
-		// SAFETY: `sbf_derive_pda` only returns `Some` after `sol_sha256`
+		if sbf_derive_pda(seeds, program_id, false, &mut out) == 0 {
+			return Err(ProgramError::InvalidSeeds);
+		}
+		// SAFETY: `sbf_derive_pda` only returns non-zero after `sol_sha256`
 		// initialized all 32 bytes of `out`.
 		Ok(Address::new_from_array(unsafe { out.assume_init() }))
 	}

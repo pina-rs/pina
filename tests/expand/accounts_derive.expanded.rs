@@ -49,7 +49,6 @@ impl<'a> pina::ParseAccounts<'a> for InitAccounts<'a> {
             remaining_mut_distinct,
         }
     };
-    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -68,7 +67,6 @@ impl<'a> pina::ParseAccounts<'a> for InitAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for InitAccounts<'a> {
-    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -170,7 +168,6 @@ impl<'a> pina::ParseAccounts<'a> for TransferAccounts<'a> {
             remaining_mut_distinct,
         }
     };
-    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -191,7 +188,6 @@ impl<'a> pina::ParseAccounts<'a> for TransferAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for TransferAccounts<'a> {
-    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -293,7 +289,6 @@ impl<'a> pina::ParseAccounts<'a> for MutableTransferAccounts<'a> {
             remaining_mut_distinct,
         }
     };
-    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -307,7 +302,6 @@ impl<'a> pina::ParseAccounts<'a> for MutableTransferAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for MutableTransferAccounts<'a> {
-    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -405,7 +399,6 @@ impl<'a> pina::ParseAccounts<'a> for DuplicateMutableRemainingAccounts<'a> {
             remaining_mut_distinct,
         }
     };
-    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -419,7 +412,6 @@ impl<'a> pina::ParseAccounts<'a> for DuplicateMutableRemainingAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for DuplicateMutableRemainingAccounts<'a> {
-    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -514,7 +506,6 @@ impl<'a> pina::ParseAccounts<'a> for SingleAccount<'a> {
             remaining_mut_distinct,
         }
     };
-    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -527,7 +518,6 @@ impl<'a> pina::ParseAccounts<'a> for SingleAccount<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for SingleAccount<'a> {
-    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -653,7 +643,6 @@ impl<'a> pina::ParseAccounts<'a> for EscrowAccounts<'a> {
             remaining_mut_distinct,
         }
     };
-    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -684,7 +673,6 @@ impl<'a> pina::ParseAccounts<'a> for EscrowAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
-    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -796,7 +784,6 @@ impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
             remaining_mut_distinct,
         }
     };
-    #[inline(always)]
     fn parse_accounts(
         cursor: &mut ::pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
@@ -810,7 +797,6 @@ impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
     }
 }
 impl<'a> ::pina::TryFromAccountInfos<'a> for DefaultCrateAccounts<'a> {
-    #[inline(always)]
     fn try_from_account_infos(
         program_id: &::pina::Address,
         accounts: &'a mut [::pina::AccountView],
@@ -923,7 +909,6 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
             remaining_mut_distinct,
         }
     };
-    #[inline(always)]
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
@@ -944,7 +929,6 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for MakeAccounts<'a> {
-    #[inline(always)]
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],

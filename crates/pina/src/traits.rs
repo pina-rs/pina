@@ -182,7 +182,9 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate `data`, then borrow `PinaPod`'s immutable zero-copy companion.
 	fn try_from_bytes(data: &[u8]) -> Result<&Self::Zc, ProgramError> {
-		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
+		if pinocchio::hint::unlikely(
+			data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data),
+		) {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
@@ -205,7 +207,9 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate `data`, then borrow `PinaPod`'s mutable zero-copy companion.
 	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ProgramError> {
-		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
+		if pinocchio::hint::unlikely(
+			data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data),
+		) {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
@@ -1185,6 +1189,16 @@ pub struct AccountsCursor<'a> {
 	check_duplicates: bool,
 }
 
+#[cold]
+fn cold_not_enough_accounts() -> ProgramError {
+	ProgramError::NotEnoughAccountKeys
+}
+
+#[cold]
+fn cold_too_many_accounts() -> ProgramError {
+	PinaProgramError::TooManyAccountKeys.into()
+}
+
 impl<'a> AccountsCursor<'a> {
 	/// Create a fail-closed cursor over an instruction account slice for the
 	/// given executing program.
@@ -1225,9 +1239,9 @@ impl<'a> AccountsCursor<'a> {
 	#[inline(always)]
 	pub fn next(&mut self) -> Result<&'a AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
-		let (account, rest) = accounts
-			.split_first_mut()
-			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		let Some((account, rest)) = accounts.split_first_mut() else {
+			return Err(cold_not_enough_accounts());
+		};
 		self.remaining = rest;
 
 		Ok(account)
@@ -1242,9 +1256,9 @@ impl<'a> AccountsCursor<'a> {
 	#[inline(always)]
 	pub fn next_mut(&mut self) -> Result<&'a mut AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
-		let (account, rest) = accounts
-			.split_first_mut()
-			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		let Some((account, rest)) = accounts.split_first_mut() else {
+			return Err(cold_not_enough_accounts());
+		};
 		self.remaining = rest;
 		validate_writable(*account)?;
 		if self.check_duplicates {
@@ -1254,24 +1268,28 @@ impl<'a> AccountsCursor<'a> {
 		Ok(account)
 	}
 
+	#[inline(always)]
+	fn next_opt_account(&mut self) -> Option<&'a mut AccountView> {
+		let accounts = core::mem::take(&mut self.remaining);
+		let (account, rest) = accounts.split_first_mut()?;
+		self.remaining = rest;
+
+		if account.address() == &self.program_id {
+			return None;
+		}
+
+		Some(account)
+	}
+
 	/// Parse the next account as an optional immutable account field.
 	///
 	/// A missing trailing slot yields [`None`]. A present slot holding the
 	/// executing program's own address also yields [`None`]; any other address
 	/// is returned as [`Some`]. Optional fields followed by another positional
 	/// field still require the program-address filler when absent.
+	#[inline(always)]
 	pub fn next_opt(&mut self) -> Result<Option<&'a AccountView>, ProgramError> {
-		let accounts = core::mem::take(&mut self.remaining);
-		let Some((account, rest)) = accounts.split_first_mut() else {
-			return Ok(None);
-		};
-		self.remaining = rest;
-
-		if account.address() == &self.program_id {
-			return Ok(None);
-		}
-
-		Ok(Some(account))
+		Ok(self.next_opt_account().map(|account| &*account))
 	}
 
 	/// Parse the next account as an optional mutable account field.
@@ -1279,16 +1297,11 @@ impl<'a> AccountsCursor<'a> {
 	/// Like [`Self::next_mut`], a present account must be marked writable. A
 	/// missing trailing slot or a present slot holding the executing program's
 	/// own address yields [`None`] without a writability requirement.
+	#[inline(always)]
 	pub fn next_mut_opt(&mut self) -> Result<Option<&'a mut AccountView>, ProgramError> {
-		let accounts = core::mem::take(&mut self.remaining);
-		let Some((account, rest)) = accounts.split_first_mut() else {
+		let Some(account) = self.next_opt_account() else {
 			return Ok(None);
 		};
-		self.remaining = rest;
-
-		if account.address() == &self.program_id {
-			return Ok(None);
-		}
 
 		validate_writable(*account)?;
 		if self.check_duplicates {
@@ -1355,12 +1368,13 @@ impl<'a> AccountsCursor<'a> {
 	}
 
 	/// Require that no unparsed accounts remain.
+	#[inline(always)]
 	pub fn finish_exact(&self) -> Result<(), ProgramError> {
-		if self.remaining.is_empty() {
+		if pinocchio::hint::likely(self.remaining.is_empty()) {
 			return Ok(());
 		}
 
-		Err(PinaProgramError::TooManyAccountKeys.into())
+		Err(cold_too_many_accounts())
 	}
 
 	/// Reject a mutable account that appears again in the cursor's remaining
@@ -1550,6 +1564,12 @@ pub fn validate_mut_aliasing_64(accounts: &[AccountView], mut_mask: u64) -> u8 {
 	ALIAS_OK
 }
 
+#[cold]
+#[inline(never)]
+fn address_eq(a: &Address, b: &Address) -> bool {
+	a == b
+}
+
 /// Unified 5-register aliasing validator for layouts with optional mutable
 /// accounts, `#[pina(unique)]` slots, or trailing mutable `#[pina(remaining)]`
 /// slices whose positional indices are `<= 32`.
@@ -1558,6 +1578,7 @@ pub fn validate_mut_aliasing_64(accounts: &[AccountView], mut_mask: u64) -> u8 {
 /// and `unique_mask` (low 32 bits), `remaining_mut_start` (bits `32..40`, with
 /// `0xFF` meaning none), and `remaining_mut_distinct` (bit `40`) into `r5`.
 #[doc(hidden)]
+#[cold]
 #[inline(never)]
 pub fn validate_account_aliasing_compact(
 	program_id: &Address,
@@ -1582,9 +1603,8 @@ pub fn validate_account_aliasing_compact(
 	while i < len {
 		let account_i = accounts[i];
 		let bit_i = if i < 32 { 1_u32 << i } else { 0 };
-		let is_program_id = opt_mask != 0 && account_i.address() == program_id;
 
-		if (opt_mask & bit_i) != 0 && is_program_id {
+		if (opt_mask & bit_i) != 0 && address_eq(account_i.address(), program_id) {
 			i += 1;
 			continue;
 		}
@@ -1606,7 +1626,7 @@ pub fn validate_account_aliasing_compact(
 			let account_j = accounts[j];
 			if account_i == account_j {
 				let bit_j = if j < 32 { 1_u32 << j } else { 0 };
-				if (opt_mask & bit_j) == 0 || !is_program_id {
+				if (opt_mask & bit_j) == 0 || !address_eq(account_j.address(), program_id) {
 					if unique_i || (unique_mask & bit_j) != 0 {
 						return ALIAS_ERR_DUPLICATE;
 					}
@@ -1705,7 +1725,6 @@ pub fn validate_account_aliasing(
 }
 
 #[cold]
-#[inline(never)]
 fn reject_duplicate_pair(account: AccountView) -> u8 {
 	if !account.is_writable() {
 		let _ = validate_writable(account);
@@ -1840,8 +1859,9 @@ where
 /// [`TryFromAccountInfos::try_from_route`].
 ///
 /// Consumes the sealed [`crate::RouteAccounts`] returned by
-/// [`crate::EntrypointInput::parse_route`]: on the duplicate-free fast path
-/// (`!may_have_duplicates`), skips aliasing validation completely.
+/// [`crate::EntrypointInput::parse_route`]: skips aliasing validation whenever
+/// the loader walk saw no duplicate that can violate this layout (`DUP_ANY_MASK`
+/// when `#[pina(unique)]` slots are present, `DUP_WRITABLE_MASK` otherwise).
 #[doc(hidden)]
 #[inline(always)]
 pub fn __parse_derived_route<'a, T, const FINISH_EXACT: bool>(
@@ -1851,15 +1871,22 @@ pub fn __parse_derived_route<'a, T, const FINISH_EXACT: bool>(
 where
 	T: ParseAccounts<'a>,
 {
-	let (accounts, may_have_duplicates) = route.into_parts();
+	let (accounts, dup_flags) = route.into_parts();
 	let mut cursor = if const { T::ALIAS_LAYOUT.static_layout } {
+		let required_dup_mask = const {
+			if __mask256_any(T::ALIAS_LAYOUT.unique_mask) {
+				crate::entry::DUP_ANY_MASK
+			} else {
+				crate::entry::DUP_WRITABLE_MASK
+			}
+		};
 		if const { T::ALIAS_LAYOUT.needs_alias_check() }
-			&& pinocchio::hint::unlikely(may_have_duplicates)
+			&& pinocchio::hint::unlikely((dup_flags & required_dup_mask) != 0)
 		{
 			run_static_alias_check::<T>(program_id, accounts)?;
 		}
 		AccountsCursor::from_verified(*program_id, accounts)
-	} else if pinocchio::hint::unlikely(may_have_duplicates) {
+	} else if pinocchio::hint::unlikely((dup_flags & crate::entry::DUP_WRITABLE_MASK) != 0) {
 		AccountsCursor::new(*program_id, accounts)
 	} else {
 		AccountsCursor::from_verified(*program_id, accounts)

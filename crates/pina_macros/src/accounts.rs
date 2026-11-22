@@ -505,7 +505,6 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 		impl #impl_generics #crate_path::ParseAccounts #ty_generics for #struct_name #ty_generics #where_clause {
 			#account_bound
 
-			#[inline(always)]
 			fn parse_accounts(
 				cursor: &mut #crate_path::AccountsCursor<#lifetime>,
 			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
@@ -522,7 +521,6 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 		}
 
 		impl #impl_generics #crate_path::TryFromAccountInfos #ty_generics for #struct_name #ty_generics #where_clause {
-			#[inline(always)]
 			fn try_from_account_infos(
 				program_id: &#crate_path::Address,
 				accounts: & #lifetime mut [#crate_path::AccountView],
