@@ -1585,5 +1585,6 @@ fn resizable_update_rejects_manual_validate_size_before_mutating_bytes() {
 		.unwrap_or_else(|e| panic!("strict try_from_bytes: {e:?}"));
 	let expected_view = CompactBuilderState::try_from_bytes(&expected_init)
 		.unwrap_or_else(|e| panic!("expected try_from_bytes: {e:?}"));
-	assert_eq!(view.value(), expected_view.value());
+	assert_eq!(view.encoded_len(), expected_view.encoded_len());
+	assert_eq!(view.storage_len(), expected_view.storage_len());
 }

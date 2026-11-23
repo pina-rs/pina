@@ -1641,7 +1641,7 @@ fn manual_parser_delegating_to_derived_unique_child_enforces_uniqueness() {
 	let mut bad_cursor = AccountsCursor::new(*pid, bad_slice);
 	assert_eq!(
 		ManualWrapperAroundUnique::parse_accounts(&mut bad_cursor).err(),
-		Some(dup)
+		Some(dup.clone())
 	);
 
 	// Distinct accounts succeed cleanly.
