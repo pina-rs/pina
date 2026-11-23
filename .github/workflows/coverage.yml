@@ -95,15 +95,14 @@ jobs:
         with:
           components: llvm-tools,rustc-dev
           cache-key: coverage
-          # mold drops LLVM coverage counter updates for cross-crate
-          # `#[inline(always)]` functions (taiki-e/cargo-llvm-cov#482),
-          # causing executed lines to report 0 hits in lcov.
+          # `CARGO_INCREMENTAL=0` (set by `dtolnay/rust-toolchain` and sccache)
+          # causes rustc + llvm-cov to emit mismatched coverage hashes across
+          # multi-crate test binaries for cross-crate `#[inline(always)]`
+          # functions, zeroing out executed lines in `lcov.info`. Disable
+          # sccache and mold here and run `coverage:all` with incremental
+          # codegen enabled (matching the pre-#718 Nix coverage environment).
           use-mold: "false"
-          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
-          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
-          sccache-region: ${{ vars.SCCACHE_REGION }}
-          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
-          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+          use-sccache: "false"
 
       - name: setup pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -121,6 +120,8 @@ jobs:
           cargo-expand: "true"
 
       - name: run coverage
+        env:
+          CARGO_INCREMENTAL: "1"
         run: node scripts/ci-tasks.ts coverage:all
         shell: bash
 
