@@ -1449,3 +1449,41 @@ fn five_mut_and_wide_fallback_derived_structs_validate_correctly() {
 		Some(dup)
 	);
 }
+
+#[test]
+fn validate_mut_aliasing_64_allows_trailing_readonly_duplicate_and_mask256_boundaries() {
+	// Mutable slot 0 duplicated by a trailing readonly slot 1 MUST succeed in
+	// `validate_mut_aliasing_64`: only mutable-vs-mutable pairs conflict.
+	let (mut buf, _) = serialize(&[rw(1), Slot::Duplicate(0), rw(2)], &[], &ID);
+	let mut views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 4];
+	// SAFETY: `buf` holds 3 serialized accounts.
+	let (_, count, _) =
+		unsafe { entrypoint::deserialize::<4>(buf.as_mut_ptr().cast(), &mut views) };
+	// SAFETY: `deserialize` initialized `count` entries.
+	let slice =
+		unsafe { core::slice::from_raw_parts(views.as_mut_ptr().cast::<AccountView>(), count) };
+	// Bits 0 and 2 mutable; bit 1 readonly (even though slot 1 aliases slot 0).
+	assert_eq!(validate_mut_aliasing_64(slice, 0b101), 0);
+	// When bit 1 is also marked mutable, the duplicate MUST be rejected.
+	assert_eq!(validate_mut_aliasing_64(slice, 0b111), 2);
+
+	// Multi-word 256-bit mask arithmetic and compact-32 boundary checks.
+	assert_eq!(__mask256_count_ones([1, 2, 4, 8]), 4);
+	assert!(!__mask256_any([0, 0, 0, 0]));
+	assert!(__mask256_any([0, 0, 0, 1]));
+	assert!(__mask256_any([0, 1, 1, 0]));
+	assert!(__mask256_any([1, 1, 0, 0]));
+	assert!(__mask256_any([0, 0, 1, 1]));
+
+	let mut layout = __AliasLayout {
+		static_layout: true,
+		mut_mask: [0, 1, 1, 0],
+		optional_mask: [0; 4],
+		unique_mask: [0; 4],
+		remaining_mut_start: usize::MAX,
+		remaining_mut_distinct: true,
+	};
+	assert!(!layout.is_compact_32());
+	layout.mut_mask = [0, 0, 1, 1];
+	assert!(!layout.is_compact_32());
+}

@@ -120,6 +120,17 @@ ignore = [
 	# Remove when Surfpool and Solana stop pulling chrono. A tracking issue
 	# still needs to be filed.
 	"RUSTSEC-2026-0543",
+	# RUSTSEC-2026-0592: `url` < 2.5.9 has a stack overflow in `Url::origin()`
+	# on nested `blob:` URLs. The workspace's `url 2.5.x` line (used by
+	# `pina_cli`, `reqwest`, and `solana-rpc-client`) is upgraded to 2.5.9.
+	# The remaining `url 1.7.2` is reached only through `pina_test` →
+	# `surfpool-sdk 1.7.0` → `surfpool-core 1.7.0` → `jsonrpc-core-client 18.0.0`
+	# → `jsonrpc-client-transports 18.0.0` and `surfpool-types 1.7.0`.
+	# Host/test stack only: `pina`, `pina_abi`, `pina_macros`, `pina_cli`, and
+	# `pina_profile` do not depend on `url 1.7.2`, and no on-chain program
+	# includes it. Reviewed 2026-11-23. Remove once Surfpool drops `url 1.7` —
+	# tracked in #722.
+	"RUSTSEC-2026-0592",
 ]
 
 [licenses]
