@@ -671,6 +671,8 @@ pub(crate) struct AccountsField {
 	pub(crate) remaining: Flag,
 	#[darling(default)]
 	pub(crate) distinct: Option<bool>,
+	#[darling(default)]
+	pub(crate) unique: Flag,
 	#[darling(multiple)]
 	pub(crate) validate: Vec<AccountsValidation>,
 }

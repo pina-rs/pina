@@ -424,9 +424,17 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -579,7 +587,6 @@ impl pina::HasDiscriminator for ConfigState {
     const VALUE: Self::Type = AccountDisc::ConfigState;
 }
 impl pina::AccountValidation for ConfigStateZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -591,7 +598,6 @@ impl pina::AccountValidation for ConfigStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -605,7 +611,6 @@ impl pina::AccountValidation for ConfigStateZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -617,7 +622,6 @@ impl pina::AccountValidation for ConfigStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -648,6 +652,17 @@ impl pina::PinaAccount for ConfigState {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -898,9 +913,17 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -1053,7 +1076,6 @@ impl pina::HasDiscriminator for GameState {
     const VALUE: Self::Type = AccountDisc::GameState;
 }
 impl pina::AccountValidation for GameStateZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1065,7 +1087,6 @@ impl pina::AccountValidation for GameStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1079,7 +1100,6 @@ impl pina::AccountValidation for GameStateZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1091,7 +1111,6 @@ impl pina::AccountValidation for GameStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -1122,6 +1141,17 @@ impl pina::PinaAccount for GameState {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -1398,9 +1428,18 @@ where
     [u8; 4]: pina::pinapod::ZcField,
     <[u8; 4] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 64] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 4] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -1580,7 +1619,6 @@ impl pina::HasDiscriminator for DataAccount {
     const VALUE: Self::Type = AccountDisc::DataAccount;
 }
 impl pina::AccountValidation for DataAccountZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1592,7 +1630,6 @@ impl pina::AccountValidation for DataAccountZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1606,7 +1643,6 @@ impl pina::AccountValidation for DataAccountZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -1618,7 +1654,6 @@ impl pina::AccountValidation for DataAccountZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -1649,6 +1684,17 @@ impl pina::PinaAccount for DataAccount {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -1968,9 +2014,19 @@ where
     PodBool: pina::pinapod::ZcField,
     <PodBool as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodBool as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -2176,7 +2232,6 @@ impl pina::HasDiscriminator for BalanceAccount {
     const VALUE: Self::Type = AccountDisc::BalanceAccount;
 }
 impl pina::AccountValidation for BalanceAccountZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2188,7 +2243,6 @@ impl pina::AccountValidation for BalanceAccountZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2202,7 +2256,6 @@ impl pina::AccountValidation for BalanceAccountZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2214,7 +2267,6 @@ impl pina::AccountValidation for BalanceAccountZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -2245,6 +2297,17 @@ impl pina::PinaAccount for BalanceAccount {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -2437,9 +2500,16 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -2566,7 +2636,6 @@ impl pina::HasDiscriminator for MyStruct {
     const VALUE: Self::Type = AccountDisc::Custom;
 }
 impl pina::AccountValidation for MyStructZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2578,7 +2647,6 @@ impl pina::AccountValidation for MyStructZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2592,7 +2660,6 @@ impl pina::AccountValidation for MyStructZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -2604,7 +2671,6 @@ impl pina::AccountValidation for MyStructZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -2635,6 +2701,17 @@ impl pina::PinaAccount for MyStruct {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -3121,9 +3198,23 @@ where
     [u8; 32]: pina::pinapod::ZcField,
     <[u8; 32] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 3] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; AccountDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -3433,7 +3524,6 @@ impl pina::HasDiscriminator for LargeState {
     const VALUE: Self::Type = AccountDisc::LargeState;
 }
 impl pina::AccountValidation for LargeStateZc {
-    #[track_caller]
     fn assert<F>(&self, condition: F) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -3445,7 +3535,6 @@ impl pina::AccountValidation for LargeStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -3459,7 +3548,6 @@ impl pina::AccountValidation for LargeStateZc {
             Ok(()) => Ok(self),
         }
     }
-    #[track_caller]
     fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, pina::ProgramError>
     where
         F: Fn(&Self) -> bool,
@@ -3471,7 +3559,6 @@ impl pina::AccountValidation for LargeStateZc {
         pina::log_caller();
         Err(pina::ProgramError::InvalidAccountData)
     }
-    #[track_caller]
     fn assert_mut_msg<F>(
         &mut self,
         condition: F,
@@ -3502,5 +3589,16 @@ impl pina::PinaAccount for LargeState {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }

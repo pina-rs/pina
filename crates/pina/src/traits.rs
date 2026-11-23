@@ -106,6 +106,23 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 		}
 	}
 
+	/// Initialize a complete fixed account representation into an already-zeroed
+	/// destination buffer.
+	///
+	/// The default forwards to [`Self::initialize`] so manual [`PinaAccount`]
+	/// implementations that override `initialize` keep their custom behavior.
+	/// `#[account]` overrides this via [`__initialize_derived_zeroed`] to skip
+	/// the redundant `data.fill(0)` pass on freshly allocated accounts while
+	/// preserving failure-clearing, discriminator-writing, structural, and
+	/// application validation guarantees.
+	#[doc(hidden)]
+	fn __initialize_zeroed<F>(data: &mut [u8], initialize: F) -> Result<&mut Self::Zc, ProgramError>
+	where
+		F: FnOnce(&mut Self::Zc) -> Result<(), crate::PinaPodError>,
+	{
+		<Self as PinaAccount>::initialize(data, initialize)
+	}
+
 	/// Reject bytes whose migration version envelope is not current.
 	///
 	/// The default accepts every representation. The `#[account]` macro
@@ -113,6 +130,7 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 	/// read path (`as_account`, `as_account_mut`, `validate_account_data`)
 	/// refuses stale bytes instead of misreading them as the current layout.
 	#[doc(hidden)]
+	#[inline(always)]
 	fn require_current_migration_envelope(_data: &[u8]) -> ProgramResult {
 		Ok(())
 	}
@@ -142,7 +160,9 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate `data`, then borrow `PinaPod`'s immutable zero-copy companion.
 	fn try_from_bytes(data: &[u8]) -> Result<&Self::Zc, ProgramError> {
-		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
+		if pinocchio::hint::unlikely(
+			data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data),
+		) {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
@@ -165,7 +185,9 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 	/// Validate `data`, then borrow `PinaPod`'s mutable zero-copy companion.
 	fn try_from_bytes_mut(data: &mut [u8]) -> Result<&mut Self::Zc, ProgramError> {
-		if data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data) {
+		if pinocchio::hint::unlikely(
+			data.len() != size_of::<Self::Zc>() || !Self::matches_discriminator(data),
+		) {
 			return Err(ProgramError::InvalidAccountData);
 		}
 
@@ -185,6 +207,45 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 
 			Ok(value)
 		}
+	}
+}
+
+/// Macro-generated zero-fill fast path for [`PinaAccount::__initialize_zeroed`].
+///
+/// Callers must guarantee that every byte of `data` is already zero (for
+/// example, freshly allocated by the System Program).
+#[doc(hidden)]
+pub fn __initialize_derived_zeroed<T, F>(
+	data: &mut [u8],
+	initialize: F,
+) -> Result<&mut T::Zc, ProgramError>
+where
+	T: PinaAccount,
+	F: FnOnce(&mut T::Zc) -> Result<(), crate::PinaPodError>,
+{
+	#[cfg(not(feature = "validation"))]
+	{
+		<T as PinaPodFixed>::initialize_zeroed(data, |value| {
+			T::write_zc_discriminator(value);
+			initialize(value)
+		})
+		.map_err(|_| ProgramError::InvalidAccountData)
+	}
+
+	#[cfg(feature = "validation")]
+	{
+		let value = <T as PinaPodFixed>::initialize_zeroed(data, |value| {
+			T::write_zc_discriminator(value);
+			initialize(value)
+		})
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+
+		if let Err(error) = T::validate_account_value(value) {
+			__clear_zc(value);
+			return Err(error);
+		}
+
+		Ok(value)
 	}
 }
 
@@ -208,6 +269,16 @@ pub trait PinaCompactAccount: HasDiscriminator + PinaPodCompact {
 	type Patch<'patch>: crate::PinaPodPatch<Self>
 	where
 		Self: 'patch;
+
+	/// Whether [`Self::validate_size`] is guaranteed to match
+	/// [`PinaPodCompact::validate_storage_len`] (enforced prior to any mutation
+	/// inside `pinapod`'s `try_update_or_len`).
+	///
+	/// `#[account(compact)]` sets this to `true` so [`crate::UpdateResizableAccount`]
+	/// stays single-pass; manual implementations inherit `false` so any custom
+	/// `validate_size` override runs before bytes are modified.
+	#[doc(hidden)]
+	const __DERIVED_COMPACT_VALIDATE_SIZE: bool = false;
 
 	/// Validate that `size` can hold this compact account.
 	fn validate_size(size: usize) -> Result<(), ProgramError> {
@@ -242,6 +313,37 @@ pub trait PinaCompactAccount: HasDiscriminator + PinaPodCompact {
 
 	/// Initialize caller-owned compact storage from `patch`.
 	fn initialize(data: &mut [u8], patch: &Self::Patch<'_>) -> Result<usize, ProgramError>;
+
+	/// Apply `patch` in place when the encoded result fits in `data`, or return
+	/// `Ok(Err(target_size))` without mutating `data` when the account must grow
+	/// first.
+	#[doc(hidden)]
+	fn __try_update_or_len(
+		data: &mut [u8],
+		patch: &Self::Patch<'_>,
+	) -> Result<Result<usize, usize>, ProgramError> {
+		let target_size = Self::updated_len(data, patch)?;
+		Self::validate_size(target_size)?;
+		if target_size > data.len() {
+			return Ok(Err(target_size));
+		}
+
+		let encoded_len = Self::update(data, patch)?;
+		if encoded_len != target_size {
+			return Err(ProgramError::InvalidAccountData);
+		}
+
+		Ok(Ok(encoded_len))
+	}
+
+	/// Initialize compact storage that is already guaranteed to be zero-filled.
+	#[doc(hidden)]
+	fn __initialize_zeroed(
+		data: &mut [u8],
+		patch: &Self::Patch<'_>,
+	) -> Result<usize, ProgramError> {
+		Self::initialize(data, patch)
+	}
 }
 
 /// A patch value that exposes an account's exact generated compact patch type.
@@ -1061,25 +1163,34 @@ pub trait CloseAccountWithRecipient {
 ///
 /// `AccountsCursor` is the runtime layer used by `#[derive(Accounts)]`. It
 /// advances through the account slice from left to right, supports explicit
-/// trailing-account capture, and rejects writable aliases for mutable accounts
-/// parsed individually through [`Self::next_mut`]. The `#[derive(Accounts)]`
-/// macro parses mutable `#[pina(remaining)]` fields with
-/// [`Self::remaining_mut_distinct`] by default. Its explicit
-/// `distinct = false` escape hatch uses [`Self::remaining_mut`] to preserve
-/// aliases for instruction contracts that intentionally allow them.
+/// trailing-account capture, and enforces writability for mutable slots.
 ///
 /// # Alias rules
 ///
-/// Alias checks look forward. A mutable account parsed through
-/// [`Self::next_mut`] or [`Self::next_mut_opt`] must not appear in any later
-/// slot, whichever way that slot is parsed. An account that is already parsed
-/// has left the cursor, so a readonly slot followed by a mutable slot for the
-/// same account is accepted. This is deliberate: an authority that signs
-/// readonly and also pays as a writable payer is one account in two slots,
-/// and the runtime marks both slots writable. Declare the readonly field first
-/// when an instruction allows that overlap. When the fields must be distinct
-/// accounts, check it explicitly (compare the two addresses) instead of relying
-/// on declaration order.
+/// For `#[derive(Accounts)]` structs with a statically known account layout:
+///
+/// - Any pair of present mutable slots (`&mut AccountView`, present
+///   `Option<&mut AccountView>`, or a trailing `#[pina(remaining)] &mut [AccountView]`
+///   slice) that alias the same runtime account is rejected symmetrically with
+///   [`PinaProgramError::DuplicateMutableAccount`], unless both slots lie inside
+///   a `#[pina(remaining, distinct = false)]` slice.
+/// - Readonly + mutable overlap (for example, an authority that signs readonly
+///   and also pays as a writable payer) is accepted symmetrically regardless of
+///   field declaration order; runtime [`Ref`]/[`RefMut`] borrow guards still
+///   prevent simultaneous conflicting data borrows.
+/// - Any present slot annotated with `#[pina(unique)]` must not alias any other
+///   present slot (readonly or mutable, positional or trailing) and is rejected
+///   with [`PinaProgramError::DuplicateMutableAccount`] regardless of order.
+/// - Omitted optional slots (`None`) never conflict with any other slot,
+///   including another omitted optional slot sharing the `program_id` filler.
+/// - Under `dispatch_entrypoint!`, when the loader walk observes no duplicate
+///   markers (`NON_DUP_MARKER` on every slot), the aliasing check is skipped
+///   entirely on the hot path.
+///
+/// Direct callers of [`AccountsCursor::new`] (and structs containing
+/// hand-written [`ParseAccounts`] fields whose slot counts are not statically
+/// known) use fail-closed forward duplicate checking inside [`Self::next_mut`],
+/// [`Self::next_mut_opt`], and [`Self::remaining_mut_distinct`].
 ///
 /// # Account identity
 ///
@@ -1103,15 +1214,39 @@ pub trait CloseAccountWithRecipient {
 pub struct AccountsCursor<'a> {
 	program_id: Address,
 	remaining: &'a mut [AccountView],
+	check_duplicates: bool,
+}
+
+#[cold]
+fn cold_not_enough_accounts() -> ProgramError {
+	ProgramError::NotEnoughAccountKeys
+}
+
+#[cold]
+fn cold_too_many_accounts() -> ProgramError {
+	PinaProgramError::TooManyAccountKeys.into()
 }
 
 impl<'a> AccountsCursor<'a> {
-	/// Create a cursor over an instruction account slice for the given
-	/// executing program.
+	/// Create a fail-closed cursor over an instruction account slice for the
+	/// given executing program.
+	#[inline(always)]
 	pub fn new(program_id: Address, accounts: &'a mut [AccountView]) -> Self {
 		Self {
 			program_id,
 			remaining: accounts,
+			check_duplicates: true,
+		}
+	}
+
+	/// Internal constructor used after `dispatch_entrypoint!`'s walk or
+	/// [`validate_account_aliasing`] has already proved duplicate safety.
+	#[inline(always)]
+	pub(crate) fn from_verified(program_id: Address, accounts: &'a mut [AccountView]) -> Self {
+		Self {
+			program_id,
+			remaining: accounts,
+			check_duplicates: false,
 		}
 	}
 
@@ -1132,9 +1267,9 @@ impl<'a> AccountsCursor<'a> {
 	#[inline(always)]
 	pub fn next(&mut self) -> Result<&'a AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
-		let (account, rest) = accounts
-			.split_first_mut()
-			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		let Some((account, rest)) = accounts.split_first_mut() else {
+			return Err(cold_not_enough_accounts());
+		};
 		self.remaining = rest;
 
 		Ok(account)
@@ -1149,14 +1284,29 @@ impl<'a> AccountsCursor<'a> {
 	#[inline(always)]
 	pub fn next_mut(&mut self) -> Result<&'a mut AccountView, ProgramError> {
 		let accounts = core::mem::take(&mut self.remaining);
-		let (account, rest) = accounts
-			.split_first_mut()
-			.ok_or(ProgramError::NotEnoughAccountKeys)?;
+		let Some((account, rest)) = accounts.split_first_mut() else {
+			return Err(cold_not_enough_accounts());
+		};
 		self.remaining = rest;
 		validate_writable(*account)?;
-		self.track_mutable_account(*account)?;
+		if self.check_duplicates {
+			self.track_mutable_account(*account)?;
+		}
 
 		Ok(account)
+	}
+
+	#[inline(always)]
+	fn next_opt_account(&mut self) -> Option<&'a mut AccountView> {
+		let accounts = core::mem::take(&mut self.remaining);
+		let (account, rest) = accounts.split_first_mut()?;
+		self.remaining = rest;
+
+		if account.address() == &self.program_id {
+			return None;
+		}
+
+		Some(account)
 	}
 
 	/// Parse the next account as an optional immutable account field.
@@ -1165,18 +1315,9 @@ impl<'a> AccountsCursor<'a> {
 	/// executing program's own address also yields [`None`]; any other address
 	/// is returned as [`Some`]. Optional fields followed by another positional
 	/// field still require the program-address filler when absent.
+	#[inline(always)]
 	pub fn next_opt(&mut self) -> Result<Option<&'a AccountView>, ProgramError> {
-		let accounts = core::mem::take(&mut self.remaining);
-		let Some((account, rest)) = accounts.split_first_mut() else {
-			return Ok(None);
-		};
-		self.remaining = rest;
-
-		if account.address() == &self.program_id {
-			return Ok(None);
-		}
-
-		Ok(Some(account))
+		Ok(self.next_opt_account().map(|account| &*account))
 	}
 
 	/// Parse the next account as an optional mutable account field.
@@ -1184,19 +1325,16 @@ impl<'a> AccountsCursor<'a> {
 	/// Like [`Self::next_mut`], a present account must be marked writable. A
 	/// missing trailing slot or a present slot holding the executing program's
 	/// own address yields [`None`] without a writability requirement.
+	#[inline(always)]
 	pub fn next_mut_opt(&mut self) -> Result<Option<&'a mut AccountView>, ProgramError> {
-		let accounts = core::mem::take(&mut self.remaining);
-		let Some((account, rest)) = accounts.split_first_mut() else {
+		let Some(account) = self.next_opt_account() else {
 			return Ok(None);
 		};
-		self.remaining = rest;
-
-		if account.address() == &self.program_id {
-			return Ok(None);
-		}
 
 		validate_writable(*account)?;
-		self.track_mutable_account(*account)?;
+		if self.check_duplicates {
+			self.track_mutable_account(*account)?;
+		}
 
 		Ok(Some(account))
 	}
@@ -1245,9 +1383,11 @@ impl<'a> AccountsCursor<'a> {
 		let remaining = core::mem::take(&mut self.remaining);
 		for (index, account) in remaining.iter().enumerate() {
 			validate_writable(*account)?;
-			for previous in &remaining[..index] {
-				if previous == account {
-					return Err(PinaProgramError::DuplicateMutableAccount.into());
+			if self.check_duplicates {
+				for previous in &remaining[..index] {
+					if previous == account {
+						return Err(PinaProgramError::DuplicateMutableAccount.into());
+					}
 				}
 			}
 		}
@@ -1256,24 +1396,46 @@ impl<'a> AccountsCursor<'a> {
 	}
 
 	/// Require that no unparsed accounts remain.
+	#[inline(always)]
 	pub fn finish_exact(&self) -> Result<(), ProgramError> {
-		if self.remaining.is_empty() {
+		if pinocchio::hint::likely(self.remaining.is_empty()) {
 			return Ok(());
 		}
 
-		Err(PinaProgramError::TooManyAccountKeys.into())
+		Err(cold_too_many_accounts())
+	}
+
+	/// Enforce a derived child group's static aliasing and `#[pina(unique)]`
+	/// layout when called through an unverified manual cursor (`check_duplicates
+	/// == true`).
+	///
+	/// Derived parents constructed via [`Self::from_verified`] already validated
+	/// the composed layout and set `check_duplicates = false`, so this becomes a
+	/// single skipped check on verified paths.
+	#[doc(hidden)]
+	#[inline(always)]
+	pub fn __validate_child_aliasing<T>(&self) -> ProgramResult
+	where
+		T: ParseAccounts<'a>,
+	{
+		if !self.check_duplicates {
+			return Ok(());
+		}
+
+		let bounded = self
+			.remaining
+			.get(..T::ACCOUNT_LIMIT)
+			.unwrap_or(self.remaining);
+		run_static_alias_check::<T>(&self.program_id, bounded)
 	}
 
 	/// Reject a mutable account that appears again in the cursor's remaining
 	/// slice.
 	///
-	/// This check protects fields parsed individually through [`Self::next_mut`]
-	/// and [`Self::next_mut_opt`]; see the type-level alias rules for why it
-	/// only looks forward. Both callers have already required the account to
-	/// be writable, and a duplicate slot shares its header, so every alias it
-	/// finds is writable too. It does not inspect pairs contained entirely
-	/// within [`Self::remaining_mut`]. [`Self::remaining_mut_distinct`] performs
-	/// that stricter trailing check.
+	/// Used on direct [`AccountsCursor::new`] callers and non-static layouts;
+	/// `#[derive(Accounts)]` structs with static layouts enforce symmetric
+	/// order-independent aliasing via [`validate_account_aliasing`] (or skip it
+	/// altogether when `dispatch_entrypoint!` proves the input is duplicate-free).
 	fn track_mutable_account(&self, account: AccountView) -> Result<(), ProgramError> {
 		for remaining in &*self.remaining {
 			if *remaining == account {
@@ -1283,6 +1445,539 @@ impl<'a> AccountsCursor<'a> {
 
 		Ok(())
 	}
+}
+
+/// Static aliasing metadata computed at compile time by `#[derive(Accounts)]`.
+///
+/// Hand-written [`ParseAccounts`] implementations inherit [`Self::DYNAMIC`],
+/// which falls back to [`AccountsCursor`]'s fail-closed runtime tracking.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct __AliasLayout {
+	/// Whether the masks below completely describe the struct's account layout.
+	pub static_layout: bool,
+	/// Bitmask of positional/optional mutable slots (`&mut` and `Option<&mut>`).
+	pub mut_mask: [u64; 4],
+	/// Bitmask of positional optional slots (`Option<&>` and `Option<&mut>`).
+	pub optional_mask: [u64; 4],
+	/// Bitmask of `#[pina(unique)]` slots.
+	pub unique_mask: [u64; 4],
+	/// Starting index of a trailing mutable `#[pina(remaining)]` slice, or
+	/// `usize::MAX` when absent.
+	pub remaining_mut_start: usize,
+	/// Whether a trailing mutable `#[pina(remaining)]` slice rejects intra-slice
+	/// duplicates.
+	pub remaining_mut_distinct: bool,
+}
+
+impl __AliasLayout {
+	/// Fail-closed default for hand-written [`ParseAccounts`] implementations.
+	pub const DYNAMIC: Self = Self {
+		static_layout: false,
+		mut_mask: [0; 4],
+		optional_mask: [0; 4],
+		unique_mask: [0; 4],
+		remaining_mut_start: usize::MAX,
+		remaining_mut_distinct: true,
+	};
+
+	/// Whether any aliasing violation is statically possible for this layout.
+	#[inline(always)]
+	pub const fn needs_alias_check(&self) -> bool {
+		if !self.static_layout {
+			return false;
+		}
+		let mut_count = __mask256_count_ones(self.mut_mask);
+		mut_count >= 2
+			|| __mask256_any(self.unique_mask)
+			|| (self.remaining_mut_start != usize::MAX
+				&& (mut_count >= 1 || self.remaining_mut_distinct))
+	}
+
+	/// Whether the compact 3-register validator [`validate_mut_aliasing_64`]
+	/// completely covers this layout (no optional mutable accounts, no
+	/// `#[pina(unique)]` slots, no trailing mutable remaining slice, and every
+	/// mutable slot below index 64).
+	#[inline(always)]
+	pub const fn is_simple_mut_64(&self) -> bool {
+		self.remaining_mut_start == usize::MAX
+			&& !__mask256_any(self.unique_mask)
+			&& (self.mut_mask[1] | self.mut_mask[2] | self.mut_mask[3]) == 0
+			&& (self.optional_mask[0] & self.mut_mask[0]) == 0
+	}
+
+	/// Whether the compact 5-register validator
+	/// [`validate_account_aliasing_compact`] completely covers this layout
+	/// (every positional mutable, optional, and `#[pina(unique)]` slot below
+	/// index 32, and either no trailing mutable remaining slice or one starting
+	/// at or below index 32).
+	#[inline(always)]
+	pub const fn is_compact_32(&self) -> bool {
+		(self.remaining_mut_start == usize::MAX || self.remaining_mut_start <= 32)
+			&& ((self.mut_mask[0] | self.optional_mask[0] | self.unique_mask[0]) >> 32) == 0
+			&& (self.mut_mask[1]
+				| self.mut_mask[2]
+				| self.mut_mask[3]
+				| self.optional_mask[1]
+				| self.optional_mask[2]
+				| self.optional_mask[3]
+				| self.unique_mask[1]
+				| self.unique_mask[2]
+				| self.unique_mask[3])
+				== 0
+	}
+}
+
+/// Set bit `index` in a 256-bit mask (no-op if `index >= 256`).
+#[doc(hidden)]
+pub const fn __mask256_with_bit(mut mask: [u64; 4], index: usize) -> [u64; 4] {
+	let word = index >> 6;
+	if word < 4 {
+		mask[word] |= 1_u64 << (index & 63);
+	}
+	mask
+}
+
+/// Shift a 256-bit mask left by `shift` bits and OR it into `dst`.
+#[doc(hidden)]
+pub const fn __mask256_or_shifted(mut dst: [u64; 4], src: [u64; 4], shift: usize) -> [u64; 4] {
+	let mut i = 0;
+	while i < 256 {
+		let src_word = i >> 6;
+		if ((src[src_word] >> (i & 63)) & 1) != 0 {
+			let target = i + shift;
+			let dst_word = target >> 6;
+			if dst_word < 4 {
+				dst[dst_word] |= 1_u64 << (target & 63);
+			}
+		}
+		i += 1;
+	}
+	dst
+}
+
+/// Count set bits in a 256-bit mask.
+#[doc(hidden)]
+pub const fn __mask256_count_ones(mask: [u64; 4]) -> u32 {
+	mask[0].count_ones() + mask[1].count_ones() + mask[2].count_ones() + mask[3].count_ones()
+}
+
+/// Return whether any bit is set in a 256-bit mask.
+#[doc(hidden)]
+pub const fn __mask256_any(mask: [u64; 4]) -> bool {
+	(mask[0] | mask[1] | mask[2] | mask[3]) != 0
+}
+
+#[inline(always)]
+const fn bit_is_set(mask: &[u64; 4], index: usize) -> bool {
+	let word = index >> 6;
+	word < 4 && ((mask[word] >> (index & 63)) & 1) != 0
+}
+
+const ALIAS_OK: u8 = 0;
+const ALIAS_ERR_NOT_WRITABLE: u8 = 1;
+const ALIAS_ERR_DUPLICATE: u8 = 2;
+const COMPACT_NO_REMAINING_MUT: u64 = 0xFF;
+
+/// Compact 3-register aliasing validator for fixed layouts with all mutable
+/// slots below index 64, no optional mutable accounts, no `#[pina(unique)]`
+/// slots, and no trailing mutable `#[pina(remaining)]` slice.
+///
+/// Passes `mut_mask` in a single register (`r3`) instead of emitting a static
+/// [`__AliasLayout`] descriptor in `.rodata`.
+#[doc(hidden)]
+#[inline(never)]
+pub fn validate_mut_aliasing_64(accounts: &[AccountView], mut_mask: u64) -> u8 {
+	let len = accounts.len().min(64);
+	let mut i = 0;
+	let mut mask_i = mut_mask;
+
+	while i < len && mask_i != 0 {
+		if (mask_i & 1) != 0 {
+			let account_i = accounts[i];
+			if !account_i.is_writable() {
+				let _ = validate_writable(account_i);
+				return ALIAS_ERR_NOT_WRITABLE;
+			}
+			let mut j = i + 1;
+			let mut mask_j = mask_i >> 1;
+			while j < len && mask_j != 0 {
+				if (mask_j & 1) != 0 && account_i == accounts[j] {
+					return ALIAS_ERR_DUPLICATE;
+				}
+				j += 1;
+				mask_j >>= 1;
+			}
+		}
+		i += 1;
+		mask_i >>= 1;
+	}
+
+	ALIAS_OK
+}
+
+#[cold]
+#[inline(never)]
+fn address_eq(a: &Address, b: &Address) -> bool {
+	a == b
+}
+
+/// Unified 5-register aliasing validator for layouts with optional mutable
+/// accounts, `#[pina(unique)]` slots, or trailing mutable `#[pina(remaining)]`
+/// slices whose positional indices are `<= 32`.
+///
+/// Packs `mut_mask` (low 32 bits) and `optional_mask` (high 32 bits) into `r4`,
+/// and `unique_mask` (low 32 bits), `remaining_mut_start` (bits `32..40`, with
+/// `0xFF` meaning none), and `remaining_mut_distinct` (bit `40`) into `r5`.
+#[doc(hidden)]
+#[cold]
+#[inline(never)]
+pub fn validate_account_aliasing_compact(
+	program_id: &Address,
+	accounts: &[AccountView],
+	mut_and_opt: u64,
+	unique_and_rem: u64,
+) -> u8 {
+	let mut_mask = mut_and_opt as u32;
+	let opt_mask = (mut_and_opt >> 32) as u32;
+	let unique_mask = unique_and_rem as u32;
+	let rem_start_raw = (unique_and_rem >> 32) & 0xFF;
+	let rem_start = if rem_start_raw == COMPACT_NO_REMAINING_MUT {
+		usize::MAX
+	} else {
+		rem_start_raw as usize
+	};
+	let rem_distinct = ((unique_and_rem >> 40) & 1) != 0;
+
+	let len = accounts.len();
+
+	// Enforce writability precedence before duplicate checks so an earlier
+	// readonly `#[pina(unique)]` slot aliasing a later non-writable mutable
+	// slot still reports `InvalidAccountData` first.
+	let mut k = 0;
+	while k < len {
+		let bit_k = if k < 32 { 1_u32 << k } else { 0 };
+		let mut_k = (mut_mask & bit_k) != 0 || k >= rem_start;
+		if mut_k {
+			let account_k = accounts[k];
+			let omitted_opt =
+				(opt_mask & bit_k) != 0 && address_eq(account_k.address(), program_id);
+			if !omitted_opt && !account_k.is_writable() {
+				let _ = validate_writable(account_k);
+				return ALIAS_ERR_NOT_WRITABLE;
+			}
+		}
+		k += 1;
+	}
+
+	let mut i = 0;
+	while i < len {
+		let account_i = accounts[i];
+		let bit_i = if i < 32 { 1_u32 << i } else { 0 };
+
+		if (opt_mask & bit_i) != 0 && address_eq(account_i.address(), program_id) {
+			i += 1;
+			continue;
+		}
+
+		let mut_i = (mut_mask & bit_i) != 0 || i >= rem_start;
+		let unique_i = (unique_mask & bit_i) != 0;
+		if !mut_i && unique_mask == 0 {
+			i += 1;
+			continue;
+		}
+
+		let mut j = i + 1;
+		while j < len {
+			let account_j = accounts[j];
+			if account_i == account_j {
+				let bit_j = if j < 32 { 1_u32 << j } else { 0 };
+				if (opt_mask & bit_j) == 0 || !address_eq(account_j.address(), program_id) {
+					if unique_i || (unique_mask & bit_j) != 0 {
+						return ALIAS_ERR_DUPLICATE;
+					}
+					let mut_j = (mut_mask & bit_j) != 0 || j >= rem_start;
+					let both_in_rem = i >= rem_start && j >= rem_start;
+					if mut_i && mut_j && (!both_in_rem || rem_distinct) {
+						return ALIAS_ERR_DUPLICATE;
+					}
+				}
+			}
+			j += 1;
+		}
+
+		i += 1;
+	}
+
+	ALIAS_OK
+}
+
+/// Order-independent aliasing validator fallback for layouts with positional
+/// slots beyond index 31.
+///
+/// Returns a compact `u8` status code (`0` = ok, `1` = not writable, `2` =
+/// duplicate) instead of `ProgramResult` so callers fold the two concrete
+/// `ProgramError` variants inline without pulling `ProgramError::into`'s full
+/// switch tree into the entrypoint.
+///
+/// Runs before [`ParseAccounts::parse_accounts`] creates individual `&mut
+/// AccountView` borrows, keeping all access in safe Rust without aliasing live
+/// mutable references:
+///
+/// 1. Any present mutable slot whose runtime account is not writable fails with
+///    `InvalidAccountData` first (preserving exact error precedence).
+/// 2. Any pair of present mutable slots aliasing the same runtime account fails
+///    with `DuplicateMutableAccount`, unless both lie inside a trailing
+///    `#[pina(remaining, distinct = false)]` slice.
+/// 3. Any present `#[pina(unique)]` slot aliasing any other present slot
+///    (readonly or mutable, positional or trailing) fails with
+///    `DuplicateMutableAccount`.
+/// 4. Omitted optional slots (`is_optional(i) && accounts[i].address() ==
+///    program_id`) are absent (`None`) and never conflict with any other slot.
+/// 5. Present readonly + mutable pairs are allowed symmetrically regardless of
+///    field order; runtime [`Ref`]/[`RefMut`] borrow guards enforce data safety.
+#[doc(hidden)]
+#[inline(never)]
+pub fn validate_account_aliasing(
+	program_id: &Address,
+	accounts: &[AccountView],
+	account_limit: usize,
+	layout: &__AliasLayout,
+) -> u8 {
+	let limit = accounts.len().min(account_limit);
+
+	// Enforce writability precedence before duplicate checks so an earlier
+	// readonly `#[pina(unique)]` slot aliasing a later non-writable mutable
+	// slot still reports `InvalidAccountData` first.
+	let mut k = 0;
+	while k < limit {
+		let mut_k = bit_is_set(&layout.mut_mask, k) || k >= layout.remaining_mut_start;
+		if mut_k {
+			let account_k = accounts[k];
+			let omitted_opt =
+				bit_is_set(&layout.optional_mask, k) && account_k.address() == program_id;
+			if !omitted_opt && !account_k.is_writable() {
+				let _ = validate_writable(account_k);
+				return ALIAS_ERR_NOT_WRITABLE;
+			}
+		}
+		k += 1;
+	}
+
+	let mut i = 0;
+	while i < limit {
+		let account_i = accounts[i];
+		if bit_is_set(&layout.optional_mask, i) && account_i.address() == program_id {
+			i += 1;
+			continue;
+		}
+
+		let mut_i = bit_is_set(&layout.mut_mask, i) || i >= layout.remaining_mut_start;
+		let unique_i = bit_is_set(&layout.unique_mask, i);
+
+		let mut j = i + 1;
+		while j < limit {
+			let account_j = accounts[j];
+			if bit_is_set(&layout.optional_mask, j) && account_j.address() == program_id {
+				j += 1;
+				continue;
+			}
+
+			if account_i == account_j {
+				if unique_i || bit_is_set(&layout.unique_mask, j) {
+					return ALIAS_ERR_DUPLICATE;
+				}
+				let mut_j = bit_is_set(&layout.mut_mask, j) || j >= layout.remaining_mut_start;
+				let both_in_remaining =
+					i >= layout.remaining_mut_start && j >= layout.remaining_mut_start;
+				if mut_i && mut_j && (!both_in_remaining || layout.remaining_mut_distinct) {
+					return ALIAS_ERR_DUPLICATE;
+				}
+			}
+
+			j += 1;
+		}
+
+		i += 1;
+	}
+
+	ALIAS_OK
+}
+
+#[cold]
+fn reject_duplicate_pair(account: AccountView) -> u8 {
+	if !account.is_writable() {
+		let _ = validate_writable(account);
+		return ALIAS_ERR_NOT_WRITABLE;
+	}
+
+	ALIAS_ERR_DUPLICATE
+}
+
+const fn nth_set_bit(mut mask: u64, mut n: usize) -> usize {
+	while n > 0 {
+		mask &= mask.wrapping_sub(1);
+		n -= 1;
+	}
+	mask.trailing_zeros() as usize
+}
+
+#[inline(always)]
+fn run_static_alias_check<'a, T: ParseAccounts<'a>>(
+	program_id: &Address,
+	accounts: &[AccountView],
+) -> ProgramResult {
+	let status = if const {
+		T::ALIAS_LAYOUT.is_simple_mut_64() && T::ALIAS_LAYOUT.mut_mask[0].count_ones() == 2
+	} {
+		let idx_a = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 0) };
+		let idx_b = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 1) };
+		// Writability for distinct accounts is enforced left-to-right by
+		// `parse_accounts`; only check writability here when `a == b` so an
+		// aliased read-only account still reports `InvalidAccountData` first.
+		if let Some(&account_a) = accounts.get(idx_a)
+			&& let Some(&account_b) = accounts.get(idx_b)
+			&& account_a == account_b
+		{
+			reject_duplicate_pair(account_a)
+		} else {
+			ALIAS_OK
+		}
+	} else if const {
+		T::ALIAS_LAYOUT.is_simple_mut_64() && T::ALIAS_LAYOUT.mut_mask[0].count_ones() == 3
+	} {
+		let idx_a = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 0) };
+		let idx_b = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 1) };
+		let idx_c = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 2) };
+		if let Some(&a) = accounts.get(idx_a)
+			&& let Some(&b) = accounts.get(idx_b)
+			&& let Some(&c) = accounts.get(idx_c)
+			&& a != b && a != c
+			&& b != c
+		{
+			ALIAS_OK
+		} else {
+			validate_mut_aliasing_64(accounts, const { T::ALIAS_LAYOUT.mut_mask[0] })
+		}
+	} else if const {
+		T::ALIAS_LAYOUT.is_simple_mut_64() && T::ALIAS_LAYOUT.mut_mask[0].count_ones() == 4
+	} {
+		let idx_a = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 0) };
+		let idx_b = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 1) };
+		let idx_c = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 2) };
+		let idx_d = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 3) };
+		if let Some(&a) = accounts.get(idx_a)
+			&& let Some(&b) = accounts.get(idx_b)
+			&& let Some(&c) = accounts.get(idx_c)
+			&& let Some(&d) = accounts.get(idx_d)
+			&& a != b && a != c
+			&& a != d && b != c
+			&& b != d && c != d
+		{
+			ALIAS_OK
+		} else {
+			validate_mut_aliasing_64(accounts, const { T::ALIAS_LAYOUT.mut_mask[0] })
+		}
+	} else if const { T::ALIAS_LAYOUT.is_simple_mut_64() } {
+		validate_mut_aliasing_64(accounts, const { T::ALIAS_LAYOUT.mut_mask[0] })
+	} else if const { T::ALIAS_LAYOUT.is_compact_32() } {
+		let bounded = accounts.get(..T::ACCOUNT_LIMIT).unwrap_or(accounts);
+		let mut_and_opt = const {
+			(T::ALIAS_LAYOUT.mut_mask[0] & 0xFFFF_FFFF)
+				| ((T::ALIAS_LAYOUT.optional_mask[0] & 0xFFFF_FFFF) << 32)
+		};
+		let unique_and_rem = const {
+			let rem_byte = if T::ALIAS_LAYOUT.remaining_mut_start == usize::MAX {
+				COMPACT_NO_REMAINING_MUT
+			} else {
+				T::ALIAS_LAYOUT.remaining_mut_start as u64
+			};
+			let distinct_bit = (T::ALIAS_LAYOUT.remaining_mut_distinct as u64) << 40;
+			(T::ALIAS_LAYOUT.unique_mask[0] & 0xFFFF_FFFF) | (rem_byte << 32) | distinct_bit
+		};
+		validate_account_aliasing_compact(program_id, bounded, mut_and_opt, unique_and_rem)
+	} else {
+		validate_account_aliasing(program_id, accounts, T::ACCOUNT_LIMIT, &T::ALIAS_LAYOUT)
+	};
+
+	match status {
+		ALIAS_OK => Ok(()),
+		ALIAS_ERR_NOT_WRITABLE => Err(ProgramError::InvalidAccountData),
+		_ => Err(PinaProgramError::DuplicateMutableAccount.into()),
+	}
+}
+
+/// Internal entry point generated by `#[derive(Accounts)]` for
+/// [`TryFromAccountInfos::try_from_account_infos`].
+#[doc(hidden)]
+#[inline(always)]
+pub fn __parse_derived_accounts<'a, T, const FINISH_EXACT: bool>(
+	program_id: &Address,
+	accounts: &'a mut [AccountView],
+) -> Result<T, ProgramError>
+where
+	T: ParseAccounts<'a>,
+{
+	let mut cursor = if const { T::ALIAS_LAYOUT.static_layout } {
+		if const { T::ALIAS_LAYOUT.needs_alias_check() } {
+			run_static_alias_check::<T>(program_id, accounts)?;
+		}
+		AccountsCursor::from_verified(*program_id, accounts)
+	} else {
+		AccountsCursor::new(*program_id, accounts)
+	};
+
+	let parsed = T::parse_accounts(&mut cursor)?;
+	if FINISH_EXACT {
+		cursor.finish_exact()?;
+	}
+
+	Ok(parsed)
+}
+
+/// Internal entry point generated by `#[derive(Accounts)]` for
+/// [`TryFromAccountInfos::try_from_route`].
+///
+/// Consumes the sealed [`crate::RouteAccounts`] returned by
+/// [`crate::EntrypointInput::parse_route`]: skips aliasing validation whenever
+/// the loader walk saw no duplicate that can violate this layout (`DUP_ANY_MASK`
+/// when `#[pina(unique)]` slots are present, `DUP_WRITABLE_MASK` otherwise).
+#[doc(hidden)]
+#[inline(always)]
+pub fn __parse_derived_route<'a, T, const FINISH_EXACT: bool>(
+	program_id: &Address,
+	route: crate::RouteAccounts<'a>,
+) -> Result<T, ProgramError>
+where
+	T: ParseAccounts<'a>,
+{
+	let (accounts, dup_flags) = route.into_parts();
+	let mut cursor = if const { T::ALIAS_LAYOUT.static_layout } {
+		let required_dup_mask = const {
+			if __mask256_any(T::ALIAS_LAYOUT.unique_mask) {
+				crate::entry::DUP_ANY_MASK
+			} else {
+				crate::entry::DUP_WRITABLE_MASK
+			}
+		};
+		if const { T::ALIAS_LAYOUT.needs_alias_check() }
+			&& pinocchio::hint::unlikely((dup_flags & required_dup_mask) != 0)
+		{
+			run_static_alias_check::<T>(program_id, accounts)?;
+		}
+		AccountsCursor::from_verified(*program_id, accounts)
+	} else if pinocchio::hint::unlikely((dup_flags & crate::entry::DUP_ANY_MASK) != 0) {
+		AccountsCursor::new(*program_id, accounts)
+	} else {
+		AccountsCursor::from_verified(*program_id, accounts)
+	};
+
+	let parsed = T::parse_accounts(&mut cursor)?;
+	if FINISH_EXACT {
+		cursor.finish_exact()?;
+	}
+
+	Ok(parsed)
 }
 
 /// Cursor-based parser for typed account structs.
@@ -1333,6 +2028,12 @@ pub trait ParseAccounts<'a>: Sized {
 	/// maximum instead of being trusted as a capacity.
 	const UNBOUNDED: usize = usize::MAX;
 
+	/// Static aliasing metadata computed by `#[derive(Accounts)]`.
+	///
+	/// Hand-written parsers keep [`__AliasLayout::DYNAMIC`] (fail-closed).
+	#[doc(hidden)]
+	const ALIAS_LAYOUT: __AliasLayout = __AliasLayout::DYNAMIC;
+
 	/// Parse accounts from the cursor, preserving user-authored validation for
 	/// later instruction processing.
 	fn parse_accounts(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError>;
@@ -1375,6 +2076,15 @@ pub trait ParseAccounts<'a>: Sized {
 /// let accounts = InitEscrow::try_from_account_infos(program_id, accounts)?;
 /// ```
 pub trait TryFromAccountInfos<'a>: Sized {
+	/// Whether this implementation is generated by `#[derive(Accounts)]` and
+	/// opts into `dispatch_entrypoint!`'s [`Self::try_from_route`] fast path.
+	///
+	/// Handwritten implementations inherit `false`, keeping `dispatch_entrypoint!`
+	/// on the same `TryFrom<(&Address, &mut [AccountView])>` conversion used by
+	/// slice-based routers.
+	#[doc(hidden)]
+	const __USES_DERIVED_ROUTE: bool = false;
+
 	/// Convert the raw instruction account slice into a typed accounts struct.
 	///
 	/// Implementations should validate account order, count, and invariants
@@ -1383,6 +2093,20 @@ pub trait TryFromAccountInfos<'a>: Sized {
 		program_id: &Address,
 		accounts: &'a mut [AccountView],
 	) -> Result<Self, ProgramError>;
+
+	/// Route-aware parser used by `dispatch_entrypoint!`.
+	///
+	/// Manual implementations inherit the fail-closed fallback through
+	/// [`Self::try_from_account_infos`]. `#[derive(Accounts)]` overrides this to
+	/// consume the loader walk's duplicate-free witness.
+	#[doc(hidden)]
+	#[inline(always)]
+	fn try_from_route(
+		program_id: &Address,
+		route: crate::RouteAccounts<'a>,
+	) -> Result<Self, ProgramError> {
+		Self::try_from_account_infos(program_id, route.into_accounts())
+	}
 }
 
 /// Instruction processor.
@@ -2066,5 +2790,14 @@ mod tests {
 			RecordingAccounts::try_from_account_infos(&Address::default(), &mut no_accounts)
 				.is_err()
 		);
+	}
+
+	#[test]
+	fn nth_set_bit_extracts_ordered_bit_indices() {
+		let mask = (1_u64 << 2) | (1_u64 << 5) | (1_u64 << 11) | (1_u64 << 40);
+		assert_eq!(nth_set_bit(mask, 0), 2);
+		assert_eq!(nth_set_bit(mask, 1), 5);
+		assert_eq!(nth_set_bit(mask, 2), 11);
+		assert_eq!(nth_set_bit(mask, 3), 40);
 	}
 }

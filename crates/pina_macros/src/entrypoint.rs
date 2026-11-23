@@ -289,11 +289,20 @@ pub(crate) fn expand(
 				let mut slots = [const {
 					::core::mem::MaybeUninit::<#crate_path::AccountView>::uninit()
 				}; SLOTS];
-				let accounts = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-				let __pina_accounts = <#accounts as ::core::convert::TryFrom<(
-					& #crate_path::Address,
-					&mut [#crate_path::AccountView],
-				)>>::try_from((program_id, accounts))?;
+				let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
+				let __pina_accounts = if const {
+					<#accounts as #crate_path::TryFromAccountInfos>::__USES_DERIVED_ROUTE
+				} {
+					<#accounts as #crate_path::TryFromAccountInfos>::try_from_route(
+						program_id,
+						route,
+					)?
+				} else {
+					<#accounts as ::core::convert::TryFrom<(
+						&#crate_path::Address,
+						&mut [#crate_path::AccountView],
+					)>>::try_from((program_id, route.into_accounts()))?
+				};
 
 				#(#versioned)*
 				<#accounts as #crate_path::ProcessAccountInfos>::process(__pina_accounts, data)

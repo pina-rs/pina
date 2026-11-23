@@ -76,7 +76,7 @@ pub(crate) const PINA_PROGRAM_ERRORS: &[(&str, u32, &str)] = &[
 	(
 		"DuplicateMutableAccount",
 		DUPLICATE_MUTABLE_ACCOUNT,
-		"Two mutable account fields point at the same runtime account.",
+		"Two mutable account fields, two entries within a distinct mutable `#[pina(remaining)]` slice, or a `#[pina(unique)]` field and another present account field or remaining entry point at the same runtime account.",
 	),
 	(
 		"DataTooShort",

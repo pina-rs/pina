@@ -743,18 +743,14 @@ mod executor {
 			.invoke_signed(self.signers)
 		}
 
-		/// Apply one planned transition. Only reachable after the first
-		/// effect, so every failure aborts the instruction.
-		fn complete_step_after_effect<T>(&mut self, step: &mut PlannedStep<T::Plan>)
-		where
-			T: MigratableAccount,
-		{
-			if step.funding > 0 {
-				finish_after_mutation(self.execute_funding_transfer(step.funding));
+		#[inline(never)]
+		fn prepare_working_buffer(&mut self, funding: u64, working_size: usize) {
+			if funding > 0 {
+				finish_after_mutation(self.execute_funding_transfer(funding));
 			}
-			if step.working_size > self.account.data_len() {
+			if working_size > self.account.data_len() {
 				let old_len = self.account.data_len();
-				finish_after_mutation(self.account.resize(step.working_size));
+				finish_after_mutation(self.account.resize(working_size));
 				// Zero-fill the grown region before the transition runs so a
 				// hand-written transition that skips an added field commits
 				// zeros, never the account's own realloc residue. This mirrors
@@ -763,6 +759,36 @@ mod executor {
 				let mut data = finish_after_mutation(self.account.try_borrow_mut());
 				data[old_len..].fill(0);
 			}
+		}
+
+		#[inline(never)]
+		fn apply_first_effect(&mut self, funding: &mut u64, working_size: usize) -> ProgramResult {
+			if *funding > 0 {
+				// The transfer is the first effect; its failure leaves the
+				// account untouched and stays catchable, so the planned
+				// funding is rolled back. Everything after it runs through
+				// the aborting tail.
+				if let Err(error) = self.execute_funding_transfer(*funding) {
+					self.transferred = self.transferred.saturating_sub(*funding);
+					return Err(error);
+				}
+				*funding = 0;
+			} else if working_size > self.account.data_len() {
+				// The resize is the first effect; its failure also leaves the
+				// account untouched. The tail's own size check then skips it.
+				self.account.resize(working_size)?;
+			}
+
+			Ok(())
+		}
+
+		/// Apply one planned transition. Only reachable after the first
+		/// effect, so every failure aborts the instruction.
+		fn complete_step_after_effect<T>(&mut self, step: &mut PlannedStep<T::Plan>)
+		where
+			T: MigratableAccount,
+		{
+			self.prepare_working_buffer(step.funding, step.working_size);
 			if let Some(payload) = step.payload.take() {
 				let mut data = finish_after_mutation(self.account.try_borrow_mut());
 				T::apply_migration(payload, &mut data);
@@ -805,21 +831,8 @@ mod executor {
 			T: MigratableAccount,
 		{
 			let mut step = plan_next_step::<T>(&mut self.ctx)?;
-			if step.funding > 0 {
-				// The transfer is the first effect; its failure leaves the
-				// account untouched and stays catchable, so the planned
-				// funding is rolled back. Everything after it runs through
-				// the aborting tail.
-				if let Err(error) = self.ctx.execute_funding_transfer(step.funding) {
-					self.ctx.transferred = self.ctx.transferred.saturating_sub(step.funding);
-					return Err(error);
-				}
-				step.funding = 0;
-			} else if step.working_size > self.ctx.account.data_len() {
-				// The resize is the first effect; its failure also leaves the
-				// account untouched. The tail's own size check then skips it.
-				self.ctx.account.resize(step.working_size)?;
-			}
+			self.ctx
+				.apply_first_effect(&mut step.funding, step.working_size)?;
 
 			let mut mutating = Mutating { ctx: self.ctx };
 			mutating.ctx.complete_step_after_effect::<T>(&mut step);

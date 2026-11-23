@@ -72,6 +72,65 @@ const MAX_CPI_SIGNERS: usize = 16;
 const SMALL_SEED_CAPACITY: usize = 4;
 const MEDIUM_SEED_CAPACITY: usize = 8;
 
+/// Maximum permitted account data length on Solana (10 MiB), matching
+/// `pinocchio::sysvars::rent::Rent::try_minimum_balance`.
+#[cfg(feature = "const-rent")]
+const MAX_PERMITTED_DATA_LENGTH: u64 = 10 * 1024 * 1024;
+
+/// Return a [`Rent`] configured with Pinocchio's compile-time
+/// [`DEFAULT_LAMPORTS_PER_BYTE`](pinocchio::sysvars::rent::DEFAULT_LAMPORTS_PER_BYTE)
+/// constant (`6_960` lamports/byte, `ACCOUNT_STORAGE_OVERHEAD = 128`).
+///
+/// Pass this value to any builder's `invoke_signed_with_rent` method to skip
+/// the `sol_get_sysvar` syscall (~100 CU) and let LLVM constant-fold fixed
+/// account rent balances into immediate values.
+///
+/// **Important**: This uses the legacy fixed `6_960` lamports/byte default and
+/// does **not** track live cluster rent reductions (such as SIMD-0437, which
+/// stepped mainnet down to `5_080` lamports/byte and lowers it further in
+/// subsequent steps). Using this helper on a cluster with a lower rent rate
+/// overfunds newly created accounts (the excess remains recoverable on close)
+/// and can reduce or suppress shrink refunds. When exact cluster rent is
+/// required, call `Rent::get()?` once per instruction and pass `&rent` to
+/// `invoke_signed_with_rent`.
+#[cfg(feature = "const-rent")]
+#[inline(always)]
+#[allow(unsafe_code)]
+pub fn default_rent() -> Rent {
+	const {
+		assert!(size_of::<Rent>() == size_of::<u64>());
+	}
+	let bytes = pinocchio::sysvars::rent::DEFAULT_LAMPORTS_PER_BYTE.to_le_bytes();
+	// SAFETY: `Rent` is a `#[repr(C)]` wrapper around `u64` (`lamports_per_byte`),
+	// verified by the compile-time size assertion above, and `bytes` holds the
+	// exact 8-byte little-endian encoding of `DEFAULT_LAMPORTS_PER_BYTE`.
+	unsafe { Rent::from_bytes_unchecked(&bytes) }
+}
+
+/// Compute the rent-exempt minimum balance in lamports for `space` bytes using
+/// Pinocchio's legacy compile-time rent constants (`(128 + space) * 6_960`).
+///
+/// This does **not** track live cluster rent reductions (such as SIMD-0437);
+/// use `Rent::get()?.try_minimum_balance(space)` when exact live cluster rent
+/// is required.
+///
+/// Rejects `space > 10 MiB` (`MAX_PERMITTED_DATA_LENGTH`) with
+/// [`ProgramError::InvalidArgument`], matching
+/// [`Rent::try_minimum_balance`].
+#[cfg(feature = "const-rent")]
+#[inline(always)]
+pub const fn minimum_balance_const(space: usize) -> Result<u64, ProgramError> {
+	let space_u64 = space as u64;
+	if space_u64 > MAX_PERMITTED_DATA_LENGTH {
+		return Err(ProgramError::InvalidArgument);
+	}
+
+	Ok(
+		(pinocchio::sysvars::rent::ACCOUNT_STORAGE_OVERHEAD + space_u64)
+			* pinocchio::sysvars::rent::DEFAULT_LAMPORTS_PER_BYTE,
+	)
+}
+
 #[inline(always)]
 fn canonical_pda(
 	account: &AccountView,
@@ -133,7 +192,7 @@ impl CompactCreationTarget<'_, '_, '_, '_> {
 	{
 		self.allocate_zeroed(signers, rent)?;
 		let mut data = self.account.try_borrow_mut()?;
-		let encoded_len = T::initialize(&mut data, patch).inspect_err(|_| {
+		let encoded_len = T::__initialize_zeroed(&mut data, patch).inspect_err(|_| {
 			data.fill(0);
 		})?;
 		debug_assert!(encoded_len <= data.len());
@@ -230,14 +289,12 @@ impl CreateAccount<'_, '_> {
 		self.invoke_signed_inner(signers, None, space)
 	}
 
-	#[cfg(test)]
+	/// Creates the account with additional PDA signer seeds and a caller-supplied
+	/// [`Rent`] value, avoiding an extra `Rent` sysvar syscall when creating
+	/// multiple accounts in one instruction.
 	#[inline(always)]
-	fn invoke_signed_with_rent(
-		&self,
-		signers: &[Signer<'_, '_>],
-		rent: Rent,
-		space: usize,
-	) -> ProgramResult {
+	pub fn invoke_signed_with_rent(&self, signers: &[Signer<'_, '_>], rent: Rent) -> ProgramResult {
+		let space = usize::try_from(self.space).map_err(|_| ProgramError::InvalidArgument)?;
 		self.invoke_signed_inner(signers, Some(rent), space)
 	}
 
@@ -438,9 +495,11 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 		self.invoke_signed_inner::<true, T, _>(signers, None, initialize)
 	}
 
-	#[cfg(test)]
+	/// Creates the account with additional PDA signers and a caller-supplied
+	/// [`Rent`] value, avoiding an extra `Rent` sysvar syscall when creating
+	/// multiple accounts in one instruction.
 	#[inline(always)]
-	fn invoke_signed_with_rent<T: PinaAccount>(
+	pub fn invoke_signed_with_rent<T: PinaAccount>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
@@ -448,9 +507,23 @@ impl CreateProgramAccount<'_, '_, '_, '_> {
 		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), |_, _bump| Ok(()))
 	}
 
-	#[cfg(test)]
+	/// Creates the account with additional PDA signers, a caller-supplied
+	/// [`Rent`] value, and an initializer closure receiving the canonical bump.
 	#[inline(always)]
-	fn invoke_signed_with_rent_fresh_bump<T: PinaAccount>(
+	pub fn invoke_signed_with_rent_and_bump<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+		initialize: impl FnOnce(&mut T::Zc, u8) -> Result<(), PinaPodError>,
+	) -> Result<(Address, u8), ProgramError> {
+		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), initialize)
+	}
+
+	/// Creates a fresh account (rejecting pre-funded targets) with additional
+	/// PDA signers, a caller-supplied [`Rent`] value, and an initializer closure
+	/// receiving the canonical bump.
+	#[inline(always)]
+	pub fn invoke_signed_with_rent_fresh_bump<T: PinaAccount>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
@@ -605,14 +678,28 @@ impl CreateProgramAccountWithBump<'_, '_, '_, '_> {
 		self.invoke_signed_inner::<true, T, _>(signers, None, initialize)
 	}
 
-	#[cfg(test)]
+	/// Creates the account with additional PDA signers and a caller-supplied
+	/// [`Rent`] value, avoiding an extra `Rent` sysvar syscall when creating
+	/// multiple accounts in one instruction.
 	#[inline(always)]
-	fn invoke_signed_with_rent<T: PinaAccount>(
+	pub fn invoke_signed_with_rent<T: PinaAccount>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
 	) -> ProgramResult {
 		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), |_| Ok(()))
+	}
+
+	/// Creates the account with additional PDA signers, a caller-supplied
+	/// [`Rent`] value, and an initializer closure.
+	#[inline(always)]
+	pub fn invoke_signed_with_rent_with<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), initialize)
 	}
 
 	#[inline(always)]
@@ -793,14 +880,28 @@ impl CreateProgramAccountWithUncheckedBump<'_, '_, '_, '_> {
 		self.invoke_signed_inner::<true, T, _>(signers, None, initialize)
 	}
 
-	#[cfg(test)]
+	/// Creates the account with additional PDA signers and a caller-supplied
+	/// [`Rent`] value, avoiding an extra `Rent` sysvar syscall when creating
+	/// multiple accounts in one instruction.
 	#[inline(always)]
-	fn invoke_signed_with_rent<T: PinaAccount>(
+	pub fn invoke_signed_with_rent<T: PinaAccount>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
 	) -> ProgramResult {
 		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), |_| Ok(()))
+	}
+
+	/// Creates the account with additional PDA signers, a caller-supplied
+	/// [`Rent`] value, and an initializer closure.
+	#[inline(always)]
+	pub fn invoke_signed_with_rent_with<T: PinaAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+		initialize: impl FnOnce(&mut T::Zc) -> Result<(), PinaPodError>,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<false, T, _>(signers, Some(rent), initialize)
 	}
 
 	#[inline(always)]
@@ -881,7 +982,7 @@ impl PdaCreationTarget<'_, '_, '_, '_> {
 		self.allocate::<FRESH>(verification, size_of::<T::Zc>() as u64, signers, rent)?;
 
 		let mut data = self.account.try_borrow_mut()?;
-		<T as PinaAccount>::initialize(&mut data, initialize)?;
+		<T as PinaAccount>::__initialize_zeroed(&mut data, initialize)?;
 
 		Ok(())
 	}
@@ -1018,8 +1119,10 @@ impl CreateCompactProgramAccount<'_, '_, '_, '_> {
 		self.invoke_signed_inner::<T, _>(signers, None, patch)
 	}
 
-	#[cfg(test)]
-	fn invoke_signed_with_rent<T, P>(
+	/// Creates the compact account with additional payer signer seeds and a
+	/// caller-supplied [`Rent`] value, passing the canonical bump to the patch
+	/// factory.
+	pub fn invoke_signed_with_rent<T, P>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
@@ -1141,8 +1244,9 @@ impl<P> CreateCompactProgramAccountWithBump<'_, '_, '_, '_, P> {
 		self.invoke_signed_inner_validated::<T>(signers, rent)
 	}
 
-	#[cfg(test)]
-	fn invoke_signed_with_rent<T>(
+	/// Creates and initializes the compact account with extra payer signers and
+	/// a caller-supplied [`Rent`] value.
+	pub fn invoke_signed_with_rent<T>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
@@ -1257,9 +1361,10 @@ impl AllocateAccount<'_, '_, '_, '_> {
 		self.invoke_signed_inner(signers, None)
 	}
 
-	#[cfg(test)]
+	/// Allocates the account using the canonical PDA bump, additional signers,
+	/// and a caller-supplied [`Rent`] value.
 	#[inline(always)]
-	fn invoke_signed_with_rent(
+	pub fn invoke_signed_with_rent(
 		&self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
@@ -1510,9 +1615,10 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		self.invoke_signed_inner::<false>(signers, None)
 	}
 
-	#[cfg(test)]
+	/// Allocates the account with its derived PDA signer, additional signers,
+	/// and a caller-supplied [`Rent`] value.
 	#[inline(always)]
-	fn invoke_signed_with_rent(&self, signers: &[Signer<'_, '_>], rent: Rent) -> ProgramResult {
+	pub fn invoke_signed_with_rent(&self, signers: &[Signer<'_, '_>], rent: Rent) -> ProgramResult {
 		self.invoke_signed_inner::<false>(signers, Some(rent))
 	}
 
@@ -1531,48 +1637,24 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		}
 
 		if self.seeds.len() < SMALL_SEED_CAPACITY {
-			self.derive_and_allocate::<FRESH, SMALL_SEED_CAPACITY, { SMALL_SEED_CAPACITY + 2 }>(
-				signers, rent,
-			)
+			self.allocate_with_seed_capacity::<
+				FRESH,
+				true,
+				SMALL_SEED_CAPACITY,
+				{ SMALL_SEED_CAPACITY + 2 },
+			>(signers, rent)
 		} else if self.seeds.len() < MEDIUM_SEED_CAPACITY {
-			self.derive_and_allocate::<FRESH, MEDIUM_SEED_CAPACITY, { MEDIUM_SEED_CAPACITY + 2 }>(
+			self.allocate_with_seed_capacity::<
+				FRESH,
+				true,
+				MEDIUM_SEED_CAPACITY,
+				{ MEDIUM_SEED_CAPACITY + 2 },
+			>(signers, rent)
+		} else {
+			self.allocate_with_seed_capacity::<FRESH, true, MAX_SEEDS, { MAX_SEEDS + 2 }>(
 				signers, rent,
 			)
-		} else {
-			self.derive_and_allocate::<FRESH, MAX_SEEDS, { MAX_SEEDS + 2 }>(signers, rent)
 		}
-	}
-
-	/// Checks that `seeds` and `bump` derive the target address, then
-	/// allocates it. The caller guarantees `seeds.len() < CAPACITY`,
-	/// `HASH_INPUTS == CAPACITY + 2`, and `signers.len() < MAX_CPI_SIGNERS`.
-	///
-	/// The check hashes the seeds, bump, owner, and PDA marker with `sha256`
-	/// instead of calling `sol_create_program_address`, about 1,350 compute
-	/// units cheaper. It skips only the ed25519 curve check, which the runtime
-	/// repeats: the allocation signs for this address through `invoke_signed`
-	/// with the same seeds and bump, and the runtime refuses to sign for an
-	/// on-curve address.
-	#[inline(always)]
-	fn derive_and_allocate<const FRESH: bool, const CAPACITY: usize, const HASH_INPUTS: usize>(
-		&self,
-		signers: &[Signer<'_, '_>],
-		rent: Option<Rent>,
-	) -> ProgramResult {
-		let bump_array = [self.bump];
-		let mut hash_inputs: [&[u8]; HASH_INPUTS] = [&[]; HASH_INPUTS];
-
-		if !crate::pda::hashes_to_program_address(
-			self.account.address(),
-			self.seeds,
-			&bump_array,
-			self.owner,
-			&mut hash_inputs,
-		) {
-			return Err(ProgramError::InvalidSeeds);
-		}
-
-		self.allocate_with_seed_capacity::<FRESH, CAPACITY>(signers, rent)
 	}
 
 	#[inline(always)]
@@ -1590,11 +1672,21 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 		}
 
 		if self.seeds.len() < SMALL_SEED_CAPACITY {
-			self.allocate_with_seed_capacity::<FRESH, SMALL_SEED_CAPACITY>(signers, rent)
+			self.allocate_with_seed_capacity::<
+				FRESH,
+				false,
+				SMALL_SEED_CAPACITY,
+				SMALL_SEED_CAPACITY,
+			>(signers, rent)
 		} else if self.seeds.len() < MEDIUM_SEED_CAPACITY {
-			self.allocate_with_seed_capacity::<FRESH, MEDIUM_SEED_CAPACITY>(signers, rent)
+			self.allocate_with_seed_capacity::<
+				FRESH,
+				false,
+				MEDIUM_SEED_CAPACITY,
+				MEDIUM_SEED_CAPACITY,
+			>(signers, rent)
 		} else {
-			self.allocate_with_seed_capacity::<FRESH, MAX_SEEDS>(signers, rent)
+			self.allocate_with_seed_capacity::<FRESH, false, MAX_SEEDS, MAX_SEEDS>(signers, rent)
 		}
 	}
 
@@ -1623,53 +1715,121 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 			return Err(ProgramError::InvalidSeeds);
 		}
 
-		self.allocate_with_seed_capacity::<FRESH, MAX_SEEDS>(signers, rent)
+		self.allocate_with_seed_capacity::<FRESH, false, MAX_SEEDS, MAX_SEEDS>(signers, rent)
 	}
 
-	/// Allocates the target, signing for it with `seeds` plus `bump`. The
-	/// caller guarantees `seeds.len() < CAPACITY` and
-	/// `signers.len() < MAX_CPI_SIGNERS`.
+	/// Optionally verifies that `seeds` and `bump` hash to the target address
+	/// (`VERIFY_PDA`), then allocates the target signing for it with `seeds`
+	/// plus `bump`.
+	///
+	/// The caller guarantees `seeds.len() < CAPACITY`,
+	/// `SEED_SLOTS >= CAPACITY + 2` when `VERIFY_PDA` is true (else
+	/// `SEED_SLOTS >= CAPACITY`), and `signers.len() < MAX_CPI_SIGNERS`.
+	///
+	/// When `VERIFY_PDA` is true, on SBF targets a single `MaybeUninit<Seed>`
+	/// buffer feeds both `sol_sha256` (`0..seeds.len() + 3`) and
+	/// `Signer::from` (`0..seeds.len() + 1`), eliminating duplicate seed-array
+	/// stack initialization. The hash check skips only the ed25519 curve check,
+	/// which the runtime repeats during `invoke_signed` (refusing to sign for
+	/// any on-curve address).
 	///
 	/// `FRESH` selects the zero-lamport path: it rejects a target that already
 	/// holds lamports and creates a fresh one with a single `CreateAccount`
 	/// call. The permissive path uses `CreateAccountAllowPrefund` for both
 	/// account states, so `FRESH` compiles that instruction out.
 	#[inline(always)]
-	// Same `[..len + 1]` rationale as `derive_and_allocate` above; both
-	// guarantees in the doc comment bound the `+ 1`.
-	#[allow(clippy::range_plus_one)]
-	fn allocate_with_seed_capacity<const FRESH: bool, const CAPACITY: usize>(
+	#[allow(unsafe_code)]
+	fn allocate_with_seed_capacity<
+		const FRESH: bool,
+		const VERIFY_PDA: bool,
+		const CAPACITY: usize,
+		const SEED_SLOTS: usize,
+	>(
 		&self,
 		signers: &[Signer<'_, '_>],
 		rent: Option<Rent>,
 	) -> ProgramResult {
+		const {
+			assert!(SEED_SLOTS >= CAPACITY);
+			assert!(!VERIFY_PDA || SEED_SLOTS >= CAPACITY + 2);
+		}
+
 		let seeds_len = self.seeds.len();
 		let bump_array = [self.bump];
-		let mut target_seeds: [Seed<'_>; CAPACITY] =
-			core::array::from_fn(|_| Seed::from(&[] as &[u8]));
-		for (destination, seed) in target_seeds.iter_mut().zip(self.seeds) {
-			*destination = Seed::from(*seed);
+
+		#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+		if VERIFY_PDA {
+			let mut hash_inputs: [&[u8]; SEED_SLOTS] = [&[]; SEED_SLOTS];
+			if !crate::pda::hashes_to_program_address(
+				self.account.address(),
+				self.seeds,
+				&bump_array,
+				self.owner,
+				&mut hash_inputs,
+			) {
+				return Err(ProgramError::InvalidSeeds);
+			}
 		}
-		target_seeds[seeds_len] = Seed::from(bump_array.as_slice());
-		let target_signer = Signer::from(&target_seeds[..seeds_len + 1]);
+
+		let mut target_seeds = [const { core::mem::MaybeUninit::<Seed<'_>>::uninit() }; SEED_SLOTS];
+		let mut seed_index = 0;
+		while seed_index < seeds_len {
+			let seed = self.seeds[seed_index];
+			#[cfg(any(target_os = "solana", target_arch = "bpf"))]
+			if VERIFY_PDA && seed.len() > crate::MAX_SEED_LEN {
+				return Err(ProgramError::InvalidSeeds);
+			}
+			target_seeds[seed_index].write(Seed::from(seed));
+			seed_index += 1;
+		}
+		target_seeds[seeds_len].write(Seed::from(bump_array.as_slice()));
+
+		#[cfg(any(target_os = "solana", target_arch = "bpf"))]
+		if VERIFY_PDA {
+			target_seeds[seeds_len + 1].write(Seed::from(self.owner.as_ref()));
+			target_seeds[seeds_len + 2].write(Seed::from(solana_address::PDA_MARKER.as_slice()));
+			// SAFETY: slots `0..seeds_len + 3` were initialized above, and
+			// `seeds_len < CAPACITY <= SEED_SLOTS - 2`.
+			let matches = unsafe {
+				crate::pda::sha256_seed_slices_matches_address(
+					target_seeds.as_ptr().cast::<Seed<'_>>(),
+					seeds_len + 3,
+					self.account.address(),
+				)
+			};
+			if !matches {
+				return Err(ProgramError::InvalidSeeds);
+			}
+		}
+
+		// SAFETY: slots `0..=seeds_len` were initialized above, and
+		// `seeds_len < CAPACITY <= SEED_SLOTS`.
+		let target_signer_seeds = unsafe {
+			core::slice::from_raw_parts(target_seeds.as_ptr().cast::<Seed<'_>>(), seeds_len + 1)
+		};
+		let target_signer = Signer::from(target_signer_seeds);
 
 		// Without extra signers the target's signer is the whole list, so the
-		// 16-slot array — every slot of which must be initialized before it
-		// escapes to the CPI syscall — only exists on the path that needs it.
-		let empty_seeds: [Seed<'_>; 0] = [];
-		let extended_signers: [Signer<'_, '_>; MAX_CPI_SIGNERS];
+		// 16-slot array only exists on the path that needs it.
+		let mut extended_signers =
+			[const { core::mem::MaybeUninit::<Signer<'_, '_>>::uninit() }; MAX_CPI_SIGNERS];
 		let all_signers = if signers.is_empty() {
 			core::slice::from_ref(&target_signer)
 		} else {
-			let empty_signer = Signer::from(&empty_seeds);
-			let mut all_signers: [Signer<'_, '_>; MAX_CPI_SIGNERS] =
-				core::array::from_fn(|_| empty_signer.clone());
-			all_signers[0] = target_signer.clone();
-			for (destination, signer) in all_signers[1..].iter_mut().zip(signers) {
-				*destination = signer.clone();
+			extended_signers[0].write(target_signer.clone());
+			let mut signer_index = 0;
+			while signer_index < signers.len() {
+				extended_signers[signer_index + 1].write(signers[signer_index].clone());
+				signer_index += 1;
 			}
-			extended_signers = all_signers;
-			&extended_signers[..signers.len() + 1]
+			// SAFETY: slots `0..=signers.len()` were initialized above, and the
+			// caller guarantees `signers.len() < MAX_CPI_SIGNERS`.
+			unsafe {
+				core::slice::from_raw_parts(
+					extended_signers.as_ptr().cast::<Signer<'_, '_>>(),
+					signers.len() + 1,
+				)
+			}
 		};
 
 		let space = usize::try_from(self.space).map_err(|_| ProgramError::InvalidArgument)?;
@@ -1683,22 +1843,13 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 			Rent::get()?
 		};
 		if FRESH {
-			return self.create_account(all_signers, space, rent);
+			return self.create_account(all_signers, rent.try_minimum_balance(space)?);
 		}
 
 		#[cfg(not(feature = "create-account-allow-prefund"))]
 		{
 			if self.account.lamports() == 0 {
-				SystemCreateAccount {
-					from: self.payer,
-					to: self.account,
-					lamports: rent.try_minimum_balance(space)?,
-					space: self.space,
-					owner: self.owner,
-				}
-				.invoke_signed(all_signers)?;
-
-				return Ok(());
+				return self.create_account(all_signers, rent.try_minimum_balance(space)?);
 			}
 
 			let rent_exempt_balance = rent
@@ -1760,16 +1911,11 @@ impl AllocateAccountWithNonCanonicalBump<'_, '_, '_, '_> {
 	///
 	/// The `FRESH` path uses this instruction independently of Cargo features.
 	#[inline(always)]
-	fn create_account(
-		&self,
-		all_signers: &[Signer<'_, '_>],
-		space: usize,
-		rent: Rent,
-	) -> ProgramResult {
+	fn create_account(&self, all_signers: &[Signer<'_, '_>], lamports: u64) -> ProgramResult {
 		SystemCreateAccount {
 			from: self.payer,
 			to: self.account,
-			lamports: rent.try_minimum_balance(space)?,
+			lamports,
 			space: self.space,
 			owner: self.owner,
 		}
@@ -1890,10 +2036,11 @@ impl ReallocPlan {
 #[cfg(feature = "account-resize")]
 #[inline(always)]
 fn validate_realloc_size(current_size: usize, target_size: usize) -> ProgramResult {
-	if target_size
-		.checked_sub(current_size)
-		.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE)
-	{
+	if pinocchio::hint::unlikely(
+		target_size
+			.checked_sub(current_size)
+			.is_some_and(|growth| growth > MAX_PERMITTED_DATA_INCREASE),
+	) {
 		return Err(ProgramError::InvalidRealloc);
 	}
 
@@ -1982,6 +2129,24 @@ impl ReallocAccount<'_, '_, '_> {
 			signers,
 		)
 	}
+
+	/// Reallocates the account with PDA signer seeds and a caller-supplied
+	/// [`Rent`] value, avoiding an extra `Rent` sysvar syscall.
+	#[inline(always)]
+	pub fn invoke_signed_with_rent(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> ProgramResult {
+		realloc_account_inner_with_rent(
+			self.account,
+			self.target_size,
+			self.rent_account,
+			self.program_id,
+			signers,
+			Some(&rent),
+		)
+	}
 }
 
 /// Reallocates an account to `target_size` bytes with explicit zero-initialization.
@@ -2043,6 +2208,24 @@ impl ReallocAccountZeroed<'_, '_, '_> {
 			signers,
 		)
 	}
+
+	/// Reallocates the account with PDA signer seeds and a caller-supplied
+	/// [`Rent`] value, avoiding an extra `Rent` sysvar syscall.
+	#[inline(always)]
+	pub fn invoke_signed_with_rent(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> ProgramResult {
+		realloc_account_inner_with_rent(
+			self.account,
+			self.target_size,
+			self.rent_account,
+			self.program_id,
+			signers,
+			Some(&rent),
+		)
+	}
 }
 
 /// Applies a structurally atomic patch and rent-adjusts the compact account.
@@ -2069,6 +2252,7 @@ pub struct UpdateResizableAccount<'account, 'rent, 'address, P> {
 #[cfg(all(feature = "account-resize", feature = "compact"))]
 impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 	/// Applies the patch and adjusts the account to its resulting encoded size.
+	#[inline(always)]
 	pub fn invoke<T>(&mut self) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
@@ -2078,6 +2262,7 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 	}
 
 	/// Applies the patch with additional signer seeds for rent adjustment.
+	#[inline(always)]
 	pub fn invoke_signed<T>(&mut self, signers: &[Signer<'_, '_>]) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
@@ -2086,8 +2271,10 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 		self.invoke_signed_inner::<T>(signers, None)
 	}
 
-	#[cfg(test)]
-	fn invoke_signed_with_rent<T>(
+	/// Applies the patch with additional signer seeds and a caller-supplied
+	/// [`Rent`] value, avoiding an extra `Rent` sysvar syscall.
+	#[inline(always)]
+	pub fn invoke_signed_with_rent<T>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
 		rent: Rent,
@@ -2096,13 +2283,13 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 		T: PinaCompactAccount,
 		P: PinaCompactPatch<T>,
 	{
-		self.invoke_signed_inner::<T>(signers, Some(rent))
+		self.invoke_signed_inner::<T>(signers, Some(&rent))
 	}
 
 	fn invoke_signed_inner<T>(
 		&mut self,
 		signers: &[Signer<'_, '_>],
-		rent: Option<Rent>,
+		rent: Option<&Rent>,
 	) -> Result<usize, ProgramError>
 	where
 		T: PinaCompactAccount,
@@ -2111,53 +2298,55 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 		self.account
 			.assert_writable()?
 			.assert_owner(self.program_id)?;
-		let target_size = {
-			let data = self.account.try_borrow()?;
-			// The generated preflight enforces the storage length, the
-			// discriminator, and the migration envelope; the raw patch
-			// preflight below it would accept a stale envelope's bytes as the
-			// current layout and compute the wrong target size for them.
-			T::updated_len(&data, self.patch.as_pina_patch())?
-		};
-		T::validate_size(target_size)?;
 
 		let current_size = self.account.data_len();
-		if target_size > current_size {
-			realloc_validated_account_inner_with_rent(
-				self.account,
-				target_size,
-				self.rent_account,
-				signers,
-				rent,
-			)?;
+		// Manual `PinaCompactAccount` implementations may override
+		// `validate_size` to reject sizes accepted by `updated_len` / `update`.
+		// Preflight `validate_size` before mutating bytes for those types so a
+		// rejected size leaves storage untouched, while derived compact
+		// accounts (whose `validate_size` matches `PinaPodCompact::validate_storage_len`,
+		// already enforced before writes in `try_update_or_len`) stay single-pass.
+		if const { !T::__DERIVED_COMPACT_VALIDATE_SIZE } {
+			let preflight_size = {
+				let data = self.account.try_borrow()?;
+				T::updated_len(&data, self.patch.as_pina_patch())?
+			};
+			T::validate_size(preflight_size)?;
 		}
+		// Single-pass preflight + in-place update: enforces the storage
+		// length, discriminator, migration envelope, and structural bounds
+		// once, committing directly when the result fits in the current
+		// allocation (same-size or shrink) and returning
+		// `Ok(Err(target_size))` without mutating `data` when the account
+		// must grow first.
+		let target_size = match {
+			let mut data = self.account.try_borrow_mut()?;
+			T::__try_update_or_len(&mut data, self.patch.as_pina_patch())?
+		} {
+			Ok(encoded_len) => {
+				T::validate_size(encoded_len)?;
+				if encoded_len < current_size {
+					realloc_shrink_validated(self.account, encoded_len, self.rent_account, rent)?;
+				}
+
+				return Ok(encoded_len);
+			}
+			Err(target_size) => target_size,
+		};
+
+		T::validate_size(target_size)?;
+		validate_realloc_size(current_size, target_size)?;
+		realloc_grow_validated(self.account, target_size, self.rent_account, signers, rent)?;
 
 		let encoded_len = {
 			let mut data = self.account.try_borrow_mut()?;
-			// `T::update` is the generated writer: it enforces the storage
-			// length, the discriminator, and the migration envelope before
-			// patching, and writes the current version afterwards. Only the
-			// application-level re-validation it appends is feature-gated, so
-			// routing every build through it keeps a stale envelope from being
-			// patched as if it were the current layout.
 			T::update(&mut data, self.patch.as_pina_patch())?
 		};
 		// The preflight and the writer must agree on the encoded size: a
-		// divergence would resize the account to the preflight's target while the
-		// writer produced a different length, so release builds reject it
-		// instead of trusting one path over the other.
-		if encoded_len != target_size {
+		// divergence would resize the account to the preflight's target while
+		// the writer produced a different length.
+		if pinocchio::hint::unlikely(encoded_len != target_size) {
 			return Err(ProgramError::InvalidAccountData);
-		}
-
-		if target_size < current_size {
-			realloc_validated_account_inner_with_rent(
-				self.account,
-				target_size,
-				self.rent_account,
-				signers,
-				rent,
-			)?;
 		}
 
 		Ok(encoded_len)
@@ -2194,6 +2383,24 @@ impl ReallocCompactAccount<'_, '_, '_> {
 		&mut self,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
+		self.invoke_signed_inner::<T>(signers, None)
+	}
+
+	/// Validates and resizes the compact account with rent-account signer seeds
+	/// and a caller-supplied [`Rent`] value.
+	pub fn invoke_signed_with_rent<T: PinaCompactAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Rent,
+	) -> ProgramResult {
+		self.invoke_signed_inner::<T>(signers, Some(&rent))
+	}
+
+	fn invoke_signed_inner<T: PinaCompactAccount>(
+		&mut self,
+		signers: &[Signer<'_, '_>],
+		rent: Option<&Rent>,
+	) -> ProgramResult {
 		self.account
 			.assert_writable()?
 			.assert_compact_type::<T>(self.program_id)?;
@@ -2209,7 +2416,7 @@ impl ReallocCompactAccount<'_, '_, '_> {
 			self.target_size,
 			self.rent_account,
 			signers,
-			None,
+			rent,
 		)
 	}
 }
@@ -2245,7 +2452,7 @@ fn realloc_account_inner_with_rent(
 	rent_account: &mut AccountView,
 	program_id: &Address,
 	signers: &[Signer<'_, '_>],
-	rent: Option<Rent>,
+	rent: Option<&Rent>,
 ) -> ProgramResult {
 	use crate::AccountInfoValidation;
 
@@ -2260,13 +2467,12 @@ fn realloc_account_inner_with_rent(
 /// properties before they call this helper. Keeping the resize work separate
 /// prevents duplicate owner checks in those hot paths.
 #[cfg(feature = "account-resize")]
-#[inline(always)]
 fn realloc_validated_account_inner_with_rent(
 	account: &mut AccountView,
 	target_size: usize,
 	rent_account: &mut AccountView,
 	signers: &[Signer<'_, '_>],
-	rent: Option<Rent>,
+	rent: Option<&Rent>,
 ) -> ProgramResult {
 	let current_size = account.data_len();
 
@@ -2279,39 +2485,64 @@ fn realloc_validated_account_inner_with_rent(
 	// serialized length is not exposed, so cumulative growth is still checked by
 	// the runtime and its error must be propagated by callers.
 	account.check_borrow_mut()?;
-	validate_realloc_size(current_size, target_size)?;
 
-	let rent = if let Some(rent) = rent {
-		rent
+	if target_size > current_size {
+		validate_realloc_size(current_size, target_size)?;
+		realloc_grow_validated(account, target_size, rent_account, signers, rent)
 	} else {
-		Rent::get()?
-	};
-	let target_minimum_balance = rent.try_minimum_balance(target_size)?;
-	let current_lamports = account.lamports();
-	let plan = ReallocPlan::from_valid_size(
-		current_size,
-		target_size,
-		current_lamports,
-		target_minimum_balance,
-	);
+		realloc_shrink_validated(account, target_size, rent_account, rent)
+	}
+}
 
-	match plan.adjustment {
-		RentAdjustment::Fund { lamports } => {
-			SystemTransfer {
-				from: rent_account,
-				to: account,
-				lamports,
-			}
-			.invoke_signed(signers)?;
+#[cfg(feature = "account-resize")]
+#[inline(always)]
+fn realloc_minimum_balance(target_size: usize, rent: Option<&Rent>) -> Result<u64, ProgramError> {
+	if let Some(rent) = rent {
+		rent.try_minimum_balance(target_size)
+	} else {
+		Rent::get()?.try_minimum_balance(target_size)
+	}
+}
+
+#[cfg(feature = "account-resize")]
+fn realloc_grow_validated(
+	account: &mut AccountView,
+	target_size: usize,
+	rent_account: &mut AccountView,
+	signers: &[Signer<'_, '_>],
+	rent: Option<&Rent>,
+) -> ProgramResult {
+	let target_minimum_balance = realloc_minimum_balance(target_size, rent)?;
+	let lamports = target_minimum_balance.saturating_sub(account.lamports());
+
+	if lamports > 0 {
+		SystemTransfer {
+			from: rent_account,
+			to: account,
+			lamports,
 		}
-		RentAdjustment::Refund { lamports } => {
-			crate::impls::send_lamports_after_owner_check(account, lamports, rent_account)?;
-		}
-		RentAdjustment::None => {}
+		.invoke_signed(signers)?;
 	}
 
 	// Resize the account data. The runtime zero-initializes new bytes.
-	account.resize(plan.target_size)
+	account.resize(target_size)
+}
+
+#[cfg(feature = "account-resize")]
+fn realloc_shrink_validated(
+	account: &mut AccountView,
+	target_size: usize,
+	rent_account: &mut AccountView,
+	rent: Option<&Rent>,
+) -> ProgramResult {
+	let target_minimum_balance = realloc_minimum_balance(target_size, rent)?;
+	let lamports = account.lamports().saturating_sub(target_minimum_balance);
+
+	if lamports > 0 {
+		crate::impls::send_lamports_after_owner_check(account, lamports, rent_account)?;
+	}
+
+	account.resize(target_size)
 }
 
 /// Closes an account and returns its remaining lamports to a recipient.
@@ -2884,7 +3115,7 @@ mod tests {
 			space: 8,
 			owner: &owner,
 		}
-		.invoke_signed_with_rent(&[], test_rent(), 8)
+		.invoke_signed_with_rent(&[], test_rent())
 		.unwrap_or_else(|error| panic!("create account: {error:?}"));
 	}
 
@@ -4114,7 +4345,7 @@ mod tests {
 			&mut rent_account,
 			&owner,
 			&[],
-			Some(test_rent()),
+			Some(&test_rent()),
 		)
 		.unwrap_or_else(|error| panic!("grow account: {error:?}"));
 
@@ -4138,7 +4369,7 @@ mod tests {
 			&mut rent_account,
 			&owner,
 			&[],
-			Some(test_rent()),
+			Some(&test_rent()),
 		)
 		.unwrap_or_else(|error| panic!("grow prefunded account: {error:?}"));
 
@@ -4165,13 +4396,39 @@ mod tests {
 			&mut rent_account,
 			&owner,
 			&[],
-			Some(test_rent()),
+			Some(&test_rent()),
 		)
 		.unwrap_or_else(|error| panic!("shrink account: {error:?}"));
 
 		assert_eq!(account.data_len(), 8);
 		assert_eq!(account.lamports() + rent_account.lamports(), initial_total);
 		assert!(rent_account.lamports() > 1);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn realloc_shrink_without_excess_rent_resizes_without_moving_lamports() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account =
+			TestAccount::<32>::new(Address::new_from_array([1; 32]), owner, 1, 16);
+		let mut stored_rent_account =
+			TestAccount::<0>::new(Address::new_from_array([2; 32]), owner, 1, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent_account.view();
+
+		realloc_account_inner_with_rent(
+			&mut account,
+			8,
+			&mut rent_account,
+			&owner,
+			&[],
+			Some(&test_rent()),
+		)
+		.expect("shrink account without excess rent");
+
+		assert_eq!(account.data_len(), 8);
+		assert_eq!(account.lamports(), 1);
+		assert_eq!(rent_account.lamports(), 1);
 	}
 
 	#[test]
@@ -4327,5 +4584,128 @@ mod tests {
 
 		assert_eq!(result, Err(ProgramError::AccountAlreadyInitialized));
 		assert_eq!(stored.data[0], 1);
+	}
+
+	#[test]
+	fn public_with_rent_initializer_variants_initialize_state() {
+		let owner = Address::new_from_array([9; 32]);
+		let seeds: &[&[u8]] = &[b"with-rent-variants"];
+		let (address, bump) = crate::try_find_program_address(seeds, &owner).unwrap();
+		let mut stored_payer = TestAccount::<0>::new(Address::new_from_array([1; 32]), owner, 1, 0);
+		let payer = stored_payer.view();
+		let state_size = size_of::<<TestState as PinaPodFixed>::Zc>();
+
+		let mut stored_a = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut view_a = stored_a.view();
+		let mut seen_bump = None;
+		let (derived_a, bump_a) = CreateProgramAccount {
+			account: &mut view_a,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+		}
+		.invoke_signed_with_rent_and_bump::<TestState>(&[], test_rent(), |state, b| {
+			seen_bump = Some(b);
+			assert_eq!(state[0], TestState::VALUE);
+			Ok(())
+		})
+		.unwrap();
+		assert_eq!((derived_a, bump_a), (address, bump));
+		assert_eq!(seen_bump, Some(bump));
+		assert_eq!(stored_a.data[0], TestState::VALUE);
+
+		let mut stored_b = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut view_b = stored_b.view();
+		CreateProgramAccountWithBump {
+			account: &mut view_b,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent_with::<TestState>(&[], test_rent(), |state| {
+			assert_eq!(state[0], TestState::VALUE);
+			Ok(())
+		})
+		.unwrap();
+		assert_eq!(stored_b.data[0], TestState::VALUE);
+
+		let mut stored_c = TestAccount::<32>::new(address, owner, 0, state_size);
+		let mut view_c = stored_c.view();
+		CreateProgramAccountWithUncheckedBump {
+			account: &mut view_c,
+			payer: &payer,
+			owner: &owner,
+			seeds,
+			bump,
+		}
+		.invoke_signed_with_rent_with::<TestState>(&[], test_rent(), |state| {
+			assert_eq!(state[0], TestState::VALUE);
+			Ok(())
+		})
+		.unwrap();
+		assert_eq!(stored_c.data[0], TestState::VALUE);
+	}
+
+	#[cfg(feature = "account-resize")]
+	#[test]
+	fn realloc_builders_invoke_signed_with_rent() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account =
+			TestAccount::<64>::new(Address::new_from_array([3; 32]), owner, 1_000, 8);
+		let mut stored_rent =
+			TestAccount::<0>::new(Address::new_from_array([4; 32]), owner, 1_000, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent.view();
+
+		ReallocAccount {
+			account: &mut account,
+			target_size: 16,
+			rent_account: &mut rent_account,
+			program_id: &owner,
+		}
+		.invoke_signed_with_rent(&[], test_rent())
+		.unwrap();
+		assert_eq!(account.data_len(), 16);
+
+		ReallocAccountZeroed {
+			account: &mut account,
+			target_size: 24,
+			rent_account: &mut rent_account,
+			program_id: &owner,
+		}
+		.invoke_signed_with_rent(&[], test_rent())
+		.unwrap();
+		assert_eq!(account.data_len(), 24);
+	}
+
+	#[cfg(all(feature = "account-resize", feature = "compact"))]
+	#[test]
+	fn realloc_compact_account_invoke_signed_with_rent() {
+		let owner = Address::new_from_array([9; 32]);
+		let mut stored_account = TestAccount::<64>::new(
+			Address::new_from_array([5; 32]),
+			owner,
+			1_000,
+			TestCompactState::MIN_SIZE,
+		);
+		let mut stored_rent =
+			TestAccount::<0>::new(Address::new_from_array([6; 32]), owner, 1_000, 0);
+		let mut account = stored_account.view();
+		let mut rent_account = stored_rent.view();
+		{
+			let mut data = account.try_borrow_mut().unwrap();
+			TestCompactState::initialize(&mut data, &TestCompactStatePatch::new()).unwrap();
+		}
+
+		ReallocCompactAccount {
+			account: &mut account,
+			rent_account: &mut rent_account,
+			target_size: TestCompactState::MIN_SIZE + 8,
+			program_id: &owner,
+		}
+		.invoke_signed_with_rent::<TestCompactState>(&[], test_rent())
+		.unwrap();
+		assert_eq!(account.data_len(), TestCompactState::MIN_SIZE + 8);
 	}
 }

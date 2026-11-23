@@ -1,0 +1,210 @@
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:26:15
+   |
+LL |     let _guard = copy.try_borrow_mut()?;
+   |                  ^^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:25:17
+   |
+LL |     let mut copy = *accounts.readonly;
+   |                    ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+   = note: `#[deny(deny_readonly_account_copy_escalation)]` on by default
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:31:2
+   |
+LL |     { *accounts.readonly }.set_lamports(0);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:31:4
+   |
+LL |     { *accounts.readonly }.set_lamports(0);
+   |       ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:35:2
+   |
+LL |     accounts.readonly.clone().close()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:35:2
+   |
+LL |     accounts.readonly.clone().close()?;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:41:13
+   |
+LL |     mutate_ref(&mut copy);
+   |                ^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:40:17
+   |
+LL |     let mut copy = Clone::clone(accounts.readonly);
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:46:2
+   |
+LL |     copy.set_lamports(1);
+   |     ^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:45:17
+   |
+LL |     let mut copy = accounts.readonly_slice[0];
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:51:3
+   |
+LL |         copy.set_lamports(2);
+   |         ^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:50:26
+   |
+LL |     if let Some(mut copy) = accounts.optional_readonly.copied() {
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:57:2
+   |
+LL |     copy.set_lamports(3);
+   |     ^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:56:17
+   |
+LL |     let mut copy = (*accounts.readonly).assert_writable()?;
+   |                    ^^^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:62:6
+   |
+LL |     let ref mut copy = { *accounts.readonly };
+   |         ^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:62:23
+   |
+LL |     let ref mut copy = { *accounts.readonly };
+   |                          ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:69:3
+   |
+LL |         copy.set_lamports(5);
+   |         ^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:67:17
+   |
+LL |     let mut copy = *accounts.readonly;
+   |                    ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:79:2
+   |
+LL |     copy.set_lamports(6);
+   |     ^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:76:15
+   |
+LL |         let alias = *accounts.readonly;
+   |                     ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:84:13
+   |
+LL |     let _ptr = &raw mut copy;
+   |                ^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:83:17
+   |
+LL |     let mut copy = *accounts.readonly;
+   |                    ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:95:2
+   |
+LL |     acc.set_lamports(7);
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:91:10
+   |
+LL |             acc = *accounts.readonly;
+   |                   ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:103:2
+   |
+LL |     acc.close()?;
+   |     ^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:101:9
+   |
+LL |         acc = *r;
+   |               ^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:113:3
+   |
+LL |         acc.set_lamports(8);
+   |         ^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:114:9
+   |
+LL |         acc = *accounts.readonly;
+   |               ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:127:3
+   |
+LL |         a.set_lamports(9);
+   |         ^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:130:7
+   |
+LL |         c = *accounts.readonly;
+   |             ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:144:2
+   |
+LL |     acc.set_lamports(11);
+   |     ^^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:140:9
+   |
+LL |         acc = *accounts.readonly;
+   |               ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: aborting due to 16 previous errors

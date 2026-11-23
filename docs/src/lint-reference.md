@@ -34,6 +34,7 @@ A `deny` lint is a security property: the build fails, and there is no supported
 | [deny_account_borrows_across_cpi](#deny_account_borrows_across_cpi)                                             | `deny`  |
 | [deny_colliding_account_discriminators](#deny_colliding_account_discriminators)                                 | `deny`  |
 | [deny_heap_allocations_in_onchain_instruction_handlers](#deny_heap_allocations_in_onchain_instruction_handlers) | `warn`  |
+| [deny_readonly_account_copy_escalation](#deny_readonly_account_copy_escalation)                                 | `deny`  |
 | [deny_unchecked_remaining_mut](#deny_unchecked_remaining_mut)                                                   | `deny`  |
 | [deny_unused_account_borrow_guards](#deny_unused_account_borrow_guards)                                         | `warn`  |
 | [require_bounded_remaining_accounts](#require_bounded_remaining_accounts)                                       | `deny`  |
@@ -82,6 +83,16 @@ Default level: `warn`
 **Why this matters.** On-chain code is charged for every allocated byte and for the code that manages it. Borrowed slices, stack buffers, and fixed-size POD types keep both compute units and deployed size down.
 
 **Blessing an exception.** Warns by default and is heuristic: it matches allocation-prone method names in handler-like functions, so a non-allocating `Clone` implementation or a foreign API can trip it. Scope `#[allow]` to the individual item and say which call is known not to allocate.
+
+## deny_readonly_account_copy_escalation
+
+Default level: `deny`
+
+**Contract.** Never take a mutable borrow of an `AccountView` copied or cloned out of a shared `&AccountView`, `&[AccountView]`, or `Option<&AccountView>` reference.
+
+**Why this matters.** `pinocchio::AccountView` implements `Copy`, so dereferencing `*self.readonly` into a local `mut` binding or calling `(*self.readonly).try_borrow_mut()` bypasses Rust's `&AccountView` immutability and Pina's `#[derive(Accounts)]` duplicate-mutable-account checks.
+
+**Blessing an exception.** There is no sound exception; if an instruction mutates an account, declare the slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or take `&mut AccountView` directly) so Pina verifies writability and mutable aliasing before execution.
 
 ## deny_unchecked_remaining_mut
 

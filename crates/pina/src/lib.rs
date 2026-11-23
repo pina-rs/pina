@@ -86,6 +86,8 @@ pub use entry::ROUTE_BOUNDED;
 pub use entry::ROUTE_EXACT;
 #[doc(hidden)]
 pub use entry::ROUTE_UNBOUNDED;
+#[doc(hidden)]
+pub use entry::RouteAccounts;
 /// Re-export all proc macros from `pina_macros` when the `derive` feature is
 /// enabled.
 #[cfg(feature = "derive")]
@@ -450,7 +452,7 @@ pub const ALLOC_FEATURE_REQUIRED_FOR_HEAP_ENTRYPOINT: () = ();
 /// ```
 ///
 /// When the `logs` feature is disabled this is a no-op.
-#[cfg(feature = "logs")]
+#[cfg(all(feature = "logs", feature = "verbose-logs"))]
 #[macro_export]
 macro_rules! log_failure {
 	($message:literal) => {{
@@ -458,11 +460,22 @@ macro_rules! log_failure {
 	}};
 	($message:literal, $($arg:tt)*) => {{
 		$crate::solana_program_log::logger::log_message($message.as_bytes());
-		if $crate::VERBOSE_LOGS_ENABLED {
-			$crate::solana_program_log::log!($($arg)*);
-		} else {
-			let _ = ($($arg)*);
-		}
+		$crate::solana_program_log::log!($($arg)*);
+	}};
+}
+
+/// Logs the static failure message when `logs` is enabled without
+/// `verbose-logs`, evaluating any formatted detail arguments without linking
+/// `core::fmt`.
+#[cfg(all(feature = "logs", not(feature = "verbose-logs")))]
+#[macro_export]
+macro_rules! log_failure {
+	($message:literal) => {{
+		$crate::solana_program_log::logger::log_message($message.as_bytes());
+	}};
+	($message:literal, $($arg:tt)*) => {{
+		$crate::solana_program_log::logger::log_message($message.as_bytes());
+		let _ = ($($arg)*);
 	}};
 }
 
@@ -564,6 +577,7 @@ macro_rules! log_verbose {
 	}};
 }
 
+/// No-op variant used when logging is compiled out entirely.
 #[cfg(not(feature = "logs"))]
 #[macro_export]
 macro_rules! log {

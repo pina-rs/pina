@@ -236,8 +236,12 @@ pub(crate) fn canonical_account_constraints(
 				}
 				return Ok(());
 			}
+			if meta.path.is_ident("unique") {
+				constraints.push("unique".to_owned());
+				return Ok(());
+			}
 			Err(meta.error(
-				"unknown account-field option; expected validate(...), remaining, or distinct",
+				"unknown account-field option; expected validate(...), remaining, distinct, or unique",
 			))
 		})?;
 	}
@@ -307,7 +311,7 @@ pub fn extract_attribute_properties(
 				});
 			}
 
-			if meta.path.is_ident("remaining") {
+			if meta.path.is_ident("remaining") || meta.path.is_ident("unique") {
 				return Ok(());
 			}
 			if meta.path.is_ident("distinct") {
@@ -319,7 +323,7 @@ pub fn extract_attribute_properties(
 
 			Err(meta.error(
 				"unknown `#[pina]` account-field option; expected `validate(...)`, `remaining`, \
-				 or `distinct`",
+				 `distinct`, or `unique`",
 			))
 		})?;
 	}
@@ -1124,6 +1128,8 @@ mod tests {
 				payer: &'a AccountView,
 				#[pina(distinct = authority)]
 				recipient: &'a AccountView,
+				#[pina(unique)]
+				unique_vault: &'a AccountView,
 			}
 		"#;
 		let file = syn::parse_file(source).expect("valid Rust");
@@ -1153,6 +1159,7 @@ mod tests {
 			#[pina(validate(signer, writable, owner = ID, not_empty, error = Error::Denied))]
 			#[pina(distinct)]
 			#[pina(distinct = authority)]
+			#[pina(unique)]
 			account: &'static AccountView
 		};
 
@@ -1166,6 +1173,7 @@ mod tests {
 				"not_empty",
 				"owner=ID",
 				"signer",
+				"unique",
 				"writable"
 			]
 		);
@@ -1185,6 +1193,7 @@ mod tests {
 		assert!(message.contains("`validate(...)`"));
 		assert!(message.contains("`remaining`"));
 		assert!(message.contains("`distinct`"));
+		assert!(message.contains("`unique`"));
 
 		let error = canonical_account_constraints(&field.attrs)
 			.expect_err("an unknown compatibility constraint must fail");

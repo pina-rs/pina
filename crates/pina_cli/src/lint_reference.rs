@@ -73,6 +73,20 @@ pub const LINT_REFERENCE: &[LintExplanation] = &[
 		           call is known not to allocate.",
 	},
 	LintExplanation {
+		name: "deny_readonly_account_copy_escalation",
+		default_level: "deny",
+		contract: "Never take a mutable borrow of an `AccountView` copied or cloned out of a \
+		           shared `&AccountView`, `&[AccountView]`, or `Option<&AccountView>` reference.",
+		rationale: "`pinocchio::AccountView` implements `Copy`, so dereferencing `*self.readonly` \
+		            into a local `mut` binding or calling `(*self.readonly).try_borrow_mut()` \
+		            bypasses Rust's `&AccountView` immutability and Pina's `#[derive(Accounts)]` \
+		            duplicate-mutable-account checks.",
+		blessing: "There is no sound exception; if an instruction mutates an account, declare the \
+		           slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or take `&mut \
+		           AccountView` directly) so Pina verifies writability and mutable aliasing \
+		           before execution.",
+	},
+	LintExplanation {
 		name: "deny_unchecked_remaining_mut",
 		default_level: "deny",
 		contract: "Reach remaining accounts through `remaining_mut_distinct()` or the derive \

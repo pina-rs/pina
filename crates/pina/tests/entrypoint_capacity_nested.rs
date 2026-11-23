@@ -29,7 +29,7 @@ pub enum Instruction {
 pub struct SweepGroup<'a> {
 	pub first: &'a mut AccountView,
 	#[pina(remaining)]
-	pub rest: &'a [AccountView],
+	pub rest: &'a mut [AccountView],
 }
 
 /// A route whose only trailing slice is inside a nested group.

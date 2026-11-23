@@ -494,9 +494,13 @@ fn layout_field(
 				return Ok(());
 			}
 
+			if meta.path.is_ident("unique") {
+				return Ok(());
+			}
+
 			Err(meta.error(
 				"unknown `#[pina]` account-field option; expected `validate(...)`, `remaining`, \
-				 or `distinct`",
+				 `distinct`, or `unique`",
 			))
 		})?;
 	}
@@ -846,6 +850,8 @@ mod tests {
 			r"
 			#[derive(Accounts)]
 			pub struct Members<'a> {
+				#[pina(unique)]
+				pub authority: &'a AccountView,
 				#[pina(remaining, distinct = true)]
 				pub members: &'a mut [AccountView],
 			}
@@ -855,7 +861,7 @@ mod tests {
 		)
 		.expect("indexes");
 		assert_eq!(
-			index.accounts["Members"].fields[0].kind,
+			index.accounts["Members"].fields[1].kind,
 			FieldKind::Remaining {
 				mutable: true,
 				distinct: true

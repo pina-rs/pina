@@ -421,7 +421,7 @@ fn benchmark_account_try_from_bytes() {
 		state.authority = [7u8; 32].into();
 		Ok(())
 	})
-	.expect("valid account storage");
+	.unwrap_or_else(|error| panic!("valid account storage: {error:?}"));
 
 	bench("PinaAccount try_from_bytes (TestState)", || {
 		let _ = black_box(TestState::try_from_bytes(black_box(&bytes)));
@@ -488,6 +488,139 @@ fn benchmark_combine_seeds_with_bump_many_seeds() {
 }
 
 // ---------------------------------------------------------------------------
+// Symmetric aliasing, const PDA, zeroed init, and const rent benchmarks
+// ---------------------------------------------------------------------------
+
+#[allow(dead_code)]
+#[derive(pina::Accounts)]
+struct BenchTwoMutAccounts<'a> {
+	payer: &'a AccountView,
+	source: &'a mut AccountView,
+	dest: &'a mut AccountView,
+}
+
+#[allow(dead_code)]
+#[derive(pina::Accounts)]
+struct BenchUniqueAccounts<'a> {
+	authority: &'a AccountView,
+	#[pina(unique)]
+	vault: &'a mut AccountView,
+	fee: &'a mut AccountView,
+}
+
+fn make_bench_account(key_byte: u8, writable: bool) -> RuntimeAccount {
+	RuntimeAccount {
+		borrow_state: NOT_BORROWED,
+		is_signer: 0,
+		is_writable: u8::from(writable),
+		executable: 0,
+		padding: [0; 4],
+		address: Address::new_from_array([key_byte; 32]),
+		owner: SYSTEM_ID,
+		lamports: 1_000_000,
+		data_len: 0,
+	}
+}
+
+#[test]
+#[allow(unsafe_code)]
+fn benchmark_accounts_parse_two_mut_symmetric_aliasing() {
+	let mut a = make_bench_account(1, false);
+	let mut b = make_bench_account(2, true);
+	let mut c = make_bench_account(3, true);
+	// SAFETY: Each local RuntimeAccount stays pinned on the stack and outlives `views`.
+	let mut views = [
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut a)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut b)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut c)) },
+	];
+
+	bench(
+		"Accounts::try_from (1 ro + 2 mut, inline fast path)",
+		|| {
+			let parsed = BenchTwoMutAccounts::try_from((&SYSTEM_ID, black_box(&mut views[..])));
+			let _ = black_box(parsed.is_ok());
+		},
+	);
+}
+
+#[test]
+#[allow(unsafe_code)]
+fn benchmark_accounts_parse_unique_aliasing() {
+	let mut a = make_bench_account(1, false);
+	let mut b = make_bench_account(2, true);
+	let mut c = make_bench_account(3, true);
+	// SAFETY: Each local RuntimeAccount stays pinned on the stack and outlives `views`.
+	let mut views = [
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut a)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut b)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut c)) },
+	];
+
+	bench("Accounts::try_from (1 ro + 1 unique mut + 1 mut)", || {
+		let parsed = BenchUniqueAccounts::try_from((&SYSTEM_ID, black_box(&mut views[..])));
+		let _ = black_box(parsed.is_ok());
+	});
+}
+
+#[test]
+fn benchmark_const_pda_vs_runtime_pda() {
+	const STATIC_PDA: (Address, u8) = pina::find_program_address_const(&[b"config"], &SYSTEM_ID);
+
+	bench("PDA compile-time const lookup", || {
+		let _ = black_box(STATIC_PDA);
+	});
+	bench("PDA runtime try_find_program_address (same seed)", || {
+		let _ = black_box(try_find_program_address(
+			black_box(&[b"config"]),
+			black_box(&SYSTEM_ID),
+		));
+	});
+}
+
+#[test]
+fn benchmark_fixed_account_initialize_vs_initialize_zeroed() {
+	use pina::PinaAccount;
+
+	let mut buf_full = [0_u8; TestState::SIZE];
+
+	bench("TestState::initialize (full zero-fill + init)", || {
+		let res = TestState::initialize(black_box(&mut buf_full), |state| {
+			state.bump = 255;
+			state.count.set(7);
+			state.authority = SYSTEM_ID;
+			Ok(())
+		});
+		assert!(black_box(res.is_ok()));
+	});
+
+	bench(
+		"TestState::__initialize_zeroed (fresh zeroed stack buf + init)",
+		|| {
+			let mut fresh_zeroed = [0_u8; TestState::SIZE];
+			let res = <TestState as PinaAccount>::__initialize_zeroed(
+				black_box(&mut fresh_zeroed),
+				|state| {
+					state.bump = 255;
+					state.count.set(7);
+					state.authority = SYSTEM_ID;
+					Ok(())
+				},
+			);
+			assert!(black_box(res.is_ok()));
+		},
+	);
+}
+
+#[cfg(feature = "const-rent")]
+#[test]
+fn benchmark_minimum_balance_const() {
+	bench("minimum_balance_const (128 bytes)", || {
+		let _ = black_box(pina::minimum_balance_const(black_box(128)));
+	});
+}
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 
@@ -500,9 +633,10 @@ fn benchmark_summary() {
 	eprintln!();
 	eprintln!("  Operations measured:");
 	eprintln!("    - Discriminator matching (u8, u16, u32, enum)");
-	eprintln!("    - PDA derivation and creation-validation paths");
+	eprintln!("    - PDA derivation, creation-validation, and const-PDA lookup");
 	eprintln!("    - Instruction parsing (valid, invalid, wrong program)");
-	eprintln!("    - Account deserialization (try_from_bytes)");
+	eprintln!("    - Account parsing and symmetric aliasing / #[pina(unique)] validation");
+	eprintln!("    - Account deserialization (try_from_bytes) and zeroed initialization");
 	eprintln!("    - Pod type conversions (PodU64)");
 	eprintln!("    - Seed combination (combine_seeds_with_bump)");
 	eprintln!();

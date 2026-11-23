@@ -203,6 +203,8 @@ pub(crate) fn expand(
 				type Ref<'data> = #ref_name<'data>;
 				type Patch<'patch> = #patch_name<'patch>;
 
+				const __DERIVED_COMPACT_VALIDATE_SIZE: bool = true;
+
 				fn try_from_bytes(
 					data: &[u8],
 				) -> Result<Self::Ref<'_>, #crate_path::ProgramError> {
@@ -230,6 +232,20 @@ pub(crate) fn expand(
 					patch: &Self::Patch<'_>,
 				) -> Result<usize, #crate_path::ProgramError> {
 					Self::initialize(data, patch)
+				}
+
+				fn __try_update_or_len(
+					data: &mut [u8],
+					patch: &Self::Patch<'_>,
+				) -> Result<Result<usize, usize>, #crate_path::ProgramError> {
+					Self::__try_update_or_len(data, patch)
+				}
+
+				fn __initialize_zeroed(
+					data: &mut [u8],
+					patch: &Self::Patch<'_>,
+				) -> Result<usize, #crate_path::ProgramError> {
+					Self::__initialize_zeroed(data, patch)
 				}
 			}
 
@@ -273,6 +289,16 @@ pub(crate) fn expand(
 						&mut value.discriminator,
 					);
 					#write_version
+				}
+
+				fn __initialize_zeroed<F>(
+					data: &mut [u8],
+					initialize: F,
+				) -> Result<&mut <Self as #crate_path::PinaPodFixed>::Zc, #crate_path::ProgramError>
+				where
+					F: FnOnce(&mut <Self as #crate_path::PinaPodFixed>::Zc) -> Result<(), #crate_path::PinaPodError>,
+				{
+					#crate_path::__initialize_derived_zeroed::<Self, F>(data, initialize)
 				}
 			}
 		}
@@ -322,9 +348,14 @@ fn generate_validation_impl(
 	crate_path: &syn::Path,
 	validation_type: &syn::Ident,
 ) -> proc_macro2::TokenStream {
+	#[cfg(feature = "verbose-logs")]
+	let track_caller = quote!(#[track_caller]);
+	#[cfg(not(feature = "verbose-logs"))]
+	let track_caller = quote!();
+
 	quote! {
 		impl #crate_path::AccountValidation for #validation_type {
-			#[track_caller]
+			#track_caller
 			fn assert<F>(&self, condition: F) -> Result<&Self, #crate_path::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
@@ -339,7 +370,7 @@ fn generate_validation_impl(
 				Err(#crate_path::ProgramError::InvalidAccountData)
 			}
 
-			#[track_caller]
+			#track_caller
 			fn assert_msg<F>(&self, condition: F, msg: &str) -> Result<&Self, #crate_path::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
@@ -354,7 +385,7 @@ fn generate_validation_impl(
 				}
 			}
 
-			#[track_caller]
+			#track_caller
 			fn assert_mut<F>(&mut self, condition: F) -> Result<&mut Self, #crate_path::ProgramError>
 			where
 				F: Fn(&Self) -> bool,
@@ -369,7 +400,7 @@ fn generate_validation_impl(
 				Err(#crate_path::ProgramError::InvalidAccountData)
 			}
 
-			#[track_caller]
+			#track_caller
 			fn assert_mut_msg<F>(
 				&mut self,
 				condition: F,
@@ -553,6 +584,17 @@ fn generate_compact_view_helpers(
 			data: &mut [u8],
 			patch: &#patch_name<'_>,
 		) -> Result<usize, #crate_path::ProgramError> {
+			match Self::__try_update_or_len(data, patch)? {
+				Ok(encoded_len) => Ok(encoded_len),
+				Err(_) => Err(#error),
+			}
+		}
+
+		#[doc(hidden)]
+		pub fn __try_update_or_len(
+			data: &mut [u8],
+			patch: &#patch_name<'_>,
+		) -> Result<Result<usize, usize>, #crate_path::ProgramError> {
 			<Self as #crate_path::PinaPodCompact>::validate_storage_len(data.len())
 				.map_err(|_| #error)?;
 
@@ -561,12 +603,16 @@ fn generate_compact_view_helpers(
 			}
 			#require_current
 
-			let encoded_len = patch.update(data).map_err(|_| #error)?;
-			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
-			#write_current
-			#validate_updated
+			match patch.try_update_or_len(data).map_err(|_| #error)? {
+				Ok(encoded_len) => {
+					<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
+					#write_current
+					#validate_updated
 
-			Ok(encoded_len)
+					Ok(Ok(encoded_len))
+				}
+				Err(required_len) => Ok(Err(required_len)),
+			}
 		}
 
 		/// Initialize compact account storage from one complete patch.
@@ -574,7 +620,16 @@ fn generate_compact_view_helpers(
 			data: &mut [u8],
 			patch: &#patch_name<'_>,
 		) -> Result<usize, #crate_path::ProgramError> {
-			let encoded_len = patch.initialize(data).map_err(|_| #error)?;
+			data.fill(0);
+			Self::__initialize_zeroed(data, patch)
+		}
+
+		#[doc(hidden)]
+		pub fn __initialize_zeroed(
+			data: &mut [u8],
+			patch: &#patch_name<'_>,
+		) -> Result<usize, #crate_path::ProgramError> {
+			let encoded_len = patch.initialize_zeroed(data).map_err(|_| #error)?;
 			<Self as #crate_path::HasDiscriminator>::write_discriminator(data);
 			#write_current
 			#validate_initialized

@@ -1,6 +1,5 @@
 ---
 source: crates/pina_cli/tests/explain_command.rs
-assertion_line: 70
 expression: document
 ---
 {
@@ -47,7 +46,7 @@ expression: document
     "cpi": null,
     "error": {
       "code": 4294967289,
-      "description": "Two mutable account fields point at the same runtime account.",
+      "description": "Two mutable account fields, two entries within a distinct mutable `#[pina(remaining)]` slice, or a `#[pina(unique)]` field and another present account field or remaining entry point at the same runtime account.",
       "kind": "pina",
       "name": "PinaProgramError::DuplicateMutableAccount"
     },

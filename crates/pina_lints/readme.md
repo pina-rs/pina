@@ -85,6 +85,7 @@ Deny-level security lints should not be disabled at crate scope; see the [suppre
 | `require_sysvar_assert_before_sysvar_use`               | deny  | Sysvar accounts cannot be substituted               |
 | `require_type_assert_before_zero_copy_cast`             | deny  | Raw account casts use guard-backed typed loading    |
 | `require_reason_for_duplicate_remaining_accounts`       | deny  | Duplicate mutable remaining accounts are justified  |
+| `deny_readonly_account_copy_escalation`                 | deny  | Readonly `&AccountView` copies cannot become `&mut` |
 | `deny_unchecked_remaining_mut`                          | deny  | Direct mutable remaining accounts reject aliases    |
 | `require_canonical_bump_before_pda_write`               | deny  | PDA namespaces use canonical bumps                  |
 | `deny_account_borrows_across_cpi`                       | deny  | Mutable data guards end before CPI                  |
@@ -223,6 +224,12 @@ pub votes: &'a mut [AccountView],
 ```
 
 `#[pina(remaining)]` is distinct by default. The word threshold only rejects missing or placeholder explanations; reviewers must still verify the stated invariant.
+
+### `deny_readonly_account_copy_escalation`
+
+Detects taking a mutable borrow (`&mut`, `&raw mut`, `ref mut`, or an `&mut self` method call) of an `AccountView` that was copied or cloned out of a shared `&AccountView`, `&[AccountView]`, or `Option<&AccountView>` reference.
+
+Because `pinocchio::AccountView` implements `Copy`, copying `*self.readonly` into a mutable local or temporary bypasses Rust's `&AccountView` immutability guarantee and Pina's `#[derive(Accounts)]` duplicate-mutable-account checks. Declare accounts that must be mutated as `&'a mut AccountView` instead.
 
 ### `deny_unchecked_remaining_mut`
 

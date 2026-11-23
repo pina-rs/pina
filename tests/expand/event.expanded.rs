@@ -436,9 +436,18 @@ where
     PodU64: pina::pinapod::ZcField,
     <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<[u8; 32] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -632,9 +641,10 @@ impl TransferEvent {
     ///
     /// This is the on-chain producer for the `Program data:` records that
     /// generated Rust, TypeScript, and Dart clients decode. The record is
-    /// built by [`Self::initialize`], so it carries the discriminator and
-    /// any schema version envelope and passes the same structural and
-    /// application validation that [`Self::try_from_bytes`] enforces.
+    /// built through the same validated initialization contract as
+    /// [`Self::initialize`], so it carries the discriminator and any schema
+    /// version envelope and passes the same structural and application
+    /// validation that [`Self::try_from_bytes`] enforces.
     ///
     /// Emission is a log write, so an emitted event is observable to
     /// clients but does not affect program state. Propagate the returned
@@ -653,7 +663,23 @@ impl TransferEvent {
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<(), pina::ProgramError> {
         let mut record = [0u8; Self::SIZE];
-        let _ = Self::initialize(&mut record, initialize)?;
+        let value = <Self as pina::PinaPodFixed>::initialize_zeroed(
+                &mut record,
+                |value| {
+                    <Self as pina::HasDiscriminator>::write_discriminator(
+                        &mut value.discriminator,
+                    );
+                    initialize(value)
+                },
+            )
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        let _ = value;
         pina::emit_event(&record)
     }
 }
@@ -857,9 +883,16 @@ where
     u8: pina::pinapod::ZcField,
     <u8 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -1000,9 +1033,10 @@ impl InitEvent {
     ///
     /// This is the on-chain producer for the `Program data:` records that
     /// generated Rust, TypeScript, and Dart clients decode. The record is
-    /// built by [`Self::initialize`], so it carries the discriminator and
-    /// any schema version envelope and passes the same structural and
-    /// application validation that [`Self::try_from_bytes`] enforces.
+    /// built through the same validated initialization contract as
+    /// [`Self::initialize`], so it carries the discriminator and any schema
+    /// version envelope and passes the same structural and application
+    /// validation that [`Self::try_from_bytes`] enforces.
     ///
     /// Emission is a log write, so an emitted event is observable to
     /// clients but does not affect program state. Propagate the returned
@@ -1021,7 +1055,23 @@ impl InitEvent {
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<(), pina::ProgramError> {
         let mut record = [0u8; Self::SIZE];
-        let _ = Self::initialize(&mut record, initialize)?;
+        let value = <Self as pina::PinaPodFixed>::initialize_zeroed(
+                &mut record,
+                |value| {
+                    <Self as pina::HasDiscriminator>::write_discriminator(
+                        &mut value.discriminator,
+                    );
+                    initialize(value)
+                },
+            )
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        let _ = value;
         pina::emit_event(&record)
     }
 }
@@ -1182,9 +1232,15 @@ where
     [u8; EventDisc::BYTES]: pina::pinapod::ZcField,
     <[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -1298,9 +1354,10 @@ impl EmptyEvent {
     ///
     /// This is the on-chain producer for the `Program data:` records that
     /// generated Rust, TypeScript, and Dart clients decode. The record is
-    /// built by [`Self::initialize`], so it carries the discriminator and
-    /// any schema version envelope and passes the same structural and
-    /// application validation that [`Self::try_from_bytes`] enforces.
+    /// built through the same validated initialization contract as
+    /// [`Self::initialize`], so it carries the discriminator and any schema
+    /// version envelope and passes the same structural and application
+    /// validation that [`Self::try_from_bytes`] enforces.
     ///
     /// Emission is a log write, so an emitted event is observable to
     /// clients but does not affect program state. Propagate the returned
@@ -1319,7 +1376,23 @@ impl EmptyEvent {
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<(), pina::ProgramError> {
         let mut record = [0u8; Self::SIZE];
-        let _ = Self::initialize(&mut record, initialize)?;
+        let value = <Self as pina::PinaPodFixed>::initialize_zeroed(
+                &mut record,
+                |value| {
+                    <Self as pina::HasDiscriminator>::write_discriminator(
+                        &mut value.discriminator,
+                    );
+                    initialize(value)
+                },
+            )
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        let _ = value;
         pina::emit_event(&record)
     }
 }
@@ -1581,9 +1654,17 @@ where
     PodU64: pina::pinapod::ZcField,
     <PodU64 as pina::pinapod::ZcField>::Pod: pina::pinapod::ZcElem,
 {
+    const TRIVIALLY_VALID: ::core::primitive::bool = true
+        && <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<u8 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID
+        && <<PodU64 as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::TRIVIALLY_VALID;
+    #[inline(always)]
     fn validate_ref(
         value: &Self,
     ) -> ::core::result::Result<(), pina::pinapod::PinaPodError> {
+        if Self::TRIVIALLY_VALID {
+            return ::core::result::Result::Ok(());
+        }
         <<[u8; EventDisc::BYTES] as pina::pinapod::ZcField>::Pod as pina::pinapod::ZcValidate>::validate_ref(
             &value.discriminator,
         )?;
@@ -1750,9 +1831,10 @@ impl AuditEvent {
     ///
     /// This is the on-chain producer for the `Program data:` records that
     /// generated Rust, TypeScript, and Dart clients decode. The record is
-    /// built by [`Self::initialize`], so it carries the discriminator and
-    /// any schema version envelope and passes the same structural and
-    /// application validation that [`Self::try_from_bytes`] enforces.
+    /// built through the same validated initialization contract as
+    /// [`Self::initialize`], so it carries the discriminator and any schema
+    /// version envelope and passes the same structural and application
+    /// validation that [`Self::try_from_bytes`] enforces.
     ///
     /// Emission is a log write, so an emitted event is observable to
     /// clients but does not affect program state. Propagate the returned
@@ -1771,7 +1853,23 @@ impl AuditEvent {
         ) -> Result<(), pina::PinaPodError>,
     ) -> Result<(), pina::ProgramError> {
         let mut record = [0u8; Self::SIZE];
-        let _ = Self::initialize(&mut record, initialize)?;
+        let value = <Self as pina::PinaPodFixed>::initialize_zeroed(
+                &mut record,
+                |value| {
+                    <Self as pina::HasDiscriminator>::write_discriminator(
+                        &mut value.discriminator,
+                    );
+                    initialize(value)
+                },
+            )
+            .map_err(|_| pina::ProgramError::InvalidInstructionData)?;
+        if let Err(error) = <<Self as pina::PinaPodFixed>::Zc as pina::PinaValidate>::validate(
+            value,
+        ) {
+            pina::__clear_zc(value);
+            return Err(error);
+        }
+        let _ = value;
         pina::emit_event(&record)
     }
 }
