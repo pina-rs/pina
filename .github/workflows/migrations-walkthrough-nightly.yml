@@ -25,14 +25,41 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: surfpool
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: setup Dart SDK
+        uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1.8.2
+        with:
+          sdk: "3.13.0"
+
+      - name: install surfpool CLI
+        uses: $/.github/actions/install-tools
+        with:
+          surfpool: "true"
+
+      - name: setup SBF toolchain
+        uses: $/.github/actions/setup-sbf
 
       - name: run migration walkthrough
-        run: walkthrough:migrations
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts walkthrough:migrations
+        shell: bash
 
       - name: upload walkthrough artifacts
         if: always()

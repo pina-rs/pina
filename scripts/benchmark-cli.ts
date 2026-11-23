@@ -4,6 +4,8 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+import { findExecutable } from "./find-executable.ts";
+
 const WARMUP_RUNS = 1;
 const SAMPLE_ROUNDS = 8;
 const COMMANDS = [
@@ -358,7 +360,8 @@ function run(arguments_: Arguments): void {
 			roundOutput,
 			...commands,
 		];
-		const hyperfineBinary = process.env.PINA_HYPERFINE_BIN;
+		const hyperfineBinary = process.env.PINA_HYPERFINE_BIN ??
+			findExecutable("hyperfine", process.env);
 		const hyperfine = hyperfineBinary === undefined
 			? spawnSync("cargo", ["hyperfine", ...hyperfineArguments], {
 				stdio: "inherit",

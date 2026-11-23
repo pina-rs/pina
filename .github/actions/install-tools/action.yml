@@ -1,0 +1,186 @@
+name: install-tools
+description: "Install pinned prebuilt CLI binaries without Nix or devenv"
+inputs:
+  tools:
+    description: "Comma-separated pinned tools supported natively by taiki-e/install-action (e.g. dprint@0.64.1,shfmt@3.14.1)"
+    required: false
+    default: ""
+  monochange:
+    description: "Install pinned monochange v0.21.0 binary"
+    required: false
+    default: "false"
+  mdt:
+    description: "Install pinned mdt v0.9.7 binary"
+    required: false
+    default: "false"
+  nixfmt:
+    description: "Install pinned nixfmt v1.5.0 binary"
+    required: false
+    default: "false"
+  cargo-fuzz:
+    description: "Install pinned cargo-fuzz v0.13.2 binary"
+    required: false
+    default: "false"
+  surfpool:
+    description: "Install pinned surfpool v1.7.0 binary"
+    required: false
+    default: "false"
+  sbpf-linker:
+    description: "Install pinned sbpf-linker v0.2.3 binary"
+    required: false
+    default: "false"
+  cargo-expand:
+    description: "Install and cache pinned cargo-expand v1.0.111 binary"
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: install native prebuilt tools
+      if: ${{ inputs.tools != '' }}
+      uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+      with:
+        tool: ${{ inputs.tools }}
+
+    - name: install SHA256-verified release binaries
+      if: >-
+        inputs.monochange == 'true' ||
+        inputs.mdt == 'true' ||
+        inputs.nixfmt == 'true' ||
+        inputs.cargo-fuzz == 'true' ||
+        inputs.surfpool == 'true' ||
+        inputs.sbpf-linker == 'true'
+      shell: bash
+      env:
+        INSTALL_MONOCHANGE: ${{ inputs.monochange }}
+        INSTALL_MDT: ${{ inputs.mdt }}
+        INSTALL_NIXFMT: ${{ inputs.nixfmt }}
+        INSTALL_CARGO_FUZZ: ${{ inputs.cargo-fuzz }}
+        INSTALL_SURFPOOL: ${{ inputs.surfpool }}
+        INSTALL_SBPF_LINKER: ${{ inputs.sbpf-linker }}
+      run: |
+        set -euo pipefail
+
+        if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
+          echo "::error::install-tools custom binary downloads currently support Linux x86_64 only." >&2
+          exit 1
+        fi
+
+        # GitHub-hosted Ubuntu runners already include `~/.cargo/bin` on PATH,
+        # matching `taiki-e/install-action` without mutating GITHUB_PATH.
+        bin_dir="${CARGO_HOME:-$HOME/.cargo}/bin"
+        mkdir -p "$bin_dir"
+
+        download_verified() {
+          local url="$1"
+          local expected_sha256="$2"
+          local dest="$3"
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --retry 5 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            --output "$dest" \
+            "$url"
+
+          printf '%s  %s\n' "$expected_sha256" "$dest" | sha256sum --check --status - || {
+            echo "::error::SHA256 verification failed for $url" >&2
+            exit 1
+          }
+        }
+
+        install_tar_bin() {
+          local url="$1"
+          local sha256="$2"
+          local bin_name="$3"
+          local tmp_dir
+          tmp_dir="$(mktemp -d)"
+
+          download_verified "$url" "$sha256" "$tmp_dir/archive.tar.gz"
+          mkdir -p "$tmp_dir/extract"
+          tar -xzf "$tmp_dir/archive.tar.gz" -C "$tmp_dir/extract"
+
+          local found
+          found="$(find "$tmp_dir/extract" -type f -name "$bin_name" -print -quit)"
+          if [[ -z "$found" ]]; then
+            echo "::error::Could not find binary '$bin_name' in $url" >&2
+            rm -rf "$tmp_dir"
+            exit 1
+          fi
+
+          install -m 0755 "$found" "$bin_dir/$bin_name"
+          rm -rf "$tmp_dir"
+        }
+
+        if [[ "$INSTALL_MONOCHANGE" == "true" ]]; then
+          install_tar_bin \
+            "https://github.com/monochange/monochange/releases/download/v0.21.0/monochange-x86_64-unknown-linux-musl-v0.21.0.tar.gz" \
+            "96bcd4357a2e89167551022ca5e1243155465658f227f79b2a87dff33e066553" \
+            "monochange"
+          ln -sf "$bin_dir/monochange" "$bin_dir/mc"
+        fi
+
+        if [[ "$INSTALL_MDT" == "true" ]]; then
+          install_tar_bin \
+            "https://github.com/ifiokjr/mdt/releases/download/v0.9.7/mdt-x86_64-unknown-linux-musl-v0.9.7.tar.gz" \
+            "e3935ae2287b07b1a6ab10264f78aefbe624838967401c20548ff7c91049cc60" \
+            "mdt"
+        fi
+
+        if [[ "$INSTALL_NIXFMT" == "true" ]]; then
+          tmp_nixfmt="$(mktemp -d)"
+          download_verified \
+            "https://github.com/NixOS/nixfmt/releases/download/v1.5.0/nixfmt" \
+            "aa029247ab89c897e2f3948463967553f902f86e86e3402fa28cb29c4a44f745" \
+            "$tmp_nixfmt/nixfmt"
+          install -m 0755 "$tmp_nixfmt/nixfmt" "$bin_dir/nixfmt"
+          rm -rf "$tmp_nixfmt"
+        fi
+
+        if [[ "$INSTALL_CARGO_FUZZ" == "true" ]]; then
+          install_tar_bin \
+            "https://github.com/rust-fuzz/cargo-fuzz/releases/download/0.13.2/cargo-fuzz-0.13.2-x86_64-unknown-linux-musl.tar.gz" \
+            "b5b704018b63e0f151c17a057ac53b5111e1db545d1b9f72fee79f08a545931c" \
+            "cargo-fuzz"
+        fi
+
+        if [[ "$INSTALL_SURFPOOL" == "true" ]]; then
+          install_tar_bin \
+            "https://github.com/txtx/surfpool/releases/download/v1.7.0/surfpool-linux-x64.tar.gz" \
+            "5bef2b0b186a74622508f104b6d2e4e2db040932b6d8f3a811172e241f802a63" \
+            "surfpool"
+        fi
+
+        if [[ "$INSTALL_SBPF_LINKER" == "true" ]]; then
+          install_tar_bin \
+            "https://github.com/blueshift-gg/sbpf-linker/releases/download/v0.2.3/sbpf-linker-x86_64-unknown-linux-musl.tar.gz" \
+            "a8945054e60086b01f9914bae4a22569b7cced8748e25b43c71385e44edadb61" \
+            "sbpf-linker"
+        fi
+
+    - name: cache cargo-expand binary
+      if: ${{ inputs.cargo-expand == 'true' }}
+      id: cargo-expand-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.local/share/pina-cargo-expand/1.0.111
+        key: ${{ runner.os }}-${{ runner.arch }}-cargo-expand-1.0.111-v1
+
+    - name: install cargo-expand on cache miss
+      if: ${{ inputs.cargo-expand == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        root="$HOME/.local/share/pina-cargo-expand/1.0.111"
+        bin_dir="${CARGO_HOME:-$HOME/.cargo}/bin"
+        mkdir -p "$bin_dir"
+        if [[ ! -x "$root/bin/cargo-expand" ]]; then
+          mkdir -p "$root"
+          cargo install --locked --version 1.0.111 --root "$root" cargo-expand
+        fi
+        ln -sf "$root/bin/cargo-expand" "$bin_dir/cargo-expand"

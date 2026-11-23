@@ -87,10 +87,30 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustc-dev,llvm-tools
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: install cargo-mutants
+        uses: $/.github/actions/install-tools
+        with:
+          tools: cargo-mutants@27.1.0
 
       # Mutate only the lines this pull request changes. A whole crate does not
       # fit the job: `pina_cli` alone yields thousands of mutants, which the
@@ -102,16 +122,15 @@ jobs:
           set -euo pipefail
           mkdir -p target
           git diff "${BASE_SHA}...HEAD" > target/mutants-pr.diff
+        shell: bash
 
       - name: prepare the mutation baseline
-        run: mutants:prepare
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts mutants:prepare
+        shell: bash
 
       # `--in-place` mutates this disposable checkout instead of a copy, which
       # keeps what `mutants:prepare` installed and the git worktree that
-      # `pina.toml`'s `{{root}}` anchor resolves through. The exit status is
-      # kept in a file because the clean devenv shell does not see
-      # `GITHUB_OUTPUT`.
+      # `pina.toml`'s `{{root}}` anchor resolves through.
       - name: run mutation tests for ${{ matrix.package }}
         id: mutation_tests
         continue-on-error: true
@@ -119,11 +138,11 @@ jobs:
           PACKAGE: ${{ matrix.package }}
         run: |
           status=0
-          mutants:crate "$PACKAGE" --in-diff target/mutants-pr.diff --in-place || status=$?
+          node scripts/ci-tasks.ts mutants:crate "$PACKAGE" --in-diff target/mutants-pr.diff --in-place || status=$?
           mkdir -p target/mutants
           echo "$status" > target/mutants/exit-status
           exit "$status"
-        shell: devenv shell -c PACKAGE -- bash -e {0}
+        shell: bash
 
       # Missed mutants and timeouts (cargo-mutants exits 2 and 3) are advisory
       # on pull requests, but the failed step and summary must remain visible

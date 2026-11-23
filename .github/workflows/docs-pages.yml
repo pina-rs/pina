@@ -44,24 +44,43 @@ jobs:
           ref: ${{ needs.authorize.outputs.sha }}
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          components: rustfmt,rustc-dev,llvm-tools
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: install docs tools
+        uses: $/.github/actions/install-tools
+        with:
+          tools: dprint@0.64.1,shfmt@3.14.1,mdbook@0.5.4
+          mdt: "true"
+          nixfmt: "true"
 
       - name: configure github pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - name: verify docs
-        run: verify:docs
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts verify:docs
+        shell: bash
 
       # Builds the book and renders the pina.rs landing page over its root
       # index. The custom domain itself is set in the repository's Pages
       # settings; Actions deployments ignore the CNAME file mdBook writes.
       - name: build mdBook docs
-        run: docs:build
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts docs:build
+        shell: bash
 
       - name: upload pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

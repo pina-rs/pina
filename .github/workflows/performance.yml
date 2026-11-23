@@ -19,7 +19,7 @@ on:
       - devenv.nix
       - devenv.lock
       - devenv.yaml
-      - .github/actions/devenv/**
+      - .github/actions/**
       - scripts/benchmark-cli.ts
       - scripts/benchmark-core.ts
       - scripts/profile-tracked-examples.ts
@@ -45,9 +45,7 @@ jobs:
   program-profiles:
     name: program compute units and sizes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    # A cold base/head build reached 20 minutes even with a clean comparison.
-    # Leave headroom for both profiles, artifact uploads, and post-job cleanup.
-    timeout-minutes: 30
+    timeout-minutes: 25
     runs-on: ubuntu-24.04
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target/performance-build/programs
@@ -59,35 +57,64 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: surfpool
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: setup SBF toolchain
+        uses: $/.github/actions/setup-sbf
+
+      # Static ELF sizes and static CU profiles are deterministic per base SHA,
+      # so parallel PRs based on the same `main` commit reuse the base profile.
+      - name: cache base program profiles
+        id: base-profiles-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/performance/programs/base
+          key: ${{ runner.os }}-perf-programs-base-v1-${{ github.event.pull_request.base.sha }}
 
       - name: create base worktree
-        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        if: ${{ steps.base-profiles-cache.outputs.cache-hit != 'true' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git worktree add --detach ../pina-performance-base "$BASE_SHA"
         shell: bash
 
       - name: profile base programs
+        if: ${{ steps.base-profiles-cache.outputs.cache-hit != 'true' }}
         run: |
           node ./scripts/profile-tracked-examples.ts \
-            "${{ github.workspace }}/../pina-performance-base" \
-            "${{ github.workspace }}/target/performance/programs/base"
-        shell: devenv shell -c -- bash -e {0}
+            "$GITHUB_WORKSPACE/../pina-performance-base" \
+            "$GITHUB_WORKSPACE/target/performance/programs/base"
+        shell: bash
 
       - name: profile head programs
         run: |
           node ./scripts/profile-tracked-examples.ts \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/target/performance/programs/head"
-        shell: devenv shell -c -- bash -e {0}
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_WORKSPACE/target/performance/programs/head"
+        shell: bash
 
       - name: compare program reports
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set +e
           node ./scripts/compare-compute-units.ts \
             --policy-file ./scripts/compute-unit-policy.json \
-            --base-revision "${{ github.event.pull_request.base.sha }}" \
+            --base-revision "$BASE_SHA" \
             --base-dir ./target/performance/programs/base \
             --head-dir ./target/performance/programs/head \
             --markdown-output ./target/performance/programs/report.md \
@@ -97,7 +124,7 @@ jobs:
           set -e
 
           printf '%s\n' "$status" > ./target/performance/programs/compare.status
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
       # Diagnostic only: the script exits 0 unless it cannot run at all, so the
       # independent CU and size policy gates above remain the enforcement point.
@@ -108,7 +135,7 @@ jobs:
             ./target/performance/programs/base \
             ./target/performance/programs/head \
             ./target/performance/programs/function-diffs
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
       - name: prepare program report
         id: program-report
@@ -152,10 +179,9 @@ jobs:
   instruction-compute:
     name: instruction compute units
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    # Budgets cover the whole job: setup, the base and head runtime builds, and
-    # two measurements that run one after the other. The step below owns most of
-    # this; the margin over it leaves room for the builds that precede it.
-    timeout-minutes: 100
+    # Budgets cover setup, the base/head runtime builds (with base cached by
+    # SHA across PRs targeting the same `main` commit), and Surfpool runs.
+    timeout-minutes: 90
     runs-on: ubuntu-24.04
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
@@ -166,74 +192,113 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: surfpool
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: setup SBF toolchain
+        uses: $/.github/actions/setup-sbf
+
+      # Recorded instruction CUs are deterministic per base commit, so reuse
+      # the base measurement across pushes sharing the same `main` SHA. Restore
+      # first and save only when the base report is complete (no failed batches
+      # or missing cases).
+      - name: restore base instruction compute units
+        id: base-cu-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/performance/instructions/runtime-base.json
+          key: ${{ runner.os }}-perf-instructions-base-v1-${{ github.event.pull_request.base.sha }}-${{ hashFiles('scripts/measure-example-compute-units.ts', 'scripts/compute-unit-policy.json') }}
 
       - name: create base worktree
-        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        if: ${{ steps.base-cu-cache.outputs.cache-hit != 'true' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git worktree add --detach ../pina-performance-base "$BASE_SHA"
         shell: bash
 
-      - name: build base and head runtime programs
+      - name: build runtime programs
+        env:
+          BASE_CACHE_HIT: ${{ steps.base-cu-cache.outputs.cache-hit }}
         run: |
-          node ./scripts/build-runtime-compute-units.ts \
-            --examples-only \
-            "${{ github.workspace }}/../pina-performance-base" \
-            "${{ github.workspace }}/target/performance-build/instructions/base" \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/target/performance-build/instructions/head"
-        shell: devenv shell -c -- bash -e {0}
+          set -euo pipefail
+          if [[ "$BASE_CACHE_HIT" == "true" ]]; then
+            node ./scripts/build-runtime-compute-units.ts \
+              --examples-only \
+              "$GITHUB_WORKSPACE" \
+              "$GITHUB_WORKSPACE/target/performance-build/instructions/head"
+          else
+            node ./scripts/build-runtime-compute-units.ts \
+              --examples-only \
+              "$GITHUB_WORKSPACE/../pina-performance-base" \
+              "$GITHUB_WORKSPACE/target/performance-build/instructions/base" \
+              "$GITHUB_WORKSPACE" \
+              "$GITHUB_WORKSPACE/target/performance-build/instructions/head"
+          fi
+        shell: bash
 
       - name: measure base and head instructions
+        id: measure-instructions
         # Surfpool test binaries can hang indefinitely (the SDK's startup wait
         # has no timeout). The measure script terminates an individual batch
         # after 30 minutes; this bounds the whole step for hangs the watchdog
         # does not cover instead of consuming the job budget below.
-        #
-        # The budget covers both measurements because they run in sequence, so
-        # it is roughly twice what one measurement needs. A head timeout fails
-        # the step and `bash -e` then skips the comparison, which is why this
-        # sits well above the observed runtime rather than close to it.
-        #
-        # Each measurement pairs a test workspace with that same workspace's
-        # ELFs. The base run therefore drives the base worktree's own surfpool
-        # suites against the base artifacts rather than running the head's
-        # tests against them: a pull request that adds a test asserting new
-        # behavior cannot pass against the old program, and with `--allow-
-        # incomplete` that only silences the exit code — the failures still
-        # abort the base batch and leave its cases missing.
-        #
-        # The two measurements also run one after the other. Surfpool's SDK
-        # picks its port by binding `127.0.0.1:0` and then dropping the
-        # listener before rebinding it, so concurrent surfnets can collide on
-        # a port and one client ends up talking to the other's instance. The
-        # figures come from a fresh instance per batch either way, so
-        # serializing changes nothing about what is measured.
-        timeout-minutes: 90
+        timeout-minutes: 80
+        env:
+          BASE_CACHE_HIT: ${{ steps.base-cu-cache.outputs.cache-hit }}
         run: |
-          node "${{ github.workspace }}/scripts/measure-example-compute-units.ts" \
-            "${{ github.workspace }}/../pina-performance-base" \
-            "${{ github.workspace }}/../pina-performance-base" \
-            "${{ github.workspace }}/target/performance-build/instructions/base" \
-            "${{ github.workspace }}/target/performance/instructions/runtime-base.json" \
-            --allow-incomplete
+          set -euo pipefail
+          base_complete=false
+          if [[ "$BASE_CACHE_HIT" != "true" ]]; then
+            node "$GITHUB_WORKSPACE/scripts/measure-example-compute-units.ts" \
+              "$GITHUB_WORKSPACE/../pina-performance-base" \
+              "$GITHUB_WORKSPACE/../pina-performance-base" \
+              "$GITHUB_WORKSPACE/target/performance-build/instructions/base" \
+              "$GITHUB_WORKSPACE/target/performance/instructions/runtime-base.json" \
+              --allow-incomplete
+            if jq -e '(.cases | length > 0) and (.missingCases | length == 0) and (.testFailures | length == 0) and (.unavailablePrograms | length == 0)' \
+              "$GITHUB_WORKSPACE/target/performance/instructions/runtime-base.json" >/dev/null; then
+              base_complete=true
+            fi
+          fi
+          echo "base_complete=${base_complete}" >> "$GITHUB_OUTPUT"
 
           node ./scripts/measure-example-compute-units.ts \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/target/performance-build/instructions/head" \
-            "${{ github.workspace }}/target/performance/instructions/runtime-head.json"
-        shell: devenv shell -c -- bash -e {0}
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_WORKSPACE/target/performance-build/instructions/head" \
+            "$GITHUB_WORKSPACE/target/performance/instructions/runtime-head.json"
+        shell: bash
+
+      - name: save complete base instruction compute units
+        if: ${{ steps.base-cu-cache.outputs.cache-hit != 'true' && steps.measure-instructions.outputs.base_complete == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/performance/instructions/runtime-base.json
+          key: ${{ runner.os }}-perf-instructions-base-v1-${{ github.event.pull_request.base.sha }}-${{ hashFiles('scripts/measure-example-compute-units.ts', 'scripts/compute-unit-policy.json') }}
 
       - name: compare instruction reports
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set +e
           mkdir -p ./target/performance/instructions/empty-base \
             ./target/performance/instructions/empty-head
           node ./scripts/compare-compute-units.ts \
             --policy-file ./scripts/compute-unit-policy.json \
-            --base-revision "${{ github.event.pull_request.base.sha }}" \
+            --base-revision "$BASE_SHA" \
             --base-dir ./target/performance/instructions/empty-base \
             --head-dir ./target/performance/instructions/empty-head \
             --base-runtime ./target/performance/instructions/runtime-base.json \
@@ -245,7 +310,7 @@ jobs:
           set -e
 
           printf '%s\n' "$status" > ./target/performance/instructions/compare.status
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
       - name: prepare instruction report
         id: instruction-report
@@ -289,7 +354,7 @@ jobs:
   token-loader-compute:
     name: focused token-loader compute units
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    timeout-minutes: 20
+    timeout-minutes: 15
     runs-on: ubuntu-24.04
     env:
       XDG_CACHE_HOME: ${{ github.workspace }}/.cache
@@ -300,53 +365,90 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: surfpool
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: setup SBF toolchain
+        uses: $/.github/actions/setup-sbf
+
+      - name: cache base token-loader compute units
+        id: base-token-loader-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/performance/token-loader/exact-runtime-base.json
+          key: ${{ runner.os }}-perf-token-loader-base-v1-${{ github.event.pull_request.base.sha }}-${{ hashFiles('tests/fixtures/token_loader_cu_program/**', 'tests/compute_units.rs', 'scripts/measure-runtime-compute-units.ts') }}
 
       - name: create base worktree
-        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        if: ${{ steps.base-token-loader-cache.outputs.cache-hit != 'true' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git worktree add --detach ../pina-performance-base "$BASE_SHA"
         shell: bash
 
-      - name: build base and head token-loader programs
+      - name: build token-loader programs
+        env:
+          BASE_CACHE_HIT: ${{ steps.base-token-loader-cache.outputs.cache-hit }}
         run: |
-          node ./scripts/build-runtime-compute-units.ts \
-            --token-loader-only \
-            "${{ github.workspace }}/../pina-performance-base" \
-            "${{ github.workspace }}/target/performance-build/token-loader/base" \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/target/performance-build/token-loader/head"
-        shell: devenv shell -c -- bash -e {0}
+          set -euo pipefail
+          if [[ "$BASE_CACHE_HIT" == "true" ]]; then
+            node ./scripts/build-runtime-compute-units.ts \
+              --token-loader-only \
+              "$GITHUB_WORKSPACE" \
+              "$GITHUB_WORKSPACE/target/performance-build/token-loader/head"
+          else
+            node ./scripts/build-runtime-compute-units.ts \
+              --token-loader-only \
+              "$GITHUB_WORKSPACE/../pina-performance-base" \
+              "$GITHUB_WORKSPACE/target/performance-build/token-loader/base" \
+              "$GITHUB_WORKSPACE" \
+              "$GITHUB_WORKSPACE/target/performance-build/token-loader/head"
+          fi
+        shell: bash
 
       - name: measure exact base token-loader cases
+        if: ${{ steps.base-token-loader-cache.outputs.cache-hit != 'true' }}
         run: |
           node ./scripts/measure-runtime-compute-units.ts \
             --token-loader-only \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/../pina-performance-base" \
-            "${{ github.workspace }}/target/performance-build/token-loader/base" \
-            "${{ github.workspace }}/target/performance/token-loader/exact-runtime-base.json"
-        shell: devenv shell -c -- bash -e {0}
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_WORKSPACE/../pina-performance-base" \
+            "$GITHUB_WORKSPACE/target/performance-build/token-loader/base" \
+            "$GITHUB_WORKSPACE/target/performance/token-loader/exact-runtime-base.json"
+        shell: bash
 
       - name: measure exact head token-loader cases
         run: |
           node ./scripts/measure-runtime-compute-units.ts \
             --token-loader-only \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/target/performance-build/token-loader/head" \
-            "${{ github.workspace }}/target/performance/token-loader/exact-runtime-head.json"
-        shell: devenv shell -c -- bash -e {0}
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_WORKSPACE/target/performance-build/token-loader/head" \
+            "$GITHUB_WORKSPACE/target/performance/token-loader/exact-runtime-head.json"
+        shell: bash
 
       - name: compare exact token-loader reports
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set +e
           mkdir -p ./target/performance/token-loader/empty-base \
             ./target/performance/token-loader/empty-head
           node ./scripts/compare-compute-units.ts \
             --policy-file ./scripts/compute-unit-policy.json \
-            --base-revision "${{ github.event.pull_request.base.sha }}" \
+            --base-revision "$BASE_SHA" \
             --base-dir ./target/performance/token-loader/empty-base \
             --head-dir ./target/performance/token-loader/empty-head \
             --base-exact-runtime ./target/performance/token-loader/exact-runtime-base.json \
@@ -360,7 +462,7 @@ jobs:
           sed -i '1s/Instruction compute units/Focused token-loader compute units/' \
             ./target/performance/token-loader/report.md
           printf '%s\n' "$status" > ./target/performance/token-loader/compare.status
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
       - name: prepare token-loader report
         id: token-loader-report
@@ -404,10 +506,7 @@ jobs:
   cli:
     name: CLI performance
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
-    # Building both CLIs and running the benchmarks against them peaked at
-    # ~11.5 minutes, which left too little room on a slow runner and surfaced
-    # as spurious job timeouts on otherwise healthy pull requests.
-    timeout-minutes: 25
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     steps:
       - name: checkout repository
@@ -416,41 +515,74 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: install hyperfine
+        uses: $/.github/actions/install-tools
+        with:
+          tools: hyperfine@1.20.0
+
+      - name: cache base CLI binary
+        id: base-cli-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/performance-build/cli/base-bin
+          key: ${{ runner.os }}-perf-cli-base-bin-v1-${{ github.event.pull_request.base.sha }}
 
       - name: create base worktree
-        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        if: ${{ steps.base-cli-cache.outputs.cache-hit != 'true' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git worktree add --detach ../pina-performance-base "$BASE_SHA"
         shell: bash
 
       - name: build base and head CLIs
+        env:
+          BASE_CACHE_HIT: ${{ steps.base-cli-cache.outputs.cache-hit }}
         run: |
+          set -euo pipefail
           # Separate target dirs: sharing one makes cargo reuse the base
           # build's pina_profile rlib for the head build when only content
           # (not mtime) differs, and the head CLI then fails with missing
           # symbols for anything the PR added to pina_profile.
           mkdir -p ./target/performance-build/cli/base-bin ./target/performance-build/cli/head-bin
-          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/base-target" \
-            cargo build --release --locked -p pina_cli \
-            --manifest-path "${{ github.workspace }}/../pina-performance-base/Cargo.toml"
-          cp ./target/performance-build/cli/base-target/release/pina \
-            ./target/performance-build/cli/base-bin/pina
-          CARGO_TARGET_DIR="${{ github.workspace }}/target/performance-build/cli/head-target" \
+          if [[ "$BASE_CACHE_HIT" != "true" ]]; then
+            CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/performance-build/cli/base-target" \
+              cargo build --release --locked -p pina_cli \
+              --manifest-path "$GITHUB_WORKSPACE/../pina-performance-base/Cargo.toml"
+            cp ./target/performance-build/cli/base-target/release/pina \
+              ./target/performance-build/cli/base-bin/pina
+          fi
+          CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target/performance-build/cli/head-target" \
             cargo build --release --locked -p pina_cli
           cp ./target/performance-build/cli/head-target/release/pina \
             ./target/performance-build/cli/head-bin/pina
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
       - name: benchmark CLI
+        env:
+          PINA_HYPERFINE_BIN: hyperfine
         run: |
           node ./scripts/benchmark-cli.ts \
             --base-bin ./target/performance-build/cli/base-bin/pina \
             --head-bin ./target/performance-build/cli/head-bin/pina \
             --markdown-output ./target/performance/cli/report.md \
             --json-output ./target/performance/cli/report.json
-        shell: devenv shell -c -- bash -e {0}
+        shell: bash
 
       - name: prepare CLI report
         if: always()
@@ -483,23 +615,36 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: host
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
 
       - name: create base worktree
-        run: git worktree add --detach ../pina-performance-base ${{ github.event.pull_request.base.sha }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git worktree add --detach ../pina-performance-base "$BASE_SHA"
         shell: bash
 
       - name: benchmark core code
         run: |
           node ./scripts/benchmark-core.ts \
-            "${{ github.workspace }}/../pina-performance-base" \
-            "${{ github.workspace }}" \
-            "${{ github.workspace }}/target/performance/core" \
-            "${{ github.workspace }}/target/performance-build/core"
-        shell: devenv shell -c -- bash -e {0}
+            "$GITHUB_WORKSPACE/../pina-performance-base" \
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_WORKSPACE/target/performance/core" \
+            "$GITHUB_WORKSPACE/target/performance-build/core"
+        shell: bash
 
       - name: prepare core report
         if: always()

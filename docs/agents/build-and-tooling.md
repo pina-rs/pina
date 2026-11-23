@@ -64,10 +64,18 @@ cargo semver-checks
 
 ## CI
 
+GitHub Actions workflows do **not** run Nix or `devenv` on runners. Instead, jobs compose lightweight, pinned setup actions and delegate shared build/test/coverage orchestration to `scripts/ci-tasks.ts` (which `devenv.nix` also delegates to so local `devenv shell` tasks stay in sync with CI):
+
+- `.github/actions/setup-rust` — installs the minimal pinned Rust toolchain, configures `mold` and `CARGO_PROFILE_DEV_DEBUG=0`, enables S3-compatible `sccache` when configured, and falls back to `Swatinem/rust-cache` with shared keys and `main`-only writes.
+- `.github/actions/install-tools` — installs only the pinned prebuilt CLI binaries a job needs (`dprint`, `shfmt`, `mdbook`, `zizmor`, `cargo-deny`, `cargo-audit`, `cargo-llvm-cov`, `monochange`, `mdt`, `nixfmt`, `cargo-fuzz`, `surfpool`, `sbpf-linker`, cached `cargo-expand`).
+- `.github/actions/setup-sbf` — caches pinned Agave SBF binaries and preinstalled `platform-tools` (`v1.54`) so SBF jobs skip `--force-tools-install`.
+
+To offload Rust compilation caching from GitHub's 10 GB cache limit to an S3-compatible bucket (Backblaze B2, Cloudflare R2, or AWS S3), configure the repository variables `SCCACHE_BUCKET`, `SCCACHE_ENDPOINT`, and `SCCACHE_REGION` alongside the repository secrets `SCCACHE_ACCESS_KEY_ID` and `SCCACHE_SECRET_ACCESS_KEY`. When present, `setup-rust` automatically activates `sccache` and shrinks `Swatinem/rust-cache` to crates.io registry downloads only.
+
 Pull requests run a fast, high-confidence subset of CI; pushes to `main` run the full suite after merge. Jobs are gated on changed paths, and the slowest verification tiers only run on `main`:
 
-- `kani (compact layouts)`, `program-e2e`, and the dedicated `build` job run post-merge only.
-- `coverage` runs post-merge only.
+- `kani (compact layouts)`, `program-e2e`, `test`, and the dedicated `build` job run post-merge only.
+- `coverage` runs on pull requests as the Rust test and patch-coverage gate.
 - Everything else runs per pull request when the changed paths can affect it (for example, `surfpool` runs only for example or crate changes, and `zizmor` only for workflow changes).
 
 Add the `ci-full` label to a pull request to force every tier, including the post-merge-only jobs, before merging. The `release` label keeps the benchmark jobs and the publish dry-run from running on release pull requests.

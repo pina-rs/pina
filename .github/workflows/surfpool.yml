@@ -52,10 +52,11 @@ jobs:
               - devenv.yaml
               - scripts/build-surfpool-examples.sh
               - .github/workflows/surfpool.yml
-              - .github/actions/devenv/**
+              - .github/actions/**
+              - scripts/ci-tasks.ts
 
   surfpool-examples:
-    timeout-minutes: 60
+    timeout-minutes: 45
     runs-on: ubuntu-24.04
     needs: changes
     if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.relevant == 'true' || contains(github.event.pull_request.labels.*.name, 'ci-full')) }}
@@ -65,11 +66,33 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: setup Rust
+        uses: $/.github/actions/setup-rust
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache-key: surfpool
+          sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
+          sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
+          sccache-region: ${{ vars.SCCACHE_REGION }}
+          sccache-access-key-id: ${{ secrets.SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.SCCACHE_SECRET_ACCESS_KEY }}
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: install surfpool CLI
+        uses: $/.github/actions/install-tools
+        with:
+          surfpool: "true"
+
+      - name: setup SBF toolchain
+        uses: $/.github/actions/setup-sbf
 
       - name: build and test all Surfpool examples
-        run: test:surfpool
-        shell: devenv shell -c -- bash -e {0}
+        run: node scripts/ci-tasks.ts test:surfpool
+        shell: bash

@@ -28,6 +28,13 @@ if ! command -v cargo-fuzz >/dev/null 2>&1; then
 	exit 1
 fi
 
+HOST_TARGET="$(rustc -vV | sed -n 's/^host: //p')"
+if [[ -z "$HOST_TARGET" ]]; then
+	echo "Failed to determine rustc host target triple." >&2
+	exit 1
+fi
+readonly HOST_TARGET
+
 cd "$FUZZ_CRATE_DIR"
 shopt -s nullglob
 
@@ -46,12 +53,30 @@ for target in "${FUZZ_TARGETS[@]}"; do
 	for seed_input in "${seed_inputs[@]}"; do
 		[[ -f "$seed_input" ]] || continue
 		echo "Replaying $seed_input..."
-		cargo fuzz run "$target" "$seed_input"
+		cargo fuzz run --target "$HOST_TARGET" "$target" "$seed_input"
 		cp "$seed_input" "$target_runtime_dir/"
 	done
-
-	echo "Fuzzing $target for ${FUZZ_SECONDS_PER_TARGET}s..."
-	cargo fuzz run "$target" "$target_runtime_dir" -- \
-		"-max_total_time=$FUZZ_SECONDS_PER_TARGET" \
-		"-timeout=$FUZZ_INPUT_TIMEOUT_SECONDS"
 done
+
+# All targets are already compiled above, so run the bounded fuzzing loops in
+# parallel across available cores instead of paying 3x wall time sequentially.
+declare -a fuzz_pids=()
+declare -a fuzz_names=()
+for target in "${FUZZ_TARGETS[@]}"; do
+	target_runtime_dir="$RUNTIME_CORPUS_DIR/$target"
+	echo "Fuzzing $target for ${FUZZ_SECONDS_PER_TARGET}s..."
+	cargo fuzz run --target "$HOST_TARGET" "$target" "$target_runtime_dir" -- \
+		"-max_total_time=$FUZZ_SECONDS_PER_TARGET" \
+		"-timeout=$FUZZ_INPUT_TIMEOUT_SECONDS" &
+	fuzz_pids+=("$!")
+	fuzz_names+=("$target")
+done
+
+fuzz_failed=0
+for index in "${!fuzz_pids[@]}"; do
+	if ! wait "${fuzz_pids[$index]}"; then
+		echo "Fuzz target '${fuzz_names[$index]}' failed." >&2
+		fuzz_failed=1
+	fi
+done
+exit "$fuzz_failed"

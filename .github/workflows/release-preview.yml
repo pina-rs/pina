@@ -52,10 +52,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: setup
-        uses: $/.github/actions/devenv
+      - name: install monochange
+        uses: $/.github/actions/install-tools
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          monochange: "true"
 
       - name: preview release
         run: |
@@ -140,4 +140,4 @@ jobs:
           preview_status=0
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           exit "$preview_status"
-        shell: devenv shell -- bash -e {0}
+        shell: bash

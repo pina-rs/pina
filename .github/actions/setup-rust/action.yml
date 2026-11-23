@@ -1,0 +1,211 @@
+name: setup-rust
+description: "Set up pinned Rust toolchain, fast linker (mold), and right-sized Rust/sccache caching without Nix"
+inputs:
+  toolchain:
+    description: "Rust toolchain channel to install (defaults to workspace pin)"
+    required: false
+    default: "nightly-2026-09-15"
+  components:
+    description: "Comma-separated rustup components to install (minimal profile avoids rust-docs and rust-analyzer)"
+    required: false
+    default: ""
+  extra-toolchain:
+    description: "Optional secondary Rust toolchain channel (e.g. nightly-2025-11-20 for SBF CPI checks)"
+    required: false
+    default: ""
+  extra-components:
+    description: "Comma-separated rustup components for extra-toolchain"
+    required: false
+    default: ""
+  cache-key:
+    description: "Shared rust-cache key group (use 'none' to disable rust-cache)"
+    required: false
+    default: "host"
+  cache-targets:
+    description: "Whether Swatinem/rust-cache should cache target/ artifacts when sccache is inactive"
+    required: false
+    default: "true"
+  workspaces:
+    description: "Optional workspaces input forwarded to Swatinem/rust-cache"
+    required: false
+    default: ""
+  use-mold:
+    description: "Use mold linker on Linux x86_64 for faster host linking"
+    required: false
+    default: "true"
+  dev-debug:
+    description: "CARGO_PROFILE_DEV_DEBUG / CARGO_PROFILE_TEST_DEBUG value ('0', 'line-tables-only', or 'inherit')"
+    required: false
+    default: "0"
+  use-sccache:
+    description: "Enable sccache when S3-compatible cache credentials are configured"
+    required: false
+    default: "true"
+  sccache-bucket:
+    description: "S3-compatible bucket name (Backblaze B2, Cloudflare R2, AWS S3)"
+    required: false
+    default: ""
+  sccache-endpoint:
+    description: "S3-compatible endpoint URL (e.g. https://s3.us-west-004.backblazeb2.com or https://<account>.r2.cloudflarestorage.com)"
+    required: false
+    default: ""
+  sccache-region:
+    description: "S3 region (e.g. us-west-004 for Backblaze B2, auto for Cloudflare R2)"
+    required: false
+    default: "auto"
+  sccache-key-prefix:
+    description: "Key prefix inside the S3-compatible bucket"
+    required: false
+    default: "pina-rs/pina"
+  sccache-rw-mode:
+    description: "sccache S3 access mode (READ_WRITE or READ_ONLY)"
+    required: false
+    default: "READ_WRITE"
+  sccache-access-key-id:
+    description: "S3/B2/R2 access key ID secret"
+    required: false
+    default: ""
+  sccache-secret-access-key:
+    description: "S3/B2/R2 secret access key"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: install Rust toolchain
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        # `rustc_private` binaries (such as `pina_lint_driver`) link against the
+        # target `libLLVM-*.so` shipped inside `llvm-tools`, so always pair
+        # `llvm-tools` with `rustc-dev`.
+        components: ${{ contains(inputs.components, 'rustc-dev') && !contains(inputs.components, 'llvm-tools') && format('{0},llvm-tools', inputs.components) || inputs.components }}
+
+    - name: install secondary Rust toolchain
+      if: ${{ inputs.extra-toolchain != '' }}
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+      with:
+        toolchain: ${{ inputs.extra-toolchain }}
+        components: ${{ inputs.extra-components }}
+
+    - name: install mold linker
+      if: ${{ runner.os == 'Linux' && inputs.use-mold == 'true' }}
+      uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+      with:
+        tool: mold@3.0.0
+
+    - name: configure Rust build environment
+      shell: bash
+      env:
+        REQUESTED_TOOLCHAIN: ${{ inputs.toolchain }}
+        USE_MOLD: ${{ inputs.use-mold }}
+        DEV_DEBUG: ${{ inputs.dev-debug }}
+        RUNNER_OS_NAME: ${{ runner.os }}
+        RUNNER_ARCH_NAME: ${{ runner.arch }}
+      run: |
+        set -euo pipefail
+
+        # Pin RUSTUP_TOOLCHAIN to the exact installed directory name
+        # (e.g. `nightly-2026-09-15-x86_64-unknown-linux-gnu`). This prevents
+        # rustup from auto-downloading unused components from
+        # `rust-toolchain.toml` (like rust-analyzer and rust-docs) while still
+        # matching `$RUSTUP_HOME/toolchains/$RUSTUP_TOOLCHAIN` for
+        # `pina_lint_driver`.
+        sysroot="$(rustc "+${REQUESTED_TOOLCHAIN}" --print sysroot)"
+        toolchain_dir="$(basename "$sysroot")"
+
+        {
+          echo "RUSTUP_TOOLCHAIN=${toolchain_dir}"
+          echo "OPENSSL_NO_VENDOR=1"
+          echo "RUSTUP_MAX_RETRIES=3"
+          echo "CARGO_TERM_COLOR=always"
+          echo "PINA_BPF_TOOLCHAIN=nightly-2025-11-20"
+          echo "SBF_TOOLS_VERSION=v1.54"
+        } >> "$GITHUB_ENV"
+
+        if [[ "$DEV_DEBUG" != "inherit" && -n "$DEV_DEBUG" ]]; then
+          {
+            echo "CARGO_PROFILE_DEV_DEBUG=${DEV_DEBUG}"
+            echo "CARGO_PROFILE_TEST_DEBUG=${DEV_DEBUG}"
+          } >> "$GITHUB_ENV"
+        fi
+
+        if [[ "$RUNNER_OS_NAME" == "Linux" && "$RUNNER_ARCH_NAME" == "X64" && "$USE_MOLD" == "true" ]]; then
+          mold_bin="$(command -v mold)"
+          # Clang looks for `ld.mold` when given `-fuse-ld=mold`, and accepts an
+          # absolute path on all modern versions. Create the sibling symlink and
+          # pass the resolved path so both bare and path-based linker invocations
+          # succeed reliably across Clang releases.
+          ln -sf "$mold_bin" "$(dirname "$mold_bin")/ld.mold"
+          {
+            echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang"
+            echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS=-C link-arg=-fuse-ld=${mold_bin}"
+          } >> "$GITHUB_ENV"
+        fi
+
+    - name: detect S3 sccache availability
+      id: sccache-check
+      shell: bash
+      env:
+        USE_SCCACHE: ${{ inputs.use-sccache }}
+        BUCKET: ${{ inputs.sccache-bucket }}
+        KEY_ID: ${{ inputs.sccache-access-key-id }}
+        SECRET_KEY: ${{ inputs.sccache-secret-access-key }}
+      run: |
+        set -euo pipefail
+        if [[ "$USE_SCCACHE" == "true" && -n "$BUCKET" && -n "$KEY_ID" && -n "$SECRET_KEY" ]]; then
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "enabled=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: install sccache
+      if: ${{ steps.sccache-check.outputs.enabled == 'true' }}
+      uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+      with:
+        tool: sccache@0.19.0
+
+    - name: configure S3 sccache
+      if: ${{ steps.sccache-check.outputs.enabled == 'true' }}
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      env:
+        BUCKET: ${{ inputs.sccache-bucket }}
+        ENDPOINT: ${{ inputs.sccache-endpoint }}
+        REGION: ${{ inputs.sccache-region }}
+        KEY_PREFIX: ${{ inputs.sccache-key-prefix }}
+        RW_MODE: ${{ inputs.sccache-rw-mode }}
+        KEY_ID: ${{ inputs.sccache-access-key-id }}
+        SECRET_KEY: ${{ inputs.sccache-secret-access-key }}
+      with:
+        script: |
+          core.exportVariable("RUSTC_WRAPPER", "sccache");
+          core.exportVariable("CARGO_INCREMENTAL", "0");
+          core.exportVariable("SCCACHE_BUCKET", process.env.BUCKET);
+          core.exportVariable("SCCACHE_REGION", process.env.REGION || "auto");
+          core.exportVariable("SCCACHE_S3_KEY_PREFIX", process.env.KEY_PREFIX);
+          core.exportVariable("SCCACHE_S3_RW_MODE", process.env.RW_MODE);
+          core.exportVariable("SCCACHE_IDLE_TIMEOUT", "0");
+          core.exportVariable("AWS_ACCESS_KEY_ID", process.env.KEY_ID);
+          core.exportVariable("AWS_SECRET_ACCESS_KEY", process.env.SECRET_KEY);
+          if (process.env.ENDPOINT) {
+            core.exportVariable("SCCACHE_ENDPOINT", process.env.ENDPOINT);
+            if (!process.env.ENDPOINT.startsWith("http://")) {
+              core.exportVariable("SCCACHE_S3_USE_SSL", "true");
+            }
+          }
+
+    - name: cache Rust dependencies (GitHub cache)
+      if: ${{ inputs.cache-key != 'none' }}
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      with:
+        # Group compatible jobs under a shared key and write only from `main`
+        # so parallel agent PRs read warm caches without thrashing GitHub's
+        # 10 GB repo cache quota. When S3/B2/R2 sccache is enabled, cache only
+        # crates.io registry downloads here and let sccache own compiled crates.
+        shared-key: "${{ inputs.cache-key }}-${{ inputs.toolchain }}-${{ inputs.dev-debug }}-${{ inputs.use-mold }}"
+        prefix-key: "v3-${{ hashFiles('rust-toolchain.toml', '.github/actions/setup-rust/action.yml') }}"
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+        cache-targets: ${{ steps.sccache-check.outputs.enabled != 'true' && inputs.cache-targets == 'true' }}
+        cache-bin: false
+        workspaces: ${{ inputs.workspaces }}
