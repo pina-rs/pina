@@ -844,6 +844,17 @@ impl pina::PinaAccount for CounterState {
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
+    }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AllSeedState {
@@ -1959,6 +1970,17 @@ impl pina::PinaAccount for AllSeedState {
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
+    }
 }
 pub struct VaultState {
     pub user: Address,
@@ -2814,6 +2836,17 @@ impl pina::PinaAccount for TodoState {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -4364,6 +4397,7 @@ impl<'__pina_validation> pina::PinaValidate for CompactStateRef<'__pina_validati
 impl pina::PinaCompactAccount for CompactState {
     type Ref<'data> = CompactStateRef<'data>;
     type Patch<'patch> = CompactStatePatch<'patch>;
+    const __DERIVED_COMPACT_VALIDATE_SIZE: bool = true;
     fn try_from_bytes(data: &[u8]) -> Result<Self::Ref<'_>, pina::ProgramError> {
         Self::try_from_bytes(data)
     }

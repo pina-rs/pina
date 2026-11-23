@@ -95,6 +95,10 @@ jobs:
         with:
           components: llvm-tools,rustc-dev
           cache-key: coverage
+          # mold drops LLVM coverage counter updates for cross-crate
+          # `#[inline(always)]` functions (taiki-e/cargo-llvm-cov#482),
+          # causing executed lines to report 0 hits in lcov.
+          use-mold: "false"
           sccache-bucket: ${{ vars.SCCACHE_BUCKET }}
           sccache-endpoint: ${{ vars.SCCACHE_ENDPOINT }}
           sccache-region: ${{ vars.SCCACHE_REGION }}

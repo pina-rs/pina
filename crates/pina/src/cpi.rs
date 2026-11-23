@@ -77,23 +77,26 @@ const MEDIUM_SEED_CAPACITY: usize = 8;
 #[cfg(feature = "const-rent")]
 const MAX_PERMITTED_DATA_LENGTH: u64 = 10 * 1024 * 1024;
 
-/// Return a [`Rent`] configured with mainnet's current rent parameters
-/// (`DEFAULT_LAMPORTS_PER_BYTE = 6_960`, `ACCOUNT_STORAGE_OVERHEAD = 128`).
+/// Return a [`Rent`] configured with Pinocchio's compile-time
+/// [`DEFAULT_LAMPORTS_PER_BYTE`](pinocchio::sysvars::rent::DEFAULT_LAMPORTS_PER_BYTE)
+/// constant (`6_960` lamports/byte, `ACCOUNT_STORAGE_OVERHEAD = 128`).
 ///
 /// Pass this value to any builder's `invoke_signed_with_rent` method to skip
 /// the `sol_get_sysvar` syscall (~100 CU) and let LLVM constant-fold fixed
 /// account rent balances into immediate values.
 ///
-/// Only use this when you explicitly accept that your program will assume
-/// mainnet's current rent rate instead of reading the runtime `Rent` sysvar
-/// (which could change under future governance proposals such as SIMD-0194).
-/// When creating multiple accounts in one instruction without assuming fixed
-/// rent parameters, call `Rent::get()?` once and pass that `Rent` value to
+/// **Important**: This uses the legacy fixed `6_960` lamports/byte default and
+/// does **not** track live cluster rent reductions (such as SIMD-0437, which
+/// stepped mainnet down to `5_080` lamports/byte and lowers it further in
+/// subsequent steps). Using this helper on a cluster with a lower rent rate
+/// overfunds newly created accounts (the excess remains recoverable on close)
+/// and can reduce or suppress shrink refunds. When exact cluster rent is
+/// required, call `Rent::get()?` once per instruction and pass `&rent` to
 /// `invoke_signed_with_rent`.
 #[cfg(feature = "const-rent")]
 #[inline(always)]
 #[allow(unsafe_code)]
-pub fn mainnet_rent() -> Rent {
+pub fn default_rent() -> Rent {
 	const {
 		assert!(size_of::<Rent>() == size_of::<u64>());
 	}
@@ -105,7 +108,11 @@ pub fn mainnet_rent() -> Rent {
 }
 
 /// Compute the rent-exempt minimum balance in lamports for `space` bytes using
-/// mainnet's current rent constants (`(128 + space) * 6_960`).
+/// Pinocchio's legacy compile-time rent constants (`(128 + space) * 6_960`).
+///
+/// This does **not** track live cluster rent reductions (such as SIMD-0437);
+/// use `Rent::get()?.try_minimum_balance(space)` when exact live cluster rent
+/// is required.
 ///
 /// Rejects `space > 10 MiB` (`MAX_PERMITTED_DATA_LENGTH`) with
 /// [`ProgramError::InvalidArgument`], matching
@@ -2293,6 +2300,19 @@ impl<P> UpdateResizableAccount<'_, '_, '_, P> {
 			.assert_owner(self.program_id)?;
 
 		let current_size = self.account.data_len();
+		// Manual `PinaCompactAccount` implementations may override
+		// `validate_size` to reject sizes accepted by `updated_len` / `update`.
+		// Preflight `validate_size` before mutating bytes for those types so a
+		// rejected size leaves storage untouched, while derived compact
+		// accounts (whose `validate_size` matches `PinaPodCompact::validate_storage_len`,
+		// already enforced before writes in `try_update_or_len`) stay single-pass.
+		if const { !T::__DERIVED_COMPACT_VALIDATE_SIZE } {
+			let preflight_size = {
+				let data = self.account.try_borrow()?;
+				T::updated_len(&data, self.patch.as_pina_patch())?
+			};
+			T::validate_size(preflight_size)?;
+		}
 		// Single-pass preflight + in-place update: enforces the storage
 		// length, discriminator, migration envelope, and structural bounds
 		// once, committing directly when the result fits in the current

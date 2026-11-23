@@ -164,6 +164,12 @@ ignore = true
 multiple-versions = "warn"
 wildcards = "deny"
 highlight = "all"
+deny = [
+	# Guard against RUSTSEC-2026-0592 regressing on the 2.x line while the
+	# advisory ignore remains in place solely for Surfpool's host/test url 1.7.2
+	# dependency (#722).
+	{ crate = "url:>=2.0.0, <2.5.9", reason = "RUSTSEC-2026-0592: url 2.x must stay >= 2.5.9; only host/test Surfpool url 1.7.2 is excepted (#722)" },
+]
 
 [sources]
 unknown-registry = "deny"

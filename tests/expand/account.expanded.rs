@@ -653,6 +653,17 @@ impl pina::PinaAccount for ConfigState {
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
+    }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct GameState {
@@ -1130,6 +1141,17 @@ impl pina::PinaAccount for GameState {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -1662,6 +1684,17 @@ impl pina::PinaAccount for DataAccount {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -2265,6 +2298,17 @@ impl pina::PinaAccount for BalanceAccount {
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
     }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
+    }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct MyStruct {
@@ -2657,6 +2701,17 @@ impl pina::PinaAccount for MyStruct {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }
 #[pinapod(crate = pina::pinapod, no_inherent)]
@@ -3534,5 +3589,16 @@ impl pina::PinaAccount for LargeState {
     }
     fn write_zc_discriminator(value: &mut <Self as pina::PinaPodFixed>::Zc) {
         <Self as pina::HasDiscriminator>::write_discriminator(&mut value.discriminator);
+    }
+    fn __initialize_zeroed<F>(
+        data: &mut [u8],
+        initialize: F,
+    ) -> Result<&mut <Self as pina::PinaPodFixed>::Zc, pina::ProgramError>
+    where
+        F: FnOnce(
+            &mut <Self as pina::PinaPodFixed>::Zc,
+        ) -> Result<(), pina::PinaPodError>,
+    {
+        pina::__initialize_derived_zeroed::<Self, F>(data, initialize)
     }
 }

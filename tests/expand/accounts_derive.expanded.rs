@@ -67,6 +67,7 @@ impl<'a> pina::ParseAccounts<'a> for InitAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for InitAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -188,6 +189,7 @@ impl<'a> pina::ParseAccounts<'a> for TransferAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for TransferAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -302,6 +304,7 @@ impl<'a> pina::ParseAccounts<'a> for MutableTransferAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for MutableTransferAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -412,6 +415,7 @@ impl<'a> pina::ParseAccounts<'a> for DuplicateMutableRemainingAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for DuplicateMutableRemainingAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -518,6 +522,7 @@ impl<'a> pina::ParseAccounts<'a> for SingleAccount<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for SingleAccount<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -673,6 +678,7 @@ impl<'a> pina::ParseAccounts<'a> for EscrowAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for EscrowAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -797,6 +803,7 @@ impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
     }
 }
 impl<'a> ::pina::TryFromAccountInfos<'a> for DefaultCrateAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &::pina::Address,
         accounts: &'a mut [::pina::AccountView],
@@ -929,6 +936,7 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for MakeAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],

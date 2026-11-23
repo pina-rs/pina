@@ -37,13 +37,14 @@ account-resize = ["pinocchio/account-resize", "pinocchio-system/account-resize"]
 # that runtime feature on the deployment cluster; trades initialization CU
 # for a smaller program while preserving pre-funded target support.
 create-account-allow-prefund = []
-# Expose `mainnet_rent()` and `minimum_balance_const()` using mainnet's
-# current rent constants (`(128 + space) * 6_960` lamports) for callers that
-# want to pass a constant `Rent` to `invoke_signed_with_rent` instead of
-# invoking `sol_get_sysvar` (~100 CU per creation/resize). Purely additive:
-# enabling this feature never alters default `invoke*` paths, avoiding Cargo
-# feature-unification surprises if governance changes rent parameters
-# (such as SIMD-0194).
+# Expose `default_rent()` and `minimum_balance_const()` using Pinocchio's
+# legacy compile-time rent constants (`(128 + space) * 6_960` lamports) for
+# callers that explicitly accept the fixed legacy rate instead of invoking
+# `sol_get_sysvar` (~100 CU per creation/resize). Does NOT track live cluster
+# rent reductions (such as SIMD-0437); call `Rent::get()?` once per instruction
+# and pass `&rent` to `invoke_signed_with_rent` when live cluster rent is
+# required. Purely additive: enabling this feature never alters default
+# `invoke*` paths.
 const-rent = []
 derive = ["dep:pina_macros"]
 compact = ["derive", "pina_macros/compact"]

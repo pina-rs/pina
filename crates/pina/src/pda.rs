@@ -17,23 +17,31 @@ struct SolBytes {
 	len: u64,
 }
 
-#[cfg(any(target_os = "solana", target_arch = "bpf"))]
-const _: () = {
-	assert!(size_of::<SolBytes>() == size_of::<&[u8]>());
-	assert!(align_of::<SolBytes>() == align_of::<&[u8]>());
-};
-
 #[inline(always)]
 #[allow(unsafe_code)]
 fn sha256_matches_address(inputs: &[&[u8]], address: &Address) -> bool {
 	#[cfg(any(target_os = "solana", target_arch = "bpf"))]
 	{
+		if inputs.len() > crate::MAX_SEEDS + 2 {
+			return false;
+		}
+		let mut descriptors =
+			[const { core::mem::MaybeUninit::<SolBytes>::uninit() }; crate::MAX_SEEDS + 2];
+		let mut i = 0;
+		while i < inputs.len() {
+			descriptors[i].write(SolBytes {
+				addr: inputs[i].as_ptr(),
+				len: inputs[i].len() as u64,
+			});
+			i += 1;
+		}
 		let mut derived = core::mem::MaybeUninit::<[u8; crate::ADDRESS_BYTES]>::uninit();
-		// SAFETY: `sol_sha256` reads `inputs.len()` `(ptr, len)` slice descriptors
-		// from `inputs` and initializes all 32 bytes of `derived`.
+		// SAFETY: `descriptors[..inputs.len()]` contains `inputs.len()` initialized
+		// `#[repr(C)] SolBytes` entries whose backing slices outlive the syscall,
+		// and `sol_sha256` initializes all 32 bytes of `derived`.
 		unsafe {
 			solana_sha256_hasher::sol_sha256(
-				inputs.as_ptr().cast::<u8>(),
+				descriptors.as_ptr().cast::<u8>(),
 				inputs.len() as u64,
 				derived.as_mut_ptr().cast::<u8>(),
 			);
@@ -608,6 +616,13 @@ pub(crate) const fn is_on_curve_const(bytes: &[u8; 32]) -> bool {
 /// [`try_find_program_address`], but runs purely in `const` evaluation so
 /// programs with constant seeds pay **0 compute units** at runtime.
 ///
+/// Unlike [`try_find_program_address`], which returns `None` both when
+/// `seeds.len() >= MAX_SEEDS` and when any seed exceeds `MAX_SEED_LEN`, this
+/// helper enforces `N < MAX_SEEDS` via a compile-time `const` assertion (so
+/// `N >= MAX_SEEDS` fails compilation rather than returning `None`). Oversized
+/// individual seeds (`seed.len() > MAX_SEED_LEN`) and exhausted bump ranges
+/// return `None`.
+///
 /// Only use this in `const` contexts where all seeds and `program_id` are
 /// compile-time constants; at runtime, call [`try_find_program_address`] so
 /// Solana targets use hardware-accelerated syscalls instead of software SHA-256
@@ -662,13 +677,16 @@ pub const fn try_find_program_address_const<const N: usize>(
 	result
 }
 
-/// Derive a canonical PDA and bump seed at compile time, panicking during
-/// compilation if the seeds are invalid or no bump exists.
+/// Derive a canonical PDA and bump seed at compile time, failing compilation
+/// in `const` contexts (or panicking if called at runtime) when the seeds are
+/// invalid or no bump exists.
 ///
 /// # Panics
 ///
-/// Panics if `N >= MAX_SEEDS`, any seed exceeds `MAX_SEED_LEN`, or no off-curve
-/// bump exists in `1..=255`.
+/// Passing `N >= MAX_SEEDS` always fails compilation (via the `const`
+/// assertion in [`try_find_program_address_const`]). An oversized seed
+/// (`seed.len() > MAX_SEED_LEN`) or an exhausted bump range fails compilation
+/// when evaluated in a `const` context, and panics if invoked at runtime.
 ///
 /// # Examples
 ///

@@ -142,4 +142,43 @@ LL |     let mut copy = *accounts.readonly;
    |                    ^^^^^^^^^^^^^^^^^^
    = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
 
-error: aborting due to 11 previous errors
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:95:2
+   |
+LL |     acc.set_lamports(7);
+   |     ^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:91:10
+   |
+LL |             acc = *accounts.readonly;
+   |                   ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:103:2
+   |
+LL |     acc.close()?;
+   |     ^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:101:9
+   |
+LL |         acc = *r;
+   |               ^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: mutably borrowing an `AccountView` copied from a shared reference bypasses readonly and mutable-aliasing checks
+  --> $DIR/readonly_copy_escalation.rs:113:3
+   |
+LL |         acc.set_lamports(8);
+   |         ^^^^^^^^^^^^^^^^^^^
+   |
+note: readonly `AccountView` was copied or cloned here
+  --> $DIR/readonly_copy_escalation.rs:114:9
+   |
+LL |         acc = *accounts.readonly;
+   |               ^^^^^^^^^^^^^^^^^^
+   = help: declare the account slot as `&'a mut AccountView` in `#[derive(Accounts)]` (or accept `&mut AccountView` directly) so Pina enforces writability and duplicate-mutable checks before execution
+
+error: aborting due to 14 previous errors

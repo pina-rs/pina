@@ -583,7 +583,6 @@ fn benchmark_fixed_account_initialize_vs_initialize_zeroed() {
 	use pina::PinaAccount;
 
 	let mut buf_full = [0_u8; TestState::SIZE];
-	let mut buf_zeroed = [0_u8; TestState::SIZE];
 
 	bench("TestState::initialize (full zero-fill + init)", || {
 		let res = TestState::initialize(black_box(&mut buf_full), |state| {
@@ -592,19 +591,25 @@ fn benchmark_fixed_account_initialize_vs_initialize_zeroed() {
 			state.authority = SYSTEM_ID;
 			Ok(())
 		});
-		let _ = black_box(res.is_ok());
+		assert!(black_box(res.is_ok()));
 	});
 
-	bench("TestState::__initialize_zeroed (pre-zeroed buffer)", || {
-		let res =
-			<TestState as PinaAccount>::__initialize_zeroed(black_box(&mut buf_zeroed), |state| {
-				state.bump = 255;
-				state.count.set(7);
-				state.authority = SYSTEM_ID;
-				Ok(())
-			});
-		let _ = black_box(res.is_ok());
-	});
+	bench(
+		"TestState::__initialize_zeroed (fresh zeroed stack buf + init)",
+		|| {
+			let mut fresh_zeroed = [0_u8; TestState::SIZE];
+			let res = <TestState as PinaAccount>::__initialize_zeroed(
+				black_box(&mut fresh_zeroed),
+				|state| {
+					state.bump = 255;
+					state.count.set(7);
+					state.authority = SYSTEM_ID;
+					Ok(())
+				},
+			);
+			assert!(black_box(res.is_ok()));
+		},
+	);
 }
 
 #[cfg(feature = "const-rent")]

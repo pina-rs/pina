@@ -486,6 +486,12 @@ impl<'a> TryFrom<(&'a Address, &'a mut [AccountView])> for ManualTryFromAccounts
 	fn try_from(
 		(program_id, accounts): (&'a Address, &'a mut [AccountView]),
 	) -> Result<Self, Self::Error> {
+		if accounts
+			.first()
+			.is_some_and(|first| first.address().as_ref()[0] == 0xFE)
+		{
+			return Err(ProgramError::Custom(0x7777));
+		}
 		Self::try_from_account_infos(program_id, accounts)
 	}
 }
@@ -683,7 +689,13 @@ fn symmetric_mut_mut_duplicates_are_rejected_in_every_position() {
 		&[rw(1), Slot::Duplicate(0), rw(2)],
 		std::vec![1, 1, 2],
 	);
-	// Three-way: mut + ro + mut with non-adjacent mutable alias fails.
+	// Three-way: mut + ro + mut with non-adjacent mutable alias fails, while
+	// distinct accounts succeed.
+	assert_both_accept(
+		AliasInstruction::MutRoMut,
+		&[rw(1), ro(2), rw(3)],
+		std::vec![1, 2, 3],
+	);
 	assert_both_reject(
 		AliasInstruction::MutRoMut,
 		&[rw(1), ro(2), Slot::Duplicate(0)],
@@ -815,15 +827,30 @@ fn pina_unique_rejects_every_aliasing_combination_regardless_of_order() {
 		&[ro(1), Slot::Duplicate(0)],
 		&dup,
 	);
+	assert_both_accept(
+		AliasInstruction::UniqueRoSecond,
+		&[ro(1), ro(2)],
+		std::vec![1, 2],
+	);
 	assert_both_reject(
 		AliasInstruction::UniqueRoSecond,
 		&[ro(1), Slot::Duplicate(0)],
 		&dup,
 	);
+	assert_both_accept(
+		AliasInstruction::UniqueMutFirst,
+		&[rw(1), ro(2)],
+		std::vec![1, 2],
+	);
 	assert_both_reject(
 		AliasInstruction::UniqueMutFirst,
 		&[rw(1), Slot::Duplicate(0)],
 		&dup,
+	);
+	assert_both_accept(
+		AliasInstruction::UniqueMutSecond,
+		&[ro(1), rw(2)],
+		std::vec![1, 2],
 	);
 	assert_both_reject(
 		AliasInstruction::UniqueMutSecond,
@@ -831,7 +858,13 @@ fn pina_unique_rejects_every_aliasing_combination_regardless_of_order() {
 		&dup,
 	);
 
-	// `#[pina(unique)]` rejects aliases inside immutable remaining slices.
+	// `#[pina(unique)]` rejects aliases inside immutable remaining slices, while
+	// distinct accounts succeed.
+	assert_both_accept(
+		AliasInstruction::UniqueMutWithImmutableRemaining,
+		&[rw(1), ro(2), ro(3)],
+		std::vec![1, 2, 3],
+	);
 	assert_both_reject(
 		AliasInstruction::UniqueMutWithImmutableRemaining,
 		&[rw(1), ro(2), Slot::Duplicate(0)],
@@ -855,6 +888,23 @@ fn pina_unique_rejects_every_aliasing_combination_regardless_of_order() {
 #[test]
 fn anchor_v2_sentinel_bug_immunity_omitted_optionals_never_conflict() {
 	let dup: ProgramError = PinaProgramError::DuplicateMutableAccount.into();
+
+	// Present distinct optional accounts succeed on all optional routes.
+	assert_both_accept(
+		AliasInstruction::OptionalMutPair,
+		&[ro(1), rw(2), rw(3)],
+		std::vec![1, 2, 3],
+	);
+	assert_both_accept(
+		AliasInstruction::UniqueOptionalPair,
+		&[ro(1), rw(2), ro(3)],
+		std::vec![1, 2, 3],
+	);
+	assert_both_accept(
+		AliasInstruction::UniqueOptionalWithRo,
+		&[ro(1), ro(2)],
+		std::vec![1, 2],
+	);
 
 	// Two omitted `Option<&mut AccountView>` slots passed via SVM duplicate
 	// marker on `program_id` MUST succeed as `(None, None)`.
@@ -1446,6 +1496,24 @@ fn five_mut_and_wide_fallback_derived_structs_validate_correctly() {
 	};
 	assert_eq!(
 		WideFallbackAccounts::try_from((pid, wdup_slice)).err(),
+		Some(dup.clone())
+	);
+
+	// Readonly slot before 32 aliasing unique mutable slot 32 while slot 33 is
+	// distinct MUST still be rejected by the wide fallback validator.
+	let mut wide_ro_alias: Vec<Slot> = (0_u8..34).map(rw).collect();
+	wide_ro_alias[32] = Slot::Duplicate(5);
+	let (mut wro_in, _) = serialize(&wide_ro_alias, &[], &ID);
+	let mut wro_views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 36];
+	// SAFETY: `wro_in` holds 34 serialized accounts.
+	let (pid, count, _) =
+		unsafe { entrypoint::deserialize::<36>(wro_in.as_mut_ptr().cast(), &mut wro_views) };
+	// SAFETY: `deserialize` initialized `count` entries.
+	let wro_slice = unsafe {
+		core::slice::from_raw_parts_mut(wro_views.as_mut_ptr().cast::<AccountView>(), count)
+	};
+	assert_eq!(
+		WideFallbackAccounts::try_from((pid, wro_slice)).err(),
 		Some(dup)
 	);
 }
@@ -1486,4 +1554,140 @@ fn validate_mut_aliasing_64_allows_trailing_readonly_duplicate_and_mask256_bound
 	assert!(!layout.is_compact_32());
 	layout.mut_mask = [0, 0, 1, 1];
 	assert!(!layout.is_compact_32());
+}
+
+#[allow(dead_code)]
+#[derive(Accounts)]
+struct UniqueRoBeforeRequiredMut<'a> {
+	#[pina(unique)]
+	unique_ro: &'a AccountView,
+	target_mut: &'a mut AccountView,
+}
+
+#[test]
+fn writability_precedes_duplicate_for_readonly_unique_before_mutable_slot() {
+	// Earlier readonly `#[pina(unique)]` slot + later required mutable slot
+	// sharing the same readonly account MUST report `InvalidAccountData`
+	// (writability precedence) in both compact-32 and wide (>32) validators.
+	let (mut compact_in, _) = serialize(&[ro(1), Slot::Duplicate(0)], &[], &ID);
+	let mut compact_views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 4];
+	// SAFETY: `compact_in` holds 2 serialized accounts.
+	let (pid, count, _) =
+		unsafe { entrypoint::deserialize::<4>(compact_in.as_mut_ptr().cast(), &mut compact_views) };
+	// SAFETY: `deserialize` initialized `count` entries.
+	let compact_slice = unsafe {
+		core::slice::from_raw_parts_mut(compact_views.as_mut_ptr().cast::<AccountView>(), count)
+	};
+	assert_eq!(
+		UniqueRoBeforeRequiredMut::try_from((pid, compact_slice)).err(),
+		Some(ProgramError::InvalidAccountData)
+	);
+
+	// Wide (>32) layout: slot 0 is readonly `unique`, slot 33 is required mut,
+	// and both receive the same readonly account.
+	let mut wide_slots: Vec<Slot> = (0_u8..34).map(ro).collect();
+	wide_slots[33] = Slot::Duplicate(0);
+	let (mut wide_in, _) = serialize(&wide_slots, &[], &ID);
+	let mut wide_views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 36];
+	// SAFETY: `wide_in` holds 34 serialized accounts.
+	let (pid, count, _) =
+		unsafe { entrypoint::deserialize::<36>(wide_in.as_mut_ptr().cast(), &mut wide_views) };
+	// SAFETY: `deserialize` initialized `count` entries.
+	let wide_slice = unsafe {
+		core::slice::from_raw_parts(wide_views.as_mut_ptr().cast::<AccountView>(), count)
+	};
+	let wide_layout = __AliasLayout {
+		static_layout: true,
+		mut_mask: __mask256_with_bit([0; 4], 33),
+		optional_mask: [0; 4],
+		unique_mask: __mask256_with_bit([0; 4], 0),
+		remaining_mut_start: usize::MAX,
+		remaining_mut_distinct: true,
+	};
+	assert_eq!(
+		validate_account_aliasing(pid, wide_slice, 34, &wide_layout),
+		1
+	);
+}
+
+#[test]
+fn manual_parser_delegating_to_derived_unique_child_enforces_uniqueness() {
+	#[allow(dead_code)]
+	struct ManualWrapperAroundUnique<'a> {
+		child: UniqueRoFirstAccounts<'a>,
+	}
+
+	impl<'a> ParseAccounts<'a> for ManualWrapperAroundUnique<'a> {
+		fn parse_accounts(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError> {
+			let child = UniqueRoFirstAccounts::parse_accounts(cursor)?;
+			cursor.finish_exact()?;
+			Ok(Self { child })
+		}
+	}
+
+	let dup: ProgramError = PinaProgramError::DuplicateMutableAccount.into();
+
+	// Aliased readonly slots inside the derived unique child MUST be rejected
+	// even when parsed through an unverified manual `AccountsCursor::new`.
+	let (mut bad_in, _) = serialize(&[ro(1), Slot::Duplicate(0)], &[], &ID);
+	let mut bad_views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 4];
+	// SAFETY: `bad_in` holds 2 serialized accounts.
+	let (pid, count, _) =
+		unsafe { entrypoint::deserialize::<4>(bad_in.as_mut_ptr().cast(), &mut bad_views) };
+	// SAFETY: `deserialize` initialized `count` entries.
+	let bad_slice = unsafe {
+		core::slice::from_raw_parts_mut(bad_views.as_mut_ptr().cast::<AccountView>(), count)
+	};
+	let mut bad_cursor = AccountsCursor::new(*pid, bad_slice);
+	assert_eq!(
+		ManualWrapperAroundUnique::parse_accounts(&mut bad_cursor).err(),
+		Some(dup)
+	);
+
+	// Distinct accounts succeed cleanly.
+	let (mut ok_in, _) = serialize(&[ro(1), ro(2)], &[], &ID);
+	let mut ok_views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 4];
+	// SAFETY: `ok_in` holds 2 serialized accounts.
+	let (pid, count, _) =
+		unsafe { entrypoint::deserialize::<4>(ok_in.as_mut_ptr().cast(), &mut ok_views) };
+	// SAFETY: `deserialize` initialized `count` entries.
+	let ok_slice = unsafe {
+		core::slice::from_raw_parts_mut(ok_views.as_mut_ptr().cast::<AccountView>(), count)
+	};
+	let mut ok_cursor = AccountsCursor::new(*pid, ok_slice);
+	assert!(ManualWrapperAroundUnique::parse_accounts(&mut ok_cursor).is_ok());
+}
+
+#[test]
+fn handwritten_try_from_conversion_runs_on_both_dispatch_first_and_slice_routers() {
+	// `ManualTryFromAccounts::try_from` rejects `0xFE` with `Custom(0x7777)`,
+	// whereas `try_from_account_infos` accepts it. Both routers MUST enforce
+	// the handwritten `TryFrom` check.
+	assert_both_reject(
+		AliasInstruction::ManualTryFrom,
+		&[rw(0xFE), rw(2)],
+		&ProgramError::Custom(0x7777),
+	);
+
+	// Also exercise the default `TryFromAccountInfos::try_from_route` fallback
+	// directly so manual callers invoking it inherit `try_from_account_infos`.
+	let (mut input, offset) = serialize(&[rw(0xFE), rw(2)], &[], &ID);
+	let ptr = input.as_mut_ptr().cast::<u8>();
+	// SAFETY: `input` is a valid serialized Solana entrypoint buffer and
+	// `offset` points at the instruction-data slice.
+	let status = unsafe {
+		__dispatch_entrypoint(
+			ptr,
+			ptr.add(offset),
+			|entry: EntrypointInput, pid: &Address, _data: &[u8]| {
+				let mut slots = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 4];
+				let route = entry.parse_route::<4, { ROUTE_UNBOUNDED }, true>(&mut slots)?;
+				let parsed = ManualTryFromAccounts::try_from_route(pid, route)?;
+				assert_eq!(parsed.first.address().as_ref()[0], 0xFE);
+				assert_eq!(parsed.second.address().as_ref()[0], 2);
+				Ok(())
+			},
+		)
+	};
+	assert_eq!(status, SUCCESS);
 }

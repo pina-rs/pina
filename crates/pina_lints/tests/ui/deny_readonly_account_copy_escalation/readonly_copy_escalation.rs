@@ -84,6 +84,38 @@ fn escalate_via_raw_mut(accounts: &ParsedAccounts<'_>) {
 	let _ptr = &raw mut copy;
 }
 
+fn escalate_via_match_arm(accounts: &mut ParsedAccounts<'_>, cond: bool) {
+	let mut acc = *accounts.mutable;
+	match cond {
+		true => {
+			acc = *accounts.readonly;
+		}
+		false => {}
+	}
+	acc.set_lamports(7);
+}
+
+fn escalate_via_for_loop(accounts: &mut ParsedAccounts<'_>) -> Result<(), ()> {
+	let mut acc = *accounts.mutable;
+	for r in accounts.readonly_slice {
+		acc = *r;
+	}
+	acc.close()?;
+	Ok(())
+}
+
+fn escalate_via_loop_second_iteration(accounts: &mut ParsedAccounts<'_>, mut count: u8) {
+	let mut acc = *accounts.mutable;
+	loop {
+		if count == 0 {
+			break;
+		}
+		acc.set_lamports(8);
+		acc = *accounts.readonly;
+		count -= 1;
+	}
+}
+
 // --- MUST PASS: legitimate readonly reads, mutable slots, and untainted copies ---
 
 fn ok_readonly_copy_for_reads(accounts: &ParsedAccounts<'_>) -> bool {
@@ -113,6 +145,18 @@ fn ok_reassigned_from_mutable(accounts: &mut ParsedAccounts<'_>) {
 	let _ = copy.address();
 	copy = *accounts.mutable;
 	copy.set_lamports(40);
+}
+
+fn ok_untainted_loop_mutation(accounts: &mut ParsedAccounts<'_>, mut count: u8) -> Result<(), ()> {
+	let mut acc = *accounts.mutable;
+	loop {
+		if count == 0 {
+			break;
+		}
+		acc.close()?;
+		count -= 1;
+	}
+	Ok(())
 }
 
 fn main() {}

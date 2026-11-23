@@ -45,8 +45,11 @@ impl<'a> RouteAccounts<'a> {
 		(self.accounts, self.dup_flags)
 	}
 
+	/// Return the underlying parsed account slice, discarding the loader's
+	/// duplicate-free witness.
+	#[doc(hidden)]
 	#[inline(always)]
-	pub(crate) fn into_accounts(self) -> &'a mut [AccountView] {
+	pub fn into_accounts(self) -> &'a mut [AccountView] {
 		self.accounts
 	}
 }

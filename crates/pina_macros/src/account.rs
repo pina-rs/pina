@@ -203,6 +203,8 @@ pub(crate) fn expand(
 				type Ref<'data> = #ref_name<'data>;
 				type Patch<'patch> = #patch_name<'patch>;
 
+				const __DERIVED_COMPACT_VALIDATE_SIZE: bool = true;
+
 				fn try_from_bytes(
 					data: &[u8],
 				) -> Result<Self::Ref<'_>, #crate_path::ProgramError> {
@@ -287,6 +289,16 @@ pub(crate) fn expand(
 						&mut value.discriminator,
 					);
 					#write_version
+				}
+
+				fn __initialize_zeroed<F>(
+					data: &mut [u8],
+					initialize: F,
+				) -> Result<&mut <Self as #crate_path::PinaPodFixed>::Zc, #crate_path::ProgramError>
+				where
+					F: FnOnce(&mut <Self as #crate_path::PinaPodFixed>::Zc) -> Result<(), #crate_path::PinaPodError>,
+				{
+					#crate_path::__initialize_derived_zeroed::<Self, F>(data, initialize)
 				}
 			}
 		}

@@ -325,10 +325,18 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::proce
                     ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
                 }; SLOTS];
                 let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-                let __pina_accounts = <InitializeAccounts as ::pina::TryFromAccountInfos>::try_from_route(
-                    program_id,
-                    route,
-                )?;
+                let __pina_accounts = if const {
+                    <InitializeAccounts as ::pina::TryFromAccountInfos>::__USES_DERIVED_ROUTE
+                } {
+                    <InitializeAccounts as ::pina::TryFromAccountInfos>::try_from_route(
+                        program_id,
+                        route,
+                    )?
+                } else {
+                    <InitializeAccounts as ::core::convert::TryFrom<
+                        (&::pina::Address, &mut [::pina::AccountView]),
+                    >>::try_from((program_id, route.into_accounts()))?
+                };
                 <InitializeAccounts as ::pina::ProcessAccountInfos>::process(
                     __pina_accounts,
                     data,
@@ -369,10 +377,18 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(CounterInstruction::proce
                     ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
                 }; SLOTS];
                 let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-                let __pina_accounts = <IncrementAccounts as ::pina::TryFromAccountInfos>::try_from_route(
-                    program_id,
-                    route,
-                )?;
+                let __pina_accounts = if const {
+                    <IncrementAccounts as ::pina::TryFromAccountInfos>::__USES_DERIVED_ROUTE
+                } {
+                    <IncrementAccounts as ::pina::TryFromAccountInfos>::try_from_route(
+                        program_id,
+                        route,
+                    )?
+                } else {
+                    <IncrementAccounts as ::core::convert::TryFrom<
+                        (&::pina::Address, &mut [::pina::AccountView]),
+                    >>::try_from((program_id, route.into_accounts()))?
+                };
                 <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
                     __pina_accounts,
                     data,
@@ -707,10 +723,18 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::proc
                     ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
                 }; SLOTS];
                 let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-                let __pina_accounts = <IncrementAccounts as ::pina::TryFromAccountInfos>::try_from_route(
-                    program_id,
-                    route,
-                )?;
+                let __pina_accounts = if const {
+                    <IncrementAccounts as ::pina::TryFromAccountInfos>::__USES_DERIVED_ROUTE
+                } {
+                    <IncrementAccounts as ::pina::TryFromAccountInfos>::try_from_route(
+                        program_id,
+                        route,
+                    )?
+                } else {
+                    <IncrementAccounts as ::core::convert::TryFrom<
+                        (&::pina::Address, &mut [::pina::AccountView]),
+                    >>::try_from((program_id, route.into_accounts()))?
+                };
                 <IncrementAccounts as ::pina::ProcessAccountInfos>::process(
                     __pina_accounts,
                     data,
@@ -751,10 +775,18 @@ Pass this to `nostd_entrypoint!` as `nostd_entrypoint!(OverrideInstruction::proc
                     ::core::mem::MaybeUninit::<::pina::AccountView>::uninit()
                 }; SLOTS];
                 let route = input.parse_route::<SLOTS, MODE, SHARED_WALK>(&mut slots)?;
-                let __pina_accounts = <UntouchedAccounts as ::pina::TryFromAccountInfos>::try_from_route(
-                    program_id,
-                    route,
-                )?;
+                let __pina_accounts = if const {
+                    <UntouchedAccounts as ::pina::TryFromAccountInfos>::__USES_DERIVED_ROUTE
+                } {
+                    <UntouchedAccounts as ::pina::TryFromAccountInfos>::try_from_route(
+                        program_id,
+                        route,
+                    )?
+                } else {
+                    <UntouchedAccounts as ::core::convert::TryFrom<
+                        (&::pina::Address, &mut [::pina::AccountView]),
+                    >>::try_from((program_id, route.into_accounts()))?
+                };
                 <UntouchedAccounts as ::pina::ProcessAccountInfos>::process(
                     __pina_accounts,
                     data,
@@ -832,6 +864,7 @@ impl<'a> pina::ParseAccounts<'a> for InitializeAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for InitializeAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],
@@ -940,6 +973,7 @@ impl<'a> pina::ParseAccounts<'a> for IncrementAccounts<'a> {
     }
 }
 impl<'a> pina::TryFromAccountInfos<'a> for IncrementAccounts<'a> {
+    const __USES_DERIVED_ROUTE: bool = true;
     fn try_from_account_infos(
         program_id: &pina::Address,
         accounts: &'a mut [pina::AccountView],

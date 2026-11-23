@@ -101,8 +101,14 @@ pub enum PinaProgramError {
 	InvalidMigrationVersion = 0xFFFF_FFF7,
 	/// The operation needs a dedicated migration or authorized funding first.
 	MigrationRequired = 0xFFFF_FFF8,
-	/// Two mutable account fields (or a `#[pina(unique)]` field and another
-	/// present account field) point at the same runtime account.
+	/// Two mutable account fields, two entries within a distinct mutable
+	/// `#[pina(remaining)]` slice, or a `#[pina(unique)]` field and another
+	/// present account field or remaining entry point at the same runtime
+	/// account.
+	///
+	/// `distinct = false` permits intra-slice aliases within a mutable
+	/// `#[pina(remaining)]` slice, but does not exempt collisions with a
+	/// `#[pina(unique)]` field.
 	DuplicateMutableAccount = 0xFFFF_FFF9,
 	/// Account or instruction data is shorter than the expected minimum.
 	DataTooShort = 0xFFFF_FFFA,

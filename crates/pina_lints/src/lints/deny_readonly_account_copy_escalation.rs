@@ -436,6 +436,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			ExprKind::Match(scrutinee, arms, _) => {
 				self.visit_expr(scrutinee, tainted);
 				let scrutinee_source = self.readonly_copy_source(scrutinee, tainted);
+				let mut merged = HashMap::new();
 				for arm in *arms {
 					let mut arm_tainted = tainted.clone();
 					self.bind_pattern(arm.pat, scrutinee_source, Some(scrutinee), &mut arm_tainted);
@@ -443,11 +444,24 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 						self.visit_expr(guard, &mut arm_tainted);
 					}
 					self.visit_expr(arm.body, &mut arm_tainted);
+					for (binding, span) in arm_tainted {
+						if !tainted.contains_key(&binding) {
+							merged.entry(binding).or_insert(span);
+						}
+					}
+				}
+				for (binding, span) in merged {
+					tainted.entry(binding).or_insert(span);
 				}
 			}
 			ExprKind::Loop(block, ..) => {
 				let mut loop_tainted = tainted.clone();
 				self.visit_block(block, &mut loop_tainted);
+				// Second pass: taint set late in one iteration reaches the next.
+				self.visit_block(block, &mut loop_tainted);
+				for (binding, span) in loop_tainted {
+					tainted.entry(binding).or_insert(span);
+				}
 			}
 			ExprKind::Closure(closure) => {
 				let body = self.cx.tcx.hir_body(closure.body);

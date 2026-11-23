@@ -1414,3 +1414,112 @@ fn program_wrapper_rejects_wrong_address() {
 
 	assert_eq!(error, ProgramError::InvalidAccountData);
 }
+
+#[cfg(all(feature = "account-resize", feature = "compact"))]
+#[test]
+#[allow(unsafe_code)]
+fn resizable_update_rejects_manual_validate_size_before_mutating_bytes() {
+	struct StrictSizeCompact;
+	struct StrictPatch<'a>(CompactBuilderStatePatch<'a>);
+
+	impl pina::PinaPod for StrictSizeCompact {}
+
+	// SAFETY: Delegates all compact pod invariants to `CompactBuilderState`.
+	unsafe impl pina::PinaPodCompact for StrictSizeCompact {
+		type Header = <CompactBuilderState as pina::PinaPodCompact>::Header;
+
+		const HEADER_SIZE: usize = CompactBuilderState::HEADER_SIZE;
+		const MAX_SIZE: usize = CompactBuilderState::MAX_SIZE;
+		const MIN_SIZE: usize = CompactBuilderState::MIN_SIZE;
+		const TAIL_ALIGNMENT: usize = CompactBuilderState::TAIL_ALIGNMENT;
+
+		fn validate(data: &[u8]) -> Result<(), pina::PinaPodError> {
+			<CompactBuilderState as pina::PinaPodCompact>::validate(data)
+		}
+	}
+
+	impl pina::PinaPodPatch<StrictSizeCompact> for StrictPatch<'_> {
+		fn updated_len(&self, data: &[u8]) -> Result<usize, pina::PinaPodError> {
+			self.0.updated_len(data)
+		}
+
+		fn update(&self, data: &mut [u8]) -> Result<usize, pina::PinaPodError> {
+			self.0.update(data)
+		}
+
+		fn initialize(&self, data: &mut [u8]) -> Result<usize, pina::PinaPodError> {
+			self.0.initialize(data)
+		}
+	}
+
+	impl pina::HasDiscriminator for StrictSizeCompact {
+		type Type = <CompactBuilderState as pina::HasDiscriminator>::Type;
+
+		const VALUE: Self::Type = CompactBuilderState::VALUE;
+	}
+
+	impl pina::PinaCompactAccount for StrictSizeCompact {
+		type Patch<'patch>
+			= StrictPatch<'patch>
+		where
+			Self: 'patch;
+		type Ref<'data>
+			= <CompactBuilderState as pina::PinaCompactAccount>::Ref<'data>
+		where
+			Self: 'data;
+
+		fn validate_size(_size: usize) -> Result<(), ProgramError> {
+			Err(ProgramError::Custom(0xDEAD))
+		}
+
+		fn try_from_bytes(data: &[u8]) -> Result<Self::Ref<'_>, ProgramError> {
+			CompactBuilderState::try_from_bytes(data)
+		}
+
+		fn updated_len(data: &[u8], patch: &Self::Patch<'_>) -> Result<usize, ProgramError> {
+			CompactBuilderState::updated_len(data, &patch.0)
+		}
+
+		fn update(data: &mut [u8], patch: &Self::Patch<'_>) -> Result<usize, ProgramError> {
+			CompactBuilderState::update(data, &patch.0)
+		}
+
+		fn initialize(data: &mut [u8], patch: &Self::Patch<'_>) -> Result<usize, ProgramError> {
+			CompactBuilderState::initialize(data, &patch.0)
+		}
+	}
+
+	impl pina::PinaCompactPatch<StrictSizeCompact> for StrictPatch<'_> {
+		fn as_pina_patch(&self) -> &<StrictSizeCompact as pina::PinaCompactAccount>::Patch<'_> {
+			self
+		}
+	}
+
+	let owner = Address::new_from_array([9u8; 32]);
+	let mut stored_account = TestAccount::<{ CompactBuilderState::HEADER_SIZE }>::new(
+		Address::new_from_array([1u8; 32]),
+		false,
+		true,
+	);
+	CompactBuilderState::initialize(
+		&mut stored_account.data,
+		&CompactBuilderStatePatch::new().value(3),
+	)
+	.unwrap_or_else(|e| panic!("init compact: {e:?}"));
+	let before = stored_account.data;
+	let mut stored_rent = TestAccount::<8>::new(Address::new_from_array([2u8; 32]), true, true);
+	let mut account = stored_account.view();
+	let mut rent_account = stored_rent.view();
+
+	let result = UpdateResizableAccount {
+		account: &mut account,
+		rent_account: &mut rent_account,
+		program_id: &owner,
+		patch: StrictPatch(CompactBuilderStatePatch::new().value(99)),
+	}
+	.invoke::<StrictSizeCompact>();
+
+	assert_eq!(result, Err(ProgramError::Custom(0xDEAD)));
+	// Account bytes MUST remain untouched when `validate_size` rejects.
+	assert_eq!(stored_account.data, before);
+}

@@ -9,11 +9,13 @@ use pina::*;
 const TEST_PROGRAM: Address = address!("GJQcuWrT2f3f4KNuJcXhhwUa1ZQTYbxzzJ1hotzKu8hS");
 const ALT_PROGRAM: Address = address!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
+#[cfg(feature = "derive")]
 #[discriminator]
 pub enum PdaAccountType {
 	GlobalConfig = 1,
 }
 
+#[cfg(feature = "derive")]
 #[account(discriminator = PdaAccountType)]
 #[pda(seeds = [b"global-config", b"v2"], bump = bump)]
 pub struct GlobalConfig {
@@ -24,7 +26,9 @@ pub struct GlobalConfig {
 /// Compile-time constant evaluation of `#[pda]`-generated `find_pda_const` and
 /// `try_find_pda_const` ensures the entire `const fn` SHA-256 + Ed25519 curve
 /// check runs inside rustc's const evaluator with zero runtime cost.
+#[cfg(feature = "derive")]
 const CONFIG_PDA_FROM_MACRO: (Address, u8) = GlobalConfig::find_pda_const(&TEST_PROGRAM);
+#[cfg(feature = "derive")]
 const CONFIG_PDA_OPT_FROM_MACRO: Option<(Address, u8)> =
 	GlobalConfig::try_find_pda_const(&TEST_PROGRAM);
 const DIRECT_CONST_PDA: (Address, u8) =
@@ -33,15 +37,18 @@ const EMPTY_SEED_CONST_PDA: (Address, u8) = find_program_address_const(&[], &TES
 
 #[test]
 fn const_pda_macro_and_direct_helpers_match_solana_address_byte_for_byte() {
-	let runtime_macro = GlobalConfig::find_pda(&TEST_PROGRAM);
 	let expected = Address::try_find_program_address(&[b"global-config", b"v2"], &TEST_PROGRAM)
 		.unwrap_or_else(|| panic!("expected valid PDA"));
 
-	assert_eq!(CONFIG_PDA_FROM_MACRO, expected);
-	assert_eq!(CONFIG_PDA_OPT_FROM_MACRO, Some(expected));
 	assert_eq!(DIRECT_CONST_PDA, expected);
-	assert_eq!(runtime_macro, expected);
-	assert_eq!(GlobalConfig::try_find_pda(&TEST_PROGRAM), Some(expected));
+	#[cfg(feature = "derive")]
+	{
+		let runtime_macro = GlobalConfig::find_pda(&TEST_PROGRAM);
+		assert_eq!(CONFIG_PDA_FROM_MACRO, expected);
+		assert_eq!(CONFIG_PDA_OPT_FROM_MACRO, Some(expected));
+		assert_eq!(runtime_macro, expected);
+		assert_eq!(GlobalConfig::try_find_pda(&TEST_PROGRAM), Some(expected));
+	}
 
 	let empty_expected = Address::try_find_program_address(&[], &TEST_PROGRAM)
 		.unwrap_or_else(|| panic!("expected valid empty-seed PDA"));
@@ -184,6 +191,7 @@ fn adversarial_pda_seed_length_and_count_boundaries_are_enforced() {
 	);
 }
 
+#[cfg(feature = "derive")]
 #[test]
 fn initialize_zeroed_matches_initialize_and_rejects_wrong_buffer_sizes() {
 	const WIRE_LEN: usize = size_of::<<GlobalConfig as PinaPodFixed>::Zc>();
@@ -226,6 +234,54 @@ fn initialize_zeroed_matches_initialize_and_rejects_wrong_buffer_sizes() {
 	);
 }
 
+#[cfg(feature = "derive")]
+#[test]
+#[allow(unsafe_code)]
+fn manual_pina_account_initialize_override_is_preserved_by_initialize_zeroed() {
+	struct ManualFixedAccount;
+
+	impl PinaPod for ManualFixedAccount {}
+
+	// SAFETY: Delegates every fixed zero-copy invariant directly to the
+	// macro-derived `GlobalConfig` implementation.
+	unsafe impl PinaPodFixed for ManualFixedAccount {
+		type Zc = <GlobalConfig as PinaPodFixed>::Zc;
+	}
+
+	impl HasDiscriminator for ManualFixedAccount {
+		type Type = <GlobalConfig as HasDiscriminator>::Type;
+
+		const VALUE: Self::Type = GlobalConfig::VALUE;
+	}
+
+	impl PinaAccount for ManualFixedAccount {
+		fn write_zc_discriminator(value: &mut Self::Zc) {
+			<GlobalConfig as PinaAccount>::write_zc_discriminator(value);
+		}
+
+		fn initialize<F>(data: &mut [u8], initialize: F) -> Result<&mut Self::Zc, ProgramError>
+		where
+			F: FnOnce(&mut Self::Zc) -> Result<(), PinaPodError>,
+		{
+			<GlobalConfig as PinaAccount>::initialize(data, |value| {
+				// Distinct non-zero default set by the manual override.
+				value.version.set(0xCAFE_BABE);
+				initialize(value)
+			})
+		}
+	}
+
+	const WIRE_LEN: usize = size_of::<<ManualFixedAccount as PinaPodFixed>::Zc>();
+	let mut buf = [0_u8; WIRE_LEN];
+	let created = <ManualFixedAccount as PinaAccount>::__initialize_zeroed(&mut buf, |value| {
+		value.bump = 7;
+		Ok(())
+	})
+	.unwrap_or_else(|e| panic!("manual __initialize_zeroed failed: {e:?}"));
+	assert_eq!(created.bump, 7);
+	assert_eq!(created.version.get(), 0xCAFE_BABE);
+}
+
 #[cfg(feature = "const-rent")]
 #[test]
 fn const_rent_matches_default_rent_and_enforces_10_mib_limit() {
@@ -239,16 +295,19 @@ fn const_rent_matches_default_rent_and_enforces_10_mib_limit() {
 		Err(_) => panic!("10-byte space must be valid"),
 	};
 
-	let rent = mainnet_rent();
-	let default_rent =
+	let rent = default_rent();
+	let expected_rent =
 		sysvars::rent::Rent::from_bytes(&sysvars::rent::DEFAULT_LAMPORTS_PER_BYTE.to_le_bytes())
 			.unwrap_or_else(|e| panic!("default rent bytes: {e:?}"));
 
-	assert_eq!(ZERO_RENT, default_rent.try_minimum_balance(0).unwrap());
-	assert_eq!(TEN_BYTE_RENT, default_rent.try_minimum_balance(10).unwrap());
+	assert_eq!(ZERO_RENT, expected_rent.try_minimum_balance(0).unwrap());
+	assert_eq!(
+		TEN_BYTE_RENT,
+		expected_rent.try_minimum_balance(10).unwrap()
+	);
 
 	for space in [0, 1, 10, 64, 128, 1_024, 10_240, 1_000_000, MAX_PERMITTED] {
-		let expected = default_rent
+		let expected = expected_rent
 			.try_minimum_balance(space)
 			.unwrap_or_else(|e| panic!("default rent failed for {space}: {e:?}"));
 		assert_eq!(rent.try_minimum_balance(space), Ok(expected));
@@ -272,6 +331,7 @@ fn const_rent_matches_default_rent_and_enforces_10_mib_limit() {
 fn find_program_address_const_runtime_matches_compile_time_value() {
 	let runtime = find_program_address_const(&[b"global-config", b"v2"], &TEST_PROGRAM);
 	assert_eq!(runtime, DIRECT_CONST_PDA);
+	#[cfg(feature = "derive")]
 	assert_eq!(
 		GlobalConfig::find_pda_const(&TEST_PROGRAM),
 		CONFIG_PDA_FROM_MACRO
@@ -285,7 +345,7 @@ fn find_program_address_const_panics_on_oversized_seed() {
 	let _ = find_program_address_const(&[&oversized], &TEST_PROGRAM);
 }
 
-#[cfg(feature = "validation")]
+#[cfg(all(feature = "derive", feature = "validation"))]
 mod validated_zeroed_init {
 	use pina::*;
 

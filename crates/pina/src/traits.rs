@@ -107,42 +107,20 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 	}
 
 	/// Initialize a complete fixed account representation into an already-zeroed
-	/// destination buffer in one validated pass.
+	/// destination buffer.
 	///
-	/// Callers must guarantee that every byte of `data` is already zero (for
-	/// example, freshly allocated by the System Program). Unlike
-	/// [`Self::initialize`], this skips the initial `data.fill(0)` pass while
-	/// keeping the exact same failure-clearing, discriminator-writing,
-	/// structural-validation, and application-validation guarantees.
+	/// The default forwards to [`Self::initialize`] so manual [`PinaAccount`]
+	/// implementations that override `initialize` keep their custom behavior.
+	/// `#[account]` overrides this via [`__initialize_derived_zeroed`] to skip
+	/// the redundant `data.fill(0)` pass on freshly allocated accounts while
+	/// preserving failure-clearing, discriminator-writing, structural, and
+	/// application validation guarantees.
 	#[doc(hidden)]
 	fn __initialize_zeroed<F>(data: &mut [u8], initialize: F) -> Result<&mut Self::Zc, ProgramError>
 	where
 		F: FnOnce(&mut Self::Zc) -> Result<(), crate::PinaPodError>,
 	{
-		#[cfg(not(feature = "validation"))]
-		{
-			<Self as PinaPodFixed>::initialize_zeroed(data, |value| {
-				Self::write_zc_discriminator(value);
-				initialize(value)
-			})
-			.map_err(|_| ProgramError::InvalidAccountData)
-		}
-
-		#[cfg(feature = "validation")]
-		{
-			let value = <Self as PinaPodFixed>::initialize_zeroed(data, |value| {
-				Self::write_zc_discriminator(value);
-				initialize(value)
-			})
-			.map_err(|_| ProgramError::InvalidAccountData)?;
-
-			if let Err(error) = Self::validate_account_value(value) {
-				__clear_zc(value);
-				return Err(error);
-			}
-
-			Ok(value)
-		}
+		<Self as PinaAccount>::initialize(data, initialize)
 	}
 
 	/// Reject bytes whose migration version envelope is not current.
@@ -232,6 +210,45 @@ pub trait PinaAccount: HasDiscriminator + PinaPodFixed {
 	}
 }
 
+/// Macro-generated zero-fill fast path for [`PinaAccount::__initialize_zeroed`].
+///
+/// Callers must guarantee that every byte of `data` is already zero (for
+/// example, freshly allocated by the System Program).
+#[doc(hidden)]
+pub fn __initialize_derived_zeroed<T, F>(
+	data: &mut [u8],
+	initialize: F,
+) -> Result<&mut T::Zc, ProgramError>
+where
+	T: PinaAccount,
+	F: FnOnce(&mut T::Zc) -> Result<(), crate::PinaPodError>,
+{
+	#[cfg(not(feature = "validation"))]
+	{
+		<T as PinaPodFixed>::initialize_zeroed(data, |value| {
+			T::write_zc_discriminator(value);
+			initialize(value)
+		})
+		.map_err(|_| ProgramError::InvalidAccountData)
+	}
+
+	#[cfg(feature = "validation")]
+	{
+		let value = <T as PinaPodFixed>::initialize_zeroed(data, |value| {
+			T::write_zc_discriminator(value);
+			initialize(value)
+		})
+		.map_err(|_| ProgramError::InvalidAccountData)?;
+
+		if let Err(error) = T::validate_account_value(value) {
+			__clear_zc(value);
+			return Err(error);
+		}
+
+		Ok(value)
+	}
+}
+
 /// A discriminator-first, variable-length account schema.
 ///
 /// Compact accounts keep inline fields and collection lengths in a fixed
@@ -252,6 +269,16 @@ pub trait PinaCompactAccount: HasDiscriminator + PinaPodCompact {
 	type Patch<'patch>: crate::PinaPodPatch<Self>
 	where
 		Self: 'patch;
+
+	/// Whether [`Self::validate_size`] is guaranteed to match
+	/// [`PinaPodCompact::validate_storage_len`] (enforced prior to any mutation
+	/// inside `pinapod`'s `try_update_or_len`).
+	///
+	/// `#[account(compact)]` sets this to `true` so [`crate::UpdateResizableAccount`]
+	/// stays single-pass; manual implementations inherit `false` so any custom
+	/// `validate_size` override runs before bytes are modified.
+	#[doc(hidden)]
+	const __DERIVED_COMPACT_VALIDATE_SIZE: bool = false;
 
 	/// Validate that `size` can hold this compact account.
 	fn validate_size(size: usize) -> Result<(), ProgramError> {
@@ -296,6 +323,7 @@ pub trait PinaCompactAccount: HasDiscriminator + PinaPodCompact {
 		patch: &Self::Patch<'_>,
 	) -> Result<Result<usize, usize>, ProgramError> {
 		let target_size = Self::updated_len(data, patch)?;
+		Self::validate_size(target_size)?;
 		if target_size > data.len() {
 			return Ok(Err(target_size));
 		}
@@ -1377,6 +1405,30 @@ impl<'a> AccountsCursor<'a> {
 		Err(cold_too_many_accounts())
 	}
 
+	/// Enforce a derived child group's static aliasing and `#[pina(unique)]`
+	/// layout when called through an unverified manual cursor (`check_duplicates
+	/// == true`).
+	///
+	/// Derived parents constructed via [`Self::from_verified`] already validated
+	/// the composed layout and set `check_duplicates = false`, so this becomes a
+	/// single skipped check on verified paths.
+	#[doc(hidden)]
+	#[inline(always)]
+	pub fn __validate_child_aliasing<T>(&self) -> ProgramResult
+	where
+		T: ParseAccounts<'a>,
+	{
+		if !self.check_duplicates {
+			return Ok(());
+		}
+
+		let bounded = self
+			.remaining
+			.get(..T::ACCOUNT_LIMIT)
+			.unwrap_or(self.remaining);
+		run_static_alias_check::<T>(&self.program_id, bounded)
+	}
+
 	/// Reject a mutable account that appears again in the cursor's remaining
 	/// slice.
 	///
@@ -1598,8 +1650,27 @@ pub fn validate_account_aliasing_compact(
 	let rem_distinct = ((unique_and_rem >> 40) & 1) != 0;
 
 	let len = accounts.len();
-	let mut i = 0;
 
+	// Enforce writability precedence before duplicate checks so an earlier
+	// readonly `#[pina(unique)]` slot aliasing a later non-writable mutable
+	// slot still reports `InvalidAccountData` first.
+	let mut k = 0;
+	while k < len {
+		let bit_k = if k < 32 { 1_u32 << k } else { 0 };
+		let mut_k = (mut_mask & bit_k) != 0 || k >= rem_start;
+		if mut_k {
+			let account_k = accounts[k];
+			let omitted_opt =
+				(opt_mask & bit_k) != 0 && address_eq(account_k.address(), program_id);
+			if !omitted_opt && !account_k.is_writable() {
+				let _ = validate_writable(account_k);
+				return ALIAS_ERR_NOT_WRITABLE;
+			}
+		}
+		k += 1;
+	}
+
+	let mut i = 0;
 	while i < len {
 		let account_i = accounts[i];
 		let bit_i = if i < 32 { 1_u32 << i } else { 0 };
@@ -1610,11 +1681,6 @@ pub fn validate_account_aliasing_compact(
 		}
 
 		let mut_i = (mut_mask & bit_i) != 0 || i >= rem_start;
-		if mut_i && !account_i.is_writable() {
-			let _ = validate_writable(account_i);
-			return ALIAS_ERR_NOT_WRITABLE;
-		}
-
 		let unique_i = (unique_mask & bit_i) != 0;
 		if !mut_i && unique_mask == 0 {
 			i += 1;
@@ -1679,8 +1745,26 @@ pub fn validate_account_aliasing(
 	layout: &__AliasLayout,
 ) -> u8 {
 	let limit = accounts.len().min(account_limit);
-	let mut i = 0;
 
+	// Enforce writability precedence before duplicate checks so an earlier
+	// readonly `#[pina(unique)]` slot aliasing a later non-writable mutable
+	// slot still reports `InvalidAccountData` first.
+	let mut k = 0;
+	while k < limit {
+		let mut_k = bit_is_set(&layout.mut_mask, k) || k >= layout.remaining_mut_start;
+		if mut_k {
+			let account_k = accounts[k];
+			let omitted_opt =
+				bit_is_set(&layout.optional_mask, k) && account_k.address() == program_id;
+			if !omitted_opt && !account_k.is_writable() {
+				let _ = validate_writable(account_k);
+				return ALIAS_ERR_NOT_WRITABLE;
+			}
+		}
+		k += 1;
+	}
+
+	let mut i = 0;
 	while i < limit {
 		let account_i = accounts[i];
 		if bit_is_set(&layout.optional_mask, i) && account_i.address() == program_id {
@@ -1689,10 +1773,6 @@ pub fn validate_account_aliasing(
 		}
 
 		let mut_i = bit_is_set(&layout.mut_mask, i) || i >= layout.remaining_mut_start;
-		if mut_i && !account_i.is_writable() {
-			let _ = validate_writable(account_i);
-			return ALIAS_ERR_NOT_WRITABLE;
-		}
 		let unique_i = bit_is_set(&layout.unique_mask, i);
 
 		let mut j = i + 1;
@@ -1996,6 +2076,15 @@ pub trait ParseAccounts<'a>: Sized {
 /// let accounts = InitEscrow::try_from_account_infos(program_id, accounts)?;
 /// ```
 pub trait TryFromAccountInfos<'a>: Sized {
+	/// Whether this implementation is generated by `#[derive(Accounts)]` and
+	/// opts into `dispatch_entrypoint!`'s [`Self::try_from_route`] fast path.
+	///
+	/// Handwritten implementations inherit `false`, keeping `dispatch_entrypoint!`
+	/// on the same `TryFrom<(&Address, &mut [AccountView])>` conversion used by
+	/// slice-based routers.
+	#[doc(hidden)]
+	const __USES_DERIVED_ROUTE: bool = false;
+
 	/// Convert the raw instruction account slice into a typed accounts struct.
 	///
 	/// Implementations should validate account order, count, and invariants
