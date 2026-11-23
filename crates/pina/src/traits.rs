@@ -1966,7 +1966,7 @@ where
 			run_static_alias_check::<T>(program_id, accounts)?;
 		}
 		AccountsCursor::from_verified(*program_id, accounts)
-	} else if pinocchio::hint::unlikely((dup_flags & crate::entry::DUP_WRITABLE_MASK) != 0) {
+	} else if pinocchio::hint::unlikely((dup_flags & crate::entry::DUP_ANY_MASK) != 0) {
 		AccountsCursor::new(*program_id, accounts)
 	} else {
 		AccountsCursor::from_verified(*program_id, accounts)

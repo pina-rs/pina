@@ -116,6 +116,35 @@ fn escalate_via_loop_second_iteration(accounts: &mut ParsedAccounts<'_>, mut cou
 	}
 }
 
+fn escalate_via_four_binding_loop_chain(accounts: &mut ParsedAccounts<'_>, mut count: u8) {
+	let mut a = *accounts.mutable;
+	let mut b = *accounts.mutable;
+	let mut c = *accounts.mutable;
+	loop {
+		if count == 0 {
+			break;
+		}
+		a.set_lamports(9);
+		a = b;
+		b = c;
+		c = *accounts.readonly;
+		count -= 1;
+	}
+}
+
+fn escalate_after_loop_break_taint(accounts: &mut ParsedAccounts<'_>) -> Result<(), ()> {
+	let mut acc = *accounts.mutable;
+	loop {
+		// Safe: runs once before `acc` is tainted, then breaks unconditionally.
+		acc.close()?;
+		acc = *accounts.readonly;
+		break;
+	}
+	// Unsafe: `acc` exited the loop tainted via `break`.
+	acc.set_lamports(11);
+	Ok(())
+}
+
 // --- MUST PASS: legitimate readonly reads, mutable slots, and untainted copies ---
 
 fn ok_readonly_copy_for_reads(accounts: &ParsedAccounts<'_>) -> bool {
@@ -156,6 +185,17 @@ fn ok_untainted_loop_mutation(accounts: &mut ParsedAccounts<'_>, mut count: u8) 
 		acc.close()?;
 		count -= 1;
 	}
+	Ok(())
+}
+
+fn ok_loop_taint_before_unconditional_break(accounts: &mut ParsedAccounts<'_>) -> Result<(), ()> {
+	let mut acc = *accounts.mutable;
+	loop {
+		acc.close()?;
+		acc = *accounts.readonly;
+		break;
+	}
+	let _ = acc.address();
 	Ok(())
 }
 

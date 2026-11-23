@@ -183,11 +183,36 @@ fn emit_escalation(cx: &LateContext<'_>, use_span: Span, copy_span: Span) {
 	});
 }
 
+struct ControlFlowTarget {
+	id: HirId,
+	backedge: HashMap<HirId, Span>,
+	exit: HashMap<HirId, Span>,
+	has_exit: bool,
+}
+
+fn merge_taint(dst: &mut HashMap<HirId, Span>, src: &HashMap<HirId, Span>) -> bool {
+	let mut changed = false;
+	for (&binding, &span) in src {
+		if let std::collections::hash_map::Entry::Vacant(entry) = dst.entry(binding) {
+			entry.insert(span);
+			changed = true;
+		}
+	}
+	changed
+}
+
 struct Analyzer<'cx, 'tcx> {
 	cx: &'cx LateContext<'tcx>,
+	emit: bool,
 }
 
 impl<'tcx> Analyzer<'_, 'tcx> {
+	fn report(&self, use_span: Span, copy_span: Span) {
+		if self.emit {
+			emit_escalation(self.cx, use_span, copy_span);
+		}
+	}
+
 	fn readonly_copy_source(
 		&self,
 		expr: &'tcx Expr<'tcx>,
@@ -294,7 +319,7 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					if matches!(mode.0, ByRef::Yes(_, Mutability::Mut))
 						&& is_account_view_ty(self.cx, pat_ty.peel_refs())
 					{
-						emit_escalation(self.cx, pat.span, copy_span);
+						self.report(pat.span, copy_span);
 					} else if ty_contains_owned_account_view(self.cx, pat_ty) {
 						tainted.insert(*binding, copy_span);
 					}
@@ -343,58 +368,86 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 		}
 	}
 
-	fn visit_block(&self, block: &'tcx rustc_hir::Block<'tcx>, tainted: &mut HashMap<HirId, Span>) {
+	fn visit_block(
+		&self,
+		block: &'tcx rustc_hir::Block<'tcx>,
+		tainted: &mut HashMap<HirId, Span>,
+		targets: &mut Vec<ControlFlowTarget>,
+	) -> bool {
 		for stmt in block.stmts {
 			match &stmt.kind {
 				StmtKind::Let(local) => {
-					let source = local.init.and_then(|init| {
-						self.visit_expr(init, tainted);
+					let source = if let Some(init) = local.init {
+						if !self.visit_expr(init, tainted, targets) {
+							return false;
+						}
 						self.readonly_copy_source(init, tainted)
-					});
+					} else {
+						None
+					};
 					self.bind_pattern(local.pat, source, local.init, tainted);
 					if let Some(els) = local.els {
 						let mut else_tainted = tainted.clone();
-						self.visit_block(els, &mut else_tainted);
+						let _ = self.visit_block(els, &mut else_tainted, targets);
 					}
 				}
 				StmtKind::Expr(expr) | StmtKind::Semi(expr) => {
-					self.visit_expr(expr, tainted);
+					if !self.visit_expr(expr, tainted, targets) {
+						return false;
+					}
 				}
 				StmtKind::Item(_) => {}
 			}
 		}
 
 		if let Some(expr) = block.expr {
-			self.visit_expr(expr, tainted);
+			self.visit_expr(expr, tainted, targets)
+		} else {
+			true
 		}
 	}
 
-	fn visit_expr(&self, expr: &'tcx Expr<'tcx>, tainted: &mut HashMap<HirId, Span>) {
+	fn visit_expr(
+		&self,
+		expr: &'tcx Expr<'tcx>,
+		tainted: &mut HashMap<HirId, Span>,
+		targets: &mut Vec<ControlFlowTarget>,
+	) -> bool {
 		match &expr.kind {
 			ExprKind::AddrOf(_, Mutability::Mut, inner) => {
-				self.visit_expr(inner, tainted);
+				if !self.visit_expr(inner, tainted, targets) {
+					return false;
+				}
 				let inner_ty = self.cx.typeck_results().expr_ty(inner);
 				if is_account_view_ty(self.cx, inner_ty)
 					&& let Some(copy_span) = self.readonly_copy_source(inner, tainted)
 				{
-					emit_escalation(self.cx, expr.span, copy_span);
+					self.report(expr.span, copy_span);
 				}
+				true
 			}
 			ExprKind::MethodCall(_, receiver, args, _) => {
-				self.visit_expr(receiver, tainted);
+				if !self.visit_expr(receiver, tainted, targets) {
+					return false;
+				}
 				let receiver_ty = self.cx.typeck_results().expr_ty(receiver);
 				if is_account_view_ty(self.cx, receiver_ty)
 					&& receiver_has_mut_autoref(self.cx, receiver)
 					&& let Some(copy_span) = self.readonly_copy_source(receiver, tainted)
 				{
-					emit_escalation(self.cx, expr.span, copy_span);
+					self.report(expr.span, copy_span);
 				}
 				for arg in *args {
-					self.visit_expr(arg, tainted);
+					if !self.visit_expr(arg, tainted, targets) {
+						return false;
+					}
 				}
+				!self.cx.typeck_results().expr_ty(expr).is_never()
 			}
 			ExprKind::Assign(lhs, rhs, _) => {
-				self.visit_expr(rhs, tainted);
+				if !self.visit_expr(rhs, tainted, targets) {
+					return false;
+				}
 				let source = self.readonly_copy_source(rhs, tainted);
 				if let Some(binding) = local_binding(lhs) {
 					if let Some(copy_span) = source {
@@ -402,81 +455,210 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 					} else {
 						tainted.remove(&binding);
 					}
+					true
 				} else {
-					self.visit_expr(lhs, tainted);
+					self.visit_expr(lhs, tainted, targets)
 				}
 			}
-			ExprKind::Block(block, _) => {
-				self.visit_block(block, tainted);
+			ExprKind::Block(block, label) => {
+				if label.is_some() {
+					let idx = targets.len();
+					targets.push(ControlFlowTarget {
+						id: block.hir_id,
+						backedge: HashMap::new(),
+						exit: HashMap::new(),
+						has_exit: false,
+					});
+					let falls = self.visit_block(block, tainted, targets);
+					let target = targets.remove(idx);
+					if falls {
+						if target.has_exit {
+							merge_taint(tainted, &target.exit);
+						}
+						true
+					} else if target.has_exit {
+						*tainted = target.exit;
+						true
+					} else {
+						false
+					}
+				} else {
+					self.visit_block(block, tainted, targets)
+				}
 			}
 			ExprKind::If(cond, then_expr, else_expr) => {
 				let before = tainted.clone();
-				self.visit_expr(cond, tainted);
-				let mut then_tainted = tainted.clone();
-				self.visit_expr(then_expr, &mut then_tainted);
-				let mut merged = then_tainted;
-				if let Some(else_expr) = else_expr {
-					let mut else_tainted = before;
-					self.visit_expr(else_expr, &mut else_tainted);
-					for (binding, span) in else_tainted {
-						merged.entry(binding).or_insert(span);
-					}
-				} else {
-					for (binding, span) in before {
-						merged.entry(binding).or_insert(span);
-					}
+				if !self.visit_expr(cond, tainted, targets) {
+					return false;
 				}
-				*tainted = merged;
+				let mut then_tainted = tainted.clone();
+				let then_falls = self.visit_expr(then_expr, &mut then_tainted, targets);
+				let mut else_tainted = before;
+				let else_falls = if let Some(else_expr) = else_expr {
+					self.visit_expr(else_expr, &mut else_tainted, targets)
+				} else {
+					true
+				};
+				match (then_falls, else_falls) {
+					(true, true) => {
+						merge_taint(&mut then_tainted, &else_tainted);
+						*tainted = then_tainted;
+						true
+					}
+					(true, false) => {
+						*tainted = then_tainted;
+						true
+					}
+					(false, true) => {
+						*tainted = else_tainted;
+						true
+					}
+					(false, false) => false,
+				}
 			}
 			ExprKind::Let(let_expr) => {
-				self.visit_expr(let_expr.init, tainted);
+				if !self.visit_expr(let_expr.init, tainted, targets) {
+					return false;
+				}
 				let source = self.readonly_copy_source(let_expr.init, tainted);
 				self.bind_pattern(let_expr.pat, source, Some(let_expr.init), tainted);
+				true
 			}
 			ExprKind::Match(scrutinee, arms, _) => {
-				self.visit_expr(scrutinee, tainted);
+				if !self.visit_expr(scrutinee, tainted, targets) {
+					return false;
+				}
 				let scrutinee_source = self.readonly_copy_source(scrutinee, tainted);
 				let mut merged = HashMap::new();
+				let mut any_falls = false;
 				for arm in *arms {
 					let mut arm_tainted = tainted.clone();
 					self.bind_pattern(arm.pat, scrutinee_source, Some(scrutinee), &mut arm_tainted);
-					if let Some(guard) = arm.guard {
-						self.visit_expr(guard, &mut arm_tainted);
+					if let Some(guard) = arm.guard
+						&& !self.visit_expr(guard, &mut arm_tainted, targets)
+					{
+						continue;
 					}
-					self.visit_expr(arm.body, &mut arm_tainted);
-					for (binding, span) in arm_tainted {
-						if !tainted.contains_key(&binding) {
-							merged.entry(binding).or_insert(span);
-						}
+					if self.visit_expr(arm.body, &mut arm_tainted, targets) {
+						any_falls = true;
+						merge_taint(&mut merged, &arm_tainted);
 					}
 				}
-				for (binding, span) in merged {
-					tainted.entry(binding).or_insert(span);
+				if any_falls {
+					*tainted = merged;
+					true
+				} else {
+					false
 				}
 			}
 			ExprKind::Loop(block, ..) => {
-				let mut loop_tainted = tainted.clone();
-				self.visit_block(block, &mut loop_tainted);
-				// Second pass: taint set late in one iteration reaches the next.
-				self.visit_block(block, &mut loop_tainted);
-				for (binding, span) in loop_tainted {
-					tainted.entry(binding).or_insert(span);
+				// Iterate silently until reachable backedges (fallthrough and
+				// `continue`) reach a fixed point, keeping `break` exit state
+				// separate so non-repeating exits do not poison earlier lines.
+				let dry = Analyzer {
+					cx: self.cx,
+					emit: false,
+				};
+				let mut iter_entry = tainted.clone();
+				let mut exit_tainted = HashMap::new();
+				let mut has_exit = false;
+				loop {
+					let mut body_tainted = iter_entry.clone();
+					let idx = targets.len();
+					targets.push(ControlFlowTarget {
+						id: expr.hir_id,
+						backedge: HashMap::new(),
+						exit: HashMap::new(),
+						has_exit: false,
+					});
+					let body_falls_through = dry.visit_block(block, &mut body_tainted, targets);
+					let target = targets.remove(idx);
+					if target.has_exit {
+						has_exit = true;
+						merge_taint(&mut exit_tainted, &target.exit);
+					}
+					let mut changed = false;
+					if body_falls_through {
+						changed |= merge_taint(&mut iter_entry, &body_tainted);
+					}
+					changed |= merge_taint(&mut iter_entry, &target.backedge);
+					if !changed {
+						break;
+					}
 				}
+
+				if self.emit {
+					let mut final_tainted = iter_entry;
+					let idx = targets.len();
+					targets.push(ControlFlowTarget {
+						id: expr.hir_id,
+						backedge: HashMap::new(),
+						exit: HashMap::new(),
+						has_exit: false,
+					});
+					let _ = self.visit_block(block, &mut final_tainted, targets);
+					let target = targets.remove(idx);
+					if target.has_exit {
+						has_exit = true;
+						merge_taint(&mut exit_tainted, &target.exit);
+					}
+				}
+
+				if has_exit {
+					*tainted = exit_tainted;
+					true
+				} else {
+					false
+				}
+			}
+			ExprKind::Break(dest, inner) => {
+				if let Some(inner) = inner
+					&& !self.visit_expr(inner, tainted, targets)
+				{
+					return false;
+				}
+				if let Ok(target_id) = dest.target_id
+					&& let Some(target) = targets.iter_mut().rev().find(|t| t.id == target_id)
+				{
+					target.has_exit = true;
+					merge_taint(&mut target.exit, tainted);
+				}
+				false
+			}
+			ExprKind::Continue(dest) => {
+				if let Ok(target_id) = dest.target_id
+					&& let Some(target) = targets.iter_mut().rev().find(|t| t.id == target_id)
+				{
+					merge_taint(&mut target.backedge, tainted);
+				}
+				false
+			}
+			ExprKind::Ret(inner) => {
+				if let Some(inner) = inner {
+					let _ = self.visit_expr(inner, tainted, targets);
+				}
+				false
 			}
 			ExprKind::Closure(closure) => {
 				let body = self.cx.tcx.hir_body(closure.body);
 				let mut closure_tainted = tainted.clone();
-				self.visit_expr(body.value, &mut closure_tainted);
+				let mut closure_targets = Vec::new();
+				let _ = self.visit_expr(body.value, &mut closure_tainted, &mut closure_targets);
+				true
 			}
 			ExprKind::Call(callee, args) => {
-				self.visit_expr(callee, tainted);
-				for arg in *args {
-					self.visit_expr(arg, tainted);
+				if !self.visit_expr(callee, tainted, targets) {
+					return false;
 				}
+				for arg in *args {
+					if !self.visit_expr(arg, tainted, targets) {
+						return false;
+					}
+				}
+				!self.cx.typeck_results().expr_ty(expr).is_never()
 			}
 			ExprKind::Binary(_, lhs, rhs) | ExprKind::AssignOp(_, lhs, rhs) => {
-				self.visit_expr(lhs, tainted);
-				self.visit_expr(rhs, tainted);
+				self.visit_expr(lhs, tainted, targets) && self.visit_expr(rhs, tainted, targets)
 			}
 			ExprKind::Unary(_, inner)
 			| ExprKind::Cast(inner, _)
@@ -486,30 +668,30 @@ impl<'tcx> Analyzer<'_, 'tcx> {
 			| ExprKind::Field(inner, _)
 			| ExprKind::AddrOf(_, Mutability::Not, inner)
 			| ExprKind::Repeat(inner, _)
-			| ExprKind::Yield(inner, _) => {
-				self.visit_expr(inner, tainted);
-			}
+			| ExprKind::Yield(inner, _) => self.visit_expr(inner, tainted, targets),
 			ExprKind::Index(base, index, _) => {
-				self.visit_expr(base, tainted);
-				self.visit_expr(index, tainted);
+				self.visit_expr(base, tainted, targets) && self.visit_expr(index, tainted, targets)
 			}
 			ExprKind::Array(elements) | ExprKind::Tup(elements) => {
 				for element in *elements {
-					self.visit_expr(element, tainted);
+					if !self.visit_expr(element, tainted, targets) {
+						return false;
+					}
 				}
+				true
 			}
 			ExprKind::Struct(_, fields, base) => {
 				for field in *fields {
-					self.visit_expr(field.expr, tainted);
+					if !self.visit_expr(field.expr, tainted, targets) {
+						return false;
+					}
 				}
 				if let rustc_hir::StructTailExpr::Base(base_expr) = base {
-					self.visit_expr(base_expr, tainted);
+					return self.visit_expr(base_expr, tainted, targets);
 				}
+				true
 			}
-			ExprKind::Ret(Some(inner)) | ExprKind::Break(_, Some(inner)) => {
-				self.visit_expr(inner, tainted);
-			}
-			_ => {}
+			_ => !self.cx.typeck_results().expr_ty(expr).is_never(),
 		}
 	}
 }
@@ -524,8 +706,9 @@ impl<'tcx> LateLintPass<'tcx> for DenyReadonlyAccountCopyEscalation {
 		_: Span,
 		_: LocalDefId,
 	) {
-		let analyzer = Analyzer { cx };
+		let analyzer = Analyzer { cx, emit: true };
 		let mut tainted = HashMap::new();
-		analyzer.visit_expr(body.value, &mut tainted);
+		let mut targets = Vec::new();
+		let _ = analyzer.visit_expr(body.value, &mut tainted, &mut targets);
 	}
 }

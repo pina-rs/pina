@@ -280,6 +280,8 @@ fn manual_pina_account_initialize_override_is_preserved_by_initialize_zeroed() {
 	.unwrap_or_else(|e| panic!("manual __initialize_zeroed failed: {e:?}"));
 	assert_eq!(created.bump, 7);
 	assert_eq!(created.version.get(), 0xCAFE_BABE);
+	<ManualFixedAccount as PinaAccount>::write_zc_discriminator(created);
+	assert!(<ManualFixedAccount as HasDiscriminator>::matches_discriminator(&buf));
 }
 
 #[cfg(feature = "const-rent")]

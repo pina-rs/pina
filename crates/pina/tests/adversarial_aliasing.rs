@@ -1656,6 +1656,55 @@ fn manual_parser_delegating_to_derived_unique_child_enforces_uniqueness() {
 	};
 	let mut ok_cursor = AccountsCursor::new(*pid, ok_slice);
 	assert!(ManualWrapperAroundUnique::parse_accounts(&mut ok_cursor).is_ok());
+
+	// A derived outer struct embedding the handwritten wrapper has a dynamic
+	// layout (`static_layout == false`). `dispatch_entrypoint!` /
+	// `try_from_route` MUST still hand it a checked cursor when a readonly
+	// duplicate is present so the child's `#[pina(unique)]` guard rejects it.
+	#[allow(dead_code)]
+	#[derive(Accounts)]
+	struct DerivedOuterAroundManualUnique<'a> {
+		manual: ManualWrapperAroundUnique<'a>,
+	}
+
+	assert!(!DerivedOuterAroundManualUnique::ALIAS_LAYOUT.static_layout);
+
+	let (mut bad_route_in, bad_offset) = serialize(&[ro(1), Slot::Duplicate(0)], &[], &ID);
+	let bad_ptr = bad_route_in.as_mut_ptr().cast::<u8>();
+	// SAFETY: `bad_route_in` is a valid serialized entrypoint buffer.
+	let bad_status = unsafe {
+		__dispatch_entrypoint(
+			bad_ptr,
+			bad_ptr.add(bad_offset),
+			|entry: EntrypointInput, pid: &Address, _data: &[u8]| {
+				let mut slots = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 4];
+				let route = entry.parse_route::<4, { ROUTE_UNBOUNDED }, true>(&mut slots)?;
+				let _ = DerivedOuterAroundManualUnique::try_from_route(pid, route)?;
+				Ok(())
+			},
+		)
+	};
+	assert_eq!(bad_status, u64::from(dup));
+
+	// Distinct readonly accounts take the duplicate-free fast path and succeed.
+	let (mut ok_route_in, ok_offset) = serialize(&[ro(1), ro(2)], &[], &ID);
+	let ok_ptr = ok_route_in.as_mut_ptr().cast::<u8>();
+	// SAFETY: `ok_route_in` is a valid serialized entrypoint buffer.
+	let ok_status = unsafe {
+		__dispatch_entrypoint(
+			ok_ptr,
+			ok_ptr.add(ok_offset),
+			|entry: EntrypointInput, pid: &Address, _data: &[u8]| {
+				let mut slots = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 4];
+				let route = entry.parse_route::<4, { ROUTE_UNBOUNDED }, true>(&mut slots)?;
+				let parsed = DerivedOuterAroundManualUnique::try_from_route(pid, route)?;
+				assert_eq!(parsed.manual.child.first.address().as_ref()[0], 1);
+				assert_eq!(parsed.manual.child.second.address().as_ref()[0], 2);
+				Ok(())
+			},
+		)
+	};
+	assert_eq!(ok_status, SUCCESS);
 }
 
 #[test]

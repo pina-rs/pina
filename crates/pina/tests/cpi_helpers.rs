@@ -1522,4 +1522,68 @@ fn resizable_update_rejects_manual_validate_size_before_mutating_bytes() {
 	assert_eq!(result, Err(ProgramError::Custom(0xDEAD)));
 	// Account bytes MUST remain untouched when `validate_size` rejects.
 	assert_eq!(stored_account.data, before);
+
+	// Exercise the local test delegates directly so every helper method matches
+	// `CompactBuilderState`.
+	assert!(<StrictSizeCompact as pina::PinaPodCompact>::validate(&before).is_ok());
+	let patch = StrictPatch(CompactBuilderStatePatch::new().value(9));
+	let expected_len = CompactBuilderState::updated_len(&before, &patch.0)
+		.unwrap_or_else(|e| panic!("expected updated_len: {e:?}"));
+	assert_eq!(
+		<StrictPatch<'_> as pina::PinaPodPatch<StrictSizeCompact>>::updated_len(&patch, &before)
+			.unwrap_or_else(|e| panic!("pod updated_len: {e:?}")),
+		expected_len
+	);
+	let mut init_buf = [0u8; CompactBuilderState::HEADER_SIZE];
+	let mut expected_init = [0u8; CompactBuilderState::HEADER_SIZE];
+	let init_len = <StrictPatch<'_> as pina::PinaPodPatch<StrictSizeCompact>>::initialize(
+		&patch,
+		&mut init_buf,
+	)
+	.unwrap_or_else(|e| panic!("pod initialize: {e:?}"));
+	let expected_init_len = patch
+		.0
+		.initialize(&mut expected_init)
+		.unwrap_or_else(|e| panic!("expected pod initialize: {e:?}"));
+	assert_eq!(init_len, expected_init_len);
+	assert_eq!(init_buf, expected_init);
+	let mut account_init = [0u8; CompactBuilderState::HEADER_SIZE];
+	assert_eq!(
+		<StrictSizeCompact as pina::PinaCompactAccount>::initialize(&mut account_init, &patch)
+			.unwrap_or_else(|e| panic!("account initialize: {e:?}")),
+		CompactBuilderState::initialize(&mut expected_init, &patch.0)
+			.unwrap_or_else(|e| panic!("expected account initialize: {e:?}"))
+	);
+	assert_eq!(account_init, expected_init);
+	let update_patch = StrictPatch(CompactBuilderStatePatch::new().value(42));
+	let mut pod_updated = account_init;
+	let mut expected_updated = expected_init;
+	assert_eq!(
+		<StrictPatch<'_> as pina::PinaPodPatch<StrictSizeCompact>>::update(
+			&update_patch,
+			&mut pod_updated
+		)
+		.unwrap_or_else(|e| panic!("pod update: {e:?}")),
+		update_patch
+			.0
+			.update(&mut expected_updated)
+			.unwrap_or_else(|e| panic!("expected pod update: {e:?}"))
+	);
+	assert_eq!(pod_updated, expected_updated);
+	let mut account_updated = account_init;
+	assert_eq!(
+		<StrictSizeCompact as pina::PinaCompactAccount>::update(
+			&mut account_updated,
+			&update_patch
+		)
+		.unwrap_or_else(|e| panic!("account update: {e:?}")),
+		CompactBuilderState::update(&mut expected_init, &update_patch.0)
+			.unwrap_or_else(|e| panic!("expected account update: {e:?}"))
+	);
+	assert_eq!(account_updated, expected_init);
+	let view = <StrictSizeCompact as pina::PinaCompactAccount>::try_from_bytes(&account_updated)
+		.unwrap_or_else(|e| panic!("strict try_from_bytes: {e:?}"));
+	let expected_view = CompactBuilderState::try_from_bytes(&expected_init)
+		.unwrap_or_else(|e| panic!("expected try_from_bytes: {e:?}"));
+	assert_eq!(view.value(), expected_view.value());
 }
