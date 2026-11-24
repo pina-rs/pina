@@ -6,6 +6,48 @@ This guide maps common Anchor patterns to their Pina equivalents. If you have an
 
 The repository includes several Anchor parity example programs (ports of Anchor's own test suite, without the `anchor_` prefix) that demonstrate direct parity with Anchor's behavior. These are referenced throughout this guide.
 
+## A counter in both frameworks
+
+The framework comparison includes complete [Anchor v1](https://github.com/pina-rs/pina/blob/main/benchmarks/framework-comparison/programs/counter/anchor_v1/src/lib.rs) and [Pina](https://github.com/pina-rs/pina/blob/main/benchmarks/framework-comparison/programs/counter/pina/src/lib.rs) counters. Both initialize a PDA derived from `b"counter"` and the authority, then increment a checked `u64`. Their account and instruction encodings differ, so this is a rewrite of the flow, not a drop-in upgrade for existing accounts or clients.
+
+Anchor declares the signer, mutable account and PDA constraints on the accounts struct:
+
+```rust,ignore
+#[derive(Accounts)]
+pub struct Increment<'info> {
+	pub authority: Signer<'info>,
+	#[account(mut, seeds = [b"counter", authority.key().as_ref()], bump)]
+	pub counter: Account<'info, CounterState>,
+}
+```
+
+The Pina version declares account access separately and checks the signer and PDA in the handler:
+
+```rust,ignore
+#[derive(Accounts, Debug)]
+pub struct IncrementAccounts<'a> {
+	pub authority: &'a AccountView,
+	pub counter: &'a mut AccountView,
+}
+
+impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
+	fn process(self, data: &[u8]) -> ProgramResult {
+		let _ = IncrementInstruction::try_from_bytes(data)?;
+		self.authority.assert_signer()?;
+		let mut counter = CounterState::load_pda_mut(self.counter, self.authority.address(), &ID)?;
+		let next = counter
+			.count
+			.get()
+			.checked_add(1)
+			.ok_or(ProgramError::ArithmeticOverflow)?;
+		counter.count.set(next);
+		Ok(())
+	}
+}
+```
+
+The Pina fixture declares the seeds and stored bump on `CounterState`. Its typed loader checks the account owner, type and PDA before giving mutable access. Initialization uses `CreateProgramAccountWithUncheckedBump`, which validates the supplied bump's derivation without proving it canonical; a noncanonical bump creates a second address for the same seeds. That is harmless for a per-authority counter, but wrong when another program or an indexer derives the canonical address. When a seed namespace must map to exactly one address, use `CreateProgramAccount` with `invoke_with_bump` and store the bump it derives. Review the full fixtures for instruction definitions, initialization and dispatch.
+
 ## Program structure
 
 <br>
@@ -73,7 +115,7 @@ impl<'a> ProcessAccountInfos<'a> for InitializeAccounts<'a> {
 
 Key differences:
 
-- **No `#[program]` module.** Pina uses explicit discriminator enums and a manual `match` in the entrypoint.
+- **No `#[program]` module.** Pina uses explicit discriminator enums; `#[discriminator(entrypoint)]` generates a router, or you can write a manual `match`.
 - **No `Context<T>`.** The entrypoint receives `&mut [AccountView]`, `#[derive(Accounts)]` maps that mutable slice into typed fields, and the processor receives raw `data: &[u8]`.
 - **Constraints are code, not attributes.** Validation happens inside `process` via chained assertions rather than `#[account(...)]` attribute directives.
 
