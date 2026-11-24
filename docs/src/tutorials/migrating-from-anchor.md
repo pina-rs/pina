@@ -46,7 +46,7 @@ impl<'a> ProcessAccountInfos<'a> for IncrementAccounts<'a> {
 }
 ```
 
-The Pina fixture declares the seeds and stored bump on `CounterState`. Its typed loader checks the account owner, type and PDA before giving mutable access. Initialization uses `CreateProgramAccountWithUncheckedBump`, which validates the supplied bump's derivation without proving it canonical; a noncanonical bump creates a second address for the same seeds. That is harmless for a per-authority counter, but wrong when another program or an indexer derives the canonical address. When a seed namespace must map to exactly one address, use `CreateProgramAccount` with `invoke_with_bump` and store the bump it derives. Review the full fixtures for instruction definitions, initialization and dispatch.
+The Pina fixture declares the seeds and stored bump on `CounterState`. Its typed loader checks the account owner, type and PDA before giving mutable access. Initialization uses `CreateProgramAccountWithUncheckedBump`, which validates the supplied bump's derivation without proving it canonical; a noncanonical bump creates a second address for the same seeds. That lets one authority create a second counter, which breaks the one-counter-per-authority model. It is also wrong when another program or an indexer derives the canonical address. When a seed namespace must map to exactly one address, use `CreateProgramAccount` with `invoke_with_bump` and store the bump it derives. Review the full fixtures for instruction definitions, initialization and dispatch.
 
 ## Program structure
 
