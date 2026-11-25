@@ -23,17 +23,26 @@ pnpm --dir "$ROOT" run build:codama-renderer-cli
 
 # Build the CLI binary once so each example only pays the generation cost
 # instead of re-entering Cargo 28 times.
+# Stream stdin with `node:readline` instead of `fs.readFileSync(0, "utf8")`:
+# Node 24.21.0..24.22.3 (and 26.8.0..26.13.0) has a heap buffer overflow in
+# `ReadFileUtf8()` when a pipe delivers >64 KiB in <8 KiB short reads before a
+# full 8 KiB read (https://github.com/nodejs/node/issues/66341).
 PINA_BIN="$(
 	cargo build --locked --quiet -p pina_cli --bin pina --message-format=json-render-diagnostics |
 		node -e '
-			const fs = require("node:fs");
-			for (const line of fs.readFileSync(0, "utf8").split(/\r?\n/)) {
-				if (!line.startsWith("{")) continue;
+			const readline = require("node:readline");
+			let executable = "";
+			const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+			rl.on("line", (line) => {
+				if (!line.startsWith("{")) return;
 				const msg = JSON.parse(line);
 				if (msg.reason === "compiler-artifact" && msg.target?.name === "pina" && typeof msg.executable === "string") {
-					process.stdout.write(msg.executable);
+					executable = msg.executable;
 				}
-			}
+			});
+			rl.on("close", () => {
+				if (executable) process.stdout.write(executable);
+			});
 		'
 )"
 if [ -z "$PINA_BIN" ]; then
