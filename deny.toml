@@ -117,8 +117,7 @@ ignore = [
 	# `pina_macros`, `pina_cli`, and `pina_profile` do not depend on it, and
 	# normal or build edges of the on-chain examples do not either (the only
 	# example edge is a dev-dependency on `pina_test`). Reviewed 2026-11-18.
-	# Remove when Surfpool and Solana stop pulling chrono. A tracking issue
-	# still needs to be filed.
+	# Remove when Surfpool and Solana stop pulling chrono — tracked in #716.
 	"RUSTSEC-2026-0543",
 	# RUSTSEC-2026-0592: `url` < 2.5.9 has a stack overflow in `Url::origin()`
 	# on nested `blob:` URLs. The workspace's `url 2.5.x` line (used by

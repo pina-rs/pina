@@ -17,7 +17,11 @@ audit:
   level: moderate
   # GHSA-fc5q-39xc-vjpf: picomatch <=4.0.7 ReDoS (CVE-2026-112366). No patched
   # release exists (latest is 4.0.7). Dev-only, reached through vitest, vite,
-  # and fdir. Reviewed 2026-11-18. Remove when a patched picomatch is published.
+  # and fdir: `pnpm why -r --prod picomatch` finds nothing. Reviewed
+  # 2026-11-18. Once a patched picomatch is published, widen the `overrides`
+  # selector below to cover every affected version (it stops at <4.0.4),
+  # regenerate pnpm-lock.yaml, confirm no version <=4.0.7 remains, and then
+  # remove this entry.
   ignore:
     - GHSA-fc5q-39xc-vjpf
 
