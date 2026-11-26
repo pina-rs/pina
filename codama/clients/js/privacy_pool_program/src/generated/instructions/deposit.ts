@@ -6,569 +6,153 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	fixDecoderSize,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	fixEncoderSize,
-	getBytesDecoder,
-	getBytesEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	transformEncoder,
-	type WritableAccount,
-	type WritableSignerAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type InstructionAccountInput,
-	type InstructionAccountInputAddress,
-	type InstructionSignerInput,
-	type ResolvedInstructionAccount,
-	type ResolvedInstructionAccountMeta,
-} from "@solana/program-client-core";
-import {
-	findMerkleTreePda,
-	findPoolConfigPda,
-	findPoolVaultPda,
-} from "../pdas";
-import {
-	fixPinaPodEncoderSize,
-	getPinaPodDiscriminatorDecoder,
-} from "../pinaPodCodecs";
-import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
+import { getAccountMetaFactory, type InstructionAccountInput, type InstructionAccountInputAddress, type InstructionSignerInput, type ResolvedInstructionAccount, type ResolvedInstructionAccountMeta } from '@solana/program-client-core';
+import { findMerkleTreePda, findPoolConfigPda, findPoolVaultPda } from '../pdas';
+import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const DEPOSIT_DISCRIMINATOR = 4;
 
-export function getDepositDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR);
+export function getDepositDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(DEPOSIT_DISCRIMINATOR); }
+
+export type DepositInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountDepositor extends string | AccountMeta<string> = string, TAccountPoolConfig extends string | AccountMeta<string> = string, TAccountPoolVault extends string | AccountMeta<string> = string, TAccountMerkleTree extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountDepositor extends string ? WritableSignerAccount<TAccountDepositor> & AccountSignerMeta<TAccountDepositor> : TAccountDepositor, TAccountPoolConfig extends string ? WritableAccount<TAccountPoolConfig> : TAccountPoolConfig, TAccountPoolVault extends string ? WritableAccount<TAccountPoolVault> : TAccountPoolVault, TAccountMerkleTree extends string ? WritableAccount<TAccountMerkleTree> : TAccountMerkleTree, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+
+export type DepositInstructionData = { discriminator: number; 
+/** Variable SOL deposit amount in lamports. */
+amount: bigint; 
+/** Client-computed Poseidon note commitment. */
+commitment: ReadonlyUint8Array; 
+/** Per-note consent/notification public key. */
+viewPubkey: ReadonlyUint8Array; envelopeLen: number; envelope: ReadonlyUint8Array; shares: ReadonlyUint8Array;  };
+
+export type DepositInstructionDataArgs = { 
+/** Variable SOL deposit amount in lamports. */
+amount: number | bigint; 
+/** Client-computed Poseidon note commitment. */
+commitment: ReadonlyUint8Array; 
+/** Per-note consent/notification public key. */
+viewPubkey: ReadonlyUint8Array; envelopeLen: number; envelope: ReadonlyUint8Array; shares: ReadonlyUint8Array;  };
+
+export function getDepositInstructionDataEncoder(): FixedSizeEncoder<DepositInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['amount', getU64Encoder()], ['commitment', fixPinaPodEncoderSize(getBytesEncoder(), 32)], ['viewPubkey', fixPinaPodEncoderSize(getBytesEncoder(), 32)], ['envelopeLen', getU8Encoder()], ['envelope', fixPinaPodEncoderSize(getBytesEncoder(), 96)], ['shares', fixPinaPodEncoderSize(getBytesEncoder(), 144)]]), (value) => ({ ...value, discriminator: 4 }));
 }
 
-export type DepositInstruction<
-	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
-	TAccountDepositor extends string | AccountMeta<string> = string,
-	TAccountPoolConfig extends string | AccountMeta<string> = string,
-	TAccountPoolVault extends string | AccountMeta<string> = string,
-	TAccountMerkleTree extends string | AccountMeta<string> = string,
-	TAccountNoteCommitment extends string | AccountMeta<string> = string,
-	TAccountSystemProgram extends string | AccountMeta<string> =
-		"11111111111111111111111111111111",
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountDepositor extends string ?
-					& WritableSignerAccount<TAccountDepositor>
-					& AccountSignerMeta<TAccountDepositor>
-				: TAccountDepositor,
-			TAccountPoolConfig extends string ? WritableAccount<TAccountPoolConfig>
-				: TAccountPoolConfig,
-			TAccountPoolVault extends string ? WritableAccount<TAccountPoolVault>
-				: TAccountPoolVault,
-			TAccountMerkleTree extends string ? WritableAccount<TAccountMerkleTree>
-				: TAccountMerkleTree,
-			TAccountNoteCommitment extends string
-				? WritableAccount<TAccountNoteCommitment>
-				: TAccountNoteCommitment,
-			TAccountSystemProgram extends string
-				? ReadonlyAccount<TAccountSystemProgram>
-				: TAccountSystemProgram,
-			...TRemainingAccounts,
-		]
-	>;
+export function getDepositInstructionDataDecoder(): FixedSizeDecoder<DepositInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(DEPOSIT_DISCRIMINATOR, getU8Decoder())], ['amount', getU64Decoder()], ['commitment', fixDecoderSize(getBytesDecoder(), 32)], ['viewPubkey', fixDecoderSize(getBytesDecoder(), 32)], ['envelopeLen', getU8Decoder()], ['envelope', fixDecoderSize(getBytesDecoder(), 96)], ['shares', fixDecoderSize(getBytesDecoder(), 144)]]);
+}
 
-export type DepositInstructionData = {
-	discriminator: number;
-	bump: number;
-	/** Client-computed Poseidon commitment of the new note. */
-	commitment: ReadonlyUint8Array;
-	/** Per-note consent/notification public key. */
-	viewPubkey: ReadonlyUint8Array;
-	/** Active length of the encrypted note plaintext. */
-	envelopeLen: number;
-	envelope: ReadonlyUint8Array;
-	/** Encrypted per-custodian key shares. */
-	shares: ReadonlyUint8Array;
+export function getDepositInstructionDataCodec(): FixedSizeCodec<DepositInstructionDataArgs, DepositInstructionData> {
+    return combineCodec(getDepositInstructionDataEncoder(), getDepositInstructionDataDecoder());
+}
+
+export type DepositAsyncInput<TAccountDepositor extends InstructionSignerInput = InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput, TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput, TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+  depositor: TAccountDepositor;
+poolConfig?: TAccountPoolConfig;
+poolVault?: TAccountPoolVault;
+merkleTree?: TAccountMerkleTree;
+systemProgram?: TAccountSystemProgram;
+amount: DepositInstructionDataArgs["amount"];
+commitment: DepositInstructionDataArgs["commitment"];
+viewPubkey: DepositInstructionDataArgs["viewPubkey"];
+envelopeLen: DepositInstructionDataArgs["envelopeLen"];
+envelope: DepositInstructionDataArgs["envelope"];
+shares: DepositInstructionDataArgs["shares"];
+}
+
+export async function getDepositInstructionAsync<TAccountDepositor extends InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput, TAccountPoolVault extends InstructionAccountInput, TAccountMerkleTree extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: DepositAsyncInput<TAccountDepositor, TAccountPoolConfig, TAccountPoolVault, TAccountMerkleTree, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): Promise<DepositInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountDepositor, InstructionAccountInputAddress<TAccountDepositor>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountPoolVault, InstructionAccountInputAddress<TAccountPoolVault>>, ResolvedInstructionAccountMeta<TAccountMerkleTree, InstructionAccountInputAddress<TAccountMerkleTree>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>> {
+  // Program address.
+const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
+
+// Account meta helper.
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+
+ // Original accounts.
+const originalAccounts = { depositor: { value: input.depositor ?? null, isSigner: true, isWritable: true }, poolConfig: { value: input.poolConfig ?? null, isSigner: false, isWritable: true }, poolVault: { value: input.poolVault ?? null, isSigner: false, isWritable: true }, merkleTree: { value: input.merkleTree ?? null, isSigner: false, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+// Original args.
+const args = { ...input,  };
+
+
+// Resolve default values.
+if (!accounts.poolConfig.value) {
+accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+}
+if (!accounts.poolVault.value) {
+accounts.poolVault.value = await findPoolVaultPda({ programAddress });
+}
+if (!accounts.merkleTree.value) {
+accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
+}
+if (!accounts.systemProgram.value) {
+accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+}
+
+return Object.freeze({ accounts: [getAccountMeta("depositor", accounts.depositor), getAccountMeta("poolConfig", accounts.poolConfig), getAccountMeta("poolVault", accounts.poolVault), getAccountMeta("merkleTree", accounts.merkleTree), getAccountMeta("systemProgram", accounts.systemProgram)], data: getDepositInstructionDataEncoder().encode(args as DepositInstructionDataArgs), programAddress } as DepositInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountDepositor, InstructionAccountInputAddress<TAccountDepositor>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountPoolVault, InstructionAccountInputAddress<TAccountPoolVault>>, ResolvedInstructionAccountMeta<TAccountMerkleTree, InstructionAccountInputAddress<TAccountMerkleTree>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
+}
+
+export type DepositInput<TAccountDepositor extends InstructionSignerInput = InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput, TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput, TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+  depositor: TAccountDepositor;
+poolConfig: TAccountPoolConfig;
+poolVault: TAccountPoolVault;
+merkleTree: TAccountMerkleTree;
+systemProgram?: TAccountSystemProgram;
+amount: DepositInstructionDataArgs["amount"];
+commitment: DepositInstructionDataArgs["commitment"];
+viewPubkey: DepositInstructionDataArgs["viewPubkey"];
+envelopeLen: DepositInstructionDataArgs["envelopeLen"];
+envelope: DepositInstructionDataArgs["envelope"];
+shares: DepositInstructionDataArgs["shares"];
+}
+
+export function getDepositInstruction<TAccountDepositor extends InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput, TAccountPoolVault extends InstructionAccountInput, TAccountMerkleTree extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: DepositInput<TAccountDepositor, TAccountPoolConfig, TAccountPoolVault, TAccountMerkleTree, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): DepositInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountDepositor, InstructionAccountInputAddress<TAccountDepositor>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountPoolVault, InstructionAccountInputAddress<TAccountPoolVault>>, ResolvedInstructionAccountMeta<TAccountMerkleTree, InstructionAccountInputAddress<TAccountMerkleTree>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>> {
+  // Program address.
+const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
+
+// Account meta helper.
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+
+ // Original accounts.
+const originalAccounts = { depositor: { value: input.depositor ?? null, isSigner: true, isWritable: true }, poolConfig: { value: input.poolConfig ?? null, isSigner: false, isWritable: true }, poolVault: { value: input.poolVault ?? null, isSigner: false, isWritable: true }, merkleTree: { value: input.merkleTree ?? null, isSigner: false, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+// Original args.
+const args = { ...input,  };
+
+
+// Resolve default values.
+if (!accounts.systemProgram.value) {
+accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+}
+
+return Object.freeze({ accounts: [getAccountMeta("depositor", accounts.depositor), getAccountMeta("poolConfig", accounts.poolConfig), getAccountMeta("poolVault", accounts.poolVault), getAccountMeta("merkleTree", accounts.merkleTree), getAccountMeta("systemProgram", accounts.systemProgram)], data: getDepositInstructionDataEncoder().encode(args as DepositInstructionDataArgs), programAddress } as DepositInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountDepositor, InstructionAccountInputAddress<TAccountDepositor>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountPoolVault, InstructionAccountInputAddress<TAccountPoolVault>>, ResolvedInstructionAccountMeta<TAccountMerkleTree, InstructionAccountInputAddress<TAccountMerkleTree>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
+}
+
+export type ParsedDepositInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+depositor: TAccountMetas[0];
+poolConfig: TAccountMetas[1];
+poolVault: TAccountMetas[2];
+merkleTree: TAccountMetas[3];
+systemProgram: TAccountMetas[4];
 };
+data: DepositInstructionData; };
 
-export type DepositInstructionDataArgs = {
-	bump: number;
-	/** Client-computed Poseidon commitment of the new note. */
-	commitment: ReadonlyUint8Array;
-	/** Per-note consent/notification public key. */
-	viewPubkey: ReadonlyUint8Array;
-	/** Active length of the encrypted note plaintext. */
-	envelopeLen: number;
-	envelope: ReadonlyUint8Array;
-	/** Encrypted per-custodian key shares. */
-	shares: ReadonlyUint8Array;
-};
-
-export function getDepositInstructionDataEncoder(): FixedSizeEncoder<
-	DepositInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["commitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
-			["viewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
-			["envelopeLen", getU8Encoder()],
-			["envelope", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["shares", fixPinaPodEncoderSize(getBytesEncoder(), 144)],
-		]),
-		(value) => ({ ...value, discriminator: 4 }),
-	);
+export function parseDepositInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedDepositInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 5) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 5 });
 }
-
-export function getDepositInstructionDataDecoder(): FixedSizeDecoder<
-	DepositInstructionData
-> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(DEPOSIT_DISCRIMINATOR, getU8Decoder()),
-		],
-		["bump", getU8Decoder()],
-		["commitment", fixDecoderSize(getBytesDecoder(), 32)],
-		["viewPubkey", fixDecoderSize(getBytesDecoder(), 32)],
-		["envelopeLen", getU8Decoder()],
-		["envelope", fixDecoderSize(getBytesDecoder(), 128)],
-		["shares", fixDecoderSize(getBytesDecoder(), 144)],
-	]);
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
 }
-
-export function getDepositInstructionDataCodec(): FixedSizeCodec<
-	DepositInstructionDataArgs,
-	DepositInstructionData
-> {
-	return combineCodec(
-		getDepositInstructionDataEncoder(),
-		getDepositInstructionDataDecoder(),
-	);
-}
-
-export type DepositAsyncInput<
-	TAccountDepositor extends InstructionSignerInput = InstructionSignerInput,
-	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
-	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
-	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput =
-		InstructionAccountInput,
-	TAccountSystemProgram extends InstructionAccountInput =
-		InstructionAccountInput,
-> = {
-	depositor: TAccountDepositor;
-	poolConfig?: TAccountPoolConfig;
-	poolVault?: TAccountPoolVault;
-	merkleTree?: TAccountMerkleTree;
-	noteCommitment: TAccountNoteCommitment;
-	systemProgram?: TAccountSystemProgram;
-	bump: DepositInstructionDataArgs["bump"];
-	commitment: DepositInstructionDataArgs["commitment"];
-	viewPubkey: DepositInstructionDataArgs["viewPubkey"];
-	envelopeLen: DepositInstructionDataArgs["envelopeLen"];
-	envelope: DepositInstructionDataArgs["envelope"];
-	shares: DepositInstructionDataArgs["shares"];
-};
-
-export async function getDepositInstructionAsync<
-	TAccountDepositor extends InstructionSignerInput,
-	TAccountPoolConfig extends InstructionAccountInput,
-	TAccountPoolVault extends InstructionAccountInput,
-	TAccountMerkleTree extends InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput,
-	TAccountSystemProgram extends InstructionAccountInput,
-	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: DepositAsyncInput<
-		TAccountDepositor,
-		TAccountPoolConfig,
-		TAccountPoolVault,
-		TAccountMerkleTree,
-		TAccountNoteCommitment,
-		TAccountSystemProgram
-	>,
-	config?: {
-		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
-	},
-): Promise<
-	DepositInstruction<
-		TProgramAddress,
-		ResolvedInstructionAccountMeta<
-			TAccountDepositor,
-			InstructionAccountInputAddress<TAccountDepositor>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolConfig,
-			InstructionAccountInputAddress<TAccountPoolConfig>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolVault,
-			InstructionAccountInputAddress<TAccountPoolVault>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountMerkleTree,
-			InstructionAccountInputAddress<TAccountMerkleTree>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountSystemProgram,
-			InstructionAccountInputAddress<TAccountSystemProgram>
-		>
-	>
-> {
-	// Program address.
-	const programAddressInput = config?.programAddress ??
-		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-	const programAddress = typeof programAddressInput === "string"
-		? programAddressInput
-		: programAddressInput.address;
-
-	// Account meta helper.
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-
-	// Original accounts.
-	const originalAccounts = {
-		depositor: {
-			value: input.depositor ?? null,
-			isSigner: true,
-			isWritable: true,
-		},
-		poolConfig: {
-			value: input.poolConfig ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		poolVault: {
-			value: input.poolVault ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		merkleTree: {
-			value: input.merkleTree ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		noteCommitment: {
-			value: input.noteCommitment ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		systemProgram: {
-			value: input.systemProgram ?? null,
-			isSigner: false,
-			isWritable: false,
-		},
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Original args.
-	const args = { ...input };
-
-	// Resolve default values.
-	if (!accounts.poolConfig.value) {
-		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
-	}
-	if (!accounts.poolVault.value) {
-		accounts.poolVault.value = await findPoolVaultPda({ programAddress });
-	}
-	if (!accounts.merkleTree.value) {
-		accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
-	}
-	if (!accounts.systemProgram.value) {
-		accounts.systemProgram.value =
-			"11111111111111111111111111111111" as Address<
-				"11111111111111111111111111111111"
-			>;
-	}
-
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("depositor", accounts.depositor),
-			getAccountMeta("poolConfig", accounts.poolConfig),
-			getAccountMeta("poolVault", accounts.poolVault),
-			getAccountMeta("merkleTree", accounts.merkleTree),
-			getAccountMeta("noteCommitment", accounts.noteCommitment),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getDepositInstructionDataEncoder().encode(
-			args as DepositInstructionDataArgs,
-		),
-		programAddress,
-	} as DepositInstruction<
-		TProgramAddress,
-		ResolvedInstructionAccountMeta<
-			TAccountDepositor,
-			InstructionAccountInputAddress<TAccountDepositor>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolConfig,
-			InstructionAccountInputAddress<TAccountPoolConfig>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolVault,
-			InstructionAccountInputAddress<TAccountPoolVault>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountMerkleTree,
-			InstructionAccountInputAddress<TAccountMerkleTree>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountSystemProgram,
-			InstructionAccountInputAddress<TAccountSystemProgram>
-		>
-	>);
-}
-
-export type DepositInput<
-	TAccountDepositor extends InstructionSignerInput = InstructionSignerInput,
-	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
-	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
-	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput =
-		InstructionAccountInput,
-	TAccountSystemProgram extends InstructionAccountInput =
-		InstructionAccountInput,
-> = {
-	depositor: TAccountDepositor;
-	poolConfig: TAccountPoolConfig;
-	poolVault: TAccountPoolVault;
-	merkleTree: TAccountMerkleTree;
-	noteCommitment: TAccountNoteCommitment;
-	systemProgram?: TAccountSystemProgram;
-	bump: DepositInstructionDataArgs["bump"];
-	commitment: DepositInstructionDataArgs["commitment"];
-	viewPubkey: DepositInstructionDataArgs["viewPubkey"];
-	envelopeLen: DepositInstructionDataArgs["envelopeLen"];
-	envelope: DepositInstructionDataArgs["envelope"];
-	shares: DepositInstructionDataArgs["shares"];
-};
-
-export function getDepositInstruction<
-	TAccountDepositor extends InstructionSignerInput,
-	TAccountPoolConfig extends InstructionAccountInput,
-	TAccountPoolVault extends InstructionAccountInput,
-	TAccountMerkleTree extends InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput,
-	TAccountSystemProgram extends InstructionAccountInput,
-	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: DepositInput<
-		TAccountDepositor,
-		TAccountPoolConfig,
-		TAccountPoolVault,
-		TAccountMerkleTree,
-		TAccountNoteCommitment,
-		TAccountSystemProgram
-	>,
-	config?: {
-		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
-	},
-): DepositInstruction<
-	TProgramAddress,
-	ResolvedInstructionAccountMeta<
-		TAccountDepositor,
-		InstructionAccountInputAddress<TAccountDepositor>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountPoolConfig,
-		InstructionAccountInputAddress<TAccountPoolConfig>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountPoolVault,
-		InstructionAccountInputAddress<TAccountPoolVault>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountMerkleTree,
-		InstructionAccountInputAddress<TAccountMerkleTree>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountNoteCommitment,
-		InstructionAccountInputAddress<TAccountNoteCommitment>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountSystemProgram,
-		InstructionAccountInputAddress<TAccountSystemProgram>
-	>
-> {
-	// Program address.
-	const programAddressInput = config?.programAddress ??
-		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-	const programAddress = typeof programAddressInput === "string"
-		? programAddressInput
-		: programAddressInput.address;
-
-	// Account meta helper.
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-
-	// Original accounts.
-	const originalAccounts = {
-		depositor: {
-			value: input.depositor ?? null,
-			isSigner: true,
-			isWritable: true,
-		},
-		poolConfig: {
-			value: input.poolConfig ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		poolVault: {
-			value: input.poolVault ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		merkleTree: {
-			value: input.merkleTree ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		noteCommitment: {
-			value: input.noteCommitment ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		systemProgram: {
-			value: input.systemProgram ?? null,
-			isSigner: false,
-			isWritable: false,
-		},
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Original args.
-	const args = { ...input };
-
-	// Resolve default values.
-	if (!accounts.systemProgram.value) {
-		accounts.systemProgram.value =
-			"11111111111111111111111111111111" as Address<
-				"11111111111111111111111111111111"
-			>;
-	}
-
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("depositor", accounts.depositor),
-			getAccountMeta("poolConfig", accounts.poolConfig),
-			getAccountMeta("poolVault", accounts.poolVault),
-			getAccountMeta("merkleTree", accounts.merkleTree),
-			getAccountMeta("noteCommitment", accounts.noteCommitment),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getDepositInstructionDataEncoder().encode(
-			args as DepositInstructionDataArgs,
-		),
-		programAddress,
-	} as DepositInstruction<
-		TProgramAddress,
-		ResolvedInstructionAccountMeta<
-			TAccountDepositor,
-			InstructionAccountInputAddress<TAccountDepositor>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolConfig,
-			InstructionAccountInputAddress<TAccountPoolConfig>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolVault,
-			InstructionAccountInputAddress<TAccountPoolVault>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountMerkleTree,
-			InstructionAccountInputAddress<TAccountMerkleTree>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountSystemProgram,
-			InstructionAccountInputAddress<TAccountSystemProgram>
-		>
-	>);
-}
-
-export type ParsedDepositInstruction<
-	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		depositor: TAccountMetas[0];
-		poolConfig: TAccountMetas[1];
-		poolVault: TAccountMetas[2];
-		merkleTree: TAccountMetas[3];
-		noteCommitment: TAccountMetas[4];
-		systemProgram: TAccountMetas[5];
-	};
-	data: DepositInstructionData;
-};
-
-export function parseDepositInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedDepositInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 6) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 6,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			depositor: getNextAccount(),
-			poolConfig: getNextAccount(),
-			poolVault: getNextAccount(),
-			merkleTree: getNextAccount(),
-			noteCommitment: getNextAccount(),
-			systemProgram: getNextAccount(),
-		},
-		data: getDepositInstructionDataDecoder().decode(instruction.data),
-	};
+  return { programAddress: instruction.programAddress, accounts: { depositor: getNextAccount(), poolConfig: getNextAccount(), poolVault: getNextAccount(), merkleTree: getNextAccount(), systemProgram: getNextAccount() }, data: getDepositInstructionDataDecoder().decode(instruction.data) };
 }

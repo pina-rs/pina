@@ -6,236 +6,78 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlySignerAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	transformEncoder,
-	type WritableAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type InstructionAccountInput,
-	type InstructionAccountInputAddress,
-	type InstructionSignerInput,
-	type ResolvedInstructionAccount,
-	type ResolvedInstructionAccountMeta,
-} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlySignerAccount, type ReadonlyUint8Array, type WritableAccount } from '@solana/kit';
+import { getAccountMetaFactory, type InstructionAccountInput, type InstructionAccountInputAddress, type InstructionSignerInput, type ResolvedInstructionAccount, type ResolvedInstructionAccountMeta } from '@solana/program-client-core';
+import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const CANCEL_DISCLOSURE_DISCRIMINATOR = 12;
 
-export function getCancelDisclosureDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(CANCEL_DISCLOSURE_DISCRIMINATOR);
+export function getCancelDisclosureDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(CANCEL_DISCLOSURE_DISCRIMINATOR); }
+
+export type CancelDisclosureInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountRequester extends string | AccountMeta<string> = string, TAccountDisclosureRequest extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountRequester extends string ? ReadonlySignerAccount<TAccountRequester> & AccountSignerMeta<TAccountRequester> : TAccountRequester, TAccountDisclosureRequest extends string ? WritableAccount<TAccountDisclosureRequest> : TAccountDisclosureRequest, ...TRemainingAccounts]>;
+
+export type CancelDisclosureInstructionData = { discriminator: number; reserved: number;  };
+
+export type CancelDisclosureInstructionDataArgs = { reserved: number;  };
+
+export function getCancelDisclosureInstructionDataEncoder(): FixedSizeEncoder<CancelDisclosureInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['reserved', getU8Encoder()]]), (value) => ({ ...value, discriminator: 12 }));
 }
 
-export type CancelDisclosureInstruction<
-	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
-	TAccountRequester extends string | AccountMeta<string> = string,
-	TAccountDisclosureRequest extends string | AccountMeta<string> = string,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountRequester extends string ?
-					& ReadonlySignerAccount<TAccountRequester>
-					& AccountSignerMeta<TAccountRequester>
-				: TAccountRequester,
-			TAccountDisclosureRequest extends string
-				? WritableAccount<TAccountDisclosureRequest>
-				: TAccountDisclosureRequest,
-			...TRemainingAccounts,
-		]
-	>;
+export function getCancelDisclosureInstructionDataDecoder(): FixedSizeDecoder<CancelDisclosureInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(CANCEL_DISCLOSURE_DISCRIMINATOR, getU8Decoder())], ['reserved', getU8Decoder()]]);
+}
 
-export type CancelDisclosureInstructionData = {
-	discriminator: number;
-	/** Reserved; must be zero. */
-	reserved: number;
+export function getCancelDisclosureInstructionDataCodec(): FixedSizeCodec<CancelDisclosureInstructionDataArgs, CancelDisclosureInstructionData> {
+    return combineCodec(getCancelDisclosureInstructionDataEncoder(), getCancelDisclosureInstructionDataDecoder());
+}
+
+export type CancelDisclosureInput<TAccountRequester extends InstructionSignerInput = InstructionSignerInput, TAccountDisclosureRequest extends InstructionAccountInput = InstructionAccountInput> =  {
+  requester: TAccountRequester;
+disclosureRequest: TAccountDisclosureRequest;
+reserved: CancelDisclosureInstructionDataArgs["reserved"];
+}
+
+export function getCancelDisclosureInstruction<TAccountRequester extends InstructionSignerInput, TAccountDisclosureRequest extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: CancelDisclosureInput<TAccountRequester, TAccountDisclosureRequest>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): CancelDisclosureInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountRequester, InstructionAccountInputAddress<TAccountRequester>>, ResolvedInstructionAccountMeta<TAccountDisclosureRequest, InstructionAccountInputAddress<TAccountDisclosureRequest>>> {
+  // Program address.
+const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
+
+// Account meta helper.
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+
+ // Original accounts.
+const originalAccounts = { requester: { value: input.requester ?? null, isSigner: true, isWritable: false }, disclosureRequest: { value: input.disclosureRequest ?? null, isSigner: false, isWritable: true } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+// Original args.
+const args = { ...input,  };
+
+
+
+
+return Object.freeze({ accounts: [getAccountMeta("requester", accounts.requester), getAccountMeta("disclosureRequest", accounts.disclosureRequest)], data: getCancelDisclosureInstructionDataEncoder().encode(args as CancelDisclosureInstructionDataArgs), programAddress } as CancelDisclosureInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountRequester, InstructionAccountInputAddress<TAccountRequester>>, ResolvedInstructionAccountMeta<TAccountDisclosureRequest, InstructionAccountInputAddress<TAccountDisclosureRequest>>>);
+}
+
+export type ParsedCancelDisclosureInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+requester: TAccountMetas[0];
+disclosureRequest: TAccountMetas[1];
 };
+data: CancelDisclosureInstructionData; };
 
-export type CancelDisclosureInstructionDataArgs = {
-	/** Reserved; must be zero. */
-	reserved: number;
-};
-
-export function getCancelDisclosureInstructionDataEncoder(): FixedSizeEncoder<
-	CancelDisclosureInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([["discriminator", getU8Encoder()], [
-			"reserved",
-			getU8Encoder(),
-		]]),
-		(value) => ({ ...value, discriminator: 12 }),
-	);
+export function parseCancelDisclosureInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedCancelDisclosureInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 2) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 2 });
 }
-
-export function getCancelDisclosureInstructionDataDecoder(): FixedSizeDecoder<
-	CancelDisclosureInstructionData
-> {
-	return getStructDecoder([[
-		"discriminator",
-		getPinaPodDiscriminatorDecoder(
-			CANCEL_DISCLOSURE_DISCRIMINATOR,
-			getU8Decoder(),
-		),
-	], ["reserved", getU8Decoder()]]);
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
 }
-
-export function getCancelDisclosureInstructionDataCodec(): FixedSizeCodec<
-	CancelDisclosureInstructionDataArgs,
-	CancelDisclosureInstructionData
-> {
-	return combineCodec(
-		getCancelDisclosureInstructionDataEncoder(),
-		getCancelDisclosureInstructionDataDecoder(),
-	);
-}
-
-export type CancelDisclosureInput<
-	TAccountRequester extends InstructionSignerInput = InstructionSignerInput,
-	TAccountDisclosureRequest extends InstructionAccountInput =
-		InstructionAccountInput,
-> = {
-	requester: TAccountRequester;
-	disclosureRequest: TAccountDisclosureRequest;
-	reserved: CancelDisclosureInstructionDataArgs["reserved"];
-};
-
-export function getCancelDisclosureInstruction<
-	TAccountRequester extends InstructionSignerInput,
-	TAccountDisclosureRequest extends InstructionAccountInput,
-	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: CancelDisclosureInput<TAccountRequester, TAccountDisclosureRequest>,
-	config?: {
-		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
-	},
-): CancelDisclosureInstruction<
-	TProgramAddress,
-	ResolvedInstructionAccountMeta<
-		TAccountRequester,
-		InstructionAccountInputAddress<TAccountRequester>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountDisclosureRequest,
-		InstructionAccountInputAddress<TAccountDisclosureRequest>
-	>
-> {
-	// Program address.
-	const programAddressInput = config?.programAddress ??
-		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-	const programAddress = typeof programAddressInput === "string"
-		? programAddressInput
-		: programAddressInput.address;
-
-	// Account meta helper.
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-
-	// Original accounts.
-	const originalAccounts = {
-		requester: {
-			value: input.requester ?? null,
-			isSigner: true,
-			isWritable: false,
-		},
-		disclosureRequest: {
-			value: input.disclosureRequest ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Original args.
-	const args = { ...input };
-
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("requester", accounts.requester),
-			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
-		],
-		data: getCancelDisclosureInstructionDataEncoder().encode(
-			args as CancelDisclosureInstructionDataArgs,
-		),
-		programAddress,
-	} as CancelDisclosureInstruction<
-		TProgramAddress,
-		ResolvedInstructionAccountMeta<
-			TAccountRequester,
-			InstructionAccountInputAddress<TAccountRequester>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountDisclosureRequest,
-			InstructionAccountInputAddress<TAccountDisclosureRequest>
-		>
-	>);
-}
-
-export type ParsedCancelDisclosureInstruction<
-	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		requester: TAccountMetas[0];
-		disclosureRequest: TAccountMetas[1];
-	};
-	data: CancelDisclosureInstructionData;
-};
-
-export function parseCancelDisclosureInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedCancelDisclosureInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 2) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 2,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			requester: getNextAccount(),
-			disclosureRequest: getNextAccount(),
-		},
-		data: getCancelDisclosureInstructionDataDecoder().decode(instruction.data),
-	};
+  return { programAddress: instruction.programAddress, accounts: { requester: getNextAccount(), disclosureRequest: getNextAccount() }, data: getCancelDisclosureInstructionDataDecoder().decode(instruction.data) };
 }

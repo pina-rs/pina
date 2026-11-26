@@ -2,7 +2,7 @@
 
 <br>
 
-A tiered-disclosure privacy pool: a shielded-pool payments program whose distinguishing feature is its disclosure protocol.
+A programmable, tiered-disclosure privacy pool: a multi-asset UTXO shielded-pool payments program combining Solana Privacy Rings' production architecture with a governed, publicly-logged disclosure state machine.
 
 <br>
 
@@ -10,12 +10,15 @@ A tiered-disclosure privacy pool: a shielded-pool payments program whose disting
 
 <br>
 
-- **Runtime-crypto integration.** Poseidon commitments go through the `sol_poseidon` syscall and Groth16 proofs verify through the `sol_alt_bn128_group_op` pairing selector, both behind a contained, heavily documented syscall boundary. A full spend — tree read, nullifier scan, four-pairing Groth16 check, payout — fits in one transaction at a fraction of the compute budget.
-- **Generated CLI surface.** The committed TypeScript, Dart, and Rust CLIs derive fixed-seed PDA addresses when `--address` is omitted, and payer-resolution accounts always resolve to the loaded payer keypair — the only key these CLIs can sign with.
-- **Real end-to-end zero knowledge.** The `prover` feature carries the host-side toolkit: an in-circuit Poseidon gadget built from the same circom x5 parameter tables the syscall implements, a spend circuit, a seeded trusted setup, and the big-endian wire codec. The tests generate real Groth16 proofs and push them through the SBF artifact — no mocks.
-- **The tiered disclosure state machine.** Three tiers — consent, verified (challenge window), and compelled — with a custodian quorum, an authority-resolvable challenge path, and an append-only public log whose entries are written by the same instruction that executes a disclosure.
-- **Heap opt-in.** `nostd_entrypoint_alloc!` installs the bump allocator; the verifier's scratch buffers are heap-backed while all account state stays fixed-layout.
-- **The full migration envelope.** Every account is enrolled, with machine-checked ABI layouts in `tests/abi_layout.rs`.
+- **Per-nullifier PDAs (`NullifierRecord`).** Each spent nullifier is stored in its own 3-byte PDA rather than a fixed-capacity array — giving $O(1)$ double-spend checks, unbounded spend capacity, and zero shared nullifier write-lock contention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.
+- **Depth-16 frontier Merkle tree (`MerkleTree`).** Holds 65,536 leaves in a 512-byte frontier plus a 32-root ring using compile-time `ZERO_HASHES`, eliminating runtime zero-hash recomputation on `Initialize` and cutting account size by more than 5× over a full-node store.
+- **Unified variable-amount 2-in-2-out join-split circuit.** One Groth16 circuit (`VK_SLOT_JOIN_SPLIT`) handles arbitrary-amount withdrawals, change outputs, UTXO splits, and UTXO merges with 64-bit range checks and single-input `statement_hash` compression (one `g1_mul` + `g1_add` on-chain).
+- **SPL Token & Token-2022 escrows (`AssetVault`).** Permissionless per-mint `RegisterAsset`, variable-amount `DepositToken`, and join-split `WithdrawToken` via `TransferChecked` CPI.
+- **192-byte compressed Groth16 proofs.** Compressed proofs (`A: 32B, B: 128B, C: 32B`) decompress G₁ on-chain via `sol_alt_bn128_compression` before the four-pairing `sol_alt_bn128_group_op` check.
+- **Relayer & fee-payer decoupling.** Optional `relayer` and `relayer_fee` are bound into the Groth16 statement so users can pay transaction fees from shielded balances without leaking a public fee payer.
+- **Real shielded keypair & X25519 + AEAD (`shielded` module).** Host-side RFC 7748 X25519 viewing keys, authenticated note envelopes, per-transaction viewing keys for selective disclosure, and 2-of-3 GF(256) Shamir custodian shares.
+- **Rent-free note emission & privacy-preserving `DisclosureLog`.** Encrypted envelopes and custodian shares emit through `NoteEncryptedEvent` (zero per-note PDA rent); `RequestDisclosure` authenticates `view_pubkey` via Merkle membership; `DisclosureLog` records a salted `scope_hash` rather than raw commitments; `SetVerificationKey` supports authority key rotation.
+- **Custom Ring policy & composable CPI.** Configurable pause and co-signer / CPI authority gates (`SetPolicy`) plus composable ZK policy proof verification (`VerifyPolicy` on `VK_SLOT_POLICY`).
 
 <br>
 
@@ -23,35 +26,30 @@ A tiered-disclosure privacy pool: a shielded-pool payments program whose disting
 
 <br>
 
-| Instruction           | Description                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| `Initialize`          | Creates the config, vault, tree, registries, and log; prefills the zero-hash chain.            |
-| `SetVerificationKey`  | Installs a Groth16 verifying key for the withdraw or transfer circuit slot.                    |
-| `SetCustodians`       | Rotates the three-member disclosure committee.                                                 |
-| `RegisterRequester`   | Grants an entity a maximum disclosure tier.                                                    |
-| `Deposit`             | Escrows one denomination of SOL and inserts the client-computed commitment.                    |
-| `Withdraw`            | Verifies a Groth16 spend proof, records the nullifier, pays out.                               |
-| `Transfer`            | Spends a note into a fresh commitment with a new consent key.                                  |
-| `RequestDisclosure`   | Files a tiered request with an encrypted notice and legal-basis hash.                          |
-| `GrantDisclosure`     | The note's view key consents (tier 0).                                                         |
-| `ChallengeDisclosure` | The view key freezes a tier-1 request during its window.                                       |
-| `ResolveChallenge`    | The authority resolves a challenge.                                                            |
-| `ApproveDisclosure`   | A custodian approves; at quorum the request executes and the log entry is appended atomically. |
-| `CancelDisclosure`    | The requester withdraws a pending request.                                                     |
+| Instruction           | Description                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `Initialize`          | Creates config, SOL vault, frontier tree, registries, and log using compile-time `ZERO_HASHES`.         |
+| `SetVerificationKey`  | Installs or rotates a single-input Groth16 verifying key for `VK_SLOT_JOIN_SPLIT` or `VK_SLOT_POLICY`.  |
+| `SetCustodians`       | Rotates the three-member disclosure committee.                                                          |
+| `RegisterRequester`   | Grants an entity a maximum disclosure tier.                                                             |
+| `Deposit`             | Escrows a variable amount of SOL, updates the frontier tree, and emits `NoteEncryptedEvent`.            |
+| `Withdraw`            | Verifies a 2-in-2-out join-split proof, nullifies inputs, pays recipient + relayer, emits change note.  |
+| `Transfer`            | Spends 1–2 UTXOs into 1–2 UTXOs with optional relayer fee and emits `NoteEncryptedEvent` per output.    |
+| `RequestDisclosure`   | Authenticates `(commitment, view_pubkey)` via Merkle proof and files a tiered disclosure request.       |
+| `GrantDisclosure`     | The note's authenticated view key consents (tier 0).                                                    |
+| `ChallengeDisclosure` | The note's authenticated view key freezes a tier-1 request during its challenge window.                 |
+| `ResolveChallenge`    | The authority resolves a challenged request.                                                            |
+| `ApproveDisclosure`   | A custodian approves; at quorum the request executes and appends a salted `scope_hash` log entry.       |
+| `CancelDisclosure`    | The requester withdraws a pending request.                                                              |
+| `RegisterAsset`       | Permissionlessly registers an SPL Token or Token-2022 mint and its program-controlled escrow account.   |
+| `DepositToken`        | Escrows a variable amount of SPL/Token-2022 tokens, updates the frontier tree, emits encrypted note.    |
+| `WithdrawToken`       | Verifies a join-split proof for `asset_id(mint)`, pays recipient + relayer in tokens, emits change.     |
+| `SetPolicy`           | Configures Custom Ring policy flags (`POLICY_PAUSED`, `POLICY_REQUIRE_COSIGNER`) and co-signer address. |
+| `VerifyPolicy`        | Verifies a 128-byte compressed Custom Ring ZK policy proof on `VK_SLOT_POLICY` (composable via CPI).    |
 
-A note is `(secret, nullifier_seed)`; the commitment is `Poseidon(Poseidon(secret, seed), amount)` and the nullifier is `Poseidon(seed, secret)`. The circuit proves knowledge of the note's preimage, membership against the tree root, and the nullifier derivation — without revealing which leaf. Deposits and withdrawals remain public edges by design (fixed denomination); the nullifier set is the only spent record — note accounts never carry a spent flag, because linking a nullifier to its commitment is exactly the leak the pool exists to prevent.
+A note is `(secret, nullifier_seed, amount, asset_id, view_pubkey)`. Its commitment is `Poseidon(Poseidon(secret, nullifier_seed), Poseidon(asset_id, amount))`, its tree leaf is `Poseidon(commitment, address_hash(view_pubkey))`, and its nullifier is `Poseidon(nullifier_seed, secret)` (or `0` for dummy inputs).
 
-Withdrawal public inputs are exactly `[root, nullifier, recipient_hash]`. The program computes `recipient_hash = Poseidon(lo128(recipient), hi128(recipient))` from the payout account's address, with each half zero-extended as a little-endian field element. The circuit constrains this input so a copied proof cannot redirect the payout. Withdrawal keys use four IC points; earlier three-point withdrawal keys are rejected.
-
-Transfer public inputs are `(root, nullifier, output_binding)`, where `output_binding = Poseidon(successor_commitment, metadata_digest)`. The digest is SHA-256 over the concatenation of `pina:privacy-pool:transfer-metadata:v1`, the 32-byte view key, the one-byte envelope length, that many envelope bytes, and all 144 share bytes. Byte 31 of the digest is cleared, yielding a canonical 248-bit little-endian BN254 scalar. Envelope padding is discarded on storage and excluded from the digest. The circuit derives the successor commitment from fresh secrets and constrains its binding to the digest; the handler recomputes the same binding from the submitted metadata. A copied proof cannot authorize different disclosure material.
-
-Merkle path directions are constrained to Boolean values inside both spend circuits. Keys from the earlier unconstrained circuits remain vulnerable even after updating the host prover. Regenerate both withdraw and transfer proving/verifying key pairs, and distribute the matching proving keys. Tests generate fresh keys through `seeded_setup`; production requires a new trusted setup ceremony.
-
-This revision supports newly initialized pools under a new program address. Install both new verifying keys in their respective withdraw and transfer slots through `SetVerificationKey` before accepting deposits. Keys for the earlier withdrawal `(root, nullifier)` statement, transfer `(root, nullifier, successor_commitment)` statement, and unconstrained Merkle circuits are incompatible with this revision. The instruction bytes, account layouts, and note commitments are unchanged.
-
-For that new deployment, use a separate project identity and keep the existing deployment's keys and published migration history intact. Bind the new project's `declare_id!`, migration manifest, and generated ABI metadata to the new program ID through Pina's [key](../../docs/src/cli/keys.md) and [migration](../../docs/src/cli/migrations.md) workflows, then regenerate the IDL and clients. Confirm that generated client defaults and test helpers derive pool and verification-key PDAs from that same ID; the example's committed ID and generated clients remain reference fixtures, not a new deployment configuration.
-
-Do not upgrade an existing funded pool to this revision. `SetVerificationKey` creates fixed slot PDAs and rejects already initialized key accounts. Existing pools cannot replace their spend keys through this instruction, and old verifying keys retain the vulnerable circuit. Existing deployments need a separately audited migration before upgrading. This example does not provide that migration.
+All join-split public inputs are compressed into a single BN254 scalar `statement_hash = Poseidon(Poseidon(root, Poseidon(n0, n1)), Poseidon(Poseidon(c0, c1), Poseidon(Poseidon(ext_data_hash, asset_id), amounts_packed)))`, where `amounts_packed = public_in + public_out * 2^64 + relayer_fee * 2^128` and `ext_data_hash` is a 248-bit SHA-256 digest over `(recipient, relayer, mint, out0_meta, out1_meta)`. On-chain Groth16 verification therefore requires only a single `g1_mul` and `g1_add` before the four-pairing check.
 
 <br>
 
@@ -59,11 +57,11 @@ Do not upgrade an existing funded pool to this revision. `SetVerificationKey` cr
 
 <br>
 
-- **Tier 0 — consent.** Anyone may request. The note's per-deposit _view key_ must grant before the committee may execute.
+- **Tier 0 — consent.** Anyone may request. The note's authenticated _view key_ must grant before the committee may execute.
 - **Tier 1 — verified.** Registered requesters. The subject is notified through an encrypted notice blob and holds a challenge window; once it lapses without a challenge (or a challenge is resolved in the requester's favor), the committee may execute.
 - **Tier 2 — compelled.** Registered requesters with a recorded legal basis. No window; the committee may execute immediately.
 
-The invariant the program enforces — the reason this is a protocol rather than a policy document — is that reaching the custodian quorum _is_ the log entry: `ApproveDisclosure` flips the request to executed and appends to the append-only `DisclosureLog` in the same instruction. Disclosure without a permanent public record is impossible by construction. Key shares travel off-chain, so no key material ever becomes public; no single custodian can open an envelope alone.
+Reaching the custodian quorum _is_ the log entry: `ApproveDisclosure` flips the request to `STATUS_EXECUTED` and appends a salted `scope_hash = SHA256("pina:privacy-pool:disclosure-scope:v2" || commitment || requester || nonce)` to `DisclosureLog` in the same instruction. Silent disclosure is impossible by construction, and the public log does not expose raw note commitments.
 
 <br>
 
@@ -71,21 +69,16 @@ The invariant the program enforces — the reason this is a protocol rather than
 
 <br>
 
-- `tests/e2e.rs` runs the compiled SBF artifact through mollusk: the on-chain Poseidon root matches the host-predicted root byte for byte, real Groth16 withdrawals and transfers pay out and re-key notes, redirected payouts, tampered proofs, unknown roots, and double spends are rejected, and the full tier lifecycle (consent gating, windows, challenges, resolutions, registry entitlement, duplicate-approval rejection, cancellation) holds.
-- `tests/surfpool/src/lib.rs` runs the same journeys on a real runtime through `pina test`, with fixed seeds so the recorded instruction paths stay deterministic for the benchmark harness.
-- The in-crate unit tests cover the tree, nullifier set, root ring, log encoding, and — through the `prover` feature — circuit satisfaction and a host mirror of the on-chain verifier that accepts real proofs and rejects flipped public inputs.
+- `tests/e2e.rs` runs the compiled SBF artifact through Mollusk: frontier tree roots match host predictions, real 192-byte compressed Groth16 proofs verify on-chain for SOL and SPL withdrawals, 2-in-2-out transfers with relayer fees, Custom Ring policy enforcement and ZK policy proofs, and the full tiered disclosure lifecycle.
+- `tests/surfpool/src/lib.rs` runs every instruction discriminator on a real runtime through `pina test` with deterministic seeds for the benchmark harness.
+- In-crate unit tests verify the compile-time `ZERO_HASHES` table, frontier tree insertion, root ring eviction, salted disclosure scope hashes, RFC 7748 X25519 test vectors, AEAD note envelopes, per-transaction viewing keys, 2-of-3 Shamir share recovery, and compressed Groth16 proving/verification.
 
 <br>
 
-## Honest limits (this is a teaching scaffold, not a production system)
+## Honest limits (reference scaffold)
 
 <br>
 
-- **Custodians can collude off-chain.** The protocol makes silent disclosure impossible, not collusion itself.
-- **No relayer.** The submitting wallet pays fees and funds successor notes, so transfers are anonymous with respect to the spent note, not to fees.
-- **Deposit/withdrawal correlation.** Fixed denomination blunts but does not eliminate edge analysis; production pools add denomination ladders and delays.
-- **Capacity.** 128 leaves and 128 nullifiers keep accounts under the 10,240-byte inner-CPI creation ceiling; production trees shard levels across child accounts and hash-index their nullifiers.
-- **Demo-grade share encryption.** The test harness encrypts custodian shares with a fixed scheme; production uses X25519 + AEAD or threshold ElGamal.
-- **Public log names its target.** The log records the commitment directly for clarity; a production design stores a salted scope root plus a private notice so the log itself cannot deanonymize.
-- **Single authority.** Verifying keys, custodians, and the challenge resolution all hang off one governance key; production distributes these.
-- **Deployment-bound bootstrap initializer.** Every pool account is a singleton PDA, so only the deployed program's current upgrade authority may run `Initialize`. Pass the canonical, upgradeable-loader-owned ProgramData account as the final read-only account. Its metadata must name the initializer as upgrade authority; no published fixture key has bootstrap privilege. Initialize before making the program immutable, because immutable deployments cannot bootstrap. The initializer becomes the permanent pool authority. Upgrading code does not replace authority values in existing accounts: a pool initialized with a disclosed key needs separate recovery or redeployment. There is deliberately no authority-transfer path — if a future version adds one, give it the two-step accept/revoke discipline a custody rotation needs.
+- **Seeded test setup.** Tests use deterministic `seeded_setup_*`; production deployments require a multi-party trusted setup ceremony.
+- **Custodian collusion.** The protocol makes silent disclosure impossible, not off-chain collusion among a threshold of custodians.
+- **Single governance authority.** Verifying-key rotation, custodians, policy flags, and challenge resolution hang off one `PoolConfig::authority`; production deployments should assign a multisig PDA.

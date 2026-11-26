@@ -10,29 +10,28 @@
 )]
 
 use clap::Args;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 use privacy_pool_program_client::instructions::Deposit;
 use privacy_pool_program_client::instructions::DepositInstructionData;
 use solana_sdk::pubkey::Pubkey;
 
-use crate::context::CliContext;
-use crate::context::CliError;
-
 #[derive(Debug, Args)]
 pub struct DepositArgs {
+	/// Variable SOL deposit amount in lamports.
 	#[arg(long)]
-	bump: u8,
-	/// Client-computed Poseidon commitment of the new note.
+	amount: u64,
+	/// Client-computed Poseidon note commitment.
 	#[arg(long)]
 	commitment: String,
 	/// Per-note consent/notification public key.
 	#[arg(long)]
 	view_pubkey: String,
-	/// Active length of the encrypted note plaintext.
 	#[arg(long)]
 	envelope_len: u8,
 	#[arg(long)]
 	envelope: String,
-	/// Encrypted per-custodian key shares.
 	#[arg(long)]
 	shares: String,
 	/// The `pool_config` account [default: derived]
@@ -44,73 +43,57 @@ pub struct DepositArgs {
 	/// The `merkle_tree` account [default: derived]
 	#[arg(long)]
 	merkle_tree: Option<String>,
-	/// The `note_commitment` account
-	#[arg(long)]
-	note_commitment: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliError> {
 	let commitment = CliContext::bytes::<32>("--commitment", &args.commitment)?;
 	let view_pubkey = CliContext::bytes::<32>("--view_pubkey", &args.view_pubkey)?;
-	let envelope = CliContext::bytes::<128>("--envelope", &args.envelope)?;
+	let envelope = CliContext::bytes::<96>("--envelope", &args.envelope)?;
 	let shares = CliContext::bytes::<144>("--shares", &args.shares)?;
 	let depositor = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-config".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
+		None => Pubkey::find_program_address(
+			&["privacy-pool-config".as_bytes()],
+			&context.program_address,
+		)
+		.0,
 	};
 	let pool_vault = match &args.pool_vault {
 		Some(value) => CliContext::pubkey("--pool_vault", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-vault".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
+		None => Pubkey::find_program_address(
+			&["privacy-pool-vault".as_bytes()],
+			&context.program_address,
+		)
+		.0,
 	};
 	let merkle_tree = match &args.merkle_tree {
 		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-tree".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
+		None => Pubkey::find_program_address(
+			&["privacy-pool-tree".as_bytes()],
+			&context.program_address,
+		)
+		.0,
 	};
-	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let data = DepositInstructionData::new(|data| {
-		data.bump = args.bump;
+		data.amount.set(args.amount);
 		data.commitment = commitment;
 		data.view_pubkey = view_pubkey;
 		data.envelope_len = args.envelope_len;
 		data.envelope = envelope;
 		data.shares = shares;
 	})
-	.map_err(|_| {
-		CliError::InvalidData {
-			message: "instruction data rejected the provided arguments".to_string(),
-		}
+	.map_err(|_| CliError::InvalidData {
+		message: "instruction data rejected the provided arguments".to_string(),
 	})?;
 
 	let accounts = Deposit {
-		depositor,
-		pool_config,
-		pool_vault,
-		merkle_tree,
-		note_commitment,
+		depositor: depositor,
+		pool_config: pool_config,
+		pool_vault: pool_vault,
+		merkle_tree: merkle_tree,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(
-		accounts.instruction(data),
-		Some(privacy_pool_program_client::instructions::DEPOSIT_COMPUTE_UNIT_LIMIT),
-	)
+	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::DEPOSIT_COMPUTE_UNIT_LIMIT))
 }

@@ -6,744 +6,147 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	assertIsInstructionWithAccounts,
-	type ClientWithRpc,
-	type ClientWithTransactionPlanning,
-	type ClientWithTransactionSending,
-	containsBytes,
-	extendClient,
-	type ExtendedClient,
-	type GetAccountInfoApi,
-	type GetMultipleAccountsApi,
-	getU8Encoder,
-	type HasAddress,
-	type Instruction,
-	type InstructionWithData,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
-	SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-	SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-	SolanaError,
-} from "@solana/kit";
-import {
-	addSelfFetchFunctions,
-	addSelfPlanAndSendFunctions,
-	type SelfFetchFunctions,
-	type SelfPlanAndSendFunctions,
-} from "@solana/program-client-core";
-import {
-	type CustodianRegistry,
-	type CustodianRegistryArgs,
-	type DisclosureLog,
-	type DisclosureLogArgs,
-	type DisclosureRequest,
-	type DisclosureRequestArgs,
-	getCustodianRegistryCodec,
-	getDisclosureLogCodec,
-	getDisclosureRequestCodec,
-	getMerkleTreeCodec,
-	getNoteCommitmentCodec,
-	getNullifierSetCodec,
-	getPoolConfigCodec,
-	getPoolVaultCodec,
-	getRequesterRegistryCodec,
-	getVerifyingKeyAccountCodec,
-	type MerkleTree,
-	type MerkleTreeArgs,
-	type NoteCommitment,
-	type NoteCommitmentArgs,
-	type NullifierSet,
-	type NullifierSetArgs,
-	type PoolConfig,
-	type PoolConfigArgs,
-	type PoolVault,
-	type PoolVaultArgs,
-	type RequesterRegistry,
-	type RequesterRegistryArgs,
-	type VerifyingKeyAccount,
-	type VerifyingKeyAccountArgs,
-} from "../accounts";
-import {
-	type ApproveDisclosureAsyncInput,
-	type CancelDisclosureInput,
-	type ChallengeDisclosureInput,
-	type DepositAsyncInput,
-	getApproveDisclosureInstructionAsync,
-	getCancelDisclosureInstruction,
-	getChallengeDisclosureInstruction,
-	getDepositInstructionAsync,
-	getGrantDisclosureInstruction,
-	getInitializeInstructionAsync,
-	getRegisterRequesterInstructionAsync,
-	getRequestDisclosureInstructionAsync,
-	getResolveChallengeInstructionAsync,
-	getSetCustodiansInstructionAsync,
-	getSetVerificationKeyInstructionAsync,
-	getTransferInstructionAsync,
-	getWithdrawInstructionAsync,
-	type GrantDisclosureInput,
-	type InitializeAsyncInput,
-	parseApproveDisclosureInstruction,
-	parseCancelDisclosureInstruction,
-	parseChallengeDisclosureInstruction,
-	type ParsedApproveDisclosureInstruction,
-	type ParsedCancelDisclosureInstruction,
-	type ParsedChallengeDisclosureInstruction,
-	type ParsedDepositInstruction,
-	parseDepositInstruction,
-	type ParsedGrantDisclosureInstruction,
-	type ParsedInitializeInstruction,
-	type ParsedRegisterRequesterInstruction,
-	type ParsedRequestDisclosureInstruction,
-	type ParsedResolveChallengeInstruction,
-	type ParsedSetCustodiansInstruction,
-	type ParsedSetVerificationKeyInstruction,
-	type ParsedTransferInstruction,
-	type ParsedWithdrawInstruction,
-	parseGrantDisclosureInstruction,
-	parseInitializeInstruction,
-	parseRegisterRequesterInstruction,
-	parseRequestDisclosureInstruction,
-	parseResolveChallengeInstruction,
-	parseSetCustodiansInstruction,
-	parseSetVerificationKeyInstruction,
-	parseTransferInstruction,
-	parseWithdrawInstruction,
-	type RegisterRequesterAsyncInput,
-	type RequestDisclosureAsyncInput,
-	type ResolveChallengeAsyncInput,
-	type SetCustodiansAsyncInput,
-	type SetVerificationKeyAsyncInput,
-	type TransferAsyncInput,
-	type WithdrawAsyncInput,
-} from "../instructions";
+import { assertIsInstructionWithAccounts, containsBytes, extendClient, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, SolanaError, type Address, type ClientWithRpc, type ClientWithTransactionPlanning, type ClientWithTransactionSending, type ExtendedClient, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type Instruction, type InstructionWithData, type ReadonlyUint8Array } from '@solana/kit';
+import { addSelfFetchFunctions, addSelfPlanAndSendFunctions, type SelfFetchFunctions, type SelfPlanAndSendFunctions } from '@solana/program-client-core';
+import { getAssetVaultCodec, getCustodianRegistryCodec, getDisclosureLogCodec, getDisclosureRequestCodec, getMerkleTreeCodec, getNullifierRecordCodec, getPoolConfigCodec, getPoolVaultCodec, getRequesterRegistryCodec, getVerifyingKeyAccountCodec, type AssetVault, type AssetVaultArgs, type CustodianRegistry, type CustodianRegistryArgs, type DisclosureLog, type DisclosureLogArgs, type DisclosureRequest, type DisclosureRequestArgs, type MerkleTree, type MerkleTreeArgs, type NullifierRecord, type NullifierRecordArgs, type PoolConfig, type PoolConfigArgs, type PoolVault, type PoolVaultArgs, type RequesterRegistry, type RequesterRegistryArgs, type VerifyingKeyAccount, type VerifyingKeyAccountArgs } from '../accounts';
+import { getApproveDisclosureInstructionAsync, getCancelDisclosureInstruction, getChallengeDisclosureInstruction, getDepositInstructionAsync, getDepositTokenInstructionAsync, getGrantDisclosureInstruction, getInitializeInstructionAsync, getRegisterAssetInstructionAsync, getRegisterRequesterInstructionAsync, getRequestDisclosureInstructionAsync, getResolveChallengeInstructionAsync, getSetCustodiansInstructionAsync, getSetPolicyInstructionAsync, getSetVerificationKeyInstructionAsync, getTransferInstructionAsync, getVerifyPolicyInstruction, getWithdrawInstructionAsync, getWithdrawTokenInstructionAsync, parseApproveDisclosureInstruction, parseCancelDisclosureInstruction, parseChallengeDisclosureInstruction, parseDepositInstruction, parseDepositTokenInstruction, parseGrantDisclosureInstruction, parseInitializeInstruction, parseRegisterAssetInstruction, parseRegisterRequesterInstruction, parseRequestDisclosureInstruction, parseResolveChallengeInstruction, parseSetCustodiansInstruction, parseSetPolicyInstruction, parseSetVerificationKeyInstruction, parseTransferInstruction, parseVerifyPolicyInstruction, parseWithdrawInstruction, parseWithdrawTokenInstruction, type ApproveDisclosureAsyncInput, type CancelDisclosureInput, type ChallengeDisclosureInput, type DepositAsyncInput, type DepositTokenAsyncInput, type GrantDisclosureInput, type InitializeAsyncInput, type ParsedApproveDisclosureInstruction, type ParsedCancelDisclosureInstruction, type ParsedChallengeDisclosureInstruction, type ParsedDepositInstruction, type ParsedDepositTokenInstruction, type ParsedGrantDisclosureInstruction, type ParsedInitializeInstruction, type ParsedRegisterAssetInstruction, type ParsedRegisterRequesterInstruction, type ParsedRequestDisclosureInstruction, type ParsedResolveChallengeInstruction, type ParsedSetCustodiansInstruction, type ParsedSetPolicyInstruction, type ParsedSetVerificationKeyInstruction, type ParsedTransferInstruction, type ParsedVerifyPolicyInstruction, type ParsedWithdrawInstruction, type ParsedWithdrawTokenInstruction, type RegisterAssetAsyncInput, type RegisterRequesterAsyncInput, type RequestDisclosureAsyncInput, type ResolveChallengeAsyncInput, type SetCustodiansAsyncInput, type SetPolicyAsyncInput, type SetVerificationKeyAsyncInput, type TransferAsyncInput, type VerifyPolicyInput, type WithdrawAsyncInput, type WithdrawTokenAsyncInput } from '../instructions';
 import { getMigrateInstruction, type MigrateInput } from "../instructions";
 
-import {
-	findCustodianRegistryPda,
-	findDisclosureLogPda,
-	findDisclosureRequestPda,
-	findMerkleTreePda,
-	findNoteCommitmentPda,
-	findNullifierSetPda,
-	findPoolConfigPda,
-	findPoolVaultPda,
-	findRequesterRegistryPda,
-	findVerifyingKeyAccountPda,
-} from "../pdas";
+import { findAssetVaultPda, findCustodianRegistryPda, findDisclosureLogPda, findDisclosureRequestPda, findMerkleTreePda, findNullifierRecordPda, findPoolConfigPda, findPoolVaultPda, findRequesterRegistryPda, findVerifyingKeyAccountPda } from '../pdas';
 
-export const PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS =
-	"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D" as Address<
-		"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D"
-	>;
+export const PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS = 'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D' as Address<'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D'>;
 
-export enum PrivacyPoolProgramAccount {
-	PoolConfig,
-	PoolVault,
-	MerkleTree,
-	NullifierSet,
-	CustodianRegistry,
-	RequesterRegistry,
-	NoteCommitment,
-	DisclosureRequest,
-	DisclosureLog,
-	VerifyingKeyAccount,
+export enum PrivacyPoolProgramAccount { PoolConfig, PoolVault, MerkleTree, NullifierRecord, CustodianRegistry, RequesterRegistry, AssetVault, DisclosureRequest, DisclosureLog, VerifyingKeyAccount }
+
+export function identifyPrivacyPoolProgramAccount(account: { data: ReadonlyUint8Array } | ReadonlyUint8Array): PrivacyPoolProgramAccount {
+    const data = 'data' in account ? account.data : account;
+    if (containsBytes(data, getU8Encoder().encode(1), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.PoolConfig; }
+if (containsBytes(data, getU8Encoder().encode(2), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.PoolVault; }
+if (containsBytes(data, getU8Encoder().encode(3), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.MerkleTree; }
+if (containsBytes(data, getU8Encoder().encode(4), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.NullifierRecord; }
+if (containsBytes(data, getU8Encoder().encode(5), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.CustodianRegistry; }
+if (containsBytes(data, getU8Encoder().encode(6), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.RequesterRegistry; }
+if (containsBytes(data, getU8Encoder().encode(8), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.AssetVault; }
+if (containsBytes(data, getU8Encoder().encode(9), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.DisclosureRequest; }
+if (containsBytes(data, getU8Encoder().encode(7), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.DisclosureLog; }
+if (containsBytes(data, getU8Encoder().encode(10), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramAccount.VerifyingKeyAccount; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT, { accountData: data, programName: "privacyPoolProgram" });
 }
 
-export function identifyPrivacyPoolProgramAccount(
-	account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): PrivacyPoolProgramAccount {
-	const data = "data" in account ? account.data : account;
-	if (
-		containsBytes(data, getU8Encoder().encode(1), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.PoolConfig;
-	if (
-		containsBytes(data, getU8Encoder().encode(2), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.PoolVault;
-	if (
-		containsBytes(data, getU8Encoder().encode(3), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.MerkleTree;
-	if (
-		containsBytes(data, getU8Encoder().encode(4), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.NullifierSet;
-	if (
-		containsBytes(data, getU8Encoder().encode(5), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.CustodianRegistry;
-	if (
-		containsBytes(data, getU8Encoder().encode(6), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.RequesterRegistry;
-	if (
-		containsBytes(data, getU8Encoder().encode(8), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.NoteCommitment;
-	if (
-		containsBytes(data, getU8Encoder().encode(9), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.DisclosureRequest;
-	if (
-		containsBytes(data, getU8Encoder().encode(7), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.DisclosureLog;
-	if (
-		containsBytes(data, getU8Encoder().encode(10), 0) &&
-		containsBytes(data, getU8Encoder().encode(0), 1)
-	) return PrivacyPoolProgramAccount.VerifyingKeyAccount;
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
-		{ accountData: data, programName: "privacyPoolProgram" },
-	);
+export enum PrivacyPoolProgramEvent { NoteEncryptedEvent }
+
+export function identifyPrivacyPoolProgramEvent(event: { data: ReadonlyUint8Array } | ReadonlyUint8Array): PrivacyPoolProgramEvent {
+    const data = 'data' in event ? event.data : event;
+    if (containsBytes(data, getU8Encoder().encode(1), 0) && containsBytes(data, getU8Encoder().encode(0), 1)) { return PrivacyPoolProgramEvent.NoteEncryptedEvent; }
+    throw new Error('The provided event could not be identified as a privacyPoolProgram event.');
 }
 
-export enum PrivacyPoolProgramInstruction {
-	Initialize,
-	SetVerificationKey,
-	SetCustodians,
-	RegisterRequester,
-	Deposit,
-	Withdraw,
-	Transfer,
-	RequestDisclosure,
-	GrantDisclosure,
-	ChallengeDisclosure,
-	ResolveChallenge,
-	ApproveDisclosure,
-	CancelDisclosure,
+export enum PrivacyPoolProgramInstruction { Initialize, SetVerificationKey, SetCustodians, RegisterRequester, Deposit, Withdraw, Transfer, RequestDisclosure, GrantDisclosure, ChallengeDisclosure, ResolveChallenge, ApproveDisclosure, CancelDisclosure, RegisterAsset, DepositToken, WithdrawToken, SetPolicy, VerifyPolicy }
+
+export function identifyPrivacyPoolProgramInstruction(instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array): PrivacyPoolProgramInstruction {
+    const data = 'data' in instruction ? instruction.data : instruction;
+    if (containsBytes(data, getU8Encoder().encode(0), 0)) { return PrivacyPoolProgramInstruction.Initialize; }
+if (containsBytes(data, getU8Encoder().encode(1), 0)) { return PrivacyPoolProgramInstruction.SetVerificationKey; }
+if (containsBytes(data, getU8Encoder().encode(2), 0)) { return PrivacyPoolProgramInstruction.SetCustodians; }
+if (containsBytes(data, getU8Encoder().encode(3), 0)) { return PrivacyPoolProgramInstruction.RegisterRequester; }
+if (containsBytes(data, getU8Encoder().encode(4), 0)) { return PrivacyPoolProgramInstruction.Deposit; }
+if (containsBytes(data, getU8Encoder().encode(5), 0)) { return PrivacyPoolProgramInstruction.Withdraw; }
+if (containsBytes(data, getU8Encoder().encode(6), 0)) { return PrivacyPoolProgramInstruction.Transfer; }
+if (containsBytes(data, getU8Encoder().encode(7), 0)) { return PrivacyPoolProgramInstruction.RequestDisclosure; }
+if (containsBytes(data, getU8Encoder().encode(8), 0)) { return PrivacyPoolProgramInstruction.GrantDisclosure; }
+if (containsBytes(data, getU8Encoder().encode(9), 0)) { return PrivacyPoolProgramInstruction.ChallengeDisclosure; }
+if (containsBytes(data, getU8Encoder().encode(10), 0)) { return PrivacyPoolProgramInstruction.ResolveChallenge; }
+if (containsBytes(data, getU8Encoder().encode(11), 0)) { return PrivacyPoolProgramInstruction.ApproveDisclosure; }
+if (containsBytes(data, getU8Encoder().encode(12), 0)) { return PrivacyPoolProgramInstruction.CancelDisclosure; }
+if (containsBytes(data, getU8Encoder().encode(13), 0)) { return PrivacyPoolProgramInstruction.RegisterAsset; }
+if (containsBytes(data, getU8Encoder().encode(14), 0)) { return PrivacyPoolProgramInstruction.DepositToken; }
+if (containsBytes(data, getU8Encoder().encode(15), 0)) { return PrivacyPoolProgramInstruction.WithdrawToken; }
+if (containsBytes(data, getU8Encoder().encode(16), 0)) { return PrivacyPoolProgramInstruction.SetPolicy; }
+if (containsBytes(data, getU8Encoder().encode(17), 0)) { return PrivacyPoolProgramInstruction.VerifyPolicy; }
+    throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION, { instructionData: data, programName: "privacyPoolProgram" });
 }
 
-export function identifyPrivacyPoolProgramInstruction(
-	instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
-): PrivacyPoolProgramInstruction {
-	const data = "data" in instruction ? instruction.data : instruction;
-	if (containsBytes(data, getU8Encoder().encode(0), 0)) {
-		return PrivacyPoolProgramInstruction.Initialize;
-	}
-	if (containsBytes(data, getU8Encoder().encode(1), 0)) {
-		return PrivacyPoolProgramInstruction.SetVerificationKey;
-	}
-	if (containsBytes(data, getU8Encoder().encode(2), 0)) {
-		return PrivacyPoolProgramInstruction.SetCustodians;
-	}
-	if (containsBytes(data, getU8Encoder().encode(3), 0)) {
-		return PrivacyPoolProgramInstruction.RegisterRequester;
-	}
-	if (containsBytes(data, getU8Encoder().encode(4), 0)) {
-		return PrivacyPoolProgramInstruction.Deposit;
-	}
-	if (containsBytes(data, getU8Encoder().encode(5), 0)) {
-		return PrivacyPoolProgramInstruction.Withdraw;
-	}
-	if (containsBytes(data, getU8Encoder().encode(6), 0)) {
-		return PrivacyPoolProgramInstruction.Transfer;
-	}
-	if (containsBytes(data, getU8Encoder().encode(7), 0)) {
-		return PrivacyPoolProgramInstruction.RequestDisclosure;
-	}
-	if (containsBytes(data, getU8Encoder().encode(8), 0)) {
-		return PrivacyPoolProgramInstruction.GrantDisclosure;
-	}
-	if (containsBytes(data, getU8Encoder().encode(9), 0)) {
-		return PrivacyPoolProgramInstruction.ChallengeDisclosure;
-	}
-	if (containsBytes(data, getU8Encoder().encode(10), 0)) {
-		return PrivacyPoolProgramInstruction.ResolveChallenge;
-	}
-	if (containsBytes(data, getU8Encoder().encode(11), 0)) {
-		return PrivacyPoolProgramInstruction.ApproveDisclosure;
-	}
-	if (containsBytes(data, getU8Encoder().encode(12), 0)) {
-		return PrivacyPoolProgramInstruction.CancelDisclosure;
-	}
-	throw new SolanaError(
-		SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
-		{ instructionData: data, programName: "privacyPoolProgram" },
-	);
-}
+export type ParsedPrivacyPoolProgramInstruction<TProgram extends string = 'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D'> =
+| { instructionType: PrivacyPoolProgramInstruction.Initialize } & ParsedInitializeInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.SetVerificationKey } & ParsedSetVerificationKeyInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.SetCustodians } & ParsedSetCustodiansInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.RegisterRequester } & ParsedRegisterRequesterInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.Deposit } & ParsedDepositInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.Withdraw } & ParsedWithdrawInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.Transfer } & ParsedTransferInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.RequestDisclosure } & ParsedRequestDisclosureInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.GrantDisclosure } & ParsedGrantDisclosureInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.ChallengeDisclosure } & ParsedChallengeDisclosureInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.ResolveChallenge } & ParsedResolveChallengeInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.ApproveDisclosure } & ParsedApproveDisclosureInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.CancelDisclosure } & ParsedCancelDisclosureInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.RegisterAsset } & ParsedRegisterAssetInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.DepositToken } & ParsedDepositTokenInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.WithdrawToken } & ParsedWithdrawTokenInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.SetPolicy } & ParsedSetPolicyInstruction<TProgram>
+| { instructionType: PrivacyPoolProgramInstruction.VerifyPolicy } & ParsedVerifyPolicyInstruction<TProgram>
 
-export type ParsedPrivacyPoolProgramInstruction<
-	TProgram extends string = "DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D",
-> =
-	| { instructionType: PrivacyPoolProgramInstruction.Initialize }
-		& ParsedInitializeInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.SetVerificationKey }
-		& ParsedSetVerificationKeyInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.SetCustodians }
-		& ParsedSetCustodiansInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.RegisterRequester }
-		& ParsedRegisterRequesterInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.Deposit }
-		& ParsedDepositInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.Withdraw }
-		& ParsedWithdrawInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.Transfer }
-		& ParsedTransferInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.RequestDisclosure }
-		& ParsedRequestDisclosureInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.GrantDisclosure }
-		& ParsedGrantDisclosureInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.ChallengeDisclosure }
-		& ParsedChallengeDisclosureInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.ResolveChallenge }
-		& ParsedResolveChallengeInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.ApproveDisclosure }
-		& ParsedApproveDisclosureInstruction<TProgram>
-	| { instructionType: PrivacyPoolProgramInstruction.CancelDisclosure }
-		& ParsedCancelDisclosureInstruction<TProgram>;
 
-export function parsePrivacyPoolProgramInstruction<TProgram extends string>(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedPrivacyPoolProgramInstruction<TProgram> {
-	const instructionType = identifyPrivacyPoolProgramInstruction(instruction);
-	switch (instructionType) {
-		case PrivacyPoolProgramInstruction.Initialize: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.Initialize,
-				...parseInitializeInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.SetVerificationKey: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.SetVerificationKey,
-				...parseSetVerificationKeyInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.SetCustodians: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.SetCustodians,
-				...parseSetCustodiansInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.RegisterRequester: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.RegisterRequester,
-				...parseRegisterRequesterInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.Deposit: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.Deposit,
-				...parseDepositInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.Withdraw: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.Withdraw,
-				...parseWithdrawInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.Transfer: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.Transfer,
-				...parseTransferInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.RequestDisclosure: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.RequestDisclosure,
-				...parseRequestDisclosureInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.GrantDisclosure: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.GrantDisclosure,
-				...parseGrantDisclosureInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.ChallengeDisclosure: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.ChallengeDisclosure,
-				...parseChallengeDisclosureInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.ResolveChallenge: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.ResolveChallenge,
-				...parseResolveChallengeInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.ApproveDisclosure: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.ApproveDisclosure,
-				...parseApproveDisclosureInstruction(instruction),
-			};
-		}
-		case PrivacyPoolProgramInstruction.CancelDisclosure: {
-			assertIsInstructionWithAccounts(instruction);
-			return {
-				instructionType: PrivacyPoolProgramInstruction.CancelDisclosure,
-				...parseCancelDisclosureInstruction(instruction),
-			};
-		}
-		default:
-			throw new SolanaError(
-				SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE,
-				{
-					instructionType: instructionType as string,
-					programName: "privacyPoolProgram",
-				},
-			);
-	}
-}
+        export function parsePrivacyPoolProgramInstruction<TProgram extends string>(
+            instruction: Instruction<TProgram> 
+                & InstructionWithData<ReadonlyUint8Array>
+        ): ParsedPrivacyPoolProgramInstruction<TProgram> {
+            const instructionType = identifyPrivacyPoolProgramInstruction(instruction);
+            switch (instructionType) {
+                case PrivacyPoolProgramInstruction.Initialize: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.Initialize, ...parseInitializeInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.SetVerificationKey: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.SetVerificationKey, ...parseSetVerificationKeyInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.SetCustodians: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.SetCustodians, ...parseSetCustodiansInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.RegisterRequester: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.RegisterRequester, ...parseRegisterRequesterInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.Deposit: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.Deposit, ...parseDepositInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.Withdraw: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.Withdraw, ...parseWithdrawInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.Transfer: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.Transfer, ...parseTransferInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.RequestDisclosure: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.RequestDisclosure, ...parseRequestDisclosureInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.GrantDisclosure: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.GrantDisclosure, ...parseGrantDisclosureInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.ChallengeDisclosure: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.ChallengeDisclosure, ...parseChallengeDisclosureInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.ResolveChallenge: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.ResolveChallenge, ...parseResolveChallengeInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.ApproveDisclosure: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.ApproveDisclosure, ...parseApproveDisclosureInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.CancelDisclosure: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.CancelDisclosure, ...parseCancelDisclosureInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.RegisterAsset: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.RegisterAsset, ...parseRegisterAssetInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.DepositToken: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.DepositToken, ...parseDepositTokenInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.WithdrawToken: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.WithdrawToken, ...parseWithdrawTokenInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.SetPolicy: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.SetPolicy, ...parseSetPolicyInstruction(instruction) }; }
+case PrivacyPoolProgramInstruction.VerifyPolicy: { assertIsInstructionWithAccounts(instruction);
+return { instructionType: PrivacyPoolProgramInstruction.VerifyPolicy, ...parseVerifyPolicyInstruction(instruction) }; }
+                default: throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__UNRECOGNIZED_INSTRUCTION_TYPE, { instructionType: instructionType as string, programName: "privacyPoolProgram" });
+            }
+        }
 
-export type PrivacyPoolProgramPlugin = {
-	accounts: PrivacyPoolProgramPluginAccounts;
-	instructions: PrivacyPoolProgramPluginInstructions;
-	pdas: PrivacyPoolProgramPluginPdas;
-	identifyAccount: typeof identifyPrivacyPoolProgramAccount;
-	identifyInstruction: typeof identifyPrivacyPoolProgramInstruction;
-	parseInstruction: typeof parsePrivacyPoolProgramInstruction;
-};
+export type PrivacyPoolProgramPlugin = { accounts: PrivacyPoolProgramPluginAccounts; instructions: PrivacyPoolProgramPluginInstructions; pdas: PrivacyPoolProgramPluginPdas; identifyAccount: typeof identifyPrivacyPoolProgramAccount; identifyInstruction: typeof identifyPrivacyPoolProgramInstruction; parseInstruction: typeof parsePrivacyPoolProgramInstruction; }
 
-export type PrivacyPoolProgramPluginAccounts = {
-	poolConfig:
-		& ReturnType<typeof getPoolConfigCodec>
-		& SelfFetchFunctions<PoolConfigArgs, PoolConfig>;
-	poolVault:
-		& ReturnType<typeof getPoolVaultCodec>
-		& SelfFetchFunctions<PoolVaultArgs, PoolVault>;
-	merkleTree:
-		& ReturnType<typeof getMerkleTreeCodec>
-		& SelfFetchFunctions<MerkleTreeArgs, MerkleTree>;
-	nullifierSet:
-		& ReturnType<typeof getNullifierSetCodec>
-		& SelfFetchFunctions<NullifierSetArgs, NullifierSet>;
-	custodianRegistry:
-		& ReturnType<typeof getCustodianRegistryCodec>
-		& SelfFetchFunctions<CustodianRegistryArgs, CustodianRegistry>;
-	requesterRegistry:
-		& ReturnType<typeof getRequesterRegistryCodec>
-		& SelfFetchFunctions<RequesterRegistryArgs, RequesterRegistry>;
-	noteCommitment:
-		& ReturnType<typeof getNoteCommitmentCodec>
-		& SelfFetchFunctions<NoteCommitmentArgs, NoteCommitment>;
-	disclosureRequest:
-		& ReturnType<typeof getDisclosureRequestCodec>
-		& SelfFetchFunctions<DisclosureRequestArgs, DisclosureRequest>;
-	disclosureLog:
-		& ReturnType<typeof getDisclosureLogCodec>
-		& SelfFetchFunctions<DisclosureLogArgs, DisclosureLog>;
-	verifyingKeyAccount:
-		& ReturnType<typeof getVerifyingKeyAccountCodec>
-		& SelfFetchFunctions<VerifyingKeyAccountArgs, VerifyingKeyAccount>;
-};
+export type PrivacyPoolProgramPluginAccounts = { poolConfig: ReturnType<typeof getPoolConfigCodec> & SelfFetchFunctions<PoolConfigArgs, PoolConfig>; poolVault: ReturnType<typeof getPoolVaultCodec> & SelfFetchFunctions<PoolVaultArgs, PoolVault>; merkleTree: ReturnType<typeof getMerkleTreeCodec> & SelfFetchFunctions<MerkleTreeArgs, MerkleTree>; nullifierRecord: ReturnType<typeof getNullifierRecordCodec> & SelfFetchFunctions<NullifierRecordArgs, NullifierRecord>; custodianRegistry: ReturnType<typeof getCustodianRegistryCodec> & SelfFetchFunctions<CustodianRegistryArgs, CustodianRegistry>; requesterRegistry: ReturnType<typeof getRequesterRegistryCodec> & SelfFetchFunctions<RequesterRegistryArgs, RequesterRegistry>; assetVault: ReturnType<typeof getAssetVaultCodec> & SelfFetchFunctions<AssetVaultArgs, AssetVault>; disclosureRequest: ReturnType<typeof getDisclosureRequestCodec> & SelfFetchFunctions<DisclosureRequestArgs, DisclosureRequest>; disclosureLog: ReturnType<typeof getDisclosureLogCodec> & SelfFetchFunctions<DisclosureLogArgs, DisclosureLog>; verifyingKeyAccount: ReturnType<typeof getVerifyingKeyAccountCodec> & SelfFetchFunctions<VerifyingKeyAccountArgs, VerifyingKeyAccount>; }
 
-export type PrivacyPoolProgramPluginInstructions = {
-	initialize: (
-		input: InitializeAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getInitializeInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	setVerificationKey: (
-		input: SetVerificationKeyAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getSetVerificationKeyInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	setCustodians: (
-		input: SetCustodiansAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getSetCustodiansInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	registerRequester: (
-		input: RegisterRequesterAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getRegisterRequesterInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	deposit: (
-		input: DepositAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) => ReturnType<typeof getDepositInstructionAsync> & SelfPlanAndSendFunctions;
-	withdraw: (
-		input: WithdrawAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getWithdrawInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	transfer: (
-		input: TransferAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getTransferInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	requestDisclosure: (
-		input: RequestDisclosureAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getRequestDisclosureInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	grantDisclosure: (
-		input: GrantDisclosureInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getGrantDisclosureInstruction>
-		& SelfPlanAndSendFunctions;
-	challengeDisclosure: (
-		input: ChallengeDisclosureInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getChallengeDisclosureInstruction>
-		& SelfPlanAndSendFunctions;
-	resolveChallenge: (
-		input: ResolveChallengeAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getResolveChallengeInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	approveDisclosure: (
-		input: ApproveDisclosureAsyncInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getApproveDisclosureInstructionAsync>
-		& SelfPlanAndSendFunctions;
-	cancelDisclosure: (
-		input: CancelDisclosureInput,
-		config?: { programAddress?: Address | HasAddress },
-	) =>
-		& ReturnType<typeof getCancelDisclosureInstruction>
-		& SelfPlanAndSendFunctions;
-};
+export type PrivacyPoolProgramPluginInstructions = { initialize: (input: InitializeAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getInitializeInstructionAsync> & SelfPlanAndSendFunctions; setVerificationKey: (input: SetVerificationKeyAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getSetVerificationKeyInstructionAsync> & SelfPlanAndSendFunctions; setCustodians: (input: SetCustodiansAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getSetCustodiansInstructionAsync> & SelfPlanAndSendFunctions; registerRequester: (input: RegisterRequesterAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getRegisterRequesterInstructionAsync> & SelfPlanAndSendFunctions; deposit: (input: DepositAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getDepositInstructionAsync> & SelfPlanAndSendFunctions; withdraw: (input: WithdrawAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getWithdrawInstructionAsync> & SelfPlanAndSendFunctions; transfer: (input: TransferAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getTransferInstructionAsync> & SelfPlanAndSendFunctions; requestDisclosure: (input: RequestDisclosureAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getRequestDisclosureInstructionAsync> & SelfPlanAndSendFunctions; grantDisclosure: (input: GrantDisclosureInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getGrantDisclosureInstruction> & SelfPlanAndSendFunctions; challengeDisclosure: (input: ChallengeDisclosureInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getChallengeDisclosureInstruction> & SelfPlanAndSendFunctions; resolveChallenge: (input: ResolveChallengeAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getResolveChallengeInstructionAsync> & SelfPlanAndSendFunctions; approveDisclosure: (input: ApproveDisclosureAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getApproveDisclosureInstructionAsync> & SelfPlanAndSendFunctions; cancelDisclosure: (input: CancelDisclosureInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getCancelDisclosureInstruction> & SelfPlanAndSendFunctions; registerAsset: (input: RegisterAssetAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getRegisterAssetInstructionAsync> & SelfPlanAndSendFunctions; depositToken: (input: DepositTokenAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getDepositTokenInstructionAsync> & SelfPlanAndSendFunctions; withdrawToken: (input: WithdrawTokenAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getWithdrawTokenInstructionAsync> & SelfPlanAndSendFunctions; setPolicy: (input: SetPolicyAsyncInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getSetPolicyInstructionAsync> & SelfPlanAndSendFunctions; verifyPolicy: (input: VerifyPolicyInput, config?: { programAddress?: Address | HasAddress }) => ReturnType<typeof getVerifyPolicyInstruction> & SelfPlanAndSendFunctions; }
 
-export type PrivacyPoolProgramPluginPdas = {
-	poolConfig: typeof findPoolConfigPda;
-	poolVault: typeof findPoolVaultPda;
-	merkleTree: typeof findMerkleTreePda;
-	nullifierSet: typeof findNullifierSetPda;
-	custodianRegistry: typeof findCustodianRegistryPda;
-	requesterRegistry: typeof findRequesterRegistryPda;
-	noteCommitment: typeof findNoteCommitmentPda;
-	disclosureRequest: typeof findDisclosureRequestPda;
-	disclosureLog: typeof findDisclosureLogPda;
-	verifyingKeyAccount: typeof findVerifyingKeyAccountPda;
-};
+export type PrivacyPoolProgramPluginPdas = { poolConfig: typeof findPoolConfigPda; poolVault: typeof findPoolVaultPda; merkleTree: typeof findMerkleTreePda; nullifierRecord: typeof findNullifierRecordPda; custodianRegistry: typeof findCustodianRegistryPda; requesterRegistry: typeof findRequesterRegistryPda; assetVault: typeof findAssetVaultPda; disclosureRequest: typeof findDisclosureRequestPda; disclosureLog: typeof findDisclosureLogPda; verifyingKeyAccount: typeof findVerifyingKeyAccountPda; }
 
-export type PrivacyPoolProgramPluginRequirements =
-	& ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi>
-	& ClientWithTransactionPlanning
-	& ClientWithTransactionSending;
+export type PrivacyPoolProgramPluginRequirements = ClientWithRpc<GetAccountInfoApi & GetMultipleAccountsApi> & ClientWithTransactionPlanning & ClientWithTransactionSending
 
-export function privacyPoolProgramProgram(
-	config: { programAddress?: Address | HasAddress } = {},
-) {
-	return <T extends PrivacyPoolProgramPluginRequirements>(
-		client: T,
-	): ExtendedClient<T, { privacyPoolProgram: PrivacyPoolProgramPlugin }> => {
-		return extendClient(client, {
-			privacyPoolProgram: <PrivacyPoolProgramPlugin> {
-				accounts: {
-					poolConfig: addSelfFetchFunctions(client, getPoolConfigCodec()),
-					poolVault: addSelfFetchFunctions(client, getPoolVaultCodec()),
-					merkleTree: addSelfFetchFunctions(client, getMerkleTreeCodec()),
-					nullifierSet: addSelfFetchFunctions(client, getNullifierSetCodec()),
-					custodianRegistry: addSelfFetchFunctions(
-						client,
-						getCustodianRegistryCodec(),
-					),
-					requesterRegistry: addSelfFetchFunctions(
-						client,
-						getRequesterRegistryCodec(),
-					),
-					noteCommitment: addSelfFetchFunctions(
-						client,
-						getNoteCommitmentCodec(),
-					),
-					disclosureRequest: addSelfFetchFunctions(
-						client,
-						getDisclosureRequestCodec(),
-					),
-					disclosureLog: addSelfFetchFunctions(client, getDisclosureLogCodec()),
-					verifyingKeyAccount: addSelfFetchFunctions(
-						client,
-						getVerifyingKeyAccountCodec(),
-					),
-				},
-				instructions: {
-					migrate: (input: MigrateInput) =>
-						addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),
-					initialize: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getInitializeInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					setVerificationKey: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getSetVerificationKeyInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					setCustodians: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getSetCustodiansInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					registerRequester: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getRegisterRequesterInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					deposit: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getDepositInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					withdraw: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getWithdrawInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					transfer: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getTransferInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					requestDisclosure: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getRequestDisclosureInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					grantDisclosure: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getGrantDisclosureInstruction(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					challengeDisclosure: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getChallengeDisclosureInstruction(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					resolveChallenge: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getResolveChallengeInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					approveDisclosure: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getApproveDisclosureInstructionAsync(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-					cancelDisclosure: (input, instructionConfig) =>
-						addSelfPlanAndSendFunctions(
-							client,
-							getCancelDisclosureInstruction(input, {
-								programAddress: instructionConfig?.programAddress ??
-									config.programAddress,
-							}),
-						),
-				},
-				pdas: {
-					poolConfig: (pdaConfig) =>
-						findPoolConfigPda({
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					poolVault: (pdaConfig) =>
-						findPoolVaultPda({
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					merkleTree: (pdaConfig) =>
-						findMerkleTreePda({
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					nullifierSet: (pdaConfig) =>
-						findNullifierSetPda({
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					custodianRegistry: (pdaConfig) =>
-						findCustodianRegistryPda({
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					requesterRegistry: (pdaConfig) =>
-						findRequesterRegistryPda({
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					noteCommitment: (seeds, pdaConfig) =>
-						findNoteCommitmentPda(seeds, {
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					disclosureRequest: (seeds, pdaConfig) =>
-						findDisclosureRequestPda(seeds, {
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					disclosureLog: (pdaConfig) =>
-						findDisclosureLogPda({
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-					verifyingKeyAccount: (seeds, pdaConfig) =>
-						findVerifyingKeyAccountPda(seeds, {
-							programAddress: pdaConfig?.programAddress ??
-								config.programAddress,
-						}),
-				},
-				identifyAccount: identifyPrivacyPoolProgramAccount,
-				identifyInstruction: identifyPrivacyPoolProgramInstruction,
-				parseInstruction: parsePrivacyPoolProgramInstruction,
-			},
-		});
-	};
+export function privacyPoolProgramProgram(config: { programAddress?: Address | HasAddress } = {}) {
+    return <T extends PrivacyPoolProgramPluginRequirements>(client: T): ExtendedClient<T, { privacyPoolProgram: PrivacyPoolProgramPlugin }> => {
+        return extendClient(client, { privacyPoolProgram: <PrivacyPoolProgramPlugin>{ accounts: { poolConfig: addSelfFetchFunctions(client, getPoolConfigCodec()), poolVault: addSelfFetchFunctions(client, getPoolVaultCodec()), merkleTree: addSelfFetchFunctions(client, getMerkleTreeCodec()), nullifierRecord: addSelfFetchFunctions(client, getNullifierRecordCodec()), custodianRegistry: addSelfFetchFunctions(client, getCustodianRegistryCodec()), requesterRegistry: addSelfFetchFunctions(client, getRequesterRegistryCodec()), assetVault: addSelfFetchFunctions(client, getAssetVaultCodec()), disclosureRequest: addSelfFetchFunctions(client, getDisclosureRequestCodec()), disclosureLog: addSelfFetchFunctions(client, getDisclosureLogCodec()), verifyingKeyAccount: addSelfFetchFunctions(client, getVerifyingKeyAccountCodec()) }, instructions: { 
+			migrate: (input: MigrateInput) =>
+				addSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),initialize: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getInitializeInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), setVerificationKey: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getSetVerificationKeyInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), setCustodians: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getSetCustodiansInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), registerRequester: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getRegisterRequesterInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), deposit: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getDepositInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), withdraw: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getWithdrawInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), transfer: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getTransferInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), requestDisclosure: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getRequestDisclosureInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), grantDisclosure: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getGrantDisclosureInstruction(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), challengeDisclosure: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getChallengeDisclosureInstruction(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), resolveChallenge: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getResolveChallengeInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), approveDisclosure: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getApproveDisclosureInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), cancelDisclosure: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getCancelDisclosureInstruction(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), registerAsset: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getRegisterAssetInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), depositToken: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getDepositTokenInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), withdrawToken: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getWithdrawTokenInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), setPolicy: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getSetPolicyInstructionAsync(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })), verifyPolicy: (input, instructionConfig) => addSelfPlanAndSendFunctions(client, getVerifyPolicyInstruction(input, { programAddress: instructionConfig?.programAddress ?? config.programAddress })) }, pdas: { poolConfig: pdaConfig => findPoolConfigPda({ programAddress: pdaConfig?.programAddress ?? config.programAddress }), poolVault: pdaConfig => findPoolVaultPda({ programAddress: pdaConfig?.programAddress ?? config.programAddress }), merkleTree: pdaConfig => findMerkleTreePda({ programAddress: pdaConfig?.programAddress ?? config.programAddress }), nullifierRecord: (seeds, pdaConfig) => findNullifierRecordPda(seeds, { programAddress: pdaConfig?.programAddress ?? config.programAddress }), custodianRegistry: pdaConfig => findCustodianRegistryPda({ programAddress: pdaConfig?.programAddress ?? config.programAddress }), requesterRegistry: pdaConfig => findRequesterRegistryPda({ programAddress: pdaConfig?.programAddress ?? config.programAddress }), assetVault: (seeds, pdaConfig) => findAssetVaultPda(seeds, { programAddress: pdaConfig?.programAddress ?? config.programAddress }), disclosureRequest: (seeds, pdaConfig) => findDisclosureRequestPda(seeds, { programAddress: pdaConfig?.programAddress ?? config.programAddress }), disclosureLog: pdaConfig => findDisclosureLogPda({ programAddress: pdaConfig?.programAddress ?? config.programAddress }), verifyingKeyAccount: (seeds, pdaConfig) => findVerifyingKeyAccountPda(seeds, { programAddress: pdaConfig?.programAddress ?? config.programAddress }) }, identifyAccount: identifyPrivacyPoolProgramAccount, identifyInstruction: identifyPrivacyPoolProgramInstruction, parseInstruction: parsePrivacyPoolProgramInstruction } });
+    };
 }

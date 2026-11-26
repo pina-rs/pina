@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,6 +12,7 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
+
 @immutable
 class DisclosureRequest {
   const DisclosureRequest({
@@ -19,6 +21,7 @@ class DisclosureRequest {
     required this.nonce,
     required this.tier,
     required this.commitment,
+    required this.viewPubkey,
     required this.noticeLen,
     required this.notice,
     required this.legalBasisHash,
@@ -27,8 +30,9 @@ class DisclosureRequest {
     required this.status,
     required this.granted,
     required this.approvals,
-  }) : discriminator = 9,
-       migrationVersion = 0;
+  }) :
+      discriminator = 9,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -37,6 +41,7 @@ class DisclosureRequest {
   final BigInt nonce;
   final int tier;
   final Uint8List commitment;
+  final Uint8List viewPubkey;
   final int noticeLen;
   final Uint8List notice;
   final Uint8List legalBasisHash;
@@ -58,6 +63,7 @@ class DisclosureRequest {
           nonce == other.nonce &&
           tier == other.tier &&
           commitment == other.commitment &&
+          viewPubkey == other.viewPubkey &&
           noticeLen == other.noticeLen &&
           notice == other.notice &&
           legalBasisHash == other.legalBasisHash &&
@@ -68,28 +74,12 @@ class DisclosureRequest {
           approvals == other.approvals;
 
   @override
-  int get hashCode => Object.hash(
-    discriminator,
-    migrationVersion,
-    bump,
-    requester,
-    nonce,
-    tier,
-    commitment,
-    noticeLen,
-    notice,
-    legalBasisHash,
-    createdAt,
-    challengeDeadline,
-    status,
-    granted,
-    approvals,
-  );
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump, requester, nonce, tier, commitment, viewPubkey, noticeLen, notice, legalBasisHash, createdAt, challengeDeadline, status, granted, approvals);
 
   @override
-  String toString() =>
-      'DisclosureRequest(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, requester: $requester, nonce: $nonce, tier: $tier, commitment: $commitment, noticeLen: $noticeLen, notice: $notice, legalBasisHash: $legalBasisHash, createdAt: $createdAt, challengeDeadline: $challengeDeadline, status: $status, granted: $granted, approvals: $approvals)';
+  String toString() => 'DisclosureRequest(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, requester: $requester, nonce: $nonce, tier: $tier, commitment: $commitment, viewPubkey: $viewPubkey, noticeLen: $noticeLen, notice: $notice, legalBasisHash: $legalBasisHash, createdAt: $createdAt, challengeDeadline: $challengeDeadline, status: $status, granted: $granted, approvals: $approvals)';
 }
+
 
 Encoder<DisclosureRequest> getDisclosureRequestEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -99,16 +89,11 @@ Encoder<DisclosureRequest> getDisclosureRequestEncoder() {
     ('requester', getAddressEncoder()),
     ('nonce', getU64Encoder()),
     ('tier', getU8Encoder()),
-    (
-      'commitment',
-      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
-    ),
+    ('commitment', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    ('viewPubkey', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
     ('noticeLen', getU8Encoder()),
     ('notice', fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false)),
-    (
-      'legalBasisHash',
-      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
-    ),
+    ('legalBasisHash', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
     ('createdAt', getU64Encoder()),
     ('challengeDeadline', getU64Encoder()),
     ('status', getU8Encoder()),
@@ -126,6 +111,7 @@ Encoder<DisclosureRequest> getDisclosureRequestEncoder() {
       'nonce': value.nonce,
       'tier': value.tier,
       'commitment': value.commitment,
+      'viewPubkey': value.viewPubkey,
       'noticeLen': value.noticeLen,
       'notice': value.notice,
       'legalBasisHash': value.legalBasisHash,
@@ -147,6 +133,7 @@ Decoder<DisclosureRequest> getDisclosureRequestDecoder() {
     ('nonce', getU64Decoder()),
     ('tier', getU8Decoder()),
     ('commitment', fixDecoderSize(getBytesDecoder(), 32)),
+    ('viewPubkey', fixDecoderSize(getBytesDecoder(), 32)),
     ('noticeLen', getU8Decoder()),
     ('notice', fixDecoderSize(getBytesDecoder(), 96)),
     ('legalBasisHash', fixDecoderSize(getBytesDecoder(), 32)),
@@ -158,15 +145,20 @@ Decoder<DisclosureRequest> getDisclosureRequestDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'disclosureRequest account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'disclosureRequest account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (DisclosureRequest, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(9)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(9),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -179,19 +171,20 @@ Decoder<DisclosureRequest> getDisclosureRequestDecoder() {
 
     return (
       DisclosureRequest(
-        bump: map['bump']! as int,
-        requester: map['requester']! as Address,
-        nonce: map['nonce']! as BigInt,
-        tier: map['tier']! as int,
-        commitment: map['commitment']! as Uint8List,
-        noticeLen: map['noticeLen']! as int,
-        notice: map['notice']! as Uint8List,
-        legalBasisHash: map['legalBasisHash']! as Uint8List,
-        createdAt: map['createdAt']! as BigInt,
-        challengeDeadline: map['challengeDeadline']! as BigInt,
-        status: map['status']! as int,
-        granted: map['granted']! as int,
-        approvals: map['approvals']! as int,
+      bump: map['bump']! as int,
+      requester: map['requester']! as Address,
+      nonce: map['nonce']! as BigInt,
+      tier: map['tier']! as int,
+      commitment: map['commitment']! as Uint8List,
+      viewPubkey: map['viewPubkey']! as Uint8List,
+      noticeLen: map['noticeLen']! as int,
+      notice: map['notice']! as Uint8List,
+      legalBasisHash: map['legalBasisHash']! as Uint8List,
+      createdAt: map['createdAt']! as BigInt,
+      challengeDeadline: map['challengeDeadline']! as BigInt,
+      status: map['status']! as int,
+      granted: map['granted']! as int,
+      approvals: map['approvals']! as int,
       ),
       newOffset,
     );
@@ -218,15 +211,10 @@ Decoder<DisclosureRequest> getDisclosureRequestDecoder() {
 }
 
 Codec<DisclosureRequest, DisclosureRequest> getDisclosureRequestCodec() {
-  return combineCodec(
-    getDisclosureRequestEncoder(),
-    getDisclosureRequestDecoder(),
-  );
+  return combineCodec(getDisclosureRequestEncoder(), getDisclosureRequestDecoder());
 }
 
-Account<DisclosureRequest> decodeDisclosureRequest(
-  EncodedAccount encodedAccount,
-) {
+Account<DisclosureRequest> decodeDisclosureRequest(EncodedAccount encodedAccount) {
   return decodeAccount(encodedAccount, getDisclosureRequestDecoder());
 }
 
@@ -238,11 +226,11 @@ const int disclosureRequestMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool disclosureRequestNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 9) {
-    return false;
-  }
-  return data[1] < 0;
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 9) {
+		return false;
+	}
+	return data[1] < 0;
 }

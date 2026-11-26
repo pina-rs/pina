@@ -6,13 +6,14 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
@@ -24,10 +25,6 @@ pub struct ChallengeDisclosure<'account> {
 	/// CPI account `disclosureRequest`.
 	/// Required privileges: writable.
 	pub disclosure_request: &'account AccountView,
-
-	/// CPI account `noteCommitment`.
-	/// Required privileges: read-only.
-	pub note_commitment: &'account AccountView,
 
 	/// CPI account `viewer`.
 	/// Required privileges: read-only and signer.
@@ -45,7 +42,6 @@ pub struct ChallengeDisclosure<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct ChallengeDisclosureIx {
 	/// Instruction argument `reserved`.
-	/// Reserved; must be zero.
 	pub reserved: u8,
 }
 
@@ -78,9 +74,8 @@ impl<'account> ChallengeDisclosure<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 4] = [
+		let accounts: [CpiHandle<'_>; 3] = [
 			CpiHandle::writable(self.disclosure_request)?,
-			CpiHandle::readonly(self.note_commitment),
 			CpiHandle::readonly_signer(self.viewer),
 			CpiHandle::readonly(self.clock),
 		];

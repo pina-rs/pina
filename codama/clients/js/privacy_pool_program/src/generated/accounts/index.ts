@@ -6,13 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./custodianRegistry";
-export * from "./disclosureLog";
-export * from "./disclosureRequest";
-export * from "./merkleTree";
-export * from "./noteCommitment";
-export * from "./nullifierSet";
-export * from "./poolConfig";
-export * from "./poolVault";
-export * from "./requesterRegistry";
-export * from "./verifyingKeyAccount";
+export * from './assetVault';
+export * from './custodianRegistry';
+export * from './disclosureLog';
+export * from './disclosureRequest';
+export * from './merkleTree';
+export * from './nullifierRecord';
+export * from './poolConfig';
+export * from './poolVault';
+export * from './requesterRegistry';
+export * from './verifyingKeyAccount';

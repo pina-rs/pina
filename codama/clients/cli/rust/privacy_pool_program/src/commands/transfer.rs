@@ -10,122 +10,150 @@
 )]
 
 use clap::Args;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 use privacy_pool_program_client::instructions::Transfer;
 use privacy_pool_program_client::instructions::TransferInstructionData;
 use solana_sdk::pubkey::Pubkey;
 
-use crate::context::CliContext;
-use crate::context::CliError;
-
 #[derive(Debug, Args)]
 pub struct TransferArgs {
 	#[arg(long)]
-	bump: u8,
+	nullifier0_bump: u8,
 	#[arg(long)]
-	nullifier: String,
+	nullifier1_bump: u8,
+	#[arg(long)]
+	nullifier0: String,
+	#[arg(long)]
+	nullifier1: String,
 	#[arg(long)]
 	root: String,
-	/// Commitment of the successor note.
+	/// Optional SOL relayer fee deducted from shielded inputs.
 	#[arg(long)]
-	new_commitment: String,
-	/// Successor note's consent key.
+	relayer_fee: u64,
 	#[arg(long)]
-	new_view_pubkey: String,
+	out0_commitment: String,
 	#[arg(long)]
-	envelope_len: u8,
+	out0_view_pubkey: String,
 	#[arg(long)]
-	envelope: String,
+	out0_envelope_len: u8,
 	#[arg(long)]
-	shares: String,
+	out0_envelope: String,
+	#[arg(long)]
+	out1_commitment: String,
+	#[arg(long)]
+	out1_view_pubkey: String,
+	#[arg(long)]
+	out1_envelope_len: u8,
+	#[arg(long)]
+	out1_envelope: String,
+	/// 192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).
 	#[arg(long)]
 	proof_a: String,
 	#[arg(long)]
 	proof_b: String,
 	#[arg(long)]
 	proof_c: String,
-	/// The `pool_config` account
+	/// The `pool_config` account [default: derived]
 	#[arg(long)]
-	pool_config: String,
+	pool_config: Option<String>,
+	/// The `pool_vault` account [default: derived]
+	#[arg(long)]
+	pool_vault: Option<String>,
 	/// The `merkle_tree` account [default: derived]
 	#[arg(long)]
 	merkle_tree: Option<String>,
-	/// The `nullifier_set` account [default: derived]
+	/// The `nullifier_record0` account
 	#[arg(long)]
-	nullifier_set: Option<String>,
+	nullifier_record0: String,
+	/// The `nullifier_record1` account
+	#[arg(long)]
+	nullifier_record1: String,
 	/// The `verifying_key_account` account
 	#[arg(long)]
 	verifying_key_account: String,
-	/// The `note_commitment` account
+	/// The `policy_cosigner` account
 	#[arg(long)]
-	note_commitment: String,
+	policy_cosigner: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: TransferArgs) -> Result<(), CliError> {
-	let nullifier = CliContext::bytes::<32>("--nullifier", &args.nullifier)?;
+	let nullifier0 = CliContext::bytes::<32>("--nullifier0", &args.nullifier0)?;
+	let nullifier1 = CliContext::bytes::<32>("--nullifier1", &args.nullifier1)?;
 	let root = CliContext::bytes::<32>("--root", &args.root)?;
-	let new_commitment = CliContext::bytes::<32>("--new_commitment", &args.new_commitment)?;
-	let new_view_pubkey = CliContext::bytes::<32>("--new_view_pubkey", &args.new_view_pubkey)?;
-	let envelope = CliContext::bytes::<128>("--envelope", &args.envelope)?;
-	let shares = CliContext::bytes::<144>("--shares", &args.shares)?;
-	let proof_a = CliContext::bytes::<64>("--proof_a", &args.proof_a)?;
+	let out0_commitment = CliContext::bytes::<32>("--out0_commitment", &args.out0_commitment)?;
+	let out0_view_pubkey = CliContext::bytes::<32>("--out0_view_pubkey", &args.out0_view_pubkey)?;
+	let out0_envelope = CliContext::bytes::<96>("--out0_envelope", &args.out0_envelope)?;
+	let out1_commitment = CliContext::bytes::<32>("--out1_commitment", &args.out1_commitment)?;
+	let out1_view_pubkey = CliContext::bytes::<32>("--out1_view_pubkey", &args.out1_view_pubkey)?;
+	let out1_envelope = CliContext::bytes::<96>("--out1_envelope", &args.out1_envelope)?;
+	let proof_a = CliContext::bytes::<32>("--proof_a", &args.proof_a)?;
 	let proof_b = CliContext::bytes::<128>("--proof_b", &args.proof_b)?;
-	let proof_c = CliContext::bytes::<64>("--proof_c", &args.proof_c)?;
-	let pool_config = CliContext::pubkey("--pool_config", &args.pool_config)?;
+	let proof_c = CliContext::bytes::<32>("--proof_c", &args.proof_c)?;
 	let payer = context.payer_pubkey();
+	let pool_config = match &args.pool_config {
+		Some(value) => CliContext::pubkey("--pool_config", value)?,
+		None => Pubkey::find_program_address(
+			&["privacy-pool-config".as_bytes()],
+			&context.program_address,
+		)
+		.0,
+	};
+	let pool_vault = match &args.pool_vault {
+		Some(value) => CliContext::pubkey("--pool_vault", value)?,
+		None => Pubkey::find_program_address(
+			&["privacy-pool-vault".as_bytes()],
+			&context.program_address,
+		)
+		.0,
+	};
 	let merkle_tree = match &args.merkle_tree {
 		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-tree".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
+		None => Pubkey::find_program_address(
+			&["privacy-pool-tree".as_bytes()],
+			&context.program_address,
+		)
+		.0,
 	};
-	let nullifier_set = match &args.nullifier_set {
-		Some(value) => CliContext::pubkey("--nullifier_set", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-nullifiers".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
-	};
-	let verifying_key_account =
-		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
-	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
+	let nullifier_record0 = CliContext::pubkey("--nullifier_record0", &args.nullifier_record0)?;
+	let nullifier_record1 = CliContext::pubkey("--nullifier_record1", &args.nullifier_record1)?;
+	let verifying_key_account = CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
+	let policy_cosigner = CliContext::pubkey("--policy_cosigner", &args.policy_cosigner)?;
 	let data = TransferInstructionData::new(|data| {
-		data.bump = args.bump;
-		data.nullifier = nullifier;
+		data.nullifier0_bump = args.nullifier0_bump;
+		data.nullifier1_bump = args.nullifier1_bump;
+		data.nullifier0 = nullifier0;
+		data.nullifier1 = nullifier1;
 		data.root = root;
-		data.new_commitment = new_commitment;
-		data.new_view_pubkey = new_view_pubkey;
-		data.envelope_len = args.envelope_len;
-		data.envelope = envelope;
-		data.shares = shares;
+		data.relayer_fee.set(args.relayer_fee);
+		data.out0_commitment = out0_commitment;
+		data.out0_view_pubkey = out0_view_pubkey;
+		data.out0_envelope_len = args.out0_envelope_len;
+		data.out0_envelope = out0_envelope;
+		data.out1_commitment = out1_commitment;
+		data.out1_view_pubkey = out1_view_pubkey;
+		data.out1_envelope_len = args.out1_envelope_len;
+		data.out1_envelope = out1_envelope;
 		data.proof_a = proof_a;
 		data.proof_b = proof_b;
 		data.proof_c = proof_c;
 	})
-	.map_err(|_| {
-		CliError::InvalidData {
-			message: "instruction data rejected the provided arguments".to_string(),
-		}
+	.map_err(|_| CliError::InvalidData {
+		message: "instruction data rejected the provided arguments".to_string(),
 	})?;
 
 	let accounts = Transfer {
-		pool_config,
-		payer,
-		merkle_tree,
-		nullifier_set,
-		verifying_key_account,
-		note_commitment,
+		payer: payer,
+		pool_config: pool_config,
+		pool_vault: pool_vault,
+		merkle_tree: merkle_tree,
+		nullifier_record0: nullifier_record0,
+		nullifier_record1: nullifier_record1,
+		verifying_key_account: verifying_key_account,
+		policy_cosigner: policy_cosigner,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(
-		accounts.instruction(data),
-		Some(privacy_pool_program_client::instructions::TRANSFER_COMPUTE_UNIT_LIMIT),
-	)
+	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::TRANSFER_COMPUTE_UNIT_LIMIT))
 }

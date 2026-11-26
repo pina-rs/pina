@@ -12,23 +12,21 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct MerkleTree {
-	/// Full-node incremental Merkle tree over Poseidon-2 hashes.
-	///
-	/// Level `ℓ` (0 = leaves) occupies `nodes` at offset
-	/// `(1 << (depth+1)) − (1 << (depth+1−ℓ))`, so the root sits in the final
-	/// slot. Empty subtrees hold the precomputed zero-hash chain, letting
-	/// witnesses cover unwritten leaves.
+/// Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.
+/// 
+/// Holds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root
+/// ring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
 	/// Number of leaves written so far.
 	pub next_leaf_index: u64,
-	/// Flat 32-byte node store; unwritten slots hold the zero-hash chain.
-	pub nodes: [u8; 8160],
+	/// Frontier of rightmost filled subtrees, one 32-byte hash per level.
+	pub filled_subtrees: [u8; 512],
 	/// Roots currently in the ring; evictions hold it at capacity.
 	pub roots_len: u16,
-	/// Ring of recent roots, oldest first, zero-padded until full.
-	pub roots: [u8; 256],
+	/// Ring of 32 recent roots, oldest first.
+	pub roots: [u8; 1024],
 }
 
 pub const MERKLE_TREE_DISCRIMINATOR: u8 = 3u8;
@@ -66,9 +64,7 @@ impl MerkleTree {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut MerkleTreeZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut MerkleTreeZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != MERKLE_TREE_DISCRIMINATOR {
@@ -84,18 +80,24 @@ impl MerkleTree {
 impl MerkleTree {
 	pub fn find_pda() -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["privacy-pool-tree".as_bytes()],
+			&[
+				"privacy-pool-tree".as_bytes(),
+			],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 
 	pub fn create_pda(bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["privacy-pool-tree".as_bytes(), &[bump]],
+			&[
+				"privacy-pool-tree".as_bytes(),
+				&[bump],
+			],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 }
+
 
 /// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
 /// [`MERKLE_TREE_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
@@ -104,6 +106,7 @@ impl MerkleTree {
 pub fn merkle_tree_needs_migration(_data: &[u8]) -> bool {
 	false
 }
+
 
 /// Why `MerkleTree::try_from_bytes` rejected account bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -120,34 +123,30 @@ impl core::fmt::Display for MerkleTreeVersionError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::InvalidData => write!(f, "invalid MerkleTree account data"),
-			Self::Stale { stored } => {
-				write!(
-					f,
-					"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
-				)
-			}
-			Self::Future { stored } => {
-				write!(
-					f,
-					"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
-				)
-			}
+			Self::Stale { stored } => write!(
+				f,
+				"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
+			),
+			Self::Future { stored } => write!(
+				f,
+				"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
+			),
 		}
 	}
 }
 
 impl MerkleTree {
 	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`MerkleTree::from_bytes`].
-	pub fn try_from_bytes(data: &[u8]) -> Result<&MerkleTreeZc, MerkleTreeVersionError> {
+	pub fn try_from_bytes(
+		data: &[u8],
+	) -> Result<&MerkleTreeZc, MerkleTreeVersionError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| MerkleTreeVersionError::InvalidData)?;
 		if account.discriminator != MERKLE_TREE_DISCRIMINATOR {
 			return Err(MerkleTreeVersionError::InvalidData);
 		}
 		if account.migration_version > MERKLE_TREE_MIGRATION_VERSION {
-			return Err(MerkleTreeVersionError::Future {
-				stored: account.migration_version,
-			});
+			return Err(MerkleTreeVersionError::Future { stored: account.migration_version });
 		}
 		Ok(account)
 	}
@@ -166,14 +165,9 @@ mod merkle_tree_version_error_tests {
 
 	#[test]
 	fn stale_and_future_versions_are_distinguishable() {
-		let error = MerkleTree::try_from_bytes(&envelope(1 as u8))
-			.err()
-			.expect("a future envelope must fail");
+		let error = MerkleTree::try_from_bytes(&envelope(1 as u8)).err().expect("a future envelope must fail");
 		assert_eq!(error, MerkleTreeVersionError::Future { stored: 1 });
-		assert_eq!(
-			MerkleTreeVersionError::Future { stored: 1 }.to_string(),
-			"migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)"
-		);
+		assert_eq!(MerkleTreeVersionError::Future { stored: 1 }.to_string(), "migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)");
 		assert!(
 			MerkleTree::try_from_bytes(&envelope(0 as u8)).is_ok(),
 			"the current version must decode",

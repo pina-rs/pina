@@ -6,13 +6,13 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// The pool's SOL custody. Data-less by design: every lamport in it is
-/// backed by an unspent note commitment in the tree.
+/// The pool's native SOL custody PDA.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PoolVault {
 	pub bump: u8,
@@ -28,7 +28,8 @@ impl PoolVault {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2 && data[..2] == POOL_VAULT_DISCRIMINATOR
+		data.len() >= 2
+			&& data[..2] == POOL_VAULT_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -43,8 +44,11 @@ impl PoolVault {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 
-		Some(PoolVault { bump })
+		Some(PoolVault {
+			bump,
+		})
 	}
 }

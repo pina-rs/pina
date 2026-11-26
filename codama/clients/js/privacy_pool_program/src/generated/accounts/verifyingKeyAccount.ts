@@ -6,282 +6,104 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	type ClientWithRpc,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	fixDecoderSize,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	fixEncoderSize,
-	type GetAccountInfoApi,
-	getBytesDecoder,
-	getBytesEncoder,
-	type GetMultipleAccountsApi,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type HasAddress,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import {
-	findVerifyingKeyAccountPda,
-	type VerifyingKeyAccountSeeds,
-} from "../pdas";
-import {
-	fixPinaPodEncoderSize,
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder, getPinaPodMigrationVersionDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type ClientWithRpc, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findVerifyingKeyAccountPda, type VerifyingKeyAccountSeeds } from '../pdas';
 
 export const VERIFYING_KEY_ACCOUNT_DISCRIMINATOR = 10;
 
-export function getVerifyingKeyAccountDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(VERIFYING_KEY_ACCOUNT_DISCRIMINATOR);
-}
+export function getVerifyingKeyAccountDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(VERIFYING_KEY_ACCOUNT_DISCRIMINATOR); }
 
 export const VERIFYING_KEY_ACCOUNT_DISCRIMINATOR2 = 0;
 
-export function getVerifyingKeyAccountDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(VERIFYING_KEY_ACCOUNT_DISCRIMINATOR2);
-}
+export function getVerifyingKeyAccountDiscriminator2Bytes(): ReadonlyUint8Array { return getU8Encoder().encode(VERIFYING_KEY_ACCOUNT_DISCRIMINATOR2); }
 
 /**
- * One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
- * (root, nullifier, recipient hash), slot 1 transfer proofs
- * (root, nullifier, output binding).
+ * Single-input Groth16 verifying key. Every circuit compresses its statement
+ * into one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are
+ * stored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).
  */
-export type VerifyingKeyAccount = {
-	discriminator: number;
-	migrationVersion: number;
-	bump: number;
-	/** Circuit slot; see the `VK_SLOT_*` constants. */
-	slot: number;
-	/** αG₁, little-endian affine coordinates. */
-	alphaG1: ReadonlyUint8Array;
-	/** βG₂, little-endian affine coordinates. */
-	betaG2: ReadonlyUint8Array;
-	/** γG₂, little-endian affine coordinates. */
-	gammaG2: ReadonlyUint8Array;
-	/** δG₂, little-endian affine coordinates. */
-	deltaG2: ReadonlyUint8Array;
-	/** IC entries in use, including the constant term. */
-	icLen: number;
-	/** IC G₁ points, little-endian; entries beyond `ic_len` are zero. */
-	ic0: ReadonlyUint8Array;
-	ic1: ReadonlyUint8Array;
-	ic2: ReadonlyUint8Array;
-	ic3: ReadonlyUint8Array;
-};
+export type VerifyingKeyAccount = { discriminator: number; migrationVersion: number; bump: number; slot: number; alphaG1: ReadonlyUint8Array; betaG2: ReadonlyUint8Array; gammaG2: ReadonlyUint8Array; deltaG2: ReadonlyUint8Array; ic0: ReadonlyUint8Array; ic1: ReadonlyUint8Array;  };
 
-export type VerifyingKeyAccountArgs = {
-	bump: number;
-	/** Circuit slot; see the `VK_SLOT_*` constants. */
-	slot: number;
-	/** αG₁, little-endian affine coordinates. */
-	alphaG1: ReadonlyUint8Array;
-	/** βG₂, little-endian affine coordinates. */
-	betaG2: ReadonlyUint8Array;
-	/** γG₂, little-endian affine coordinates. */
-	gammaG2: ReadonlyUint8Array;
-	/** δG₂, little-endian affine coordinates. */
-	deltaG2: ReadonlyUint8Array;
-	/** IC entries in use, including the constant term. */
-	icLen: number;
-	/** IC G₁ points, little-endian; entries beyond `ic_len` are zero. */
-	ic0: ReadonlyUint8Array;
-	ic1: ReadonlyUint8Array;
-	ic2: ReadonlyUint8Array;
-	ic3: ReadonlyUint8Array;
-};
+export type VerifyingKeyAccountArgs = { bump: number; slot: number; alphaG1: ReadonlyUint8Array; betaG2: ReadonlyUint8Array; gammaG2: ReadonlyUint8Array; deltaG2: ReadonlyUint8Array; ic0: ReadonlyUint8Array; ic1: ReadonlyUint8Array;  };
 
 /** Gets the encoder for {@link VerifyingKeyAccountArgs} account data. */
-export function getVerifyingKeyAccountEncoder(): FixedSizeEncoder<
-	VerifyingKeyAccountArgs
-> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["slot", getU8Encoder()],
-			["alphaG1", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["betaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["gammaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["deltaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["icLen", getU8Encoder()],
-			["ic0", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic1", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic2", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic3", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-		]),
-		(value) => ({ ...value, discriminator: 10, migrationVersion: 0 }),
-	);
+export function getVerifyingKeyAccountEncoder(): FixedSizeEncoder<VerifyingKeyAccountArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['migrationVersion', getU8Encoder()], ['bump', getU8Encoder()], ['slot', getU8Encoder()], ['alphaG1', fixPinaPodEncoderSize(getBytesEncoder(), 64)], ['betaG2', fixPinaPodEncoderSize(getBytesEncoder(), 128)], ['gammaG2', fixPinaPodEncoderSize(getBytesEncoder(), 128)], ['deltaG2', fixPinaPodEncoderSize(getBytesEncoder(), 128)], ['ic0', fixPinaPodEncoderSize(getBytesEncoder(), 64)], ['ic1', fixPinaPodEncoderSize(getBytesEncoder(), 64)]]), (value) => ({ ...value, discriminator: 10, migrationVersion: 0 }));
 }
 
 /** Gets the decoder for {@link VerifyingKeyAccount} account data. */
-export function getVerifyingKeyAccountDecoder(): FixedSizeDecoder<
-	VerifyingKeyAccount
-> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				VERIFYING_KEY_ACCOUNT_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["bump", getU8Decoder()],
-		["slot", getU8Decoder()],
-		["alphaG1", fixDecoderSize(getBytesDecoder(), 64)],
-		["betaG2", fixDecoderSize(getBytesDecoder(), 128)],
-		["gammaG2", fixDecoderSize(getBytesDecoder(), 128)],
-		["deltaG2", fixDecoderSize(getBytesDecoder(), 128)],
-		["icLen", getU8Decoder()],
-		["ic0", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic1", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic2", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic3", fixDecoderSize(getBytesDecoder(), 64)],
-	]);
+export function getVerifyingKeyAccountDecoder(): FixedSizeDecoder<VerifyingKeyAccount> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(VERIFYING_KEY_ACCOUNT_DISCRIMINATOR, getU8Decoder())], ['migrationVersion', getPinaPodMigrationVersionDecoder(0, getU8Decoder())], ['bump', getU8Decoder()], ['slot', getU8Decoder()], ['alphaG1', fixDecoderSize(getBytesDecoder(), 64)], ['betaG2', fixDecoderSize(getBytesDecoder(), 128)], ['gammaG2', fixDecoderSize(getBytesDecoder(), 128)], ['deltaG2', fixDecoderSize(getBytesDecoder(), 128)], ['ic0', fixDecoderSize(getBytesDecoder(), 64)], ['ic1', fixDecoderSize(getBytesDecoder(), 64)]]);
 }
 
 /** Gets the codec for {@link VerifyingKeyAccount} account data. */
-export function getVerifyingKeyAccountCodec(): FixedSizeCodec<
-	VerifyingKeyAccountArgs,
-	VerifyingKeyAccount
-> {
-	return combineCodec(
-		getVerifyingKeyAccountEncoder(),
-		getVerifyingKeyAccountDecoder(),
-	);
+export function getVerifyingKeyAccountCodec(): FixedSizeCodec<VerifyingKeyAccountArgs, VerifyingKeyAccount> {
+    return combineCodec(getVerifyingKeyAccountEncoder(), getVerifyingKeyAccountDecoder());
 }
 
-export function decodeVerifyingKeyAccount<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<VerifyingKeyAccount, TAddress>;
-export function decodeVerifyingKeyAccount<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<VerifyingKeyAccount, TAddress>;
-export function decodeVerifyingKeyAccount<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-):
-	| Account<VerifyingKeyAccount, TAddress>
-	| MaybeAccount<VerifyingKeyAccount, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getVerifyingKeyAccountDecoder(),
-	);
+export function decodeVerifyingKeyAccount<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<VerifyingKeyAccount, TAddress>;
+export function decodeVerifyingKeyAccount<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<VerifyingKeyAccount, TAddress>;
+export function decodeVerifyingKeyAccount<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<VerifyingKeyAccount, TAddress> | MaybeAccount<VerifyingKeyAccount, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getVerifyingKeyAccountDecoder());
 }
 
-export async function fetchVerifyingKeyAccount<
-	TAddress extends string = string,
->(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	address: Address<TAddress> | HasAddress<TAddress>,
-	config?: FetchAccountConfig,
+export async function fetchVerifyingKeyAccount<TAddress extends string = string>(
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  address: Address<TAddress> | HasAddress<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<VerifyingKeyAccount, TAddress>> {
-	const maybeAccount = await fetchMaybeVerifyingKeyAccount(
-		rpc,
-		address,
-		config,
-	);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeVerifyingKeyAccount(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
-export async function fetchMaybeVerifyingKeyAccount<
-	TAddress extends string = string,
->(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	address: Address<TAddress> | HasAddress<TAddress>,
-	config?: FetchAccountConfig,
+export async function fetchMaybeVerifyingKeyAccount<TAddress extends string = string>(
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  address: Address<TAddress> | HasAddress<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<VerifyingKeyAccount, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(
-		"rpc" in rpc ? rpc.rpc : rpc,
-		typeof address === "string" ? address : address.address,
-		config,
-	);
-	return decodeVerifyingKeyAccount(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount('rpc' in rpc ? rpc.rpc : rpc, typeof address === 'string' ? address : address.address, config);
+  return decodeVerifyingKeyAccount(maybeAccount);
 }
 
 export async function fetchAllVerifyingKeyAccount(
-	rpc:
-		| Parameters<typeof fetchEncodedAccounts>[0]
-		| ClientWithRpc<GetMultipleAccountsApi>,
-	addresses: Array<Address | HasAddress>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
+  addresses: Array<Address | HasAddress>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<VerifyingKeyAccount>[]> {
-	const maybeAccounts = await fetchAllMaybeVerifyingKeyAccount(
-		rpc,
-		addresses,
-		config,
-	);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeVerifyingKeyAccount(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeVerifyingKeyAccount(
-	rpc:
-		| Parameters<typeof fetchEncodedAccounts>[0]
-		| ClientWithRpc<GetMultipleAccountsApi>,
-	addresses: Array<Address | HasAddress>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
+  addresses: Array<Address | HasAddress>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<VerifyingKeyAccount>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(
-		"rpc" in rpc ? rpc.rpc : rpc,
-		addresses.map((a) => (typeof a === "string" ? a : a.address)),
-		config,
-	);
-	return maybeAccounts.map((maybeAccount) =>
-		decodeVerifyingKeyAccount(maybeAccount)
-	);
+  const maybeAccounts = await fetchEncodedAccounts('rpc' in rpc ? rpc.rpc : rpc, addresses.map((a) => (typeof a === 'string' ? a : a.address)), config);
+  return maybeAccounts.map((maybeAccount) => decodeVerifyingKeyAccount(maybeAccount));
 }
 
 export async function fetchVerifyingKeyAccountFromSeeds(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	seeds: VerifyingKeyAccountSeeds,
-	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  seeds: VerifyingKeyAccountSeeds,
+  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<VerifyingKeyAccount>> {
-	const maybeAccount = await fetchMaybeVerifyingKeyAccountFromSeeds(
-		rpc,
-		seeds,
-		config,
-	);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeVerifyingKeyAccountFromSeeds(rpc, seeds, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeVerifyingKeyAccountFromSeeds(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	seeds: VerifyingKeyAccountSeeds,
-	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  seeds: VerifyingKeyAccountSeeds,
+  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<VerifyingKeyAccount>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findVerifyingKeyAccountPda(seeds, { programAddress });
-	return await fetchMaybeVerifyingKeyAccount(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findVerifyingKeyAccountPda(seeds, { programAddress });
+  return await fetchMaybeVerifyingKeyAccount(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */
@@ -302,9 +124,7 @@ export const VERIFYING_KEY_ACCOUNT_MIGRATION_VERSION = 0;
  * }
  * ```
  */
-export function verifyingKeyAccountNeedsMigration(
-	data: ReadonlyUint8Array,
-): boolean {
+export function verifyingKeyAccountNeedsMigration(data: ReadonlyUint8Array): boolean {
 	if (data.length < 2) {
 		return false;
 	}

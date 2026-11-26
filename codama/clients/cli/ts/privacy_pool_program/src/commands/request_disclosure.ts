@@ -3,86 +3,48 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import {
-	getRequestDisclosureInstructionAsync,
-	REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT,
-} from "../client";
-import {
-	base58,
-	base58Vec,
-	bigInteger,
-	CliContext,
-	pubkey,
-	registerGlobals,
-	smallInteger,
-} from "../context";
+import { getRequestDisclosureInstructionAsync, REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT } from "../client";
+import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
 
-export const requestDisclosureCommand = registerGlobals(
-	new Command("request_disclosure"),
-)
+export const requestDisclosureCommand = registerGlobals(new Command("request_disclosure"))
 	.description("requestDisclosure")
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--nonce <nonce>", "nonce")
-	.requiredOption(
-		"--tier <tier>",
-		"Tier being invoked; see the `TIER_*` constants.",
-	)
-	.requiredOption("--commitment <commitment>", "Target note commitment.")
-	.requiredOption(
-		"--notice-len <noticeLen>",
-		"Active length of the encrypted notice.",
-	)
+	.requiredOption("--tier <tier>", "tier")
+	.requiredOption("--commitment <commitment>", "commitment")
+	.requiredOption("--view-pubkey <viewPubkey>", "Claimed consent key for `commitment`, authenticated via `path_elements`.")
+	.requiredOption("--leaf-index <leafIndex>", "leafIndex")
+	.requiredOption("--path-elements <pathElements>", "pathElements")
+	.requiredOption("--notice-len <noticeLen>", "noticeLen")
 	.requiredOption("--notice <notice>", "notice")
-	.requiredOption(
-		"--legal-basis-hash <legalBasisHash>",
-		"Hash of the legal basis; nonzero required above tier 0.",
-	)
-	.option(
-		"--pool-config <poolConfig>",
-		"The `pool_config` account [default: derived]",
-	)
-	.option(
-		"--requester-registry <requesterRegistry>",
-		"The `requester_registry` account [default: derived]",
-	)
-	.requiredOption(
-		"--note-commitment <noteCommitment>",
-		"The `note_commitment` account",
-	)
-	.requiredOption(
-		"--disclosure-request <disclosureRequest>",
-		"The `disclosure_request` account",
-	)
-	.requiredOption(
-		"--system-program <systemProgram>",
-		"The `system_program` account",
-	)
+	.requiredOption("--legal-basis-hash <legalBasisHash>", "legalBasisHash")
+	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
+	.option("--requester-registry <requesterRegistry>", "The `requester_registry` account [default: derived]")
+	.option("--merkle-tree <merkleTree>", "The `merkle_tree` account [default: derived]")
+	.requiredOption("--disclosure-request <disclosureRequest>", "The `disclosure_request` account")
+	.requiredOption("--system-program <systemProgram>", "The `system_program` account")
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-		const input = {
-			bump: smallInteger("--bump", options.bump),
-			nonce: bigInteger("--nonce", options.nonce),
-			tier: smallInteger("--tier", options.tier),
-			commitment: base58("--commitment", options.commitment),
-			noticeLen: smallInteger("--notice-len", options.noticeLen),
-			notice: base58("--notice", options.notice),
-			legalBasisHash: base58("--legal-basis-hash", options.legalBasisHash),
-			requester: context.payer,
-			poolConfig: options.poolConfig === undefined
-				? undefined
-				: pubkey("--pool-config", options.poolConfig),
-			requesterRegistry: options.requesterRegistry === undefined
-				? undefined
-				: pubkey("--requester-registry", options.requesterRegistry),
-			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
-			disclosureRequest: pubkey(
-				"--disclosure-request",
-				options.disclosureRequest,
-			),
-			systemProgram: pubkey("--system-program", options.systemProgram),
-			clock: pubkey("--clock", options.clock),
-		};
+const input = {
+		bump: smallInteger("--bump", options.bump),
+		nonce: bigInteger("--nonce", options.nonce),
+		tier: smallInteger("--tier", options.tier),
+		commitment: base58("--commitment", options.commitment),
+		viewPubkey: base58("--view-pubkey", options.viewPubkey),
+		leafIndex: bigInteger("--leaf-index", options.leafIndex),
+		pathElements: base58("--path-elements", options.pathElements),
+		noticeLen: smallInteger("--notice-len", options.noticeLen),
+		notice: base58("--notice", options.notice),
+		legalBasisHash: base58("--legal-basis-hash", options.legalBasisHash),
+		requester: context.payer,
+		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
+		requesterRegistry: options.requesterRegistry === undefined ? undefined : pubkey("--requester-registry", options.requesterRegistry),
+		merkleTree: options.merkleTree === undefined ? undefined : pubkey("--merkle-tree", options.merkleTree),
+		disclosureRequest: pubkey("--disclosure-request", options.disclosureRequest),
+		systemProgram: pubkey("--system-program", options.systemProgram),
+		clock: pubkey("--clock", options.clock),
+	};
 		const instruction = await getRequestDisclosureInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

@@ -6,9 +6,10 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./accounts";
+export * from './accounts';
+export * from './errors';
+export * from './events';
+export * from './instructions';
+export * from './pdas';
+export * from './programs';
 export * from "./computeUnits";
-export * from "./errors";
-export * from "./instructions";
-export * from "./pdas";
-export * from "./programs";

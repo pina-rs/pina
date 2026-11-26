@@ -10,12 +10,12 @@
 )]
 
 use clap::Args;
-use privacy_pool_program_client::instructions::RequestDisclosure;
-use privacy_pool_program_client::instructions::RequestDisclosureInstructionData;
-use solana_sdk::pubkey::Pubkey;
 
 use crate::context::CliContext;
 use crate::context::CliError;
+use privacy_pool_program_client::instructions::RequestDisclosure;
+use privacy_pool_program_client::instructions::RequestDisclosureInstructionData;
+use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Args)]
 pub struct RequestDisclosureArgs {
@@ -23,18 +23,21 @@ pub struct RequestDisclosureArgs {
 	bump: u8,
 	#[arg(long)]
 	nonce: u64,
-	/// Tier being invoked; see the `TIER_*` constants.
 	#[arg(long)]
 	tier: u8,
-	/// Target note commitment.
 	#[arg(long)]
 	commitment: String,
-	/// Active length of the encrypted notice.
+	/// Claimed consent key for `commitment`, authenticated via `path_elements`.
+	#[arg(long)]
+	view_pubkey: String,
+	#[arg(long)]
+	leaf_index: u64,
+	#[arg(long)]
+	path_elements: String,
 	#[arg(long)]
 	notice_len: u8,
 	#[arg(long)]
 	notice: String,
-	/// Hash of the legal basis; nonzero required above tier 0.
 	#[arg(long)]
 	legal_basis_hash: String,
 	/// The `pool_config` account [default: derived]
@@ -43,9 +46,9 @@ pub struct RequestDisclosureArgs {
 	/// The `requester_registry` account [default: derived]
 	#[arg(long)]
 	requester_registry: Option<String>,
-	/// The `note_commitment` account
+	/// The `merkle_tree` account [default: derived]
 	#[arg(long)]
-	note_commitment: String,
+	merkle_tree: Option<String>,
 	/// The `disclosure_request` account
 	#[arg(long)]
 	disclosure_request: String,
@@ -59,30 +62,35 @@ pub struct RequestDisclosureArgs {
 
 pub(crate) fn run(context: &CliContext, args: RequestDisclosureArgs) -> Result<(), CliError> {
 	let commitment = CliContext::bytes::<32>("--commitment", &args.commitment)?;
+	let view_pubkey = CliContext::bytes::<32>("--view_pubkey", &args.view_pubkey)?;
+	let path_elements = CliContext::bytes::<512>("--path_elements", &args.path_elements)?;
 	let notice = CliContext::bytes::<96>("--notice", &args.notice)?;
 	let legal_basis_hash = CliContext::bytes::<32>("--legal_basis_hash", &args.legal_basis_hash)?;
 	let requester = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-config".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
+		None => Pubkey::find_program_address(
+			&["privacy-pool-config".as_bytes()],
+			&context.program_address,
+		)
+		.0,
 	};
 	let requester_registry = match &args.requester_registry {
 		Some(value) => CliContext::pubkey("--requester_registry", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-requesters".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
+		None => Pubkey::find_program_address(
+			&["privacy-pool-requesters".as_bytes()],
+			&context.program_address,
+		)
+		.0,
 	};
-	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
+	let merkle_tree = match &args.merkle_tree {
+		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
+		None => Pubkey::find_program_address(
+			&["privacy-pool-tree".as_bytes()],
+			&context.program_address,
+		)
+		.0,
+	};
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
 	let system_program = CliContext::pubkey("--system_program", &args.system_program)?;
 	let clock = CliContext::pubkey("--clock", &args.clock)?;
@@ -91,28 +99,26 @@ pub(crate) fn run(context: &CliContext, args: RequestDisclosureArgs) -> Result<(
 		data.nonce.set(args.nonce);
 		data.tier = args.tier;
 		data.commitment = commitment;
+		data.view_pubkey = view_pubkey;
+		data.leaf_index.set(args.leaf_index);
+		data.path_elements = path_elements;
 		data.notice_len = args.notice_len;
 		data.notice = notice;
 		data.legal_basis_hash = legal_basis_hash;
 	})
-	.map_err(|_| {
-		CliError::InvalidData {
-			message: "instruction data rejected the provided arguments".to_string(),
-		}
+	.map_err(|_| CliError::InvalidData {
+		message: "instruction data rejected the provided arguments".to_string(),
 	})?;
 
 	let accounts = RequestDisclosure {
-		requester,
-		pool_config,
-		requester_registry,
-		note_commitment,
-		disclosure_request,
-		system_program,
-		clock,
+		requester: requester,
+		pool_config: pool_config,
+		requester_registry: requester_registry,
+		merkle_tree: merkle_tree,
+		disclosure_request: disclosure_request,
+		system_program: system_program,
+		clock: clock,
 	};
 
-	context.send(
-		accounts.instruction(data),
-		Some(privacy_pool_program_client::instructions::REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT),
-	)
+	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT))
 }

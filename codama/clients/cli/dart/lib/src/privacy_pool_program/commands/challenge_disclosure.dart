@@ -10,17 +10,8 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class ChallengeDisclosureCommand extends Command<void> {
   ChallengeDisclosureCommand() {
     argParser
-      ..addOption('reserved', mandatory: true, help: "Reserved; must be zero.")
-      ..addOption(
-        'disclosure_request',
-        mandatory: true,
-        help: "The disclosure_request account",
-      )
-      ..addOption(
-        'note_commitment',
-        mandatory: true,
-        help: "The note_commitment account",
-      )
+      ..addOption('reserved', mandatory: true, help: "reserved")
+      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account")
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -34,27 +25,17 @@ final class ChallengeDisclosureCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final disclosureRequest = pubkey(
-      '--disclosure-request',
-      results['disclosure_request']! as String,
-    );
-    final noteCommitment = pubkey(
-      '--note-commitment',
-      results['note_commitment']! as String,
-    );
+    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
     final viewer = context.payerAddress;
     final clock = pubkey('--clock', results['clock']! as String);
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getChallengeDisclosureInstruction(
       programAddress: context.programAddress,
       disclosureRequest: disclosureRequest,
-      noteCommitment: noteCommitment,
       viewer: viewer,
       clock: clock,
       reserved: reservedValue,
     );
-    await context.send([
-      instruction,
-    ], recordedLimit: challengeDisclosureComputeUnitLimit);
+    await context.send([instruction], recordedLimit: challengeDisclosureComputeUnitLimit);
   }
 }

@@ -12,32 +12,24 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DisclosureRequest {
-	/// One disclosure request and its state machine.
+/// One disclosure request and its state machine. Stores `view_pubkey` after
+/// `RequestDisclosure` authenticates it against the Merkle tree so
+/// `GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// Filing entity.
 	pub requester: solana_pubkey::Pubkey,
-	/// Client-chosen disambiguator for repeat filings.
 	pub nonce: u64,
-	/// Tier this request was filed at; see the `TIER_*` constants.
 	pub tier: u8,
-	/// Target note commitment.
 	pub commitment: [u8; 32],
-	/// Active bytes of the encrypted notice to the subject, client-opaque.
+	pub view_pubkey: [u8; 32],
 	pub notice_len: u8,
 	pub notice: [u8; 96],
-	/// Hash of the legal basis document; required nonzero above tier 0.
 	pub legal_basis_hash: [u8; 32],
-	/// Filing unix timestamp.
 	pub created_at: u64,
-	/// Challenge deadline unix timestamp (tier 1).
 	pub challenge_deadline: u64,
-	/// Current status; see the `STATUS_*` constants.
 	pub status: u8,
-	/// Set when the note's view key has granted consent.
 	pub granted: u8,
-	/// Custodian approval bitmask.
 	pub approvals: u8,
 }
 
@@ -64,9 +56,7 @@ impl DisclosureRequest {
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
-	pub fn from_bytes(
-		data: &[u8],
-	) -> Result<&DisclosureRequestZc, solana_program_error::ProgramError> {
+	pub fn from_bytes(data: &[u8]) -> Result<&DisclosureRequestZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != DISCLOSURE_REQUEST_DISCRIMINATOR {
@@ -78,9 +68,7 @@ impl DisclosureRequest {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut DisclosureRequestZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut DisclosureRequestZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != DISCLOSURE_REQUEST_DISCRIMINATOR {
@@ -105,11 +93,7 @@ impl DisclosureRequest {
 		)
 	}
 
-	pub fn create_pda(
-		requester: &solana_pubkey::Pubkey,
-		nonce: u64,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(requester: &solana_pubkey::Pubkey, nonce: u64, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
 			&[
 				"privacy-pool-request".as_bytes(),
@@ -122,6 +106,7 @@ impl DisclosureRequest {
 	}
 }
 
+
 /// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
 /// [`DISCLOSURE_REQUEST_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
 ///
@@ -129,6 +114,7 @@ impl DisclosureRequest {
 pub fn disclosure_request_needs_migration(_data: &[u8]) -> bool {
 	false
 }
+
 
 /// Why `DisclosureRequest::try_from_bytes` rejected account bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -145,18 +131,14 @@ impl core::fmt::Display for DisclosureRequestVersionError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::InvalidData => write!(f, "invalid DisclosureRequest account data"),
-			Self::Stale { stored } => {
-				write!(
-					f,
-					"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
-				)
-			}
-			Self::Future { stored } => {
-				write!(
-					f,
-					"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
-				)
-			}
+			Self::Stale { stored } => write!(
+				f,
+				"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
+			),
+			Self::Future { stored } => write!(
+				f,
+				"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
+			),
 		}
 	}
 }
@@ -172,9 +154,7 @@ impl DisclosureRequest {
 			return Err(DisclosureRequestVersionError::InvalidData);
 		}
 		if account.migration_version > DISCLOSURE_REQUEST_MIGRATION_VERSION {
-			return Err(DisclosureRequestVersionError::Future {
-				stored: account.migration_version,
-			});
+			return Err(DisclosureRequestVersionError::Future { stored: account.migration_version });
 		}
 		Ok(account)
 	}
@@ -193,14 +173,9 @@ mod disclosure_request_version_error_tests {
 
 	#[test]
 	fn stale_and_future_versions_are_distinguishable() {
-		let error = DisclosureRequest::try_from_bytes(&envelope(1 as u8))
-			.err()
-			.expect("a future envelope must fail");
+		let error = DisclosureRequest::try_from_bytes(&envelope(1 as u8)).err().expect("a future envelope must fail");
 		assert_eq!(error, DisclosureRequestVersionError::Future { stored: 1 });
-		assert_eq!(
-			DisclosureRequestVersionError::Future { stored: 1 }.to_string(),
-			"migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)"
-		);
+		assert_eq!(DisclosureRequestVersionError::Future { stored: 1 }.to_string(), "migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)");
 		assert!(
 			DisclosureRequest::try_from_bytes(&envelope(0 as u8)).is_ok(),
 			"the current version must decode",

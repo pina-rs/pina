@@ -11,16 +11,8 @@ final class SetCustodiansCommand extends Command<void> {
   SetCustodiansCommand() {
     argParser
       ..addOption('custodians', mandatory: true, help: "custodians")
-      ..addOption(
-        'pool_config',
-        mandatory: false,
-        help: "The pool_config account [default: derived]",
-      )
-      ..addOption(
-        'custodian_registry',
-        mandatory: false,
-        help: "The custodian_registry account [default: derived]",
-      );
+      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
+      ..addOption('custodian_registry', mandatory: false, help: "The custodian_registry account [default: derived]");
   }
 
   @override
@@ -36,19 +28,15 @@ final class SetCustodiansCommand extends Command<void> {
     final authority = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
+        : (await findPoolConfigPda(
+          programAddress: context.programAddress,
+        )).$1;
     final custodianRegistry = (results['custodian_registry'] as String?) != null
-        ? pubkey(
-            '--custodian-registry',
-            results['custodian_registry']! as String,
-          )
+        ? pubkey('--custodian-registry', results['custodian_registry']! as String)
         : (await findCustodianRegistryPda(
-            programAddress: context.programAddress,
-          )).$1;
-    final custodiansValue = base58Bytes(
-      '--custodians',
-      results['custodians']! as String,
-    );
+          programAddress: context.programAddress,
+        )).$1;
+    final custodiansValue = base58Bytes('--custodians', results['custodians']! as String);
     final instruction = getSetCustodiansInstruction(
       programAddress: context.programAddress,
       authority: authority,
@@ -56,8 +44,6 @@ final class SetCustodiansCommand extends Command<void> {
       custodianRegistry: custodianRegistry,
       custodians: custodiansValue,
     );
-    await context.send([
-      instruction,
-    ], recordedLimit: setCustodiansComputeUnitLimit);
+    await context.send([instruction], recordedLimit: setCustodiansComputeUnitLimit);
   }
 }

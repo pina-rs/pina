@@ -21,10 +21,10 @@ pub enum PrivacyPoolProgramError {
 	/// 1 - The commitment is the zero field element.
 	#[error("The commitment is the zero field element.")]
 	ZeroCommitment = 0x1,
-	/// The note account already exists for this commitment.
-	/// 2 - The note account already exists for this commitment.
-	#[error("The note account already exists for this commitment.")]
-	NoteAlreadyExists = 0x2,
+	/// The deposit or withdrawal amount is zero.
+	/// 2 - The deposit or withdrawal amount is zero.
+	#[error("The deposit or withdrawal amount is zero.")]
+	ZeroAmount = 0x2,
 	/// The Merkle tree is full.
 	/// 3 - The Merkle tree is full.
 	#[error("The Merkle tree is full.")]
@@ -37,10 +37,10 @@ pub enum PrivacyPoolProgramError {
 	/// 5 - The nullifier has already been spent.
 	#[error("The nullifier has already been spent.")]
 	NullifierAlreadySpent = 0x5,
-	/// The nullifier set is full.
-	/// 6 - The nullifier set is full.
-	#[error("The nullifier set is full.")]
-	NullifierSetFull = 0x6,
+	/// The pool is currently paused by policy.
+	/// 6 - The pool is currently paused by policy.
+	#[error("The pool is currently paused by policy.")]
+	PoolPaused = 0x6,
 	/// The Groth16 proof failed verification.
 	/// 7 - The Groth16 proof failed verification.
 	#[error("The Groth16 proof failed verification.")]
@@ -77,10 +77,10 @@ pub enum PrivacyPoolProgramError {
 	/// 15 - The requester registry is full.
 	#[error("The requester registry is full.")]
 	RequesterRegistryFull = 0xF,
-	/// The target note does not exist.
-	/// 16 - The target note does not exist.
-	#[error("The target note does not exist.")]
-	NoteNotFound = 0x10,
+	/// The submitted Merkle membership proof does not match any known root.
+	/// 16 - The submitted Merkle membership proof does not match any known root.
+	#[error("The submitted Merkle membership proof does not match any known root.")]
+	InvalidMerkleProof = 0x10,
 	/// The request status does not allow this transition.
 	/// 17 - The request status does not allow this transition.
 	#[error("The request status does not allow this transition.")]
@@ -109,6 +109,14 @@ pub enum PrivacyPoolProgramError {
 	/// 23 - A primitive failed its own bounds check.
 	#[error("A primitive failed its own bounds check.")]
 	ArithmeticOverflow = 0x17,
+	/// The required Custom Ring policy co-signer did not sign.
+	/// 24 - The required Custom Ring policy co-signer did not sign.
+	#[error("The required Custom Ring policy co-signer did not sign.")]
+	PolicyCosignerRequired = 0x18,
+	/// The token account or mint does not match the registered asset vault.
+	/// 25 - The token account or mint does not match the registered asset vault.
+	#[error("The token account or mint does not match the registered asset vault.")]
+	InvalidAssetVault = 0x19,
 }
 
 impl From<PrivacyPoolProgramError> for solana_program_error::ProgramError {

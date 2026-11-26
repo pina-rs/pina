@@ -3,74 +3,34 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import {
-	DEPOSIT_COMPUTE_UNIT_LIMIT,
-	getDepositInstructionAsync,
-} from "../client";
-import {
-	base58,
-	base58Vec,
-	bigInteger,
-	CliContext,
-	pubkey,
-	registerGlobals,
-	smallInteger,
-} from "../context";
+import { getDepositInstructionAsync, DEPOSIT_COMPUTE_UNIT_LIMIT } from "../client";
+import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
 
 export const depositCommand = registerGlobals(new Command("deposit"))
 	.description("deposit")
-	.requiredOption("--bump <bump>", "bump")
-	.requiredOption(
-		"--commitment <commitment>",
-		"Client-computed Poseidon commitment of the new note.",
-	)
-	.requiredOption(
-		"--view-pubkey <viewPubkey>",
-		"Per-note consent/notification public key.",
-	)
-	.requiredOption(
-		"--envelope-len <envelopeLen>",
-		"Active length of the encrypted note plaintext.",
-	)
+	.requiredOption("--amount <amount>", "Variable SOL deposit amount in lamports.")
+	.requiredOption("--commitment <commitment>", "Client-computed Poseidon note commitment.")
+	.requiredOption("--view-pubkey <viewPubkey>", "Per-note consent/notification public key.")
+	.requiredOption("--envelope-len <envelopeLen>", "envelopeLen")
 	.requiredOption("--envelope <envelope>", "envelope")
-	.requiredOption("--shares <shares>", "Encrypted per-custodian key shares.")
-	.option(
-		"--pool-config <poolConfig>",
-		"The `pool_config` account [default: derived]",
-	)
-	.option(
-		"--pool-vault <poolVault>",
-		"The `pool_vault` account [default: derived]",
-	)
-	.option(
-		"--merkle-tree <merkleTree>",
-		"The `merkle_tree` account [default: derived]",
-	)
-	.requiredOption(
-		"--note-commitment <noteCommitment>",
-		"The `note_commitment` account",
-	)
+	.requiredOption("--shares <shares>", "shares")
+	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
+	.option("--pool-vault <poolVault>", "The `pool_vault` account [default: derived]")
+	.option("--merkle-tree <merkleTree>", "The `merkle_tree` account [default: derived]")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-		const input = {
-			bump: smallInteger("--bump", options.bump),
-			commitment: base58("--commitment", options.commitment),
-			viewPubkey: base58("--view-pubkey", options.viewPubkey),
-			envelopeLen: smallInteger("--envelope-len", options.envelopeLen),
-			envelope: base58("--envelope", options.envelope),
-			shares: base58("--shares", options.shares),
-			depositor: context.payer,
-			poolConfig: options.poolConfig === undefined
-				? undefined
-				: pubkey("--pool-config", options.poolConfig),
-			poolVault: options.poolVault === undefined
-				? undefined
-				: pubkey("--pool-vault", options.poolVault),
-			merkleTree: options.merkleTree === undefined
-				? undefined
-				: pubkey("--merkle-tree", options.merkleTree),
-			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
-		};
+const input = {
+		amount: bigInteger("--amount", options.amount),
+		commitment: base58("--commitment", options.commitment),
+		viewPubkey: base58("--view-pubkey", options.viewPubkey),
+		envelopeLen: smallInteger("--envelope-len", options.envelopeLen),
+		envelope: base58("--envelope", options.envelope),
+		shares: base58("--shares", options.shares),
+		depositor: context.payer,
+		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
+		poolVault: options.poolVault === undefined ? undefined : pubkey("--pool-vault", options.poolVault),
+		merkleTree: options.merkleTree === undefined ? undefined : pubkey("--merkle-tree", options.merkleTree),
+	};
 		const instruction = await getDepositInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

@@ -10,46 +10,35 @@
 )]
 
 use clap::Args;
-use privacy_pool_program_client::instructions::GrantDisclosure;
-use privacy_pool_program_client::instructions::GrantDisclosureInstructionData;
 
 use crate::context::CliContext;
 use crate::context::CliError;
+use privacy_pool_program_client::instructions::GrantDisclosure;
+use privacy_pool_program_client::instructions::GrantDisclosureInstructionData;
 
 #[derive(Debug, Args)]
 pub struct GrantDisclosureArgs {
-	/// Reserved; must be zero.
 	#[arg(long)]
 	reserved: u8,
 	/// The `disclosure_request` account
 	#[arg(long)]
 	disclosure_request: String,
-	/// The `note_commitment` account
-	#[arg(long)]
-	note_commitment: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: GrantDisclosureArgs) -> Result<(), CliError> {
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
-	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let viewer = context.payer_pubkey();
 	let data = GrantDisclosureInstructionData::new(|data| {
 		data.reserved = args.reserved;
 	})
-	.map_err(|_| {
-		CliError::InvalidData {
-			message: "instruction data rejected the provided arguments".to_string(),
-		}
+	.map_err(|_| CliError::InvalidData {
+		message: "instruction data rejected the provided arguments".to_string(),
 	})?;
 
 	let accounts = GrantDisclosure {
-		disclosure_request,
-		note_commitment,
-		viewer,
+		disclosure_request: disclosure_request,
+		viewer: viewer,
 	};
 
-	context.send(
-		accounts.instruction(data),
-		Some(privacy_pool_program_client::instructions::GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT),
-	)
+	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT))
 }

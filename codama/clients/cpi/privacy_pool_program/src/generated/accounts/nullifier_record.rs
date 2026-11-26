@@ -6,37 +6,38 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// Append-only set of spent nullifiers.
+/// Per-nullifier spent marker PDA. Existence proves the nullifier was spent in
+/// $O(1)$ without a global nullifier write-lock hotspot or fixed capacity cap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NullifierSet {
+pub struct NullifierRecord {
 	pub bump: u8,
-	pub count: u64,
-	pub nullifiers: [u8; 4096],
 }
 
 /// Account discriminator declared by the program's IDL.
-pub const NULLIFIER_SET_DISCRIMINATOR: [u8; 2] = [4, 0];
+pub const NULLIFIER_RECORD_DISCRIMINATOR: [u8; 2] = [4, 0];
 
-impl NullifierSet {
+impl NullifierRecord {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 4107;
+	pub const LEN: usize = 3;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2 && data[..2] == NULLIFIER_SET_DISCRIMINATOR
+		data.len() >= 2
+			&& data[..2] == NULLIFIER_RECORD_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
 	///
 	/// Returns `None` when the data is too short, the discriminator does not match, or a field is truncated.
 	#[inline(always)]
-	pub fn parse(data: &[u8]) -> Option<NullifierSet> {
+	pub fn parse(data: &[u8]) -> Option<NullifierRecord> {
 		if !Self::matches(data) {
 			return None;
 		}
@@ -44,16 +45,11 @@ impl NullifierSet {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
-		cursor += 1;
-		let count: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
-		cursor += 8;
-		let nullifiers: [u8; 4096] = data.get(cursor..cursor + 4096)?.try_into().ok()?;
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 
-		Some(NullifierSet {
+		Some(NullifierRecord {
 			bump,
-			count,
-			nullifiers,
 		})
 	}
 }

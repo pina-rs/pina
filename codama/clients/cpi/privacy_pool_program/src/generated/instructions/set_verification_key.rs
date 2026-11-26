@@ -6,13 +6,14 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
@@ -48,11 +49,8 @@ pub struct SetVerificationKeyIx {
 	pub bump: u8,
 
 	/// Instruction argument `slot`.
-	/// Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].
+	/// Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`].
 	pub slot: u8,
-
-	/// Instruction argument `icLen`.
-	pub ic_len: u8,
 
 	/// Instruction argument `alphaG1`.
 	pub alpha_g1: [u8; 64],
@@ -71,34 +69,25 @@ pub struct SetVerificationKeyIx {
 
 	/// Instruction argument `ic1`.
 	pub ic1: [u8; 64],
-
-	/// Instruction argument `ic2`.
-	pub ic2: [u8; 64],
-
-	/// Instruction argument `ic3`.
-	pub ic3: [u8; 64],
 }
 
 impl SetVerificationKeyIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 708;
+	pub const LEN: usize = 579;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 708], ProgramError> {
-		let mut data = [0u8; 708];
+	pub fn to_bytes(&self) -> Result<[u8; 579], ProgramError> {
+		let mut data = [0u8; 579];
 		data[..1].copy_from_slice(&SET_VERIFICATION_KEY_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
 		data[2..3].copy_from_slice(&self.slot.to_le_bytes());
-		data[3..4].copy_from_slice(&self.ic_len.to_le_bytes());
-		data[4..68].copy_from_slice(&self.alpha_g1);
-		data[68..196].copy_from_slice(&self.beta_g2);
-		data[196..324].copy_from_slice(&self.gamma_g2);
-		data[324..452].copy_from_slice(&self.delta_g2);
-		data[452..516].copy_from_slice(&self.ic0);
-		data[516..580].copy_from_slice(&self.ic1);
-		data[580..644].copy_from_slice(&self.ic2);
-		data[644..708].copy_from_slice(&self.ic3);
+		data[3..67].copy_from_slice(&self.alpha_g1);
+		data[67..195].copy_from_slice(&self.beta_g2);
+		data[195..323].copy_from_slice(&self.gamma_g2);
+		data[323..451].copy_from_slice(&self.delta_g2);
+		data[451..515].copy_from_slice(&self.ic0);
+		data[515..579].copy_from_slice(&self.ic1);
 
 		Ok(data)
 	}

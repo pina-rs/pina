@@ -7,13 +7,13 @@
  */
 
 import {
-	addDecoderSizePrefix,
-	createDecoder,
 	type Decoder,
 	type Encoder,
-	fixDecoderSize,
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
+	addDecoderSizePrefix,
+	createDecoder,
+	fixDecoderSize,
 	fixEncoderSize,
 	getBytesDecoder,
 	getU8Decoder,
@@ -32,9 +32,7 @@ function assertPinaPodString(value: string, capacity: number): void {
 		);
 	}
 	if (new TextDecoder("utf-8", { fatal: true }).decode(bytes) !== value) {
-		throw new TypeError(
-			"PinaPod strings must contain valid Unicode scalar values",
-		);
+		throw new TypeError("PinaPod strings must contain valid Unicode scalar values");
 	}
 }
 
@@ -119,9 +117,8 @@ export function getPinaPodBoundedStringDecoder(
 
 /** Decodes variable-size UTF-8 strictly instead of replacing malformed input. */
 export function getPinaPodUtf8Decoder(): Decoder<string> {
-	return transformDecoder(
-		getBytesDecoder(),
-		(value) => new TextDecoder("utf-8", { fatal: true }).decode(value),
+	return transformDecoder(getBytesDecoder(), (value) =>
+		new TextDecoder("utf-8", { fatal: true }).decode(value)
 	);
 }
 
@@ -151,9 +148,8 @@ export function getPinaPodStringDecoder<TSize extends number>(
 	fixedBytes: TSize,
 ): FixedSizeDecoder<string, TSize> {
 	const bytes = addDecoderSizePrefix(getBytesDecoder(), prefix);
-	return transformDecoder(
-		fixDecoderSize(bytes, fixedBytes),
-		(value) => new TextDecoder("utf-8", { fatal: true }).decode(value),
+	return transformDecoder(fixDecoderSize(bytes, fixedBytes), (value) =>
+		new TextDecoder("utf-8", { fatal: true }).decode(value)
 	);
 }
 
@@ -210,9 +206,10 @@ export function getPinaPodMigrationVersionDecoder<
 ): FixedSizeDecoder<TDecoded, TSize> {
 	return transformDecoder(decoder, (value) => {
 		if (BigInt(value) !== BigInt(expected)) {
-			const hint = BigInt(value) < BigInt(expected)
-				? "the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL"
-				: "the data was written by a newer program; upgrade this client";
+			const hint =
+				BigInt(value) < BigInt(expected)
+					? "the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL"
+					: "the data was written by a newer program; upgrade this client";
 			throw new RangeError(
 				`migration version mismatch: expected ${expected}, received ${value} (${hint})`,
 			);
@@ -222,10 +219,7 @@ export function getPinaPodMigrationVersionDecoder<
 }
 
 /** Rejects numeric enum representations not declared by the native schema. */
-export function getPinaPodEnumDecoder<
-	TValue extends number,
-	TSize extends number,
->(
+export function getPinaPodEnumDecoder<TValue extends number, TSize extends number>(
 	decoder: FixedSizeDecoder<TValue, TSize>,
 	validValues: readonly TValue[],
 ): FixedSizeDecoder<TValue, TSize> {

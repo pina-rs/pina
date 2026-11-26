@@ -28,7 +28,6 @@ fn privacy_pool_serializes_its_global_state() {
 			"pool_config",
 			"pool_vault",
 			"merkle_tree",
-			"nullifier_set",
 			"custodian_registry",
 			"requester_registry",
 			"disclosure_log",

@@ -43,21 +43,14 @@ const SET_COMPUTE_UNIT_LIMIT_TAG: u8 = 2;
 #[allow(dead_code)]
 #[derive(Debug, Error)]
 pub enum CliError {
-	#[error(
-		"`{value}` is not a valid RPC endpoint; expected mainnet, devnet, testnet, localhost, or an http(s) URL"
-	)]
+	#[error("`{value}` is not a valid RPC endpoint; expected mainnet, devnet, testnet, localhost, or an http(s) URL")]
 	InvalidEndpoint { value: String },
 
-	#[error(
-		"plaintext `http://` endpoints are only allowed on localhost; use https for remote clusters"
-	)]
+	#[error("plaintext `http://` endpoints are only allowed on localhost; use https for remote clusters")]
 	InsecureEndpoint { value: String },
 
 	#[error("`{flag}` must be a base58 public key: {source}")]
-	InvalidPubkey {
-		flag: String,
-		source: ParsePubkeyError,
-	},
+	InvalidPubkey { flag: String, source: ParsePubkeyError },
 
 	#[error("`{flag}` must be valid base58: {source}")]
 	InvalidBase58 {
@@ -144,32 +137,32 @@ impl CliContext {
 
 	/// Parse and validate a base58 public key flag.
 	pub fn pubkey(flag: &str, value: &str) -> Result<Pubkey, CliError> {
-		value.parse().map_err(|source| {
-			CliError::InvalidPubkey {
+		value
+			.parse()
+			.map_err(|source| CliError::InvalidPubkey {
 				flag: flag.to_string(),
 				source,
-			}
-		})
+			})
 	}
 
 	/// Decode a capacity-bounded byte flag from base58.
 	pub fn byte_vec(flag: &str, value: &str) -> Result<Vec<u8>, CliError> {
-		bs58::decode(value).into_vec().map_err(|source| {
-			CliError::InvalidBase58 {
+		bs58::decode(value)
+			.into_vec()
+			.map_err(|source| CliError::InvalidBase58 {
 				flag: flag.to_string(),
 				source,
-			}
-		})
+			})
 	}
 
 	/// Decode an exact-length byte flag from base58.
 	pub fn bytes<const N: usize>(flag: &str, value: &str) -> Result<[u8; N], CliError> {
-		let decoded = bs58::decode(value).into_vec().map_err(|source| {
-			CliError::InvalidBase58 {
+		let decoded = bs58::decode(value)
+			.into_vec()
+			.map_err(|source| CliError::InvalidBase58 {
 				flag: flag.to_string(),
 				source,
-			}
-		})?;
+			})?;
 
 		decoded.try_into().map_err(|actual: Vec<u8>| {
 			CliError::InvalidByteLength {
@@ -185,15 +178,10 @@ impl CliContext {
 	/// `recorded_limit` is the compute unit limit the IDL records for the
 	/// instruction. `--compute-unit-limit` replaces it; with neither, the
 	/// transaction requests no limit and the runtime default applies.
-	pub fn send(
-		&self,
-		instruction: Instruction,
-		recorded_limit: Option<u32>,
-	) -> Result<(), CliError> {
+	pub fn send(&self, instruction: Instruction, recorded_limit: Option<u32>) -> Result<(), CliError> {
 		let mut instruction = instruction;
 		instruction.program_id = self.program_address;
-		let compute_unit_limit =
-			requested_compute_unit_limit(self.compute_unit_limit, recorded_limit);
+		let compute_unit_limit = requested_compute_unit_limit(self.compute_unit_limit, recorded_limit);
 		let blockhash = self.rpc.get_latest_blockhash()?;
 		let transaction = Transaction::new_signed_with_payer(
 			&transaction_instructions(instruction, compute_unit_limit),
@@ -206,10 +194,7 @@ impl CliContext {
 			return self.simulate(&transaction, compute_unit_limit);
 		}
 
-		let signature = self
-			.rpc
-			.send_and_confirm_transaction(&transaction)?
-			.to_string();
+		let signature = self.rpc.send_and_confirm_transaction(&transaction)?.to_string();
 		if self.json {
 			println!("{{\"signature\":\"{signature}\"}}");
 		} else {
@@ -359,10 +344,7 @@ mod compute_unit_limit_tests {
 
 	#[test]
 	fn the_override_replaces_the_recorded_limit() {
-		assert_eq!(
-			requested_compute_unit_limit(Some(5_000), Some(800)),
-			Some(5_000)
-		);
+		assert_eq!(requested_compute_unit_limit(Some(5_000), Some(800)), Some(5_000));
 		assert_eq!(requested_compute_unit_limit(None, Some(800)), Some(800));
 		assert_eq!(requested_compute_unit_limit(Some(5_000), None), Some(5_000));
 		assert_eq!(requested_compute_unit_limit(None, None), None);
@@ -446,7 +428,10 @@ mod resolve_endpoint_tests {
 			resolve_endpoint("devnet").unwrap(),
 			("https://api.devnet.solana.com".to_string(), "devnet")
 		);
-		assert_eq!(resolve_endpoint("mainnet").unwrap().1, "");
+		assert_eq!(
+			resolve_endpoint("mainnet").unwrap().1,
+			""
+		);
 		assert!(
 			resolve_endpoint("https://rpc.example.com").is_ok(),
 			"https URLs are always allowed"
@@ -497,11 +482,9 @@ mod resolve_endpoint_tests {
 
 fn load_keypair(path: &str) -> Result<Keypair, CliError> {
 	let expanded = expand_home(path);
-	read_keypair_file(&expanded).map_err(|error| {
-		CliError::Keypair {
-			path: PathBuf::from(expanded),
-			message: error.to_string(),
-		}
+	read_keypair_file(&expanded).map_err(|error| CliError::Keypair {
+		path: PathBuf::from(expanded),
+		message: error.to_string(),
 	})
 }
 
@@ -520,11 +503,11 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 	match code {
 		0 => Some("InvalidAuthority"),
 		1 => Some("ZeroCommitment"),
-		2 => Some("NoteAlreadyExists"),
+		2 => Some("ZeroAmount"),
 		3 => Some("TreeFull"),
 		4 => Some("UnknownRoot"),
 		5 => Some("NullifierAlreadySpent"),
-		6 => Some("NullifierSetFull"),
+		6 => Some("PoolPaused"),
 		7 => Some("ProofVerificationFailed"),
 		8 => Some("VerifyingKeyMissing"),
 		9 => Some("InvalidVerifyingKeySlot"),
@@ -534,7 +517,7 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		13 => Some("InvalidTier"),
 		14 => Some("RequesterNotEntitled"),
 		15 => Some("RequesterRegistryFull"),
-		16 => Some("NoteNotFound"),
+		16 => Some("InvalidMerkleProof"),
 		17 => Some("InvalidRequestStatus"),
 		18 => Some("ConsentRequired"),
 		19 => Some("ChallengeWindowOpen"),
@@ -542,6 +525,8 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		21 => Some("LogFull"),
 		22 => Some("BufferOverflow"),
 		23 => Some("ArithmeticOverflow"),
+		24 => Some("PolicyCosignerRequired"),
+		25 => Some("InvalidAssetVault"),
 		_ => None,
 	}
 }

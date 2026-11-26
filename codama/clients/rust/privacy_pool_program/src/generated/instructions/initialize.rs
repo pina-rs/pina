@@ -11,12 +11,12 @@
 pub const INITIALIZE_DISCRIMINATOR: u8 = 0u8;
 /// Compute units `Initialize` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const INITIALIZE_MEASURED_COMPUTE_UNITS: u32 = 48260;
+pub const INITIALIZE_MEASURED_COMPUTE_UNITS: u32 = 14980;
 /// Compute unit limit to request for a transaction carrying `Initialize`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const INITIALIZE_COMPUTE_UNIT_LIMIT: u32 = 58300;
+pub const INITIALIZE_COMPUTE_UNIT_LIMIT: u32 = 18300;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -25,12 +25,10 @@ pub struct Initialize {
 	pub pool_config: solana_pubkey::Pubkey,
 	pub pool_vault: solana_pubkey::Pubkey,
 	pub merkle_tree: solana_pubkey::Pubkey,
-	pub nullifier_set: solana_pubkey::Pubkey,
 	pub custodian_registry: solana_pubkey::Pubkey,
 	pub requester_registry: solana_pubkey::Pubkey,
 	pub disclosure_log: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
-	/// Canonical `ProgramData` for this program, owned by the upgradeable loader.
 	pub program_data: solana_pubkey::Pubkey,
 }
 
@@ -41,38 +39,27 @@ impl Initialize {
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			pool_vault: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-vault".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			merkle_tree: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-tree".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
-			nullifier_set: solana_pubkey::Pubkey::find_program_address(
-				&["privacy-pool-nullifiers".as_bytes()],
-				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			custodian_registry: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-custodians".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			requester_registry: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-requesters".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			disclosure_log: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-log".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			program_data,
 		}
@@ -88,41 +75,16 @@ impl Initialize {
 		data: InitializeInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(10 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.pool_config,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.pool_config, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.merkle_tree,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.nullifier_set,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.custodian_registry,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.requester_registry,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.disclosure_log,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.program_data,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.merkle_tree, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.custodian_registry, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.requester_registry, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.disclosure_log, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.program_data, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -138,16 +100,14 @@ pub struct InitializeInstructionData {
 }
 
 impl InitializeInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut InitializeInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut InitializeInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<InitializeInstructionWireZc>()];
 		<InitializeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
@@ -161,11 +121,9 @@ pub struct InitializeInstructionWire {
 	pub config_bump: u8,
 	pub vault_bump: u8,
 	pub tree_bump: u8,
-	pub nullifiers_bump: u8,
 	pub custodians_bump: u8,
 	pub requesters_bump: u8,
 	pub log_bump: u8,
-	/// Initial three-member disclosure committee as concatenated 32-byte
-	/// addresses.
+	/// Initial three-member disclosure committee as concatenated 32-byte keys.
 	pub custodians: [u8; 96],
 }

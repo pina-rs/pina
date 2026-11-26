@@ -11,12 +11,12 @@
 pub const DEPOSIT_DISCRIMINATOR: u8 = 4u8;
 /// Compute units `Deposit` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const DEPOSIT_MEASURED_COMPUTE_UNITS: u32 = 15996;
+pub const DEPOSIT_MEASURED_COMPUTE_UNITS: u32 = 17804;
 /// Compute unit limit to request for a transaction carrying `Deposit`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const DEPOSIT_COMPUTE_UNIT_LIMIT: u32 = 19500;
+pub const DEPOSIT_COMPUTE_UNIT_LIMIT: u32 = 21700;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -25,30 +25,25 @@ pub struct Deposit {
 	pub pool_config: solana_pubkey::Pubkey,
 	pub pool_vault: solana_pubkey::Pubkey,
 	pub merkle_tree: solana_pubkey::Pubkey,
-	pub note_commitment: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 }
 
 impl Deposit {
-	pub fn new(depositor: solana_pubkey::Pubkey, note_commitment: solana_pubkey::Pubkey) -> Self {
+	pub fn new(depositor: solana_pubkey::Pubkey) -> Self {
 		Self {
 			depositor,
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			pool_vault: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-vault".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			merkle_tree: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-tree".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
-			note_commitment,
+			).0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -63,25 +58,12 @@ impl Deposit {
 		data: DepositInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(6 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(5 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.depositor, true));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.pool_config,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.pool_config, false));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.merkle_tree,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.note_commitment,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new(self.merkle_tree, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -97,16 +79,14 @@ pub struct DepositInstructionData {
 }
 
 impl DepositInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut DepositInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut DepositInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<DepositInstructionWireZc>()];
 		<DepositInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = DEPOSIT_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
@@ -117,14 +97,13 @@ impl DepositInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DepositInstructionWire {
 	pub discriminator: u8,
-	pub bump: u8,
-	/// Client-computed Poseidon commitment of the new note.
+	/// Variable SOL deposit amount in lamports.
+	pub amount: u64,
+	/// Client-computed Poseidon note commitment.
 	pub commitment: [u8; 32],
 	/// Per-note consent/notification public key.
 	pub view_pubkey: [u8; 32],
-	/// Active length of the encrypted note plaintext.
 	pub envelope_len: u8,
-	pub envelope: [u8; 128],
-	/// Encrypted per-custodian key shares.
+	pub envelope: [u8; 96],
 	pub shares: [u8; 144],
 }

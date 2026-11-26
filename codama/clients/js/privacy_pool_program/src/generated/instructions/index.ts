@@ -6,17 +6,22 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./approveDisclosure";
-export * from "./cancelDisclosure";
-export * from "./challengeDisclosure";
-export * from "./deposit";
-export * from "./grantDisclosure";
-export * from "./initialize";
 export * from "./migrate";
-export * from "./registerRequester";
-export * from "./requestDisclosure";
-export * from "./resolveChallenge";
-export * from "./setCustodians";
-export * from "./setVerificationKey";
-export * from "./transfer";
-export * from "./withdraw";
+export * from './approveDisclosure';
+export * from './cancelDisclosure';
+export * from './challengeDisclosure';
+export * from './deposit';
+export * from './depositToken';
+export * from './grantDisclosure';
+export * from './initialize';
+export * from './registerAsset';
+export * from './registerRequester';
+export * from './requestDisclosure';
+export * from './resolveChallenge';
+export * from './setCustodians';
+export * from './setPolicy';
+export * from './setVerificationKey';
+export * from './transfer';
+export * from './verifyPolicy';
+export * from './withdraw';
+export * from './withdrawToken';

@@ -1,28 +1,27 @@
-//! Poseidon hashing and Groth16 verification, dispatched per target.
+//! Poseidon hashing and compressed Groth16 verification, dispatched per target.
 //!
-//! On SBF both run through the runtime syscalls (`sol_poseidon`,
-//! `sol_alt_bn128_group_op`) — see the `syscalls` module. On the host, where
-//! tests and the `prover` feature execute the same program code, the
-//! identical operations are computed with arkworks against the same circom
-//! x5 parameters, so a host-generated proof verifies on-chain and a
-//! host-predicted root matches the tree the program writes. Host builds
-//! with neither `test` nor `prover` never execute these paths; they compile
-//! to explicit `unimplemented` panics so the SBF artifact never carries a
-//! field-arithmetic dependency.
+//! On SBF all operations run through runtime syscalls (`sol_poseidon`,
+//! `sol_alt_bn128_compression`, `sol_alt_bn128_group_op`) — see the `syscalls`
+//! module. On the host, where tests and the `prover` feature execute the same
+//! program code, identical operations are computed with arkworks against the
+//! same circom x5 parameters and EIP-197 compression format so host-generated
+//! proofs verify on-chain and host-predicted roots match byte for byte.
 
 use pina::ProgramError;
 
-use crate::PrivacyPoolError;
-
-/// Verified-key material as plain values, decoupled from any account view
-/// so the verifier reads like the equation it checks.
+/// Single-input Groth16 verifying key material as plain values, decoupled from
+/// any account view so the verifier reads like the equation it checks.
+///
+/// Every circuit hashes its statement into one canonical BN254 scalar
+/// (`statement_hash`), so on-chain verification needs only two IC points
+/// (`ic0` and `ic1`) and a single `g1_mul` + `g1_add` syscall.
 pub struct Groth16Key {
 	pub alpha_g1: [u8; 64],
 	pub beta_g2: [u8; 128],
 	pub gamma_g2: [u8; 128],
 	pub delta_g2: [u8; 128],
-	pub ic: [[u8; 64]; crate::MAX_PUBLIC_INPUTS],
-	pub ic_len: usize,
+	pub ic0: [u8; 64],
+	pub ic1: [u8; 64],
 }
 
 /// Concatenate a G₁ point (64 bytes) and a G₂ point (128 bytes) into one
@@ -34,8 +33,9 @@ pub fn pairing_element(g1: &[u8; 64], g2: &[u8; 128]) -> [u8; 192] {
 	element
 }
 
-/// The zero-hash chain for empty subtrees: `zero[0] = 0`,
+/// Compute the zero-hash chain for empty subtrees: `zero[0] = 0`,
 /// `zero[ℓ] = H(zero[ℓ−1], zero[ℓ−1])`.
+#[cfg(any(test, feature = "prover"))]
 pub fn zero_hashes() -> Result<[[u8; 32]; crate::TREE_DEPTH + 1], ProgramError> {
 	let mut zeros = [[0_u8; 32]; crate::TREE_DEPTH + 1];
 	for level in 1..=crate::TREE_DEPTH {
@@ -44,47 +44,33 @@ pub fn zero_hashes() -> Result<[[u8; 32]; crate::TREE_DEPTH + 1], ProgramError> 
 	Ok(zeros)
 }
 
-/// Verify a Groth16 proof against installed key material.
+/// Verify a 192-byte compressed Groth16 proof (`A: 32B` compressed G₁,
+/// `B: 128B` uncompressed G₂, `C: 32B` compressed G₁) against a single public
+/// input `statement_hash` (in little-endian tree byte order).
 ///
-/// Checks `e(A, B) · e(−C, δ) · e(−IC(x), γ) · e(−α, β) = 1`, with
-/// `IC(x) = ic₀ + Σ icᵢ₊₁ · xᵢ` accumulated through G₁ addition and
-/// multiplication. All coordinates are little-endian affine.
-pub fn verify_groth16(
+/// Mirrors Helius Privacy Rings' 192-byte proof format: compressing G₁ saves
+/// 64 bytes of transaction payload for ~5,000 CU via `sol_alt_bn128_compression`,
+/// while keeping G₂ uncompressed avoids ~30,000 CU of $\mathbb{F}_{p^2}$ square
+/// root decompression on-chain.
+pub fn verify_groth16_compressed(
 	key: &Groth16Key,
-	proof_a: &[u8; 64],
+	proof_a: &[u8; 32],
 	proof_b: &[u8; 128],
-	proof_c: &[u8; 64],
-	public_inputs: &[[u8; 32]],
+	proof_c: &[u8; 32],
+	statement_hash_le: &[u8; 32],
 ) -> Result<bool, ProgramError> {
-	if key.ic_len == 0
-		|| key.ic_len > crate::MAX_PUBLIC_INPUTS
-		|| public_inputs.len() + 1 != key.ic_len
-	{
-		return Err(ProgramError::from(
-			PrivacyPoolError::InvalidVerifyingKeySlot,
-		));
-	}
+	let a = g1_decompress_be(proof_a)?;
+	let c = g1_decompress_be(proof_c)?;
 
-	// IC(x) = ic0 + ic1·x0 + ic2·x1 … Public inputs arrive little-endian
-	// (the tree's storage order) and reverse into the big-endian scalar
-	// words the multiplication selector consumes.
-	let mut accumulator = key.ic[0];
-	for (index, input) in public_inputs.iter().enumerate() {
-		let mut scalar_be = [0_u8; 32];
-		scalar_be.copy_from_slice(input);
-		scalar_be.reverse();
-		let product = g1_mul(&key.ic[index + 1], &scalar_be)?;
-		accumulator = g1_add(&accumulator, &product)?;
-	}
+	let mut scalar_be = *statement_hash_le;
+	scalar_be.reverse();
+	let product = g1_mul(&key.ic1, &scalar_be)?;
+	let accumulator = g1_add(&key.ic0, &product)?;
 
-	// e(−A, B) · e(IC(x), γ) · e(C, δ) · e(α, β) = 1, the raw Groth16
-	// equation with everything on one side. The A negation happened
-	// host-side at proof serialization; on-chain pairing inputs are all
-	// positive points.
 	let mut pairing_input = [0_u8; 768];
-	pairing_input[..192].copy_from_slice(&pairing_element(proof_a, proof_b));
+	pairing_input[..192].copy_from_slice(&pairing_element(&a, proof_b));
 	pairing_input[192..384].copy_from_slice(&pairing_element(&accumulator, &key.gamma_g2));
-	pairing_input[384..576].copy_from_slice(&pairing_element(proof_c, &key.delta_g2));
+	pairing_input[384..576].copy_from_slice(&pairing_element(&c, &key.delta_g2));
 	pairing_input[576..].copy_from_slice(&pairing_element(&key.alpha_g1, &key.beta_g2));
 	pairing_check(&pairing_input)
 }
@@ -92,8 +78,9 @@ pub fn verify_groth16(
 #[cfg(any(target_os = "solana", test, feature = "prover"))]
 pub use executable::g1_add;
 #[cfg(any(target_os = "solana", test, feature = "prover"))]
-pub use executable::g1_mul;
+pub use executable::g1_decompress_be;
 #[cfg(any(target_os = "solana", test, feature = "prover"))]
+pub use executable::g1_mul;
 #[cfg(any(target_os = "solana", test, feature = "prover"))]
 pub use executable::pairing_check;
 #[cfg(any(target_os = "solana", test, feature = "prover"))]
@@ -101,8 +88,9 @@ pub use executable::poseidon2;
 #[cfg(not(any(target_os = "solana", test, feature = "prover")))]
 pub use stub::g1_add;
 #[cfg(not(any(target_os = "solana", test, feature = "prover")))]
-pub use stub::g1_mul;
+pub use stub::g1_decompress_be;
 #[cfg(not(any(target_os = "solana", test, feature = "prover")))]
+pub use stub::g1_mul;
 #[cfg(not(any(target_os = "solana", test, feature = "prover")))]
 pub use stub::pairing_check;
 #[cfg(not(any(target_os = "solana", test, feature = "prover")))]
@@ -124,15 +112,15 @@ mod stub {
 		Err(unreachable_host())
 	}
 
+	pub fn g1_decompress_be(_compressed: &[u8; 32]) -> Result<[u8; 64], ProgramError> {
+		Err(unreachable_host())
+	}
+
 	pub fn g1_add(_left: &[u8; 64], _right: &[u8; 64]) -> Result<[u8; 64], ProgramError> {
 		Err(unreachable_host())
 	}
 
 	pub fn g1_mul(_point: &[u8; 64], _scalar: &[u8; 32]) -> Result<[u8; 64], ProgramError> {
-		Err(unreachable_host())
-	}
-
-	pub fn negate_g1(_point: &[u8; 64]) -> Result<[u8; 64], ProgramError> {
 		Err(unreachable_host())
 	}
 
@@ -144,20 +132,20 @@ mod stub {
 /// Real implementations: the runtime syscalls on SBF, arkworks on host.
 #[cfg(any(target_os = "solana", test, feature = "prover"))]
 mod executable {
-	use pina::ProgramError;
-
 	#[cfg(target_os = "solana")]
 	pub use crate::syscalls::g1_add;
 	#[cfg(target_os = "solana")]
-	pub use crate::syscalls::g1_mul;
+	pub use crate::syscalls::g1_decompress_be;
 	#[cfg(target_os = "solana")]
+	pub use crate::syscalls::g1_mul;
 	#[cfg(target_os = "solana")]
 	pub use crate::syscalls::pairing_check;
 	#[cfg(target_os = "solana")]
 	pub use crate::syscalls::poseidon2;
 
-	/// Host implementation: arkworks against the same x5 parameters the
-	/// syscall implements, so both sides agree byte for byte.
+	/// Host implementation: arkworks against the same x5 parameters and
+	/// EIP-197 compression format the syscalls implement, so both sides agree
+	/// byte for byte.
 	#[cfg(not(target_os = "solana"))]
 	pub(crate) mod host {
 		extern crate alloc;
@@ -174,10 +162,13 @@ mod executable {
 		use ark_ff::Field;
 		use ark_ff::PrimeField;
 		use ark_ff::Zero;
+		use ark_serialize::CanonicalDeserialize;
+		use ark_serialize::CanonicalSerialize;
+		use ark_serialize::Compress;
+		use ark_serialize::Validate;
 		use light_poseidon::PoseidonParameters;
 		use light_poseidon::parameters::bn254_x5;
-
-		use super::*;
+		use pina::ProgramError;
 
 		fn invalid() -> ProgramError {
 			ProgramError::from(crate::PrivacyPoolError::ProofVerificationFailed)
@@ -232,6 +223,28 @@ mod executable {
 			Ok(fr_to_le(&state[0]))
 		}
 
+		pub fn g1_decompress_be(compressed: &[u8; 32]) -> Result<[u8; 64], ProgramError> {
+			if *compressed == [0_u8; 32] {
+				return Ok([0_u8; 64]);
+			}
+			let mut le = *compressed;
+			le.reverse();
+			let point = G1Affine::deserialize_with_mode(le.as_slice(), Compress::Yes, Validate::No)
+				.map_err(|_| invalid())?;
+			let mut out_le = [0_u8; 64];
+			point
+				.x
+				.serialize_with_mode(&mut out_le[..32], Compress::No)
+				.map_err(|_| invalid())?;
+			point
+				.y
+				.serialize_with_mode(&mut out_le[32..], Compress::No)
+				.map_err(|_| invalid())?;
+			out_le[..32].reverse();
+			out_le[32..].reverse();
+			Ok(out_le)
+		}
+
 		fn fq_from_be(bytes: &[u8; 32]) -> Option<ark_bn254::Fq> {
 			field_from_be::<ark_bn254::Fq>(bytes)
 		}
@@ -243,8 +256,6 @@ mod executable {
 		fn field_from_be<F: PrimeField<BigInt = ark_ff::BigInteger256>>(
 			bytes: &[u8; 32],
 		) -> Option<F> {
-			// Big-endian words: the first eight bytes are the most
-			// significant limb, so chunk 0 lands in limb 3.
 			let limbs: [u64; 4] = core::array::from_fn(|index| {
 				let word: [u8; 8] = bytes[(3 - index) * 8..(4 - index) * 8]
 					.try_into()
@@ -320,7 +331,6 @@ mod executable {
 				g2.copy_from_slice(&element[64..]);
 				pairs.push((g1_from_be(&g1)?, g2_from_be(&g2)?));
 			}
-			// PairingOutput derives PartialEq; compare against one directly.
 			let g1_prepared: Vec<<Bn254 as Pairing>::G1Prepared> =
 				pairs.iter().map(|(g1, _)| (*g1).into()).collect();
 			let g2_prepared: Vec<<Bn254 as Pairing>::G2Prepared> =
@@ -333,8 +343,9 @@ mod executable {
 	#[cfg(not(target_os = "solana"))]
 	pub use host::g1_add;
 	#[cfg(not(target_os = "solana"))]
-	pub use host::g1_mul;
+	pub use host::g1_decompress_be;
 	#[cfg(not(target_os = "solana"))]
+	pub use host::g1_mul;
 	#[cfg(not(target_os = "solana"))]
 	pub use host::pairing_check;
 	#[cfg(not(target_os = "solana"))]

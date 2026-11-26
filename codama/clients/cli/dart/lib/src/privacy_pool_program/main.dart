@@ -8,41 +8,39 @@ import 'commands/commands.dart';
 
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
-      'privacy-pool-program-cli',
-      "A tiered-disclosure privacy pool built with pina.\n\nThis example is a shielded-pool payments program whose distinguishing\nfeature is its disclosure protocol: transfers are private by default, and\naccess to a note's history is a *governed, logged* act rather than a\nstanding backdoor. It exists to show the scale of program pina can carry —\nPoseidon commitments through the runtime syscall, on-chain Groth16\nverification through the BN254 pairing syscall, a full nullifier-set\ndiscipline, and a multi-party disclosure state machine — inside one\n`no_std` crate with no `unsafe` code and heap use confined to the\nverifier's scratch buffers.\n\n# The pool\n\n[`PrivacyPoolInstruction::Deposit`] escrows a fixed denomination of SOL\nand inserts a client-computed Poseidon commitment into an on-chain\nincremental Merkle tree. [`PrivacyPoolInstruction::Withdraw`] and\n[`PrivacyPoolInstruction::Transfer`] spend a note by verifying a Groth16\nproof (public inputs: the tree root, the derived nullifier, and either\nthe withdrawal recipient hash or a binding of the successor commitment\nand disclosure metadata) and recording the nullifier. The pairing check\nruns entirely through the\n`sol_alt_bn128_group_op` syscall,\nso a spend fits in one transaction at a fraction of the compute budget\ninstead of demanding the multi-transaction slicing a hand-written\nverifier used to need.\n\n# The disclosure tiers\n\nEvery note carries an *audit envelope*: the note plaintext encrypted by\nthe depositor's client, plus key shares escrowed to a committee of\ncustodians. No single custodian can open an envelope; a threshold can,\nand the shares travel off-chain so no key material ever becomes public.\nDisclosure requests flow through three tiers:\n\n- **Tier 0 — consent.** Anyone may request. The note's *view key* holder\n(a fresh keypair per note) must grant before custodians may execute.\n- **Tier 1 — verified.** Registered requesters. The subject is notified\nthrough an encrypted notice blob and holds a challenge window; once the\nwindow lapses without a challenge, the committee may execute.\n- **Tier 2 — compelled.** Registered requesters with standing legal\nprocess. No window; the committee may execute immediately.\n\nThe invariant the program enforces — the reason this is a protocol and\nnot a policy document — is that reaching the custodian threshold *is* the\nlog entry: [`PrivacyPoolInstruction::ApproveDisclosure`] flips a request\nto executed and appends to the append-only [`DisclosureLog`] in the same\ninstruction. Disclosure without a permanent public record is impossible\nby construction.\n\n# What this example deliberately is not\n\nThis is a teaching scaffold, not a production privacy system. The\nreadme enumerates the honest limits: custodians can collude off-chain,\nfee-payer linkage is unaddressed (no relayer), deposits and withdrawals\nare correlation points, the nullifier scan is linear, the share\nencryption in tests is demo-grade, and the disclosure log names its\ntarget commitment rather than a salted scope root.\n\nThe `migrations(...)` list is the reserved `Migrate` instruction's slot\norder: `[payer, systemProgram, poolConfig, merkleTree, nullifierSet,\ncustodianRegistry, requesterRegistry, disclosureLog, noteCommitment,\ndisclosureRequest, verifyingKeyAccount]`. Generated clients derive the\nsame order from the IDL.",
-    )
+    'privacy-pool-program-cli',
+    "A programmable, tiered-disclosure privacy pool built with pina.\n\nCombines Helius Solana Privacy Rings' production architecture with Pina's\ngoverned, publicly-logged disclosure state machine — all inside one\n`no_std` crate with no `unsafe` code outside `syscalls.rs` and zero\nrequired off-chain infrastructure:\n\n- **Per-nullifier PDAs ([`NullifierRecord`])** — \$O(1)\$ double-spend\ndetection, unbounded spend capacity, and zero shared nullifier write-lock\ncontention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.\n- **Depth-16 frontier Merkle tree ([`MerkleTree`])** — holds 65,536 leaves\nin a 512-byte frontier plus a 32-root ring using compile-time\n[`ZERO_HASHES`], eliminating runtime zero-hash recomputation on\ninitialization.\n- **Variable-amount 2-in-2-out join-split circuit** — one unified Groth16\ncircuit (`VK_SLOT_JOIN_SPLIT`) handles arbitrary-amount withdrawals,\nchange outputs, UTXO splits, and UTXO merges with 64-bit range checks and\nsingle-input `statement_hash` compression (one `g1_mul` + `g1_add`).\n- **SPL Token & Token-2022 escrows ([`AssetVault`])** — permissionless\nper-mint asset registration, variable-amount token deposits, and\njoin-split token withdrawals.\n- **128-byte compressed Groth16 proofs** — decompressed on-chain via\n`sol_alt_bn128_compression` before the four-pairing check.\n- **Relayer & fee-payer decoupling** — optional relayer address and fee\nbound into the Groth16 statement so users can pay fees out of shielded\nbalances without leaking a public fee payer.\n- **Real shielded keypair & X25519 + AEAD (`shielded` module)** — host-side\nRFC 7748 X25519 viewing keys, per-transaction viewing keys for selective\ndisclosure, and 2-of-3 GF(256) Shamir custodian shares.\n- **Rent-free note emission & privacy-preserving [`DisclosureLog`]** —\nencrypted note envelopes and shares emit via [`NoteEncryptedEvent`] with\nzero per-note PDA rent; [`RequestDisclosure`] authenticates `view_pubkey`\nvia Merkle membership; [`DisclosureLog`] stores a salted `scope_hash`\nrather than raw commitments; verifying keys support authority rotation.\n- **Custom Ring policy & composable CPI** — configurable pause and\nco-signer / CPI authority gates ([`SetPolicy`]) plus composable ZK policy\nverification ([`VerifyPolicy`] on `VK_SLOT_POLICY`).",
+  )
     ..argParser.addOption(
-      'url',
-      abbr: 'u',
-      defaultsTo: 'devnet',
-      help:
-          'RPC endpoint: mainnet, devnet, testnet, localhost, or an https URL.',
-    )
+        'url',
+        abbr: 'u',
+        defaultsTo: 'devnet',
+        help: 'RPC endpoint: mainnet, devnet, testnet, localhost, or an https URL.',
+      )
     ..argParser.addOption(
-      'keypair',
-      abbr: 'k',
-      defaultsTo: '~/.config/solana/id.json',
-      help: 'Payer keypair JSON file.',
-    )
+        'keypair',
+        abbr: 'k',
+        defaultsTo: '~/.config/solana/id.json',
+        help: 'Payer keypair JSON file.',
+      )
     ..argParser.addOption(
-      'program-id',
-      help: 'Override the on-chain program address.',
-    )
+        'program-id',
+        help: 'Override the on-chain program address.',
+      )
     ..argParser.addFlag(
-      'simulate',
-      help: 'Simulate the transaction and print logs instead of sending.',
-    )
+        'simulate',
+        help: 'Simulate the transaction and print logs instead of sending.',
+      )
     ..argParser.addFlag(
-      'json',
-      negatable: false,
-      help: 'Print machine-readable JSON output.',
-    )
+        'json',
+        negatable: false,
+        help: 'Print machine-readable JSON output.',
+      )
     ..argParser.addOption(
-      'compute-unit-limit',
-      valueHelp: 'units',
-      help:
-          'Compute unit limit to request instead of the one recorded for the instruction.',
-    )
+        'compute-unit-limit',
+        valueHelp: 'units',
+        help: 'Compute unit limit to request instead of the one recorded for the instruction.',
+      )
     ..addCommand(InitializeCommand())
     ..addCommand(SetVerificationKeyCommand())
     ..addCommand(SetCustodiansCommand())
@@ -56,5 +54,10 @@ CommandRunner<void> buildRunner() {
     ..addCommand(ResolveChallengeCommand())
     ..addCommand(ApproveDisclosureCommand())
     ..addCommand(CancelDisclosureCommand())
+    ..addCommand(RegisterAssetCommand())
+    ..addCommand(DepositTokenCommand())
+    ..addCommand(WithdrawTokenCommand())
+    ..addCommand(SetPolicyCommand())
+    ..addCommand(VerifyPolicyCommand())
     ..addCommand(FetchCommand());
 }

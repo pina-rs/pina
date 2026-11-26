@@ -10,17 +10,15 @@
 )]
 
 use clap::Args;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 use privacy_pool_program_client::instructions::ResolveChallenge;
 use privacy_pool_program_client::instructions::ResolveChallengeInstructionData;
 use solana_sdk::pubkey::Pubkey;
 
-use crate::context::CliContext;
-use crate::context::CliError;
-
 #[derive(Debug, Args)]
 pub struct ResolveChallengeArgs {
-	/// Nonzero resolves in the requester's favor (execution may proceed);
-	/// zero rejects the request outright.
 	#[arg(long)]
 	approve: u8,
 	/// The `pool_config` account [default: derived]
@@ -35,32 +33,25 @@ pub(crate) fn run(context: &CliContext, args: ResolveChallengeArgs) -> Result<()
 	let authority = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-config".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
+		None => Pubkey::find_program_address(
+			&["privacy-pool-config".as_bytes()],
+			&context.program_address,
+		)
+		.0,
 	};
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
 	let data = ResolveChallengeInstructionData::new(|data| {
 		data.approve = args.approve;
 	})
-	.map_err(|_| {
-		CliError::InvalidData {
-			message: "instruction data rejected the provided arguments".to_string(),
-		}
+	.map_err(|_| CliError::InvalidData {
+		message: "instruction data rejected the provided arguments".to_string(),
 	})?;
 
 	let accounts = ResolveChallenge {
-		authority,
-		pool_config,
-		disclosure_request,
+		authority: authority,
+		pool_config: pool_config,
+		disclosure_request: disclosure_request,
 	};
 
-	context.send(
-		accounts.instruction(data),
-		Some(privacy_pool_program_client::instructions::RESOLVE_CHALLENGE_COMPUTE_UNIT_LIMIT),
-	)
+	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::RESOLVE_CHALLENGE_COMPUTE_UNIT_LIMIT))
 }

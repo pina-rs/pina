@@ -11,7 +11,7 @@
 pub const CANCEL_DISCLOSURE_DISCRIMINATOR: u8 = 12u8;
 /// Compute units `CancelDisclosure` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const CANCEL_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 121;
+pub const CANCEL_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 125;
 /// Compute unit limit to request for a transaction carrying `CancelDisclosure`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
@@ -26,20 +26,14 @@ pub struct CancelDisclosure {
 }
 
 impl CancelDisclosure {
-	pub fn new(
-		requester: solana_pubkey::Pubkey,
-		disclosure_request: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(requester: solana_pubkey::Pubkey, disclosure_request: solana_pubkey::Pubkey) -> Self {
 		Self {
 			requester,
 			disclosure_request,
 		}
 	}
 
-	pub fn instruction(
-		&self,
-		data: CancelDisclosureInstructionData,
-	) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: CancelDisclosureInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -50,14 +44,8 @@ impl CancelDisclosure {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.requester,
-			true,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.disclosure_request,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.requester, true));
+		accounts.push(solana_instruction::AccountMeta::new(self.disclosure_request, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -73,16 +61,14 @@ pub struct CancelDisclosureInstructionData {
 }
 
 impl CancelDisclosureInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut CancelDisclosureInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut CancelDisclosureInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<CancelDisclosureInstructionWireZc>()];
 		<CancelDisclosureInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = CANCEL_DISCLOSURE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
@@ -93,6 +79,5 @@ impl CancelDisclosureInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct CancelDisclosureInstructionWire {
 	pub discriminator: u8,
-	/// Reserved; must be zero.
 	pub reserved: u8,
 }

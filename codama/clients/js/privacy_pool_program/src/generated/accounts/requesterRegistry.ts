@@ -6,233 +6,100 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	type ClientWithRpc,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	fixDecoderSize,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	fixEncoderSize,
-	type GetAccountInfoApi,
-	getBytesDecoder,
-	getBytesEncoder,
-	type GetMultipleAccountsApi,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type HasAddress,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { findRequesterRegistryPda } from "../pdas";
-import {
-	fixPinaPodEncoderSize,
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder, getPinaPodMigrationVersionDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type ClientWithRpc, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findRequesterRegistryPda } from '../pdas';
 
 export const REQUESTER_REGISTRY_DISCRIMINATOR = 6;
 
-export function getRequesterRegistryDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REQUESTER_REGISTRY_DISCRIMINATOR);
-}
+export function getRequesterRegistryDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(REQUESTER_REGISTRY_DISCRIMINATOR); }
 
 export const REQUESTER_REGISTRY_DISCRIMINATOR2 = 0;
 
-export function getRequesterRegistryDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(REQUESTER_REGISTRY_DISCRIMINATOR2);
-}
+export function getRequesterRegistryDiscriminator2Bytes(): ReadonlyUint8Array { return getU8Encoder().encode(REQUESTER_REGISTRY_DISCRIMINATOR2); }
 
 /** Entities allowed to file tier-1 and tier-2 disclosure requests. */
-export type RequesterRegistry = {
-	discriminator: number;
-	migrationVersion: number;
-	bump: number;
-	/** Active entries in the parallel arrays below. */
-	count: number;
-	/**
-	 * Requester keys as concatenated 32-byte addresses, parallel to
-	 * `max_tiers`.
-	 */
-	keys: ReadonlyUint8Array;
-	/** Highest tier each requester may file at. */
-	maxTiers: ReadonlyUint8Array;
-};
+export type RequesterRegistry = { discriminator: number; migrationVersion: number; bump: number; count: number; keys: ReadonlyUint8Array; maxTiers: ReadonlyUint8Array;  };
 
-export type RequesterRegistryArgs = {
-	bump: number;
-	/** Active entries in the parallel arrays below. */
-	count: number;
-	/**
-	 * Requester keys as concatenated 32-byte addresses, parallel to
-	 * `max_tiers`.
-	 */
-	keys: ReadonlyUint8Array;
-	/** Highest tier each requester may file at. */
-	maxTiers: ReadonlyUint8Array;
-};
+export type RequesterRegistryArgs = { bump: number; count: number; keys: ReadonlyUint8Array; maxTiers: ReadonlyUint8Array;  };
 
 /** Gets the encoder for {@link RequesterRegistryArgs} account data. */
-export function getRequesterRegistryEncoder(): FixedSizeEncoder<
-	RequesterRegistryArgs
-> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["count", getU8Encoder()],
-			["keys", fixPinaPodEncoderSize(getBytesEncoder(), 512)],
-			["maxTiers", fixPinaPodEncoderSize(getBytesEncoder(), 16)],
-		]),
-		(value) => ({ ...value, discriminator: 6, migrationVersion: 0 }),
-	);
+export function getRequesterRegistryEncoder(): FixedSizeEncoder<RequesterRegistryArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['migrationVersion', getU8Encoder()], ['bump', getU8Encoder()], ['count', getU8Encoder()], ['keys', fixPinaPodEncoderSize(getBytesEncoder(), 512)], ['maxTiers', fixPinaPodEncoderSize(getBytesEncoder(), 16)]]), (value) => ({ ...value, discriminator: 6, migrationVersion: 0 }));
 }
 
 /** Gets the decoder for {@link RequesterRegistry} account data. */
-export function getRequesterRegistryDecoder(): FixedSizeDecoder<
-	RequesterRegistry
-> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				REQUESTER_REGISTRY_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["bump", getU8Decoder()],
-		["count", getU8Decoder()],
-		["keys", fixDecoderSize(getBytesDecoder(), 512)],
-		["maxTiers", fixDecoderSize(getBytesDecoder(), 16)],
-	]);
+export function getRequesterRegistryDecoder(): FixedSizeDecoder<RequesterRegistry> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(REQUESTER_REGISTRY_DISCRIMINATOR, getU8Decoder())], ['migrationVersion', getPinaPodMigrationVersionDecoder(0, getU8Decoder())], ['bump', getU8Decoder()], ['count', getU8Decoder()], ['keys', fixDecoderSize(getBytesDecoder(), 512)], ['maxTiers', fixDecoderSize(getBytesDecoder(), 16)]]);
 }
 
 /** Gets the codec for {@link RequesterRegistry} account data. */
-export function getRequesterRegistryCodec(): FixedSizeCodec<
-	RequesterRegistryArgs,
-	RequesterRegistry
-> {
-	return combineCodec(
-		getRequesterRegistryEncoder(),
-		getRequesterRegistryDecoder(),
-	);
+export function getRequesterRegistryCodec(): FixedSizeCodec<RequesterRegistryArgs, RequesterRegistry> {
+    return combineCodec(getRequesterRegistryEncoder(), getRequesterRegistryDecoder());
 }
 
-export function decodeRequesterRegistry<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<RequesterRegistry, TAddress>;
-export function decodeRequesterRegistry<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<RequesterRegistry, TAddress>;
-export function decodeRequesterRegistry<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-):
-	| Account<RequesterRegistry, TAddress>
-	| MaybeAccount<RequesterRegistry, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getRequesterRegistryDecoder(),
-	);
+export function decodeRequesterRegistry<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<RequesterRegistry, TAddress>;
+export function decodeRequesterRegistry<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<RequesterRegistry, TAddress>;
+export function decodeRequesterRegistry<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<RequesterRegistry, TAddress> | MaybeAccount<RequesterRegistry, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getRequesterRegistryDecoder());
 }
 
 export async function fetchRequesterRegistry<TAddress extends string = string>(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	address: Address<TAddress> | HasAddress<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  address: Address<TAddress> | HasAddress<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<RequesterRegistry, TAddress>> {
-	const maybeAccount = await fetchMaybeRequesterRegistry(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeRequesterRegistry(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
-export async function fetchMaybeRequesterRegistry<
-	TAddress extends string = string,
->(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	address: Address<TAddress> | HasAddress<TAddress>,
-	config?: FetchAccountConfig,
+export async function fetchMaybeRequesterRegistry<TAddress extends string = string>(
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  address: Address<TAddress> | HasAddress<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<RequesterRegistry, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(
-		"rpc" in rpc ? rpc.rpc : rpc,
-		typeof address === "string" ? address : address.address,
-		config,
-	);
-	return decodeRequesterRegistry(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount('rpc' in rpc ? rpc.rpc : rpc, typeof address === 'string' ? address : address.address, config);
+  return decodeRequesterRegistry(maybeAccount);
 }
 
 export async function fetchAllRequesterRegistry(
-	rpc:
-		| Parameters<typeof fetchEncodedAccounts>[0]
-		| ClientWithRpc<GetMultipleAccountsApi>,
-	addresses: Array<Address | HasAddress>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
+  addresses: Array<Address | HasAddress>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<RequesterRegistry>[]> {
-	const maybeAccounts = await fetchAllMaybeRequesterRegistry(
-		rpc,
-		addresses,
-		config,
-	);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeRequesterRegistry(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeRequesterRegistry(
-	rpc:
-		| Parameters<typeof fetchEncodedAccounts>[0]
-		| ClientWithRpc<GetMultipleAccountsApi>,
-	addresses: Array<Address | HasAddress>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
+  addresses: Array<Address | HasAddress>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<RequesterRegistry>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(
-		"rpc" in rpc ? rpc.rpc : rpc,
-		addresses.map((a) => (typeof a === "string" ? a : a.address)),
-		config,
-	);
-	return maybeAccounts.map((maybeAccount) =>
-		decodeRequesterRegistry(maybeAccount)
-	);
+  const maybeAccounts = await fetchEncodedAccounts('rpc' in rpc ? rpc.rpc : rpc, addresses.map((a) => (typeof a === 'string' ? a : a.address)), config);
+  return maybeAccounts.map((maybeAccount) => decodeRequesterRegistry(maybeAccount));
 }
 
 export async function fetchRequesterRegistryFromSeeds(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  
+  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<RequesterRegistry>> {
-	const maybeAccount = await fetchMaybeRequesterRegistryFromSeeds(rpc, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeRequesterRegistryFromSeeds(rpc, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeRequesterRegistryFromSeeds(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  
+  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<RequesterRegistry>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findRequesterRegistryPda({ programAddress });
-	return await fetchMaybeRequesterRegistry(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findRequesterRegistryPda({ programAddress });
+  return await fetchMaybeRequesterRegistry(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */
@@ -253,9 +120,7 @@ export const REQUESTER_REGISTRY_MIGRATION_VERSION = 0;
  * }
  * ```
  */
-export function requesterRegistryNeedsMigration(
-	data: ReadonlyUint8Array,
-): boolean {
+export function requesterRegistryNeedsMigration(data: ReadonlyUint8Array): boolean {
 	if (data.length < 2) {
 		return false;
 	}

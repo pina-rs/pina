@@ -6,40 +6,15 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	getAddressEncoder,
-	getProgramDerivedAddress,
-	getU64Encoder,
-	getUtf8Encoder,
-	type HasAddress,
-	type ProgramDerivedAddress,
-} from "@solana/kit";
+import { getAddressEncoder, getProgramDerivedAddress, getU64Encoder, getUtf8Encoder, type Address, type HasAddress, type ProgramDerivedAddress } from '@solana/kit';
 
 export type DisclosureRequestSeeds = {
-	requester: Address | HasAddress;
-	nonce: number | bigint;
+requester: Address | HasAddress;
+nonce: number | bigint;
 };
 
-export async function findDisclosureRequestPda(
-	seeds: DisclosureRequestSeeds,
-	config: { programAddress?: Address | HasAddress | undefined } = {},
-): Promise<ProgramDerivedAddress> {
-	const {
-		programAddress: programAddressInput =
-			"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D" as Address<
-				"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D"
-			>,
-	} = config;
-	const programAddress = typeof programAddressInput === "string"
-		? programAddressInput
-		: programAddressInput.address;
-	return await getProgramDerivedAddress({
-		programAddress,
-		seeds: [
-			getUtf8Encoder().encode("privacy-pool-request"),
-			getAddressEncoder().encode(seeds.requester),
-			getU64Encoder().encode(seeds.nonce),
-		],
-	});
+export async function findDisclosureRequestPda(seeds: DisclosureRequestSeeds, config: { programAddress?: Address | HasAddress | undefined } = {}): Promise<ProgramDerivedAddress> {
+  const { programAddress: programAddressInput = 'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D' as Address<'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D'> } = config;
+  const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
+  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("privacy-pool-request"), getAddressEncoder().encode(seeds.requester), getU64Encoder().encode(seeds.nonce)]});
 }

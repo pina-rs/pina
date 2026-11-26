@@ -8,7 +8,6 @@
 	clippy::too_many_arguments
 )]
 
-use solana_pubkey::Pubkey;
-use solana_pubkey::pubkey;
+use solana_pubkey::{pubkey, Pubkey};
 
 pub const PRIVACY_POOL_PROGRAM_ID: Pubkey = pubkey!("DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D");

@@ -24,7 +24,7 @@ light-poseidon = { workspace = true, default-features = true }
 # included source resolves `cfg(feature = ...)` against the including
 # crate, so this is how the harness opens the program's host-only `prover`
 # module without enabling anything on a dependency (there is none).
-pina = { workspace = true, features = ["alloc", "account-resize", "compact", "derive", "logs"] }
+pina = { workspace = true, features = ["alloc", "account-resize", "compact", "derive", "logs", "token"] }
 pina_test = { workspace = true }
 rand = { workspace = true, default-features = true }
 solana-sha256-hasher = { workspace = true, features = ["sha2"] }

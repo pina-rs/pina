@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -10,84 +11,75 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
+
 @immutable
-class NullifierSet {
-  const NullifierSet({
+class NullifierRecord {
+  const NullifierRecord({
     required this.bump,
-    required this.count,
-    required this.nullifiers,
-  }) : discriminator = 4,
-       migrationVersion = 0;
+  }) :
+      discriminator = 4,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
   final int bump;
-  final BigInt count;
-  final Uint8List nullifiers;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is NullifierSet &&
+      other is NullifierRecord &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
           migrationVersion == other.migrationVersion &&
-          bump == other.bump &&
-          count == other.count &&
-          nullifiers == other.nullifiers;
+          bump == other.bump;
 
   @override
-  int get hashCode =>
-      Object.hash(discriminator, migrationVersion, bump, count, nullifiers);
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump);
 
   @override
-  String toString() =>
-      'NullifierSet(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, count: $count, nullifiers: $nullifiers)';
+  String toString() => 'NullifierRecord(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump)';
 }
 
-Encoder<NullifierSet> getNullifierSetEncoder() {
+
+Encoder<NullifierRecord> getNullifierRecordEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
-    ('count', getU64Encoder()),
-    (
-      'nullifiers',
-      fixEncoderSize(getBytesEncoder(), 4096, allowTruncation: false),
-    ),
   ]);
 
   return transformEncoder(
     structEncoder,
-    (NullifierSet value) => <String, Object?>{
+    (NullifierRecord value) => <String, Object?>{
       'discriminator': 4,
       'migrationVersion': 0,
       'bump': value.bump,
-      'count': value.count,
-      'nullifiers': value.nullifiers,
     },
   );
 }
 
-Decoder<NullifierSet> getNullifierSetDecoder() {
+Decoder<NullifierRecord> getNullifierRecordDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
-    ('count', getU64Decoder()),
-    ('nullifiers', fixDecoderSize(getBytesDecoder(), 4096)),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'nullifierSet account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'nullifierRecord account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
-  (NullifierSet, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
+  (NullifierRecord, int) readTopLevel(Uint8List bytes, int offset) {
+    getConstantDecoder(
+      getU8Encoder().encode(4),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -99,55 +91,54 @@ Decoder<NullifierSet> getNullifierSetDecoder() {
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
-      NullifierSet(
-        bump: map['bump']! as int,
-        count: map['count']! as BigInt,
-        nullifiers: map['nullifiers']! as Uint8List,
+      NullifierRecord(
+      bump: map['bump']! as int,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<NullifierSet>(
-      fixedSize: structDecoder.fixedSize,
-      read: (bytes, offset) {
-        final bytesLength = bytes.length - offset;
-        if (bytesLength < structDecoder.fixedSize) {
-          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-        }
-        return readTopLevel(bytes, offset);
-      },
-    ),
+    FixedSizeDecoder<Map<String, Object?>>() =>
+      FixedSizeDecoder<NullifierRecord>(
+        fixedSize: structDecoder.fixedSize,
+        read: (bytes, offset) {
+          final bytesLength = bytes.length - offset;
+          if (bytesLength < structDecoder.fixedSize) {
+            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+          }
+          return readTopLevel(bytes, offset);
+        },
+      ),
     VariableSizeDecoder<Map<String, Object?>>() =>
-      VariableSizeDecoder<NullifierSet>(
+      VariableSizeDecoder<NullifierRecord>(
         read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };
 }
 
-Codec<NullifierSet, NullifierSet> getNullifierSetCodec() {
-  return combineCodec(getNullifierSetEncoder(), getNullifierSetDecoder());
+Codec<NullifierRecord, NullifierRecord> getNullifierRecordCodec() {
+  return combineCodec(getNullifierRecordEncoder(), getNullifierRecordDecoder());
 }
 
-Account<NullifierSet> decodeNullifierSet(EncodedAccount encodedAccount) {
-  return decodeAccount(encodedAccount, getNullifierSetDecoder());
+Account<NullifierRecord> decodeNullifierRecord(EncodedAccount encodedAccount) {
+  return decodeAccount(encodedAccount, getNullifierRecordDecoder());
 }
 
 /// The account schema version this client was generated from.
-const int nullifierSetMigrationVersion = 0;
+const int nullifierRecordMigrationVersion = 0;
 
-/// Cheap envelope check for fetched `NullifierSet` bytes: returns true only when
+/// Cheap envelope check for fetched `NullifierRecord` bytes: returns true only when
 /// the bytes carry this account's discriminator and a migration version older
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
-bool nullifierSetNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 4) {
-    return false;
-  }
-  return data[1] < 0;
+bool nullifierRecordNeedsMigration(List<int> data) {
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 4) {
+		return false;
+	}
+	return data[1] < 0;
 }

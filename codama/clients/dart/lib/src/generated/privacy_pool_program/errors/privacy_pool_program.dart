@@ -11,9 +11,9 @@ const int privacyPoolProgramErrorInvalidAuthority = 0x0; // 0
 /// Message: "The commitment is the zero field element."
 const int privacyPoolProgramErrorZeroCommitment = 0x1; // 1
 
-/// The note account already exists for this commitment.
-/// Message: "The note account already exists for this commitment."
-const int privacyPoolProgramErrorNoteAlreadyExists = 0x2; // 2
+/// The deposit or withdrawal amount is zero.
+/// Message: "The deposit or withdrawal amount is zero."
+const int privacyPoolProgramErrorZeroAmount = 0x2; // 2
 
 /// The Merkle tree is full.
 /// Message: "The Merkle tree is full."
@@ -27,9 +27,9 @@ const int privacyPoolProgramErrorUnknownRoot = 0x4; // 4
 /// Message: "The nullifier has already been spent."
 const int privacyPoolProgramErrorNullifierAlreadySpent = 0x5; // 5
 
-/// The nullifier set is full.
-/// Message: "The nullifier set is full."
-const int privacyPoolProgramErrorNullifierSetFull = 0x6; // 6
+/// The pool is currently paused by policy.
+/// Message: "The pool is currently paused by policy."
+const int privacyPoolProgramErrorPoolPaused = 0x6; // 6
 
 /// The Groth16 proof failed verification.
 /// Message: "The Groth16 proof failed verification."
@@ -67,9 +67,9 @@ const int privacyPoolProgramErrorRequesterNotEntitled = 0xe; // 14
 /// Message: "The requester registry is full."
 const int privacyPoolProgramErrorRequesterRegistryFull = 0xf; // 15
 
-/// The target note does not exist.
-/// Message: "The target note does not exist."
-const int privacyPoolProgramErrorNoteNotFound = 0x10; // 16
+/// The submitted Merkle membership proof does not match any known root.
+/// Message: "The submitted Merkle membership proof does not match any known root."
+const int privacyPoolProgramErrorInvalidMerkleProof = 0x10; // 16
 
 /// The request status does not allow this transition.
 /// Message: "The request status does not allow this transition."
@@ -99,51 +99,42 @@ const int privacyPoolProgramErrorBufferOverflow = 0x16; // 22
 /// Message: "A primitive failed its own bounds check."
 const int privacyPoolProgramErrorArithmeticOverflow = 0x17; // 23
 
+/// The required Custom Ring policy co-signer did not sign.
+/// Message: "The required Custom Ring policy co-signer did not sign."
+const int privacyPoolProgramErrorPolicyCosignerRequired = 0x18; // 24
+
+/// The token account or mint does not match the registered asset vault.
+/// Message: "The token account or mint does not match the registered asset vault."
+const int privacyPoolProgramErrorInvalidAssetVault = 0x19; // 25
+
 /// Map of error codes to human-readable messages.
 const Map<int, String> _privacyPoolProgramErrorMessages = {
-  privacyPoolProgramErrorInvalidAuthority:
-      'The signer is not the pool authority.',
-  privacyPoolProgramErrorZeroCommitment:
-      'The commitment is the zero field element.',
-  privacyPoolProgramErrorNoteAlreadyExists:
-      'The note account already exists for this commitment.',
-  privacyPoolProgramErrorTreeFull: 'The Merkle tree is full.',
-  privacyPoolProgramErrorUnknownRoot:
-      'The submitted root is not in the recent-root ring.',
-  privacyPoolProgramErrorNullifierAlreadySpent:
-      'The nullifier has already been spent.',
-  privacyPoolProgramErrorNullifierSetFull: 'The nullifier set is full.',
-  privacyPoolProgramErrorProofVerificationFailed:
-      'The Groth16 proof failed verification.',
-  privacyPoolProgramErrorVerifyingKeyMissing:
-      'The verifying key slot has not been installed.',
-  privacyPoolProgramErrorInvalidVerifyingKeySlot:
-      'The verifying key slot identifier is invalid.',
-  privacyPoolProgramErrorInvalidCustodianSet:
-      'A custodian slot address is zero or duplicated.',
-  privacyPoolProgramErrorNotAcustodian:
-      'The signer is not a registered custodian.',
-  privacyPoolProgramErrorAlreadyApproved:
-      'The custodian has already approved this request.',
-  privacyPoolProgramErrorInvalidTier: 'The disclosure tier is unknown.',
-  privacyPoolProgramErrorRequesterNotEntitled:
-      'The requester is not registered for this tier.',
-  privacyPoolProgramErrorRequesterRegistryFull:
-      'The requester registry is full.',
-  privacyPoolProgramErrorNoteNotFound: 'The target note does not exist.',
-  privacyPoolProgramErrorInvalidRequestStatus:
-      'The request status does not allow this transition.',
-  privacyPoolProgramErrorConsentRequired:
-      'Consent (tier 0) has not been granted by the note\'s view key.',
-  privacyPoolProgramErrorChallengeWindowOpen:
-      'The tier-1 challenge window is still open.',
-  privacyPoolProgramErrorNotNoteViewer:
-      'Only the note\'s view key may perform this action.',
-  privacyPoolProgramErrorLogFull: 'The disclosure log is full.',
-  privacyPoolProgramErrorBufferOverflow:
-      'A slice operation went out of bounds.',
-  privacyPoolProgramErrorArithmeticOverflow:
-      'A primitive failed its own bounds check.',
+    privacyPoolProgramErrorInvalidAuthority: 'The signer is not the pool authority.',
+    privacyPoolProgramErrorZeroCommitment: 'The commitment is the zero field element.',
+    privacyPoolProgramErrorZeroAmount: 'The deposit or withdrawal amount is zero.',
+    privacyPoolProgramErrorTreeFull: 'The Merkle tree is full.',
+    privacyPoolProgramErrorUnknownRoot: 'The submitted root is not in the recent-root ring.',
+    privacyPoolProgramErrorNullifierAlreadySpent: 'The nullifier has already been spent.',
+    privacyPoolProgramErrorPoolPaused: 'The pool is currently paused by policy.',
+    privacyPoolProgramErrorProofVerificationFailed: 'The Groth16 proof failed verification.',
+    privacyPoolProgramErrorVerifyingKeyMissing: 'The verifying key slot has not been installed.',
+    privacyPoolProgramErrorInvalidVerifyingKeySlot: 'The verifying key slot identifier is invalid.',
+    privacyPoolProgramErrorInvalidCustodianSet: 'A custodian slot address is zero or duplicated.',
+    privacyPoolProgramErrorNotAcustodian: 'The signer is not a registered custodian.',
+    privacyPoolProgramErrorAlreadyApproved: 'The custodian has already approved this request.',
+    privacyPoolProgramErrorInvalidTier: 'The disclosure tier is unknown.',
+    privacyPoolProgramErrorRequesterNotEntitled: 'The requester is not registered for this tier.',
+    privacyPoolProgramErrorRequesterRegistryFull: 'The requester registry is full.',
+    privacyPoolProgramErrorInvalidMerkleProof: 'The submitted Merkle membership proof does not match any known root.',
+    privacyPoolProgramErrorInvalidRequestStatus: 'The request status does not allow this transition.',
+    privacyPoolProgramErrorConsentRequired: 'Consent (tier 0) has not been granted by the note\'s view key.',
+    privacyPoolProgramErrorChallengeWindowOpen: 'The tier-1 challenge window is still open.',
+    privacyPoolProgramErrorNotNoteViewer: 'Only the note\'s view key may perform this action.',
+    privacyPoolProgramErrorLogFull: 'The disclosure log is full.',
+    privacyPoolProgramErrorBufferOverflow: 'A slice operation went out of bounds.',
+    privacyPoolProgramErrorArithmeticOverflow: 'A primitive failed its own bounds check.',
+    privacyPoolProgramErrorPolicyCosignerRequired: 'The required Custom Ring policy co-signer did not sign.',
+    privacyPoolProgramErrorInvalidAssetVault: 'The token account or mint does not match the registered asset vault.',
 };
 
 /// Get the error message for a PrivacyPoolProgram program error code.

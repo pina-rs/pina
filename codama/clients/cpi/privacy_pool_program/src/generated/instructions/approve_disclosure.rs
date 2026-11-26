@@ -6,13 +6,14 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
@@ -53,7 +54,6 @@ pub struct ApproveDisclosure<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct ApproveDisclosureIx {
 	/// Instruction argument `reserved`.
-	/// Reserved; must be zero.
 	pub reserved: u8,
 }
 

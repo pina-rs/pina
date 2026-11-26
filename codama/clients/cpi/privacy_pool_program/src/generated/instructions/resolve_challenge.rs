@@ -6,13 +6,14 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
@@ -41,8 +42,6 @@ pub struct ResolveChallenge<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct ResolveChallengeIx {
 	/// Instruction argument `approve`.
-	/// Nonzero resolves in the requester's favor (execution may proceed);
-	/// zero rejects the request outright.
 	pub approve: u8,
 }
 

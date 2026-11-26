@@ -4,6 +4,8 @@
 
 import 'package:args/command_runner.dart';
 
+import 'package:solana_kit_address/solana_kit_address.dart';
+
 import '../context.dart';
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
@@ -11,35 +13,15 @@ final class SetVerificationKeyCommand extends Command<void> {
   SetVerificationKeyCommand() {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
-      ..addOption(
-        'slot',
-        mandatory: true,
-        help: "Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].",
-      )
-      ..addOption('ic_len', mandatory: true, help: "icLen")
+      ..addOption('slot', mandatory: true, help: "Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`].")
       ..addOption('alpha_g1', mandatory: true, help: "alphaG1")
       ..addOption('beta_g2', mandatory: true, help: "betaG2")
       ..addOption('gamma_g2', mandatory: true, help: "gammaG2")
       ..addOption('delta_g2', mandatory: true, help: "deltaG2")
       ..addOption('ic0', mandatory: true, help: "ic0")
       ..addOption('ic1', mandatory: true, help: "ic1")
-      ..addOption('ic2', mandatory: true, help: "ic2")
-      ..addOption('ic3', mandatory: true, help: "ic3")
-      ..addOption(
-        'pool_config',
-        mandatory: false,
-        help: "The pool_config account [default: derived]",
-      )
-      ..addOption(
-        'verifying_key_account',
-        mandatory: true,
-        help: "The verifying_key_account account",
-      )
-      ..addOption(
-        'system_program',
-        mandatory: true,
-        help: "The system_program account",
-      );
+      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
+      ..addOption('verifying_key_account', mandatory: true, help: "The verifying_key_account account");
   }
 
   @override
@@ -55,55 +37,33 @@ final class SetVerificationKeyCommand extends Command<void> {
     final authority = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
-    final verifyingKeyAccount = pubkey(
-      '--verifying-key-account',
-      results['verifying_key_account']! as String,
-    );
-    final systemProgram = pubkey(
-      '--system-program',
-      results['system_program']! as String,
-    );
+        : (await findPoolConfigPda(
+          programAddress: context.programAddress,
+        )).$1;
+    final verifyingKeyAccount = pubkey('--verifying-key-account', results['verifying_key_account']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final slotValue = integer('--slot', results['slot']! as String);
-    final icLenValue = integer('--ic-len', results['ic_len']! as String);
-    final alphaG1Value = base58Bytes(
-      '--alpha-g1',
-      results['alpha_g1']! as String,
-    );
+    final alphaG1Value = base58Bytes('--alpha-g1', results['alpha_g1']! as String);
     final betaG2Value = base58Bytes('--beta-g2', results['beta_g2']! as String);
-    final gammaG2Value = base58Bytes(
-      '--gamma-g2',
-      results['gamma_g2']! as String,
-    );
-    final deltaG2Value = base58Bytes(
-      '--delta-g2',
-      results['delta_g2']! as String,
-    );
+    final gammaG2Value = base58Bytes('--gamma-g2', results['gamma_g2']! as String);
+    final deltaG2Value = base58Bytes('--delta-g2', results['delta_g2']! as String);
     final ic0Value = base58Bytes('--ic0', results['ic0']! as String);
     final ic1Value = base58Bytes('--ic1', results['ic1']! as String);
-    final ic2Value = base58Bytes('--ic2', results['ic2']! as String);
-    final ic3Value = base58Bytes('--ic3', results['ic3']! as String);
     final instruction = getSetVerificationKeyInstruction(
       programAddress: context.programAddress,
       authority: authority,
       poolConfig: poolConfig,
       verifyingKeyAccount: verifyingKeyAccount,
-      systemProgram: systemProgram,
+      systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
       slot: slotValue,
-      icLen: icLenValue,
       alphaG1: alphaG1Value,
       betaG2: betaG2Value,
       gammaG2: gammaG2Value,
       deltaG2: deltaG2Value,
       ic0: ic0Value,
       ic1: ic1Value,
-      ic2: ic2Value,
-      ic3: ic3Value,
     );
-    await context.send([
-      instruction,
-    ], recordedLimit: setVerificationKeyComputeUnitLimit);
+    await context.send([instruction], recordedLimit: setVerificationKeyComputeUnitLimit);
   }
 }

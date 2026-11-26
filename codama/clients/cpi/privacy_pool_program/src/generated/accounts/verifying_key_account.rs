@@ -6,14 +6,15 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
-/// (root, nullifier, recipient hash), slot 1 transfer proofs
-/// (root, nullifier, output binding).
+/// Single-input Groth16 verifying key. Every circuit compresses its statement
+/// into one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are
+/// stored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VerifyingKeyAccount {
 	pub bump: u8,
@@ -22,11 +23,8 @@ pub struct VerifyingKeyAccount {
 	pub beta_g2: [u8; 128],
 	pub gamma_g2: [u8; 128],
 	pub delta_g2: [u8; 128],
-	pub ic_len: u8,
 	pub ic0: [u8; 64],
 	pub ic1: [u8; 64],
-	pub ic2: [u8; 64],
-	pub ic3: [u8; 64],
 }
 
 /// Account discriminator declared by the program's IDL.
@@ -34,12 +32,13 @@ pub const VERIFYING_KEY_ACCOUNT_DISCRIMINATOR: [u8; 2] = [10, 0];
 
 impl VerifyingKeyAccount {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 709;
+	pub const LEN: usize = 580;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2 && data[..2] == VERIFYING_KEY_ACCOUNT_DISCRIMINATOR
+		data.len() >= 2
+			&& data[..2] == VERIFYING_KEY_ACCOUNT_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -54,27 +53,29 @@ impl VerifyingKeyAccount {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 		cursor += 1;
-		let slot: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let slot: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 		cursor += 1;
-		let alpha_g1: [u8; 64] = data.get(cursor..cursor + 64)?.try_into().ok()?;
+		let alpha_g1: [u8; 64] = data.get(cursor..cursor + 64)?
+		.try_into().ok()?;
 		cursor += 64;
-		let beta_g2: [u8; 128] = data.get(cursor..cursor + 128)?.try_into().ok()?;
+		let beta_g2: [u8; 128] = data.get(cursor..cursor + 128)?
+		.try_into().ok()?;
 		cursor += 128;
-		let gamma_g2: [u8; 128] = data.get(cursor..cursor + 128)?.try_into().ok()?;
+		let gamma_g2: [u8; 128] = data.get(cursor..cursor + 128)?
+		.try_into().ok()?;
 		cursor += 128;
-		let delta_g2: [u8; 128] = data.get(cursor..cursor + 128)?.try_into().ok()?;
+		let delta_g2: [u8; 128] = data.get(cursor..cursor + 128)?
+		.try_into().ok()?;
 		cursor += 128;
-		let ic_len: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
-		cursor += 1;
-		let ic0: [u8; 64] = data.get(cursor..cursor + 64)?.try_into().ok()?;
+		let ic0: [u8; 64] = data.get(cursor..cursor + 64)?
+		.try_into().ok()?;
 		cursor += 64;
-		let ic1: [u8; 64] = data.get(cursor..cursor + 64)?.try_into().ok()?;
-		cursor += 64;
-		let ic2: [u8; 64] = data.get(cursor..cursor + 64)?.try_into().ok()?;
-		cursor += 64;
-		let ic3: [u8; 64] = data.get(cursor..cursor + 64)?.try_into().ok()?;
+		let ic1: [u8; 64] = data.get(cursor..cursor + 64)?
+		.try_into().ok()?;
 
 		Some(VerifyingKeyAccount {
 			bump,
@@ -83,11 +84,8 @@ impl VerifyingKeyAccount {
 			beta_g2,
 			gamma_g2,
 			delta_g2,
-			ic_len,
 			ic0,
 			ic1,
-			ic2,
-			ic3,
 		})
 	}
 }

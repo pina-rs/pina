@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,17 +12,19 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
+
 @immutable
 class ChallengeDisclosureInstructionData {
-  const ChallengeDisclosureInstructionData({required this.reserved})
-    : discriminator = 9;
+  const ChallengeDisclosureInstructionData({
+    required this.reserved,
+  }) :
+      discriminator = 9;
 
   final int discriminator;
   final int reserved;
 }
 
-Encoder<ChallengeDisclosureInstructionData>
-getChallengeDisclosureInstructionDataEncoder() {
+Encoder<ChallengeDisclosureInstructionData> getChallengeDisclosureInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('reserved', getU8Encoder()),
@@ -36,33 +39,36 @@ getChallengeDisclosureInstructionDataEncoder() {
   );
 }
 
-Decoder<ChallengeDisclosureInstructionData>
-getChallengeDisclosureInstructionDataDecoder() {
+Decoder<ChallengeDisclosureInstructionData> getChallengeDisclosureInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('reserved', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'challengeDisclosure instruction decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'challengeDisclosure instruction decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
-  (ChallengeDisclosureInstructionData, int) readTopLevel(
-    Uint8List bytes,
-    int offset,
-  ) {
-    getConstantDecoder(getU8Encoder().encode(9)).read(bytes, offset + 0);
+  (ChallengeDisclosureInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
+    getConstantDecoder(
+      getU8Encoder().encode(9),
+    ).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
     return (
-      ChallengeDisclosureInstructionData(reserved: map['reserved']! as int),
+      ChallengeDisclosureInstructionData(
+      reserved: map['reserved']! as int,
+      ),
       newOffset,
     );
   }
@@ -87,46 +93,34 @@ getChallengeDisclosureInstructionDataDecoder() {
   };
 }
 
-Codec<ChallengeDisclosureInstructionData, ChallengeDisclosureInstructionData>
-getChallengeDisclosureInstructionDataCodec() {
-  return combineCodec(
-    getChallengeDisclosureInstructionDataEncoder(),
-    getChallengeDisclosureInstructionDataDecoder(),
-  );
+Codec<ChallengeDisclosureInstructionData, ChallengeDisclosureInstructionData> getChallengeDisclosureInstructionDataCodec() {
+  return combineCodec(getChallengeDisclosureInstructionDataEncoder(), getChallengeDisclosureInstructionDataDecoder());
 }
 
 /// Creates a [ChallengeDisclosure] instruction.
 Instruction getChallengeDisclosureInstruction({
   required Address programAddress,
   required Address disclosureRequest,
-  required Address noteCommitment,
   required Address viewer,
   required Address clock,
   required int reserved,
 }) {
   final instructionData = ChallengeDisclosureInstructionData(
-    reserved: reserved,
+      reserved: reserved,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-      AccountMeta(address: disclosureRequest, role: AccountRole.writable),
-      AccountMeta(address: noteCommitment, role: AccountRole.readonly),
-      AccountMeta(address: viewer, role: AccountRole.readonlySigner),
-      AccountMeta(address: clock, role: AccountRole.readonly),
+    AccountMeta(address: disclosureRequest, role: AccountRole.writable),
+    AccountMeta(address: viewer, role: AccountRole.readonlySigner),
+    AccountMeta(address: clock, role: AccountRole.readonly),
     ],
-    data: getChallengeDisclosureInstructionDataEncoder().encode(
-      instructionData,
-    ),
+    data: getChallengeDisclosureInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [ChallengeDisclosure] instruction from raw instruction data.
-ChallengeDisclosureInstructionData parseChallengeDisclosureInstruction(
-  Instruction instruction,
-) {
-  return getChallengeDisclosureInstructionDataDecoder().decode(
-    instruction.data!,
-  );
+ChallengeDisclosureInstructionData parseChallengeDisclosureInstruction(Instruction instruction) {
+  return getChallengeDisclosureInstructionDataDecoder().decode(instruction.data!);
 }

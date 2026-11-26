@@ -1,6 +1,7 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
+
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,6 +12,7 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
+
 @immutable
 class PoolConfig {
   const PoolConfig({
@@ -18,10 +20,12 @@ class PoolConfig {
     required this.authority,
     required this.custodianThreshold,
     required this.challengeWindowSecs,
-    required this.depositLamports,
+    required this.policyFlags,
+    required this.policyCosigner,
     required this.totalDeposits,
-  }) : discriminator = 1,
-       migrationVersion = 0;
+  }) :
+      discriminator = 1,
+      migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -29,7 +33,8 @@ class PoolConfig {
   final Address authority;
   final int custodianThreshold;
   final int challengeWindowSecs;
-  final BigInt depositLamports;
+  final int policyFlags;
+  final Address policyCosigner;
   final BigInt totalDeposits;
 
   @override
@@ -43,25 +48,17 @@ class PoolConfig {
           authority == other.authority &&
           custodianThreshold == other.custodianThreshold &&
           challengeWindowSecs == other.challengeWindowSecs &&
-          depositLamports == other.depositLamports &&
+          policyFlags == other.policyFlags &&
+          policyCosigner == other.policyCosigner &&
           totalDeposits == other.totalDeposits;
 
   @override
-  int get hashCode => Object.hash(
-    discriminator,
-    migrationVersion,
-    bump,
-    authority,
-    custodianThreshold,
-    challengeWindowSecs,
-    depositLamports,
-    totalDeposits,
-  );
+  int get hashCode => Object.hash(discriminator, migrationVersion, bump, authority, custodianThreshold, challengeWindowSecs, policyFlags, policyCosigner, totalDeposits);
 
   @override
-  String toString() =>
-      'PoolConfig(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, authority: $authority, custodianThreshold: $custodianThreshold, challengeWindowSecs: $challengeWindowSecs, depositLamports: $depositLamports, totalDeposits: $totalDeposits)';
+  String toString() => 'PoolConfig(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, authority: $authority, custodianThreshold: $custodianThreshold, challengeWindowSecs: $challengeWindowSecs, policyFlags: $policyFlags, policyCosigner: $policyCosigner, totalDeposits: $totalDeposits)';
 }
+
 
 Encoder<PoolConfig> getPoolConfigEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -71,7 +68,8 @@ Encoder<PoolConfig> getPoolConfigEncoder() {
     ('authority', getAddressEncoder()),
     ('custodianThreshold', getU16Encoder()),
     ('challengeWindowSecs', getU32Encoder()),
-    ('depositLamports', getU64Encoder()),
+    ('policyFlags', getU8Encoder()),
+    ('policyCosigner', getAddressEncoder()),
     ('totalDeposits', getU64Encoder()),
   ]);
 
@@ -84,7 +82,8 @@ Encoder<PoolConfig> getPoolConfigEncoder() {
       'authority': value.authority,
       'custodianThreshold': value.custodianThreshold,
       'challengeWindowSecs': value.challengeWindowSecs,
-      'depositLamports': value.depositLamports,
+      'policyFlags': value.policyFlags,
+      'policyCosigner': value.policyCosigner,
       'totalDeposits': value.totalDeposits,
     },
   );
@@ -98,20 +97,26 @@ Decoder<PoolConfig> getPoolConfigDecoder() {
     ('authority', getAddressDecoder()),
     ('custodianThreshold', getU16Decoder()),
     ('challengeWindowSecs', getU32Decoder()),
-    ('depositLamports', getU64Decoder()),
+    ('policyFlags', getU8Decoder()),
+    ('policyCosigner', getAddressDecoder()),
     ('totalDeposits', getU64Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'poolConfig account decoder',
-      'expected': expected,
-      'bytesLength': bytesLength,
-    });
+    throw SolanaError(
+      SolanaErrorCode.codecsInvalidByteLength,
+      {
+        'codecDescription': 'poolConfig account decoder',
+        'expected': expected,
+        'bytesLength': bytesLength,
+      },
+    );
   }
 
   (PoolConfig, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
+    getConstantDecoder(
+      getU8Encoder().encode(1),
+    ).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -124,28 +129,30 @@ Decoder<PoolConfig> getPoolConfigDecoder() {
 
     return (
       PoolConfig(
-        bump: map['bump']! as int,
-        authority: map['authority']! as Address,
-        custodianThreshold: map['custodianThreshold']! as int,
-        challengeWindowSecs: map['challengeWindowSecs']! as int,
-        depositLamports: map['depositLamports']! as BigInt,
-        totalDeposits: map['totalDeposits']! as BigInt,
+      bump: map['bump']! as int,
+      authority: map['authority']! as Address,
+      custodianThreshold: map['custodianThreshold']! as int,
+      challengeWindowSecs: map['challengeWindowSecs']! as int,
+      policyFlags: map['policyFlags']! as int,
+      policyCosigner: map['policyCosigner']! as Address,
+      totalDeposits: map['totalDeposits']! as BigInt,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<PoolConfig>(
-      fixedSize: structDecoder.fixedSize,
-      read: (bytes, offset) {
-        final bytesLength = bytes.length - offset;
-        if (bytesLength < structDecoder.fixedSize) {
-          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-        }
-        return readTopLevel(bytes, offset);
-      },
-    ),
+    FixedSizeDecoder<Map<String, Object?>>() =>
+      FixedSizeDecoder<PoolConfig>(
+        fixedSize: structDecoder.fixedSize,
+        read: (bytes, offset) {
+          final bytesLength = bytes.length - offset;
+          if (bytesLength < structDecoder.fixedSize) {
+            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+          }
+          return readTopLevel(bytes, offset);
+        },
+      ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<PoolConfig>(
         read: readTopLevel,
@@ -170,11 +177,11 @@ const int poolConfigMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool poolConfigNeedsMigration(List<int> data) {
-  if (data.length < 2) {
-    return false;
-  }
-  if (data[0] != 1) {
-    return false;
-  }
-  return data[1] < 0;
+	if (data.length < 2) {
+		return false;
+	}
+	if (data[0] != 1) {
+		return false;
+	}
+	return data[1] < 0;
 }

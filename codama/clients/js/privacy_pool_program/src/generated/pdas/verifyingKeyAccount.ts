@@ -6,37 +6,14 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Address,
-	getProgramDerivedAddress,
-	getU64Encoder,
-	getUtf8Encoder,
-	type HasAddress,
-	type ProgramDerivedAddress,
-} from "@solana/kit";
+import { getProgramDerivedAddress, getU64Encoder, getUtf8Encoder, type Address, type HasAddress, type ProgramDerivedAddress } from '@solana/kit';
 
 export type VerifyingKeyAccountSeeds = {
-	slot: number | bigint;
+slot: number | bigint;
 };
 
-export async function findVerifyingKeyAccountPda(
-	seeds: VerifyingKeyAccountSeeds,
-	config: { programAddress?: Address | HasAddress | undefined } = {},
-): Promise<ProgramDerivedAddress> {
-	const {
-		programAddress: programAddressInput =
-			"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D" as Address<
-				"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D"
-			>,
-	} = config;
-	const programAddress = typeof programAddressInput === "string"
-		? programAddressInput
-		: programAddressInput.address;
-	return await getProgramDerivedAddress({
-		programAddress,
-		seeds: [
-			getUtf8Encoder().encode("privacy-pool-vkey"),
-			getU64Encoder().encode(seeds.slot),
-		],
-	});
+export async function findVerifyingKeyAccountPda(seeds: VerifyingKeyAccountSeeds, config: { programAddress?: Address | HasAddress | undefined } = {}): Promise<ProgramDerivedAddress> {
+  const { programAddress: programAddressInput = 'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D' as Address<'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D'> } = config;
+  const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
+  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("privacy-pool-vkey"), getU64Encoder().encode(seeds.slot)]});
 }

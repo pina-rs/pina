@@ -11,38 +11,29 @@
 pub const GRANT_DISCLOSURE_DISCRIMINATOR: u8 = 8u8;
 /// Compute units `GrantDisclosure` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const GRANT_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 1893;
+pub const GRANT_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 171;
 /// Compute unit limit to request for a transaction carrying `GrantDisclosure`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT: u32 = 2600;
+pub const GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT: u32 = 600;
 
 /// Accounts.
 #[derive(Clone, Debug)]
 pub struct GrantDisclosure {
 	pub disclosure_request: solana_pubkey::Pubkey,
-	pub note_commitment: solana_pubkey::Pubkey,
 	pub viewer: solana_pubkey::Pubkey,
 }
 
 impl GrantDisclosure {
-	pub fn new(
-		disclosure_request: solana_pubkey::Pubkey,
-		note_commitment: solana_pubkey::Pubkey,
-		viewer: solana_pubkey::Pubkey,
-	) -> Self {
+	pub fn new(disclosure_request: solana_pubkey::Pubkey, viewer: solana_pubkey::Pubkey) -> Self {
 		Self {
 			disclosure_request,
-			note_commitment,
 			viewer,
 		}
 	}
 
-	pub fn instruction(
-		&self,
-		data: GrantDisclosureInstructionData,
-	) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: GrantDisclosureInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -52,19 +43,9 @@ impl GrantDisclosure {
 		data: GrantDisclosureInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.disclosure_request,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.note_commitment,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.viewer,
-			true,
-		));
+		let mut accounts = Vec::with_capacity(2 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.disclosure_request, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.viewer, true));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -80,16 +61,14 @@ pub struct GrantDisclosureInstructionData {
 }
 
 impl GrantDisclosureInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut GrantDisclosureInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut GrantDisclosureInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<GrantDisclosureInstructionWireZc>()];
 		<GrantDisclosureInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = GRANT_DISCLOSURE_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }
@@ -100,6 +79,5 @@ impl GrantDisclosureInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct GrantDisclosureInstructionWire {
 	pub discriminator: u8,
-	/// Reserved; must be zero.
 	pub reserved: u8,
 }

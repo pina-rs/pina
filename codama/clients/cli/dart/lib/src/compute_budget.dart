@@ -18,7 +18,10 @@ TransactionMessage budgetedTransactionMessage({
     TransactionMessage(version: TransactionVersion.legacy, feePayer: feePayer),
   );
 
-  return appendTransactionMessageInstructions(instructions.toList(), budgeted);
+  return appendTransactionMessageInstructions(
+    instructions.toList(),
+    budgeted,
+  );
 }
 
 /// Parses `--compute-unit-limit`: a whole number of compute units from 1 to
@@ -30,9 +33,7 @@ int? parseComputeUnitLimit(String? value) {
     return null;
   }
 
-  final units = RegExp(r'^[0-9]+$').hasMatch(value)
-      ? int.tryParse(value)
-      : null;
+  final units = RegExp(r'^[0-9]+$').hasMatch(value) ? int.tryParse(value) : null;
   if (units == null || units < 1 || units > maxComputeUnitLimit) {
     throw FormatException(
       '--compute-unit-limit must be a whole number from 1 to $maxComputeUnitLimit',

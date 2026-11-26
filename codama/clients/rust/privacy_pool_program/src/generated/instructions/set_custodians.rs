@@ -11,7 +11,7 @@
 pub const SET_CUSTODIANS_DISCRIMINATOR: u8 = 2u8;
 /// Compute units `SetCustodians` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const SET_CUSTODIANS_MEASURED_COMPUTE_UNITS: u32 = 243;
+pub const SET_CUSTODIANS_MEASURED_COMPUTE_UNITS: u32 = 230;
 /// Compute unit limit to request for a transaction carrying `SetCustodians`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
@@ -33,20 +33,15 @@ impl SetCustodians {
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 			custodian_registry: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-custodians".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			).0,
 		}
 	}
 
-	pub fn instruction(
-		&self,
-		data: SetCustodiansInstructionData,
-	) -> solana_instruction::Instruction {
+	pub fn instruction(&self, data: SetCustodiansInstructionData) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -57,18 +52,9 @@ impl SetCustodians {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.authority,
-			true,
-		));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.pool_config,
-			false,
-		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.custodian_registry,
-			false,
-		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(self.pool_config, false));
+		accounts.push(solana_instruction::AccountMeta::new(self.custodian_registry, false));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -84,16 +70,14 @@ pub struct SetCustodiansInstructionData {
 }
 
 impl SetCustodiansInstructionData {
-	pub fn new(
-		configure: impl FnOnce(&mut SetCustodiansInstructionWireZc),
-	) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(configure: impl FnOnce(&mut SetCustodiansInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<SetCustodiansInstructionWireZc>()];
 		<SetCustodiansInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = SET_CUSTODIANS_DISCRIMINATOR;
 			Ok(())
 		})
-		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

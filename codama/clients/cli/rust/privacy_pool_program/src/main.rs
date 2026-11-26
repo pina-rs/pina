@@ -19,70 +19,43 @@ use clap::Subcommand;
 use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
-/// A tiered-disclosure privacy pool built with pina.
-///
-/// This example is a shielded-pool payments program whose distinguishing
-/// feature is its disclosure protocol: transfers are private by default, and
-/// access to a note's history is a *governed, logged* act rather than a
-/// standing backdoor. It exists to show the scale of program pina can carry —
-/// Poseidon commitments through the runtime syscall, on-chain Groth16
-/// verification through the BN254 pairing syscall, a full nullifier-set
-/// discipline, and a multi-party disclosure state machine — inside one
-/// `no_std` crate with no `unsafe` code and heap use confined to the
-/// verifier's scratch buffers.
-///
-/// # The pool
-///
-/// [`PrivacyPoolInstruction::Deposit`] escrows a fixed denomination of SOL
-/// and inserts a client-computed Poseidon commitment into an on-chain
-/// incremental Merkle tree. [`PrivacyPoolInstruction::Withdraw`] and
-/// [`PrivacyPoolInstruction::Transfer`] spend a note by verifying a Groth16
-/// proof (public inputs: the tree root, the derived nullifier, and either
-/// the withdrawal recipient hash or a binding of the successor commitment
-/// and disclosure metadata) and recording the nullifier. The pairing check
-/// runs entirely through the
-/// `sol_alt_bn128_group_op` syscall,
-/// so a spend fits in one transaction at a fraction of the compute budget
-/// instead of demanding the multi-transaction slicing a hand-written
-/// verifier used to need.
-///
-/// # The disclosure tiers
-///
-/// Every note carries an *audit envelope*: the note plaintext encrypted by
-/// the depositor's client, plus key shares escrowed to a committee of
-/// custodians. No single custodian can open an envelope; a threshold can,
-/// and the shares travel off-chain so no key material ever becomes public.
-/// Disclosure requests flow through three tiers:
-///
-/// - **Tier 0 — consent.** Anyone may request. The note's *view key* holder
-/// (a fresh keypair per note) must grant before custodians may execute.
-/// - **Tier 1 — verified.** Registered requesters. The subject is notified
-/// through an encrypted notice blob and holds a challenge window; once the
-/// window lapses without a challenge, the committee may execute.
-/// - **Tier 2 — compelled.** Registered requesters with standing legal
-/// process. No window; the committee may execute immediately.
-///
-/// The invariant the program enforces — the reason this is a protocol and
-/// not a policy document — is that reaching the custodian threshold *is* the
-/// log entry: [`PrivacyPoolInstruction::ApproveDisclosure`] flips a request
-/// to executed and appends to the append-only [`DisclosureLog`] in the same
-/// instruction. Disclosure without a permanent public record is impossible
-/// by construction.
-///
-/// # What this example deliberately is not
-///
-/// This is a teaching scaffold, not a production privacy system. The
-/// readme enumerates the honest limits: custodians can collude off-chain,
-/// fee-payer linkage is unaddressed (no relayer), deposits and withdrawals
-/// are correlation points, the nullifier scan is linear, the share
-/// encryption in tests is demo-grade, and the disclosure log names its
-/// target commitment rather than a salted scope root.
-///
-/// The `migrations(...)` list is the reserved `Migrate` instruction's slot
-/// order: `[payer, systemProgram, poolConfig, merkleTree, nullifierSet,
-/// custodianRegistry, requesterRegistry, disclosureLog, noteCommitment,
-/// disclosureRequest, verifyingKeyAccount]`. Generated clients derive the
-/// same order from the IDL.
+/// A programmable, tiered-disclosure privacy pool built with pina.
+/// 
+/// Combines Helius Solana Privacy Rings' production architecture with Pina's
+/// governed, publicly-logged disclosure state machine — all inside one
+/// `no_std` crate with no `unsafe` code outside `syscalls.rs` and zero
+/// required off-chain infrastructure:
+/// 
+/// - **Per-nullifier PDAs ([`NullifierRecord`])** — $O(1)$ double-spend
+/// detection, unbounded spend capacity, and zero shared nullifier write-lock
+/// contention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.
+/// - **Depth-16 frontier Merkle tree ([`MerkleTree`])** — holds 65,536 leaves
+/// in a 512-byte frontier plus a 32-root ring using compile-time
+/// [`ZERO_HASHES`], eliminating runtime zero-hash recomputation on
+/// initialization.
+/// - **Variable-amount 2-in-2-out join-split circuit** — one unified Groth16
+/// circuit (`VK_SLOT_JOIN_SPLIT`) handles arbitrary-amount withdrawals,
+/// change outputs, UTXO splits, and UTXO merges with 64-bit range checks and
+/// single-input `statement_hash` compression (one `g1_mul` + `g1_add`).
+/// - **SPL Token & Token-2022 escrows ([`AssetVault`])** — permissionless
+/// per-mint asset registration, variable-amount token deposits, and
+/// join-split token withdrawals.
+/// - **128-byte compressed Groth16 proofs** — decompressed on-chain via
+/// `sol_alt_bn128_compression` before the four-pairing check.
+/// - **Relayer & fee-payer decoupling** — optional relayer address and fee
+/// bound into the Groth16 statement so users can pay fees out of shielded
+/// balances without leaking a public fee payer.
+/// - **Real shielded keypair & X25519 + AEAD (`shielded` module)** — host-side
+/// RFC 7748 X25519 viewing keys, per-transaction viewing keys for selective
+/// disclosure, and 2-of-3 GF(256) Shamir custodian shares.
+/// - **Rent-free note emission & privacy-preserving [`DisclosureLog`]** —
+/// encrypted note envelopes and shares emit via [`NoteEncryptedEvent`] with
+/// zero per-note PDA rent; [`RequestDisclosure`] authenticates `view_pubkey`
+/// via Merkle membership; [`DisclosureLog`] stores a salted `scope_hash`
+/// rather than raw commitments; verifying keys support authority rotation.
+/// - **Custom Ring policy & composable CPI** — configurable pause and
+/// co-signer / CPI authority gates ([`SetPolicy`]) plus composable ZK policy
+/// verification ([`VerifyPolicy`] on `VK_SLOT_POLICY`).
 #[derive(Debug, Parser)]
 #[command(name = "privacy-pool-program-cli", version = env!("CARGO_PKG_VERSION"), propagate_version = true)]
 struct Cli {
@@ -133,6 +106,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+
 	Initialize(commands::InitializeArgs),
 
 	SetVerificationKey(commands::SetVerificationKeyArgs),
@@ -158,6 +132,16 @@ enum Command {
 	ApproveDisclosure(commands::ApproveDisclosureArgs),
 
 	CancelDisclosure(commands::CancelDisclosureArgs),
+
+	RegisterAsset(commands::RegisterAssetArgs),
+
+	DepositToken(commands::DepositTokenArgs),
+
+	WithdrawToken(commands::WithdrawTokenArgs),
+
+	SetPolicy(commands::SetPolicyArgs),
+
+	VerifyPolicy(commands::VerifyPolicyArgs),
 	/// Fetch and decode a program account.
 	#[command(subcommand)]
 	Fetch(fetch::Command),
@@ -199,6 +183,11 @@ fn run(cli: Cli) -> Result<(), context::CliError> {
 		Command::ResolveChallenge(args) => commands::resolve_challenge::run(&context, args),
 		Command::ApproveDisclosure(args) => commands::approve_disclosure::run(&context, args),
 		Command::CancelDisclosure(args) => commands::cancel_disclosure::run(&context, args),
+		Command::RegisterAsset(args) => commands::register_asset::run(&context, args),
+		Command::DepositToken(args) => commands::deposit_token::run(&context, args),
+		Command::WithdrawToken(args) => commands::withdraw_token::run(&context, args),
+		Command::SetPolicy(args) => commands::set_policy::run(&context, args),
+		Command::VerifyPolicy(args) => commands::verify_policy::run(&context, args),
 		Command::Fetch(command) => fetch::run(&context, command),
 	}
 }

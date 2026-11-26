@@ -6,6 +6,7 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::Address;
@@ -13,7 +14,9 @@ use pina::Address;
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// One disclosure request and its state machine.
+/// One disclosure request and its state machine. Stores `view_pubkey` after
+/// `RequestDisclosure` authenticates it against the Merkle tree so
+/// `GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DisclosureRequest {
 	pub bump: u8,
@@ -21,6 +24,7 @@ pub struct DisclosureRequest {
 	pub nonce: u64,
 	pub tier: u8,
 	pub commitment: [u8; 32],
+	pub view_pubkey: [u8; 32],
 	pub notice_len: u8,
 	pub notice: [u8; 96],
 	pub legal_basis_hash: [u8; 32],
@@ -36,12 +40,13 @@ pub const DISCLOSURE_REQUEST_DISCRIMINATOR: [u8; 2] = [9, 0];
 
 impl DisclosureRequest {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 224;
+	pub const LEN: usize = 256;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2 && data[..2] == DISCLOSURE_REQUEST_DISCRIMINATOR
+		data.len() >= 2
+			&& data[..2] == DISCLOSURE_REQUEST_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -56,32 +61,47 @@ impl DisclosureRequest {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 		cursor += 1;
-		let requester = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
+		let requester = Address::new_from_array(data.get(cursor..cursor + 32)?
+		.try_into().ok()?);
 		cursor += 32;
-		let nonce: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
+		let nonce: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
+		.try_into().ok()?);
 		cursor += 8;
-		let tier: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let tier: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 		cursor += 1;
-		let commitment: [u8; 32] = data.get(cursor..cursor + 32)?.try_into().ok()?;
+		let commitment: [u8; 32] = data.get(cursor..cursor + 32)?
+		.try_into().ok()?;
 		cursor += 32;
-		let notice_len: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let view_pubkey: [u8; 32] = data.get(cursor..cursor + 32)?
+		.try_into().ok()?;
+		cursor += 32;
+		let notice_len: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 		cursor += 1;
-		let notice: [u8; 96] = data.get(cursor..cursor + 96)?.try_into().ok()?;
+		let notice: [u8; 96] = data.get(cursor..cursor + 96)?
+		.try_into().ok()?;
 		cursor += 96;
-		let legal_basis_hash: [u8; 32] = data.get(cursor..cursor + 32)?.try_into().ok()?;
+		let legal_basis_hash: [u8; 32] = data.get(cursor..cursor + 32)?
+		.try_into().ok()?;
 		cursor += 32;
-		let created_at: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
+		let created_at: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
+		.try_into().ok()?);
 		cursor += 8;
-		let challenge_deadline: u64 =
-			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
+		let challenge_deadline: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
+		.try_into().ok()?);
 		cursor += 8;
-		let status: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let status: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 		cursor += 1;
-		let granted: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let granted: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 		cursor += 1;
-		let approvals: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let approvals: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 
 		Some(DisclosureRequest {
 			bump,
@@ -89,6 +109,7 @@ impl DisclosureRequest {
 			nonce,
 			tier,
 			commitment,
+			view_pubkey,
 			notice_len,
 			notice,
 			legal_basis_hash,

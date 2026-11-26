@@ -3,100 +3,44 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import {
-	getInitializeInstructionAsync,
-	INITIALIZE_COMPUTE_UNIT_LIMIT,
-} from "../client";
-import {
-	base58,
-	base58Vec,
-	bigInteger,
-	CliContext,
-	pubkey,
-	registerGlobals,
-	smallInteger,
-} from "../context";
+import { getInitializeInstructionAsync, INITIALIZE_COMPUTE_UNIT_LIMIT } from "../client";
+import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
 
 export const initializeCommand = registerGlobals(new Command("initialize"))
 	.description("initialize")
 	.requiredOption("--config-bump <configBump>", "configBump")
 	.requiredOption("--vault-bump <vaultBump>", "vaultBump")
 	.requiredOption("--tree-bump <treeBump>", "treeBump")
-	.requiredOption("--nullifiers-bump <nullifiersBump>", "nullifiersBump")
 	.requiredOption("--custodians-bump <custodiansBump>", "custodiansBump")
 	.requiredOption("--requesters-bump <requestersBump>", "requestersBump")
 	.requiredOption("--log-bump <logBump>", "logBump")
-	.requiredOption(
-		"--custodians <custodians>",
-		"Initial three-member disclosure committee as concatenated 32-byte",
-	)
-	.option(
-		"--pool-config <poolConfig>",
-		"The `pool_config` account [default: derived]",
-	)
-	.option(
-		"--pool-vault <poolVault>",
-		"The `pool_vault` account [default: derived]",
-	)
-	.option(
-		"--merkle-tree <merkleTree>",
-		"The `merkle_tree` account [default: derived]",
-	)
-	.option(
-		"--nullifier-set <nullifierSet>",
-		"The `nullifier_set` account [default: derived]",
-	)
-	.option(
-		"--custodian-registry <custodianRegistry>",
-		"The `custodian_registry` account [default: derived]",
-	)
-	.option(
-		"--requester-registry <requesterRegistry>",
-		"The `requester_registry` account [default: derived]",
-	)
-	.option(
-		"--disclosure-log <disclosureLog>",
-		"The `disclosure_log` account [default: derived]",
-	)
-	.requiredOption(
-		"--program-data <programData>",
-		"Canonical `ProgramData` for this program, owned by the upgradeable loader",
-	)
+	.requiredOption("--custodians <custodians>", "Initial three-member disclosure committee as concatenated 32-byte keys.")
+	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
+	.option("--pool-vault <poolVault>", "The `pool_vault` account [default: derived]")
+	.option("--merkle-tree <merkleTree>", "The `merkle_tree` account [default: derived]")
+	.option("--custodian-registry <custodianRegistry>", "The `custodian_registry` account [default: derived]")
+	.option("--requester-registry <requesterRegistry>", "The `requester_registry` account [default: derived]")
+	.option("--disclosure-log <disclosureLog>", "The `disclosure_log` account [default: derived]")
+	.requiredOption("--program-data <programData>", "The `program_data` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-		const input = {
-			configBump: smallInteger("--config-bump", options.configBump),
-			vaultBump: smallInteger("--vault-bump", options.vaultBump),
-			treeBump: smallInteger("--tree-bump", options.treeBump),
-			nullifiersBump: smallInteger("--nullifiers-bump", options.nullifiersBump),
-			custodiansBump: smallInteger("--custodians-bump", options.custodiansBump),
-			requestersBump: smallInteger("--requesters-bump", options.requestersBump),
-			logBump: smallInteger("--log-bump", options.logBump),
-			custodians: base58("--custodians", options.custodians),
-			authority: context.payer,
-			poolConfig: options.poolConfig === undefined
-				? undefined
-				: pubkey("--pool-config", options.poolConfig),
-			poolVault: options.poolVault === undefined
-				? undefined
-				: pubkey("--pool-vault", options.poolVault),
-			merkleTree: options.merkleTree === undefined
-				? undefined
-				: pubkey("--merkle-tree", options.merkleTree),
-			nullifierSet: options.nullifierSet === undefined
-				? undefined
-				: pubkey("--nullifier-set", options.nullifierSet),
-			custodianRegistry: options.custodianRegistry === undefined
-				? undefined
-				: pubkey("--custodian-registry", options.custodianRegistry),
-			requesterRegistry: options.requesterRegistry === undefined
-				? undefined
-				: pubkey("--requester-registry", options.requesterRegistry),
-			disclosureLog: options.disclosureLog === undefined
-				? undefined
-				: pubkey("--disclosure-log", options.disclosureLog),
-			programData: pubkey("--program-data", options.programData),
-		};
+const input = {
+		configBump: smallInteger("--config-bump", options.configBump),
+		vaultBump: smallInteger("--vault-bump", options.vaultBump),
+		treeBump: smallInteger("--tree-bump", options.treeBump),
+		custodiansBump: smallInteger("--custodians-bump", options.custodiansBump),
+		requestersBump: smallInteger("--requesters-bump", options.requestersBump),
+		logBump: smallInteger("--log-bump", options.logBump),
+		custodians: base58("--custodians", options.custodians),
+		authority: context.payer,
+		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
+		poolVault: options.poolVault === undefined ? undefined : pubkey("--pool-vault", options.poolVault),
+		merkleTree: options.merkleTree === undefined ? undefined : pubkey("--merkle-tree", options.merkleTree),
+		custodianRegistry: options.custodianRegistry === undefined ? undefined : pubkey("--custodian-registry", options.custodianRegistry),
+		requesterRegistry: options.requesterRegistry === undefined ? undefined : pubkey("--requester-registry", options.requesterRegistry),
+		disclosureLog: options.disclosureLog === undefined ? undefined : pubkey("--disclosure-log", options.disclosureLog),
+		programData: pubkey("--program-data", options.programData),
+	};
 		const instruction = await getInitializeInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

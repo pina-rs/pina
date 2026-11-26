@@ -12,29 +12,19 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct VerifyingKeyAccount {
-	/// One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
-	/// (root, nullifier, recipient hash), slot 1 transfer proofs
-	/// (root, nullifier, output binding).
+/// Single-input Groth16 verifying key. Every circuit compresses its statement
+/// into one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are
+/// stored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// Circuit slot; see the `VK_SLOT_*` constants.
 	pub slot: u8,
-	/// αG₁, little-endian affine coordinates.
 	pub alpha_g1: [u8; 64],
-	/// βG₂, little-endian affine coordinates.
 	pub beta_g2: [u8; 128],
-	/// γG₂, little-endian affine coordinates.
 	pub gamma_g2: [u8; 128],
-	/// δG₂, little-endian affine coordinates.
 	pub delta_g2: [u8; 128],
-	/// IC entries in use, including the constant term.
-	pub ic_len: u8,
-	/// IC G₁ points, little-endian; entries beyond `ic_len` are zero.
 	pub ic0: [u8; 64],
 	pub ic1: [u8; 64],
-	pub ic2: [u8; 64],
-	pub ic3: [u8; 64],
 }
 
 pub const VERIFYING_KEY_ACCOUNT_DISCRIMINATOR: u8 = 10u8;
@@ -60,9 +50,7 @@ impl VerifyingKeyAccount {
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
-	pub fn from_bytes(
-		data: &[u8],
-	) -> Result<&VerifyingKeyAccountZc, solana_program_error::ProgramError> {
+	pub fn from_bytes(data: &[u8]) -> Result<&VerifyingKeyAccountZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != VERIFYING_KEY_ACCOUNT_DISCRIMINATOR {
@@ -74,9 +62,7 @@ impl VerifyingKeyAccount {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(
-		data: &mut [u8],
-	) -> Result<&mut VerifyingKeyAccountZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut VerifyingKeyAccountZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != VERIFYING_KEY_ACCOUNT_DISCRIMINATOR {
@@ -92,21 +78,26 @@ impl VerifyingKeyAccount {
 impl VerifyingKeyAccount {
 	pub fn find_pda(slot: u64) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["privacy-pool-vkey".as_bytes(), &slot.to_le_bytes()],
+			&[
+				"privacy-pool-vkey".as_bytes(),
+				&slot.to_le_bytes(),
+			],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(
-		slot: u64,
-		bump: u8,
-	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(slot: u64, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["privacy-pool-vkey".as_bytes(), &slot.to_le_bytes(), &[bump]],
+			&[
+				"privacy-pool-vkey".as_bytes(),
+				&slot.to_le_bytes(),
+				&[bump],
+			],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 }
+
 
 /// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
 /// [`VERIFYING_KEY_ACCOUNT_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
@@ -115,6 +106,7 @@ impl VerifyingKeyAccount {
 pub fn verifying_key_account_needs_migration(_data: &[u8]) -> bool {
 	false
 }
+
 
 /// Why `VerifyingKeyAccount::try_from_bytes` rejected account bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -131,18 +123,14 @@ impl core::fmt::Display for VerifyingKeyAccountVersionError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::InvalidData => write!(f, "invalid VerifyingKeyAccount account data"),
-			Self::Stale { stored } => {
-				write!(
-					f,
-					"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
-				)
-			}
-			Self::Future { stored } => {
-				write!(
-					f,
-					"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
-				)
-			}
+			Self::Stale { stored } => write!(
+				f,
+				"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
+			),
+			Self::Future { stored } => write!(
+				f,
+				"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
+			),
 		}
 	}
 }
@@ -158,9 +146,7 @@ impl VerifyingKeyAccount {
 			return Err(VerifyingKeyAccountVersionError::InvalidData);
 		}
 		if account.migration_version > VERIFYING_KEY_ACCOUNT_MIGRATION_VERSION {
-			return Err(VerifyingKeyAccountVersionError::Future {
-				stored: account.migration_version,
-			});
+			return Err(VerifyingKeyAccountVersionError::Future { stored: account.migration_version });
 		}
 		Ok(account)
 	}
@@ -179,14 +165,9 @@ mod verifying_key_account_version_error_tests {
 
 	#[test]
 	fn stale_and_future_versions_are_distinguishable() {
-		let error = VerifyingKeyAccount::try_from_bytes(&envelope(1 as u8))
-			.err()
-			.expect("a future envelope must fail");
+		let error = VerifyingKeyAccount::try_from_bytes(&envelope(1 as u8)).err().expect("a future envelope must fail");
 		assert_eq!(error, VerifyingKeyAccountVersionError::Future { stored: 1 });
-		assert_eq!(
-			VerifyingKeyAccountVersionError::Future { stored: 1 }.to_string(),
-			"migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)"
-		);
+		assert_eq!(VerifyingKeyAccountVersionError::Future { stored: 1 }.to_string(), "migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)");
 		assert!(
 			VerifyingKeyAccount::try_from_bytes(&envelope(0 as u8)).is_ok(),
 			"the current version must decode",

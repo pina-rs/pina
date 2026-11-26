@@ -6,491 +6,140 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type AccountMeta,
-	type AccountSignerMeta,
-	type Address,
-	combineCodec,
-	fixDecoderSize,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	fixEncoderSize,
-	getBytesDecoder,
-	getBytesEncoder,
-	getStructDecoder,
-	getStructEncoder,
-	getU8Decoder,
-	getU8Encoder,
-	type Instruction,
-	type InstructionWithAccounts,
-	type InstructionWithData,
-	type ReadonlyAccount,
-	type ReadonlyUint8Array,
-	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-	SolanaError,
-	transformEncoder,
-	type WritableAccount,
-	type WritableSignerAccount,
-} from "@solana/kit";
-import {
-	getAccountMetaFactory,
-	type InstructionAccountInput,
-	type InstructionAccountInputAddress,
-	type InstructionSignerInput,
-	type ResolvedInstructionAccount,
-	type ResolvedInstructionAccountMeta,
-} from "@solana/program-client-core";
-import { findPoolConfigPda } from "../pdas";
-import {
-	fixPinaPodEncoderSize,
-	getPinaPodDiscriminatorDecoder,
-} from "../pinaPodCodecs";
-import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
+import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
+import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
+import { getAccountMetaFactory, type InstructionAccountInput, type InstructionAccountInputAddress, type InstructionSignerInput, type ResolvedInstructionAccount, type ResolvedInstructionAccountMeta } from '@solana/program-client-core';
+import { findPoolConfigPda } from '../pdas';
+import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from '../programs';
 
 export const SET_VERIFICATION_KEY_DISCRIMINATOR = 1;
 
-export function getSetVerificationKeyDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(SET_VERIFICATION_KEY_DISCRIMINATOR);
+export function getSetVerificationKeyDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(SET_VERIFICATION_KEY_DISCRIMINATOR); }
+
+export type SetVerificationKeyInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountPoolConfig extends string | AccountMeta<string> = string, TAccountVerifyingKeyAccount extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = "11111111111111111111111111111111", TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
+Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? WritableSignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountPoolConfig extends string ? ReadonlyAccount<TAccountPoolConfig> : TAccountPoolConfig, TAccountVerifyingKeyAccount extends string ? WritableAccount<TAccountVerifyingKeyAccount> : TAccountVerifyingKeyAccount, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, ...TRemainingAccounts]>;
+
+export type SetVerificationKeyInstructionData = { discriminator: number; bump: number; 
+/** Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`]. */
+slot: number; alphaG1: ReadonlyUint8Array; betaG2: ReadonlyUint8Array; gammaG2: ReadonlyUint8Array; deltaG2: ReadonlyUint8Array; ic0: ReadonlyUint8Array; ic1: ReadonlyUint8Array;  };
+
+export type SetVerificationKeyInstructionDataArgs = { bump: number; 
+/** Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`]. */
+slot: number; alphaG1: ReadonlyUint8Array; betaG2: ReadonlyUint8Array; gammaG2: ReadonlyUint8Array; deltaG2: ReadonlyUint8Array; ic0: ReadonlyUint8Array; ic1: ReadonlyUint8Array;  };
+
+export function getSetVerificationKeyInstructionDataEncoder(): FixedSizeEncoder<SetVerificationKeyInstructionDataArgs> {
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()], ['slot', getU8Encoder()], ['alphaG1', fixPinaPodEncoderSize(getBytesEncoder(), 64)], ['betaG2', fixPinaPodEncoderSize(getBytesEncoder(), 128)], ['gammaG2', fixPinaPodEncoderSize(getBytesEncoder(), 128)], ['deltaG2', fixPinaPodEncoderSize(getBytesEncoder(), 128)], ['ic0', fixPinaPodEncoderSize(getBytesEncoder(), 64)], ['ic1', fixPinaPodEncoderSize(getBytesEncoder(), 64)]]), (value) => ({ ...value, discriminator: 1 }));
 }
 
-export type SetVerificationKeyInstruction<
-	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
-	TAccountAuthority extends string | AccountMeta<string> = string,
-	TAccountPoolConfig extends string | AccountMeta<string> = string,
-	TAccountVerifyingKeyAccount extends string | AccountMeta<string> = string,
-	TAccountSystemProgram extends string | AccountMeta<string> = string,
-	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
-> =
-	& Instruction<TProgram>
-	& InstructionWithData<ReadonlyUint8Array>
-	& InstructionWithAccounts<
-		[
-			TAccountAuthority extends string ?
-					& WritableSignerAccount<TAccountAuthority>
-					& AccountSignerMeta<TAccountAuthority>
-				: TAccountAuthority,
-			TAccountPoolConfig extends string ? ReadonlyAccount<TAccountPoolConfig>
-				: TAccountPoolConfig,
-			TAccountVerifyingKeyAccount extends string
-				? WritableAccount<TAccountVerifyingKeyAccount>
-				: TAccountVerifyingKeyAccount,
-			TAccountSystemProgram extends string
-				? ReadonlyAccount<TAccountSystemProgram>
-				: TAccountSystemProgram,
-			...TRemainingAccounts,
-		]
-	>;
+export function getSetVerificationKeyInstructionDataDecoder(): FixedSizeDecoder<SetVerificationKeyInstructionData> {
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(SET_VERIFICATION_KEY_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()], ['slot', getU8Decoder()], ['alphaG1', fixDecoderSize(getBytesDecoder(), 64)], ['betaG2', fixDecoderSize(getBytesDecoder(), 128)], ['gammaG2', fixDecoderSize(getBytesDecoder(), 128)], ['deltaG2', fixDecoderSize(getBytesDecoder(), 128)], ['ic0', fixDecoderSize(getBytesDecoder(), 64)], ['ic1', fixDecoderSize(getBytesDecoder(), 64)]]);
+}
 
-export type SetVerificationKeyInstructionData = {
-	discriminator: number;
-	bump: number;
-	/** Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`]. */
-	slot: number;
-	icLen: number;
-	alphaG1: ReadonlyUint8Array;
-	betaG2: ReadonlyUint8Array;
-	gammaG2: ReadonlyUint8Array;
-	deltaG2: ReadonlyUint8Array;
-	ic0: ReadonlyUint8Array;
-	ic1: ReadonlyUint8Array;
-	ic2: ReadonlyUint8Array;
-	ic3: ReadonlyUint8Array;
+export function getSetVerificationKeyInstructionDataCodec(): FixedSizeCodec<SetVerificationKeyInstructionDataArgs, SetVerificationKeyInstructionData> {
+    return combineCodec(getSetVerificationKeyInstructionDataEncoder(), getSetVerificationKeyInstructionDataDecoder());
+}
+
+export type SetVerificationKeyAsyncInput<TAccountAuthority extends InstructionSignerInput = InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput, TAccountVerifyingKeyAccount extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+  authority: TAccountAuthority;
+poolConfig?: TAccountPoolConfig;
+verifyingKeyAccount: TAccountVerifyingKeyAccount;
+systemProgram?: TAccountSystemProgram;
+bump: SetVerificationKeyInstructionDataArgs["bump"];
+slot: SetVerificationKeyInstructionDataArgs["slot"];
+alphaG1: SetVerificationKeyInstructionDataArgs["alphaG1"];
+betaG2: SetVerificationKeyInstructionDataArgs["betaG2"];
+gammaG2: SetVerificationKeyInstructionDataArgs["gammaG2"];
+deltaG2: SetVerificationKeyInstructionDataArgs["deltaG2"];
+ic0: SetVerificationKeyInstructionDataArgs["ic0"];
+ic1: SetVerificationKeyInstructionDataArgs["ic1"];
+}
+
+export async function getSetVerificationKeyInstructionAsync<TAccountAuthority extends InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput, TAccountVerifyingKeyAccount extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: SetVerificationKeyAsyncInput<TAccountAuthority, TAccountPoolConfig, TAccountVerifyingKeyAccount, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): Promise<SetVerificationKeyInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountVerifyingKeyAccount, InstructionAccountInputAddress<TAccountVerifyingKeyAccount>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>> {
+  // Program address.
+const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
+
+// Account meta helper.
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+
+ // Original accounts.
+const originalAccounts = { authority: { value: input.authority ?? null, isSigner: true, isWritable: true }, poolConfig: { value: input.poolConfig ?? null, isSigner: false, isWritable: false }, verifyingKeyAccount: { value: input.verifyingKeyAccount ?? null, isSigner: false, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+// Original args.
+const args = { ...input,  };
+
+
+// Resolve default values.
+if (!accounts.poolConfig.value) {
+accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+}
+if (!accounts.systemProgram.value) {
+accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+}
+
+return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("poolConfig", accounts.poolConfig), getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount), getAccountMeta("systemProgram", accounts.systemProgram)], data: getSetVerificationKeyInstructionDataEncoder().encode(args as SetVerificationKeyInstructionDataArgs), programAddress } as SetVerificationKeyInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountVerifyingKeyAccount, InstructionAccountInputAddress<TAccountVerifyingKeyAccount>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
+}
+
+export type SetVerificationKeyInput<TAccountAuthority extends InstructionSignerInput = InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput, TAccountVerifyingKeyAccount extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput> =  {
+  authority: TAccountAuthority;
+poolConfig: TAccountPoolConfig;
+verifyingKeyAccount: TAccountVerifyingKeyAccount;
+systemProgram?: TAccountSystemProgram;
+bump: SetVerificationKeyInstructionDataArgs["bump"];
+slot: SetVerificationKeyInstructionDataArgs["slot"];
+alphaG1: SetVerificationKeyInstructionDataArgs["alphaG1"];
+betaG2: SetVerificationKeyInstructionDataArgs["betaG2"];
+gammaG2: SetVerificationKeyInstructionDataArgs["gammaG2"];
+deltaG2: SetVerificationKeyInstructionDataArgs["deltaG2"];
+ic0: SetVerificationKeyInstructionDataArgs["ic0"];
+ic1: SetVerificationKeyInstructionDataArgs["ic1"];
+}
+
+export function getSetVerificationKeyInstruction<TAccountAuthority extends InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput, TAccountVerifyingKeyAccount extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: SetVerificationKeyInput<TAccountAuthority, TAccountPoolConfig, TAccountVerifyingKeyAccount, TAccountSystemProgram>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): SetVerificationKeyInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountVerifyingKeyAccount, InstructionAccountInputAddress<TAccountVerifyingKeyAccount>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>> {
+  // Program address.
+const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
+
+// Account meta helper.
+const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
+
+ // Original accounts.
+const originalAccounts = { authority: { value: input.authority ?? null, isSigner: true, isWritable: true }, poolConfig: { value: input.poolConfig ?? null, isSigner: false, isWritable: false }, verifyingKeyAccount: { value: input.verifyingKeyAccount ?? null, isSigner: false, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false } }
+const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
+
+
+// Original args.
+const args = { ...input,  };
+
+
+// Resolve default values.
+if (!accounts.systemProgram.value) {
+accounts.systemProgram.value = '11111111111111111111111111111111' as Address<'11111111111111111111111111111111'>;
+}
+
+return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("poolConfig", accounts.poolConfig), getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount), getAccountMeta("systemProgram", accounts.systemProgram)], data: getSetVerificationKeyInstructionDataEncoder().encode(args as SetVerificationKeyInstructionDataArgs), programAddress } as SetVerificationKeyInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountVerifyingKeyAccount, InstructionAccountInputAddress<TAccountVerifyingKeyAccount>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>>);
+}
+
+export type ParsedSetVerificationKeyInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
+accounts: {
+authority: TAccountMetas[0];
+poolConfig: TAccountMetas[1];
+verifyingKeyAccount: TAccountMetas[2];
+systemProgram: TAccountMetas[3];
 };
+data: SetVerificationKeyInstructionData; };
 
-export type SetVerificationKeyInstructionDataArgs = {
-	bump: number;
-	/** Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`]. */
-	slot: number;
-	icLen: number;
-	alphaG1: ReadonlyUint8Array;
-	betaG2: ReadonlyUint8Array;
-	gammaG2: ReadonlyUint8Array;
-	deltaG2: ReadonlyUint8Array;
-	ic0: ReadonlyUint8Array;
-	ic1: ReadonlyUint8Array;
-	ic2: ReadonlyUint8Array;
-	ic3: ReadonlyUint8Array;
-};
-
-export function getSetVerificationKeyInstructionDataEncoder(): FixedSizeEncoder<
-	SetVerificationKeyInstructionDataArgs
-> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["slot", getU8Encoder()],
-			["icLen", getU8Encoder()],
-			["alphaG1", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["betaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["gammaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["deltaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["ic0", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic1", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic2", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic3", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-		]),
-		(value) => ({ ...value, discriminator: 1 }),
-	);
+export function parseSetVerificationKeyInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedSetVerificationKeyInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 4) {
+  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 4 });
 }
-
-export function getSetVerificationKeyInstructionDataDecoder(): FixedSizeDecoder<
-	SetVerificationKeyInstructionData
-> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				SET_VERIFICATION_KEY_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["bump", getU8Decoder()],
-		["slot", getU8Decoder()],
-		["icLen", getU8Decoder()],
-		["alphaG1", fixDecoderSize(getBytesDecoder(), 64)],
-		["betaG2", fixDecoderSize(getBytesDecoder(), 128)],
-		["gammaG2", fixDecoderSize(getBytesDecoder(), 128)],
-		["deltaG2", fixDecoderSize(getBytesDecoder(), 128)],
-		["ic0", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic1", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic2", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic3", fixDecoderSize(getBytesDecoder(), 64)],
-	]);
+let accountIndex = 0;
+const getNextAccount = () => {
+  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+  accountIndex += 1;
+  return accountMeta;
 }
-
-export function getSetVerificationKeyInstructionDataCodec(): FixedSizeCodec<
-	SetVerificationKeyInstructionDataArgs,
-	SetVerificationKeyInstructionData
-> {
-	return combineCodec(
-		getSetVerificationKeyInstructionDataEncoder(),
-		getSetVerificationKeyInstructionDataDecoder(),
-	);
-}
-
-export type SetVerificationKeyAsyncInput<
-	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
-	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
-	TAccountVerifyingKeyAccount extends InstructionAccountInput =
-		InstructionAccountInput,
-	TAccountSystemProgram extends InstructionAccountInput =
-		InstructionAccountInput,
-> = {
-	authority: TAccountAuthority;
-	poolConfig?: TAccountPoolConfig;
-	verifyingKeyAccount: TAccountVerifyingKeyAccount;
-	systemProgram: TAccountSystemProgram;
-	bump: SetVerificationKeyInstructionDataArgs["bump"];
-	slot: SetVerificationKeyInstructionDataArgs["slot"];
-	icLen: SetVerificationKeyInstructionDataArgs["icLen"];
-	alphaG1: SetVerificationKeyInstructionDataArgs["alphaG1"];
-	betaG2: SetVerificationKeyInstructionDataArgs["betaG2"];
-	gammaG2: SetVerificationKeyInstructionDataArgs["gammaG2"];
-	deltaG2: SetVerificationKeyInstructionDataArgs["deltaG2"];
-	ic0: SetVerificationKeyInstructionDataArgs["ic0"];
-	ic1: SetVerificationKeyInstructionDataArgs["ic1"];
-	ic2: SetVerificationKeyInstructionDataArgs["ic2"];
-	ic3: SetVerificationKeyInstructionDataArgs["ic3"];
-};
-
-export async function getSetVerificationKeyInstructionAsync<
-	TAccountAuthority extends InstructionSignerInput,
-	TAccountPoolConfig extends InstructionAccountInput,
-	TAccountVerifyingKeyAccount extends InstructionAccountInput,
-	TAccountSystemProgram extends InstructionAccountInput,
-	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: SetVerificationKeyAsyncInput<
-		TAccountAuthority,
-		TAccountPoolConfig,
-		TAccountVerifyingKeyAccount,
-		TAccountSystemProgram
-	>,
-	config?: {
-		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
-	},
-): Promise<
-	SetVerificationKeyInstruction<
-		TProgramAddress,
-		ResolvedInstructionAccountMeta<
-			TAccountAuthority,
-			InstructionAccountInputAddress<TAccountAuthority>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolConfig,
-			InstructionAccountInputAddress<TAccountPoolConfig>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountVerifyingKeyAccount,
-			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountSystemProgram,
-			InstructionAccountInputAddress<TAccountSystemProgram>
-		>
-	>
-> {
-	// Program address.
-	const programAddressInput = config?.programAddress ??
-		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-	const programAddress = typeof programAddressInput === "string"
-		? programAddressInput
-		: programAddressInput.address;
-
-	// Account meta helper.
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-
-	// Original accounts.
-	const originalAccounts = {
-		authority: {
-			value: input.authority ?? null,
-			isSigner: true,
-			isWritable: true,
-		},
-		poolConfig: {
-			value: input.poolConfig ?? null,
-			isSigner: false,
-			isWritable: false,
-		},
-		verifyingKeyAccount: {
-			value: input.verifyingKeyAccount ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		systemProgram: {
-			value: input.systemProgram ?? null,
-			isSigner: false,
-			isWritable: false,
-		},
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Original args.
-	const args = { ...input };
-
-	// Resolve default values.
-	if (!accounts.poolConfig.value) {
-		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
-	}
-
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("authority", accounts.authority),
-			getAccountMeta("poolConfig", accounts.poolConfig),
-			getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getSetVerificationKeyInstructionDataEncoder().encode(
-			args as SetVerificationKeyInstructionDataArgs,
-		),
-		programAddress,
-	} as SetVerificationKeyInstruction<
-		TProgramAddress,
-		ResolvedInstructionAccountMeta<
-			TAccountAuthority,
-			InstructionAccountInputAddress<TAccountAuthority>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolConfig,
-			InstructionAccountInputAddress<TAccountPoolConfig>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountVerifyingKeyAccount,
-			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountSystemProgram,
-			InstructionAccountInputAddress<TAccountSystemProgram>
-		>
-	>);
-}
-
-export type SetVerificationKeyInput<
-	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
-	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
-	TAccountVerifyingKeyAccount extends InstructionAccountInput =
-		InstructionAccountInput,
-	TAccountSystemProgram extends InstructionAccountInput =
-		InstructionAccountInput,
-> = {
-	authority: TAccountAuthority;
-	poolConfig: TAccountPoolConfig;
-	verifyingKeyAccount: TAccountVerifyingKeyAccount;
-	systemProgram: TAccountSystemProgram;
-	bump: SetVerificationKeyInstructionDataArgs["bump"];
-	slot: SetVerificationKeyInstructionDataArgs["slot"];
-	icLen: SetVerificationKeyInstructionDataArgs["icLen"];
-	alphaG1: SetVerificationKeyInstructionDataArgs["alphaG1"];
-	betaG2: SetVerificationKeyInstructionDataArgs["betaG2"];
-	gammaG2: SetVerificationKeyInstructionDataArgs["gammaG2"];
-	deltaG2: SetVerificationKeyInstructionDataArgs["deltaG2"];
-	ic0: SetVerificationKeyInstructionDataArgs["ic0"];
-	ic1: SetVerificationKeyInstructionDataArgs["ic1"];
-	ic2: SetVerificationKeyInstructionDataArgs["ic2"];
-	ic3: SetVerificationKeyInstructionDataArgs["ic3"];
-};
-
-export function getSetVerificationKeyInstruction<
-	TAccountAuthority extends InstructionSignerInput,
-	TAccountPoolConfig extends InstructionAccountInput,
-	TAccountVerifyingKeyAccount extends InstructionAccountInput,
-	TAccountSystemProgram extends InstructionAccountInput,
-	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
->(
-	input: SetVerificationKeyInput<
-		TAccountAuthority,
-		TAccountPoolConfig,
-		TAccountVerifyingKeyAccount,
-		TAccountSystemProgram
-	>,
-	config?: {
-		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
-	},
-): SetVerificationKeyInstruction<
-	TProgramAddress,
-	ResolvedInstructionAccountMeta<
-		TAccountAuthority,
-		InstructionAccountInputAddress<TAccountAuthority>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountPoolConfig,
-		InstructionAccountInputAddress<TAccountPoolConfig>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountVerifyingKeyAccount,
-		InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountSystemProgram,
-		InstructionAccountInputAddress<TAccountSystemProgram>
-	>
-> {
-	// Program address.
-	const programAddressInput = config?.programAddress ??
-		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-	const programAddress = typeof programAddressInput === "string"
-		? programAddressInput
-		: programAddressInput.address;
-
-	// Account meta helper.
-	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
-
-	// Original accounts.
-	const originalAccounts = {
-		authority: {
-			value: input.authority ?? null,
-			isSigner: true,
-			isWritable: true,
-		},
-		poolConfig: {
-			value: input.poolConfig ?? null,
-			isSigner: false,
-			isWritable: false,
-		},
-		verifyingKeyAccount: {
-			value: input.verifyingKeyAccount ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		systemProgram: {
-			value: input.systemProgram ?? null,
-			isSigner: false,
-			isWritable: false,
-		},
-	};
-	const accounts = originalAccounts as Record<
-		keyof typeof originalAccounts,
-		ResolvedInstructionAccount
-	>;
-
-	// Original args.
-	const args = { ...input };
-
-	return Object.freeze({
-		accounts: [
-			getAccountMeta("authority", accounts.authority),
-			getAccountMeta("poolConfig", accounts.poolConfig),
-			getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount),
-			getAccountMeta("systemProgram", accounts.systemProgram),
-		],
-		data: getSetVerificationKeyInstructionDataEncoder().encode(
-			args as SetVerificationKeyInstructionDataArgs,
-		),
-		programAddress,
-	} as SetVerificationKeyInstruction<
-		TProgramAddress,
-		ResolvedInstructionAccountMeta<
-			TAccountAuthority,
-			InstructionAccountInputAddress<TAccountAuthority>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountPoolConfig,
-			InstructionAccountInputAddress<TAccountPoolConfig>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountVerifyingKeyAccount,
-			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountSystemProgram,
-			InstructionAccountInputAddress<TAccountSystemProgram>
-		>
-	>);
-}
-
-export type ParsedSetVerificationKeyInstruction<
-	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
-	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
-> = {
-	programAddress: Address<TProgram>;
-	accounts: {
-		authority: TAccountMetas[0];
-		poolConfig: TAccountMetas[1];
-		verifyingKeyAccount: TAccountMetas[2];
-		systemProgram: TAccountMetas[3];
-	};
-	data: SetVerificationKeyInstructionData;
-};
-
-export function parseSetVerificationKeyInstruction<
-	TProgram extends string,
-	TAccountMetas extends readonly AccountMeta[],
->(
-	instruction:
-		& Instruction<TProgram>
-		& InstructionWithAccounts<TAccountMetas>
-		& InstructionWithData<ReadonlyUint8Array>,
-): ParsedSetVerificationKeyInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 4) {
-		throw new SolanaError(
-			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
-			{
-				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 4,
-			},
-		);
-	}
-	let accountIndex = 0;
-	const getNextAccount = () => {
-		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-		accountIndex += 1;
-		return accountMeta;
-	};
-	return {
-		programAddress: instruction.programAddress,
-		accounts: {
-			authority: getNextAccount(),
-			poolConfig: getNextAccount(),
-			verifyingKeyAccount: getNextAccount(),
-			systemProgram: getNextAccount(),
-		},
-		data: getSetVerificationKeyInstructionDataDecoder().decode(
-			instruction.data,
-		),
-	};
+  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), poolConfig: getNextAccount(), verifyingKeyAccount: getNextAccount(), systemProgram: getNextAccount() }, data: getSetVerificationKeyInstructionDataDecoder().decode(instruction.data) };
 }

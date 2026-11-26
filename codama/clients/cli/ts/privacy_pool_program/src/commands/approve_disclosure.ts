@@ -3,62 +3,28 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import {
-	APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT,
-	getApproveDisclosureInstructionAsync,
-} from "../client";
-import {
-	base58,
-	base58Vec,
-	bigInteger,
-	CliContext,
-	pubkey,
-	registerGlobals,
-	smallInteger,
-} from "../context";
+import { getApproveDisclosureInstructionAsync, APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT } from "../client";
+import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
 
-export const approveDisclosureCommand = registerGlobals(
-	new Command("approve_disclosure"),
-)
+export const approveDisclosureCommand = registerGlobals(new Command("approve_disclosure"))
 	.description("approveDisclosure")
-	.requiredOption("--reserved <reserved>", "Reserved; must be zero.")
-	.option(
-		"--pool-config <poolConfig>",
-		"The `pool_config` account [default: derived]",
-	)
-	.option(
-		"--custodian-registry <custodianRegistry>",
-		"The `custodian_registry` account [default: derived]",
-	)
-	.requiredOption(
-		"--disclosure-request <disclosureRequest>",
-		"The `disclosure_request` account",
-	)
-	.option(
-		"--disclosure-log <disclosureLog>",
-		"The `disclosure_log` account [default: derived]",
-	)
+	.requiredOption("--reserved <reserved>", "reserved")
+	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
+	.option("--custodian-registry <custodianRegistry>", "The `custodian_registry` account [default: derived]")
+	.requiredOption("--disclosure-request <disclosureRequest>", "The `disclosure_request` account")
+	.option("--disclosure-log <disclosureLog>", "The `disclosure_log` account [default: derived]")
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-		const input = {
-			reserved: smallInteger("--reserved", options.reserved),
-			custodian: context.payer,
-			poolConfig: options.poolConfig === undefined
-				? undefined
-				: pubkey("--pool-config", options.poolConfig),
-			custodianRegistry: options.custodianRegistry === undefined
-				? undefined
-				: pubkey("--custodian-registry", options.custodianRegistry),
-			disclosureRequest: pubkey(
-				"--disclosure-request",
-				options.disclosureRequest,
-			),
-			disclosureLog: options.disclosureLog === undefined
-				? undefined
-				: pubkey("--disclosure-log", options.disclosureLog),
-			clock: pubkey("--clock", options.clock),
-		};
+const input = {
+		reserved: smallInteger("--reserved", options.reserved),
+		custodian: context.payer,
+		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
+		custodianRegistry: options.custodianRegistry === undefined ? undefined : pubkey("--custodian-registry", options.custodianRegistry),
+		disclosureRequest: pubkey("--disclosure-request", options.disclosureRequest),
+		disclosureLog: options.disclosureLog === undefined ? undefined : pubkey("--disclosure-log", options.disclosureLog),
+		clock: pubkey("--clock", options.clock),
+	};
 		const instruction = await getApproveDisclosureInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

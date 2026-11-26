@@ -6,13 +6,14 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
@@ -21,6 +22,11 @@ use crate::ProgramAccount;
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 pub struct Withdraw<'account> {
+	/// CPI account `payer`.
+	/// Relayer / transaction fee payer; receives `relayer_fee` directly.
+	/// Required privileges: writable and signer.
+	pub payer: &'account AccountView,
+
 	/// CPI account `poolConfig`.
 	/// Required privileges: read-only.
 	pub pool_config: &'account AccountView,
@@ -30,12 +36,16 @@ pub struct Withdraw<'account> {
 	pub pool_vault: &'account AccountView,
 
 	/// CPI account `merkleTree`.
-	/// Required privileges: read-only.
+	/// Required privileges: writable.
 	pub merkle_tree: &'account AccountView,
 
-	/// CPI account `nullifierSet`.
+	/// CPI account `nullifierRecord0`.
 	/// Required privileges: writable.
-	pub nullifier_set: &'account AccountView,
+	pub nullifier_record0: &'account AccountView,
+
+	/// CPI account `nullifierRecord1`.
+	/// Required privileges: writable.
+	pub nullifier_record1: &'account AccountView,
 
 	/// CPI account `verifyingKeyAccount`.
 	/// Required privileges: read-only.
@@ -44,6 +54,10 @@ pub struct Withdraw<'account> {
 	/// CPI account `recipient`.
 	/// Required privileges: writable.
 	pub recipient: &'account AccountView,
+
+	/// CPI account `policyCosigner`.
+	/// Required privileges: read-only.
+	pub policy_cosigner: &'account AccountView,
 
 	/// CPI account `systemProgram`.
 	/// Required privileges: read-only.
@@ -56,38 +70,80 @@ pub struct Withdraw<'account> {
 /// Instruction arguments for the `withdraw` CPI call.
 #[derive(Clone, Copy, Debug)]
 pub struct WithdrawIx {
-	/// Instruction argument `nullifier`.
-	/// Nullifier derived by the circuit from the spent note's secrets.
-	pub nullifier: [u8; 32],
+	/// Instruction argument `nullifier0Bump`.
+	pub nullifier0_bump: u8,
+
+	/// Instruction argument `nullifier1Bump`.
+	pub nullifier1_bump: u8,
+
+	/// Instruction argument `nullifier0`.
+	pub nullifier0: [u8; 32],
+
+	/// Instruction argument `nullifier1`.
+	pub nullifier1: [u8; 32],
 
 	/// Instruction argument `root`.
-	/// Tree root the proof's membership witness was built against.
 	pub root: [u8; 32],
 
+	/// Instruction argument `publicOut`.
+	/// SOL withdrawn to `recipient` in lamports.
+	pub public_out: u64,
+
+	/// Instruction argument `relayerFee`.
+	/// Optional fee paid from shielded balance to `relayer`.
+	pub relayer_fee: u64,
+
+	/// Instruction argument `changeCommitment`.
+	/// Optional change output commitment (`[0; 32]` if no change).
+	pub change_commitment: [u8; 32],
+
+	/// Instruction argument `changeViewPubkey`.
+	pub change_view_pubkey: [u8; 32],
+
+	/// Instruction argument `envelopeLen`.
+	pub envelope_len: u8,
+
+	/// Instruction argument `envelope`.
+	pub envelope: [u8; 96],
+
+	/// Instruction argument `shares`.
+	pub shares: [u8; 144],
+
 	/// Instruction argument `proofA`.
-	pub proof_a: [u8; 64],
+	/// 192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).
+	pub proof_a: [u8; 32],
 
 	/// Instruction argument `proofB`.
 	pub proof_b: [u8; 128],
 
 	/// Instruction argument `proofC`.
-	pub proof_c: [u8; 64],
+	pub proof_c: [u8; 32],
 }
 
 impl WithdrawIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 321;
+	pub const LEN: usize = 612;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 321], ProgramError> {
-		let mut data = [0u8; 321];
+	pub fn to_bytes(&self) -> Result<[u8; 612], ProgramError> {
+		let mut data = [0u8; 612];
 		data[..1].copy_from_slice(&WITHDRAW_DISCRIMINATOR);
-		data[1..33].copy_from_slice(&self.nullifier);
-		data[33..65].copy_from_slice(&self.root);
-		data[65..129].copy_from_slice(&self.proof_a);
-		data[129..257].copy_from_slice(&self.proof_b);
-		data[257..321].copy_from_slice(&self.proof_c);
+		data[1..2].copy_from_slice(&self.nullifier0_bump.to_le_bytes());
+		data[2..3].copy_from_slice(&self.nullifier1_bump.to_le_bytes());
+		data[3..35].copy_from_slice(&self.nullifier0);
+		data[35..67].copy_from_slice(&self.nullifier1);
+		data[67..99].copy_from_slice(&self.root);
+		data[99..107].copy_from_slice(&self.public_out.to_le_bytes());
+		data[107..115].copy_from_slice(&self.relayer_fee.to_le_bytes());
+		data[115..147].copy_from_slice(&self.change_commitment);
+		data[147..179].copy_from_slice(&self.change_view_pubkey);
+		data[179..180].copy_from_slice(&self.envelope_len.to_le_bytes());
+		data[180..276].copy_from_slice(&self.envelope);
+		data[276..420].copy_from_slice(&self.shares);
+		data[420..452].copy_from_slice(&self.proof_a);
+		data[452..580].copy_from_slice(&self.proof_b);
+		data[580..612].copy_from_slice(&self.proof_c);
 
 		Ok(data)
 	}
@@ -107,13 +163,16 @@ impl<'account> Withdraw<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 7] = [
+		let accounts: [CpiHandle<'_>; 10] = [
+			CpiHandle::writable_signer(self.payer)?,
 			CpiHandle::readonly(self.pool_config),
 			CpiHandle::writable(self.pool_vault)?,
-			CpiHandle::readonly(self.merkle_tree),
-			CpiHandle::writable(self.nullifier_set)?,
+			CpiHandle::writable(self.merkle_tree)?,
+			CpiHandle::writable(self.nullifier_record0)?,
+			CpiHandle::writable(self.nullifier_record1)?,
 			CpiHandle::readonly(self.verifying_key_account),
 			CpiHandle::writable(self.recipient)?,
+			CpiHandle::readonly(self.policy_cosigner),
 			CpiHandle::readonly(self.system_program),
 		];
 		let data = self.ix.to_bytes()?;

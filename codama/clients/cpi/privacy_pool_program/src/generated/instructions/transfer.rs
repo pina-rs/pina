@@ -6,13 +6,14 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramError;
 use pina::ProgramResult;
+use pina::ProgramError;
 use pina::Signer;
 
 use crate::ProgramAccount;
@@ -21,33 +22,38 @@ use crate::ProgramAccount;
 #[derive(Clone, Copy, Debug)]
 #[must_use = "the CPI has no effect until invoke or invoke_signed is called"]
 pub struct Transfer<'account> {
+	/// CPI account `payer`.
+	/// Relayer / transaction fee payer; receives `relayer_fee` directly.
+	/// Required privileges: writable and signer.
+	pub payer: &'account AccountView,
+
 	/// CPI account `poolConfig`.
 	/// Required privileges: read-only.
 	pub pool_config: &'account AccountView,
 
-	/// CPI account `payer`.
-	/// Funds the successor note's rent. Transfers are anonymous with respect
-	/// to the spent note, not to fees: this example has no relayer, so the
-	/// submitting wallet signs and pays. Production routes this through a
-	/// relayer so even this linkage disappears.
-	/// Required privileges: writable and signer.
-	pub payer: &'account AccountView,
+	/// CPI account `poolVault`.
+	/// Required privileges: writable.
+	pub pool_vault: &'account AccountView,
 
 	/// CPI account `merkleTree`.
 	/// Required privileges: writable.
 	pub merkle_tree: &'account AccountView,
 
-	/// CPI account `nullifierSet`.
+	/// CPI account `nullifierRecord0`.
 	/// Required privileges: writable.
-	pub nullifier_set: &'account AccountView,
+	pub nullifier_record0: &'account AccountView,
+
+	/// CPI account `nullifierRecord1`.
+	/// Required privileges: writable.
+	pub nullifier_record1: &'account AccountView,
 
 	/// CPI account `verifyingKeyAccount`.
 	/// Required privileges: read-only.
 	pub verifying_key_account: &'account AccountView,
 
-	/// CPI account `noteCommitment`.
-	/// Required privileges: writable.
-	pub note_commitment: &'account AccountView,
+	/// CPI account `policyCosigner`.
+	/// Required privileges: read-only.
+	pub policy_cosigner: &'account AccountView,
 
 	/// CPI account `systemProgram`.
 	/// Required privileges: read-only.
@@ -60,62 +66,86 @@ pub struct Transfer<'account> {
 /// Instruction arguments for the `transfer` CPI call.
 #[derive(Clone, Copy, Debug)]
 pub struct TransferIx {
-	/// Instruction argument `bump`.
-	pub bump: u8,
+	/// Instruction argument `nullifier0Bump`.
+	pub nullifier0_bump: u8,
 
-	/// Instruction argument `nullifier`.
-	pub nullifier: [u8; 32],
+	/// Instruction argument `nullifier1Bump`.
+	pub nullifier1_bump: u8,
+
+	/// Instruction argument `nullifier0`.
+	pub nullifier0: [u8; 32],
+
+	/// Instruction argument `nullifier1`.
+	pub nullifier1: [u8; 32],
 
 	/// Instruction argument `root`.
 	pub root: [u8; 32],
 
-	/// Instruction argument `newCommitment`.
-	/// Commitment of the successor note.
-	pub new_commitment: [u8; 32],
+	/// Instruction argument `relayerFee`.
+	/// Optional SOL relayer fee deducted from shielded inputs.
+	pub relayer_fee: u64,
 
-	/// Instruction argument `newViewPubkey`.
-	/// Successor note's consent key.
-	pub new_view_pubkey: [u8; 32],
+	/// Instruction argument `out0Commitment`.
+	pub out0_commitment: [u8; 32],
 
-	/// Instruction argument `envelopeLen`.
-	pub envelope_len: u8,
+	/// Instruction argument `out0ViewPubkey`.
+	pub out0_view_pubkey: [u8; 32],
 
-	/// Instruction argument `envelope`.
-	pub envelope: [u8; 128],
+	/// Instruction argument `out0EnvelopeLen`.
+	pub out0_envelope_len: u8,
 
-	/// Instruction argument `shares`.
-	pub shares: [u8; 144],
+	/// Instruction argument `out0Envelope`.
+	pub out0_envelope: [u8; 96],
+
+	/// Instruction argument `out1Commitment`.
+	pub out1_commitment: [u8; 32],
+
+	/// Instruction argument `out1ViewPubkey`.
+	pub out1_view_pubkey: [u8; 32],
+
+	/// Instruction argument `out1EnvelopeLen`.
+	pub out1_envelope_len: u8,
+
+	/// Instruction argument `out1Envelope`.
+	pub out1_envelope: [u8; 96],
 
 	/// Instruction argument `proofA`.
-	pub proof_a: [u8; 64],
+	/// 192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).
+	pub proof_a: [u8; 32],
 
 	/// Instruction argument `proofB`.
 	pub proof_b: [u8; 128],
 
 	/// Instruction argument `proofC`.
-	pub proof_c: [u8; 64],
+	pub proof_c: [u8; 32],
 }
 
 impl TransferIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 659;
+	pub const LEN: usize = 621;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 659], ProgramError> {
-		let mut data = [0u8; 659];
+	pub fn to_bytes(&self) -> Result<[u8; 621], ProgramError> {
+		let mut data = [0u8; 621];
 		data[..1].copy_from_slice(&TRANSFER_DISCRIMINATOR);
-		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
-		data[2..34].copy_from_slice(&self.nullifier);
-		data[34..66].copy_from_slice(&self.root);
-		data[66..98].copy_from_slice(&self.new_commitment);
-		data[98..130].copy_from_slice(&self.new_view_pubkey);
-		data[130..131].copy_from_slice(&self.envelope_len.to_le_bytes());
-		data[131..259].copy_from_slice(&self.envelope);
-		data[259..403].copy_from_slice(&self.shares);
-		data[403..467].copy_from_slice(&self.proof_a);
-		data[467..595].copy_from_slice(&self.proof_b);
-		data[595..659].copy_from_slice(&self.proof_c);
+		data[1..2].copy_from_slice(&self.nullifier0_bump.to_le_bytes());
+		data[2..3].copy_from_slice(&self.nullifier1_bump.to_le_bytes());
+		data[3..35].copy_from_slice(&self.nullifier0);
+		data[35..67].copy_from_slice(&self.nullifier1);
+		data[67..99].copy_from_slice(&self.root);
+		data[99..107].copy_from_slice(&self.relayer_fee.to_le_bytes());
+		data[107..139].copy_from_slice(&self.out0_commitment);
+		data[139..171].copy_from_slice(&self.out0_view_pubkey);
+		data[171..172].copy_from_slice(&self.out0_envelope_len.to_le_bytes());
+		data[172..268].copy_from_slice(&self.out0_envelope);
+		data[268..300].copy_from_slice(&self.out1_commitment);
+		data[300..332].copy_from_slice(&self.out1_view_pubkey);
+		data[332..333].copy_from_slice(&self.out1_envelope_len.to_le_bytes());
+		data[333..429].copy_from_slice(&self.out1_envelope);
+		data[429..461].copy_from_slice(&self.proof_a);
+		data[461..589].copy_from_slice(&self.proof_b);
+		data[589..621].copy_from_slice(&self.proof_c);
 
 		Ok(data)
 	}
@@ -135,13 +165,15 @@ impl<'account> Transfer<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 7] = [
-			CpiHandle::readonly(self.pool_config),
+		let accounts: [CpiHandle<'_>; 9] = [
 			CpiHandle::writable_signer(self.payer)?,
+			CpiHandle::readonly(self.pool_config),
+			CpiHandle::writable(self.pool_vault)?,
 			CpiHandle::writable(self.merkle_tree)?,
-			CpiHandle::writable(self.nullifier_set)?,
+			CpiHandle::writable(self.nullifier_record0)?,
+			CpiHandle::writable(self.nullifier_record1)?,
 			CpiHandle::readonly(self.verifying_key_account),
-			CpiHandle::writable(self.note_commitment)?,
+			CpiHandle::readonly(self.policy_cosigner),
 			CpiHandle::readonly(self.system_program),
 		];
 		let data = self.ix.to_bytes()?;

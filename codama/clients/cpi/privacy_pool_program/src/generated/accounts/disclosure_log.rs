@@ -6,14 +6,15 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
+
 #![allow(rustdoc::broken_intra_doc_links)]
 
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// Append-only public record of executed disclosures. The entry is written
-/// by the same instruction that marks the request executed, so execution
-/// without a log record cannot happen.
+/// Append-only public record of executed disclosures. Stores a salted
+/// `scope_hash` rather than raw note commitments so observers cannot link log
+/// entries back to shielded notes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DisclosureLog {
 	pub bump: u8,
@@ -31,7 +32,8 @@ impl DisclosureLog {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2 && data[..2] == DISCLOSURE_LOG_DISCRIMINATOR
+		data.len() >= 2
+			&& data[..2] == DISCLOSURE_LOG_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -46,11 +48,14 @@ impl DisclosureLog {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
+		.try_into().ok()?);
 		cursor += 1;
-		let count: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
+		let count: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
+		.try_into().ok()?);
 		cursor += 8;
-		let entries: [u8; 3072] = data.get(cursor..cursor + 3072)?.try_into().ok()?;
+		let entries: [u8; 3072] = data.get(cursor..cursor + 3072)?
+		.try_into().ok()?;
 
 		Some(DisclosureLog {
 			bump,

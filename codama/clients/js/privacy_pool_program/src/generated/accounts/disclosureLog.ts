@@ -6,220 +6,104 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import {
-	type Account,
-	type Address,
-	assertAccountExists,
-	assertAccountsExist,
-	type ClientWithRpc,
-	combineCodec,
-	decodeAccount,
-	type EncodedAccount,
-	type FetchAccountConfig,
-	type FetchAccountsConfig,
-	fetchEncodedAccount,
-	fetchEncodedAccounts,
-	fixDecoderSize,
-	type FixedSizeCodec,
-	type FixedSizeDecoder,
-	type FixedSizeEncoder,
-	fixEncoderSize,
-	type GetAccountInfoApi,
-	getBytesDecoder,
-	getBytesEncoder,
-	type GetMultipleAccountsApi,
-	getStructDecoder,
-	getStructEncoder,
-	getU64Decoder,
-	getU64Encoder,
-	getU8Decoder,
-	getU8Encoder,
-	type HasAddress,
-	type MaybeAccount,
-	type MaybeEncodedAccount,
-	type ReadonlyUint8Array,
-	transformEncoder,
-} from "@solana/kit";
-import { findDisclosureLogPda } from "../pdas";
-import {
-	fixPinaPodEncoderSize,
-	getPinaPodDiscriminatorDecoder,
-	getPinaPodMigrationVersionDecoder,
-} from "../pinaPodCodecs";
+import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder, getPinaPodMigrationVersionDecoder } from "../pinaPodCodecs";
+import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type ClientWithRpc, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
+import { findDisclosureLogPda } from '../pdas';
 
 export const DISCLOSURE_LOG_DISCRIMINATOR = 7;
 
-export function getDisclosureLogDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(DISCLOSURE_LOG_DISCRIMINATOR);
-}
+export function getDisclosureLogDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(DISCLOSURE_LOG_DISCRIMINATOR); }
 
 export const DISCLOSURE_LOG_DISCRIMINATOR2 = 0;
 
-export function getDisclosureLogDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(DISCLOSURE_LOG_DISCRIMINATOR2);
-}
+export function getDisclosureLogDiscriminator2Bytes(): ReadonlyUint8Array { return getU8Encoder().encode(DISCLOSURE_LOG_DISCRIMINATOR2); }
 
 /**
- * Append-only public record of executed disclosures. The entry is written
- * by the same instruction that marks the request executed, so execution
- * without a log record cannot happen.
+ * Append-only public record of executed disclosures. Stores a salted
+ * `scope_hash` rather than raw note commitments so observers cannot link log
+ * entries back to shielded notes.
  */
-export type DisclosureLog = {
-	discriminator: number;
-	migrationVersion: number;
-	bump: number;
-	/** Entries written so far. */
-	count: bigint;
-	/**
-	 * Flat `LOG_ENTRY_BYTES` entries: requester, commitment, tier, nonce,
-	 * timestamp, padding.
-	 */
-	entries: ReadonlyUint8Array;
-};
+export type DisclosureLog = { discriminator: number; migrationVersion: number; bump: number; count: bigint; entries: ReadonlyUint8Array;  };
 
-export type DisclosureLogArgs = {
-	bump: number;
-	/** Entries written so far. */
-	count: number | bigint;
-	/**
-	 * Flat `LOG_ENTRY_BYTES` entries: requester, commitment, tier, nonce,
-	 * timestamp, padding.
-	 */
-	entries: ReadonlyUint8Array;
-};
+export type DisclosureLogArgs = { bump: number; count: number | bigint; entries: ReadonlyUint8Array;  };
 
 /** Gets the encoder for {@link DisclosureLogArgs} account data. */
 export function getDisclosureLogEncoder(): FixedSizeEncoder<DisclosureLogArgs> {
-	return transformEncoder(
-		getStructEncoder([
-			["discriminator", getU8Encoder()],
-			["migrationVersion", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["count", getU64Encoder()],
-			["entries", fixPinaPodEncoderSize(getBytesEncoder(), 3072)],
-		]),
-		(value) => ({ ...value, discriminator: 7, migrationVersion: 0 }),
-	);
+    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['migrationVersion', getU8Encoder()], ['bump', getU8Encoder()], ['count', getU64Encoder()], ['entries', fixPinaPodEncoderSize(getBytesEncoder(), 3072)]]), (value) => ({ ...value, discriminator: 7, migrationVersion: 0 }));
 }
 
 /** Gets the decoder for {@link DisclosureLog} account data. */
 export function getDisclosureLogDecoder(): FixedSizeDecoder<DisclosureLog> {
-	return getStructDecoder([
-		[
-			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				DISCLOSURE_LOG_DISCRIMINATOR,
-				getU8Decoder(),
-			),
-		],
-		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
-		["bump", getU8Decoder()],
-		["count", getU64Decoder()],
-		["entries", fixDecoderSize(getBytesDecoder(), 3072)],
-	]);
+    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(DISCLOSURE_LOG_DISCRIMINATOR, getU8Decoder())], ['migrationVersion', getPinaPodMigrationVersionDecoder(0, getU8Decoder())], ['bump', getU8Decoder()], ['count', getU64Decoder()], ['entries', fixDecoderSize(getBytesDecoder(), 3072)]]);
 }
 
 /** Gets the codec for {@link DisclosureLog} account data. */
-export function getDisclosureLogCodec(): FixedSizeCodec<
-	DisclosureLogArgs,
-	DisclosureLog
-> {
-	return combineCodec(getDisclosureLogEncoder(), getDisclosureLogDecoder());
+export function getDisclosureLogCodec(): FixedSizeCodec<DisclosureLogArgs, DisclosureLog> {
+    return combineCodec(getDisclosureLogEncoder(), getDisclosureLogDecoder());
 }
 
-export function decodeDisclosureLog<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress>,
-): Account<DisclosureLog, TAddress>;
-export function decodeDisclosureLog<TAddress extends string = string>(
-	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<DisclosureLog, TAddress>;
-export function decodeDisclosureLog<TAddress extends string = string>(
-	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<DisclosureLog, TAddress> | MaybeAccount<DisclosureLog, TAddress> {
-	return decodeAccount(
-		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getDisclosureLogDecoder(),
-	);
+export function decodeDisclosureLog<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<DisclosureLog, TAddress>;
+export function decodeDisclosureLog<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<DisclosureLog, TAddress>;
+export function decodeDisclosureLog<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<DisclosureLog, TAddress> | MaybeAccount<DisclosureLog, TAddress> {
+  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getDisclosureLogDecoder());
 }
 
 export async function fetchDisclosureLog<TAddress extends string = string>(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	address: Address<TAddress> | HasAddress<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  address: Address<TAddress> | HasAddress<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<Account<DisclosureLog, TAddress>> {
-	const maybeAccount = await fetchMaybeDisclosureLog(rpc, address, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeDisclosureLog(rpc, address, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeDisclosureLog<TAddress extends string = string>(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	address: Address<TAddress> | HasAddress<TAddress>,
-	config?: FetchAccountConfig,
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  address: Address<TAddress> | HasAddress<TAddress>,
+  config?: FetchAccountConfig,
 ): Promise<MaybeAccount<DisclosureLog, TAddress>> {
-	const maybeAccount = await fetchEncodedAccount(
-		"rpc" in rpc ? rpc.rpc : rpc,
-		typeof address === "string" ? address : address.address,
-		config,
-	);
-	return decodeDisclosureLog(maybeAccount);
+  const maybeAccount = await fetchEncodedAccount('rpc' in rpc ? rpc.rpc : rpc, typeof address === 'string' ? address : address.address, config);
+  return decodeDisclosureLog(maybeAccount);
 }
 
 export async function fetchAllDisclosureLog(
-	rpc:
-		| Parameters<typeof fetchEncodedAccounts>[0]
-		| ClientWithRpc<GetMultipleAccountsApi>,
-	addresses: Array<Address | HasAddress>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
+  addresses: Array<Address | HasAddress>,
+  config?: FetchAccountsConfig,
 ): Promise<Account<DisclosureLog>[]> {
-	const maybeAccounts = await fetchAllMaybeDisclosureLog(
-		rpc,
-		addresses,
-		config,
-	);
-	assertAccountsExist(maybeAccounts);
-	return maybeAccounts;
+  const maybeAccounts = await fetchAllMaybeDisclosureLog(rpc, addresses, config);
+  assertAccountsExist(maybeAccounts);
+  return maybeAccounts;
 }
 
 export async function fetchAllMaybeDisclosureLog(
-	rpc:
-		| Parameters<typeof fetchEncodedAccounts>[0]
-		| ClientWithRpc<GetMultipleAccountsApi>,
-	addresses: Array<Address | HasAddress>,
-	config?: FetchAccountsConfig,
+  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
+  addresses: Array<Address | HasAddress>,
+  config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<DisclosureLog>[]> {
-	const maybeAccounts = await fetchEncodedAccounts(
-		"rpc" in rpc ? rpc.rpc : rpc,
-		addresses.map((a) => (typeof a === "string" ? a : a.address)),
-		config,
-	);
-	return maybeAccounts.map((maybeAccount) => decodeDisclosureLog(maybeAccount));
+  const maybeAccounts = await fetchEncodedAccounts('rpc' in rpc ? rpc.rpc : rpc, addresses.map((a) => (typeof a === 'string' ? a : a.address)), config);
+  return maybeAccounts.map((maybeAccount) => decodeDisclosureLog(maybeAccount));
 }
 
 export async function fetchDisclosureLogFromSeeds(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  
+  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<DisclosureLog>> {
-	const maybeAccount = await fetchMaybeDisclosureLogFromSeeds(rpc, config);
-	assertAccountExists(maybeAccount);
-	return maybeAccount;
+  const maybeAccount = await fetchMaybeDisclosureLogFromSeeds(rpc, config);
+  assertAccountExists(maybeAccount);
+  return maybeAccount;
 }
 
 export async function fetchMaybeDisclosureLogFromSeeds(
-	rpc:
-		| Parameters<typeof fetchEncodedAccount>[0]
-		| ClientWithRpc<GetAccountInfoApi>,
-	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
+  
+  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<DisclosureLog>> {
-	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findDisclosureLogPda({ programAddress });
-	return await fetchMaybeDisclosureLog(rpc, address, fetchConfig);
+  const { programAddress, ...fetchConfig } = config;
+  const [address] = await findDisclosureLogPda({ programAddress });
+  return await fetchMaybeDisclosureLog(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */

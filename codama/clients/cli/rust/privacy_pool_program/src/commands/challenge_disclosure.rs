@@ -10,23 +10,19 @@
 )]
 
 use clap::Args;
-use privacy_pool_program_client::instructions::ChallengeDisclosure;
-use privacy_pool_program_client::instructions::ChallengeDisclosureInstructionData;
 
 use crate::context::CliContext;
 use crate::context::CliError;
+use privacy_pool_program_client::instructions::ChallengeDisclosure;
+use privacy_pool_program_client::instructions::ChallengeDisclosureInstructionData;
 
 #[derive(Debug, Args)]
 pub struct ChallengeDisclosureArgs {
-	/// Reserved; must be zero.
 	#[arg(long)]
 	reserved: u8,
 	/// The `disclosure_request` account
 	#[arg(long)]
 	disclosure_request: String,
-	/// The `note_commitment` account
-	#[arg(long)]
-	note_commitment: String,
 	/// The `clock` account
 	#[arg(long)]
 	clock: String,
@@ -34,27 +30,20 @@ pub struct ChallengeDisclosureArgs {
 
 pub(crate) fn run(context: &CliContext, args: ChallengeDisclosureArgs) -> Result<(), CliError> {
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
-	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let viewer = context.payer_pubkey();
 	let clock = CliContext::pubkey("--clock", &args.clock)?;
 	let data = ChallengeDisclosureInstructionData::new(|data| {
 		data.reserved = args.reserved;
 	})
-	.map_err(|_| {
-		CliError::InvalidData {
-			message: "instruction data rejected the provided arguments".to_string(),
-		}
+	.map_err(|_| CliError::InvalidData {
+		message: "instruction data rejected the provided arguments".to_string(),
 	})?;
 
 	let accounts = ChallengeDisclosure {
-		disclosure_request,
-		note_commitment,
-		viewer,
-		clock,
+		disclosure_request: disclosure_request,
+		viewer: viewer,
+		clock: clock,
 	};
 
-	context.send(
-		accounts.instruction(data),
-		Some(privacy_pool_program_client::instructions::CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT),
-	)
+	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT))
 }

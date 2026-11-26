@@ -3,80 +3,62 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import {
-	getWithdrawInstructionAsync,
-	WITHDRAW_COMPUTE_UNIT_LIMIT,
-} from "../client";
-import {
-	base58,
-	base58Vec,
-	bigInteger,
-	CliContext,
-	pubkey,
-	registerGlobals,
-	smallInteger,
-} from "../context";
+import { getWithdrawInstructionAsync, WITHDRAW_COMPUTE_UNIT_LIMIT } from "../client";
+import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
 
 export const withdrawCommand = registerGlobals(new Command("withdraw"))
 	.description("withdraw")
-	.requiredOption(
-		"--nullifier <nullifier>",
-		"Nullifier derived by the circuit from the spent note's secrets.",
-	)
-	.requiredOption(
-		"--root <root>",
-		"Tree root the proof's membership witness was built against.",
-	)
-	.requiredOption("--proof-a <proofA>", "proofA")
+	.requiredOption("--nullifier0-bump <nullifier0Bump>", "nullifier0Bump")
+	.requiredOption("--nullifier1-bump <nullifier1Bump>", "nullifier1Bump")
+	.requiredOption("--nullifier0 <nullifier0>", "nullifier0")
+	.requiredOption("--nullifier1 <nullifier1>", "nullifier1")
+	.requiredOption("--root <root>", "root")
+	.requiredOption("--public-out <publicOut>", "SOL withdrawn to `recipient` in lamports.")
+	.requiredOption("--relayer-fee <relayerFee>", "Optional fee paid from shielded balance to `relayer`.")
+	.requiredOption("--change-commitment <changeCommitment>", "Optional change output commitment (`[0; 32]` if no change).")
+	.requiredOption("--change-view-pubkey <changeViewPubkey>", "changeViewPubkey")
+	.requiredOption("--envelope-len <envelopeLen>", "envelopeLen")
+	.requiredOption("--envelope <envelope>", "envelope")
+	.requiredOption("--shares <shares>", "shares")
+	.requiredOption("--proof-a <proofA>", "192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).")
 	.requiredOption("--proof-b <proofB>", "proofB")
 	.requiredOption("--proof-c <proofC>", "proofC")
-	.option(
-		"--pool-config <poolConfig>",
-		"The `pool_config` account [default: derived]",
-	)
-	.option(
-		"--pool-vault <poolVault>",
-		"The `pool_vault` account [default: derived]",
-	)
-	.option(
-		"--merkle-tree <merkleTree>",
-		"The `merkle_tree` account [default: derived]",
-	)
-	.option(
-		"--nullifier-set <nullifierSet>",
-		"The `nullifier_set` account [default: derived]",
-	)
-	.requiredOption(
-		"--verifying-key-account <verifyingKeyAccount>",
-		"The `verifying_key_account` account",
-	)
+	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
+	.option("--pool-vault <poolVault>", "The `pool_vault` account [default: derived]")
+	.option("--merkle-tree <merkleTree>", "The `merkle_tree` account [default: derived]")
+	.requiredOption("--nullifier-record0 <nullifierRecord0>", "The `nullifier_record0` account")
+	.requiredOption("--nullifier-record1 <nullifierRecord1>", "The `nullifier_record1` account")
+	.requiredOption("--verifying-key-account <verifyingKeyAccount>", "The `verifying_key_account` account")
 	.requiredOption("--recipient <recipient>", "The `recipient` account")
+	.requiredOption("--policy-cosigner <policyCosigner>", "The `policy_cosigner` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-		const input = {
-			nullifier: base58("--nullifier", options.nullifier),
-			root: base58("--root", options.root),
-			proofA: base58("--proof-a", options.proofA),
-			proofB: base58("--proof-b", options.proofB),
-			proofC: base58("--proof-c", options.proofC),
-			poolConfig: options.poolConfig === undefined
-				? undefined
-				: pubkey("--pool-config", options.poolConfig),
-			poolVault: options.poolVault === undefined
-				? undefined
-				: pubkey("--pool-vault", options.poolVault),
-			merkleTree: options.merkleTree === undefined
-				? undefined
-				: pubkey("--merkle-tree", options.merkleTree),
-			nullifierSet: options.nullifierSet === undefined
-				? undefined
-				: pubkey("--nullifier-set", options.nullifierSet),
-			verifyingKeyAccount: pubkey(
-				"--verifying-key-account",
-				options.verifyingKeyAccount,
-			),
-			recipient: pubkey("--recipient", options.recipient),
-		};
+const input = {
+		nullifier0Bump: smallInteger("--nullifier0-bump", options.nullifier0Bump),
+		nullifier1Bump: smallInteger("--nullifier1-bump", options.nullifier1Bump),
+		nullifier0: base58("--nullifier0", options.nullifier0),
+		nullifier1: base58("--nullifier1", options.nullifier1),
+		root: base58("--root", options.root),
+		publicOut: bigInteger("--public-out", options.publicOut),
+		relayerFee: bigInteger("--relayer-fee", options.relayerFee),
+		changeCommitment: base58("--change-commitment", options.changeCommitment),
+		changeViewPubkey: base58("--change-view-pubkey", options.changeViewPubkey),
+		envelopeLen: smallInteger("--envelope-len", options.envelopeLen),
+		envelope: base58("--envelope", options.envelope),
+		shares: base58("--shares", options.shares),
+		proofA: base58("--proof-a", options.proofA),
+		proofB: base58("--proof-b", options.proofB),
+		proofC: base58("--proof-c", options.proofC),
+		payer: context.payer,
+		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
+		poolVault: options.poolVault === undefined ? undefined : pubkey("--pool-vault", options.poolVault),
+		merkleTree: options.merkleTree === undefined ? undefined : pubkey("--merkle-tree", options.merkleTree),
+		nullifierRecord0: pubkey("--nullifier-record0", options.nullifierRecord0),
+		nullifierRecord1: pubkey("--nullifier-record1", options.nullifierRecord1),
+		verifyingKeyAccount: pubkey("--verifying-key-account", options.verifyingKeyAccount),
+		recipient: pubkey("--recipient", options.recipient),
+		policyCosigner: pubkey("--policy-cosigner", options.policyCosigner),
+	};
 		const instruction = await getWithdrawInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

@@ -10,22 +10,9 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class ResolveChallengeCommand extends Command<void> {
   ResolveChallengeCommand() {
     argParser
-      ..addOption(
-        'approve',
-        mandatory: true,
-        help:
-            "Nonzero resolves in the requester's favor (execution may proceed);",
-      )
-      ..addOption(
-        'pool_config',
-        mandatory: false,
-        help: "The pool_config account [default: derived]",
-      )
-      ..addOption(
-        'disclosure_request',
-        mandatory: true,
-        help: "The disclosure_request account",
-      );
+      ..addOption('approve', mandatory: true, help: "approve")
+      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
+      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account");
   }
 
   @override
@@ -41,11 +28,10 @@ final class ResolveChallengeCommand extends Command<void> {
     final authority = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
-    final disclosureRequest = pubkey(
-      '--disclosure-request',
-      results['disclosure_request']! as String,
-    );
+        : (await findPoolConfigPda(
+          programAddress: context.programAddress,
+        )).$1;
+    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
     final approveValue = integer('--approve', results['approve']! as String);
     final instruction = getResolveChallengeInstruction(
       programAddress: context.programAddress,
@@ -54,8 +40,6 @@ final class ResolveChallengeCommand extends Command<void> {
       disclosureRequest: disclosureRequest,
       approve: approveValue,
     );
-    await context.send([
-      instruction,
-    ], recordedLimit: resolveChallengeComputeUnitLimit);
+    await context.send([instruction], recordedLimit: resolveChallengeComputeUnitLimit);
   }
 }
