@@ -1900,9 +1900,15 @@ impl<'a> ProcessAccountInfos<'a> for RegisterAssetAccounts<'a> {
 		self.token_program.assert_addresses(&SPL_PROGRAM_IDS)?;
 		let token_program = *self.token_program.address();
 
-		// Validate mint and confirm the escrow token account belongs to this
-		// mint and is controlled by the `AssetVault` PDA.
-		drop(self.mint.as_token_mint_for_program(&token_program)?);
+		// Validate mint (rejecting Token-2022 extensions such as transfer fees
+		// or hooks that would break shielded pool accounting) and confirm the
+		// escrow token account belongs to this mint and is controlled by the
+		// `AssetVault` PDA.
+		let mint = self
+			.mint
+			.as_token_mint_for_program(&token_program)?
+			.assert_no_extensions()?;
+		drop(mint);
 		let vault_ta = self
 			.vault_token_account
 			.as_token_account_for_program(&token_program)?;
@@ -1957,6 +1963,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositTokenAccounts<'a> {
 		let decimals = self
 			.mint
 			.as_token_mint_for_program(&token_program)?
+			.assert_no_extensions()?
 			.decimals();
 		let vault_before = self
 			.vault_token_account
@@ -2085,6 +2092,7 @@ impl<'a> ProcessAccountInfos<'a> for WithdrawTokenAccounts<'a> {
 		let decimals = self
 			.mint
 			.as_token_mint_for_program(&token_program)?
+			.assert_no_extensions()?
 			.decimals();
 		let bump_bytes = [vault_bump];
 		let signer_seeds = [
