@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { resolveCargoTargetDir } from "./cargo-target-dir.ts";
 import { findExecutable } from "./find-executable.ts";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
@@ -494,8 +495,11 @@ function taskVerifyDocs(): void {
 function taskSecurityPinaLint(): void {
 	run("cargo", ["build", "-p", "pina_lints", "--bin", "pina_lint_driver"]);
 
-	const targetDir = process.env.CARGO_TARGET_DIR ?? join(REPO_ROOT, "target");
-	const driver = join(targetDir, "debug", "pina_lint_driver");
+	const targetDir = resolveCargoTargetDir(REPO_ROOT);
+	const driverName = process.platform === "win32"
+		? "pina_lint_driver.exe"
+		: "pina_lint_driver";
+	const driver = join(targetDir, "debug", driverName);
 	if (!existsSync(driver)) {
 		throw new Error(`Expected built lint driver at ${driver}`);
 	}
@@ -736,7 +740,8 @@ function taskCoverageAll(): void {
 	mkdirSync(coverageDir, { recursive: true });
 
 	// Clear stale profiling data without wiping compiled crate artifacts.
-	if (existsSync(join(REPO_ROOT, "target/llvm-cov-target"))) {
+	const cargoTargetDir = resolveCargoTargetDir(REPO_ROOT, env);
+	if (existsSync(join(cargoTargetDir, "llvm-cov-target"))) {
 		run("cargo", ["llvm-cov", "clean", "--profraw-only", "--workspace"], {
 			env,
 		});

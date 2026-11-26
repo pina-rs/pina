@@ -46,7 +46,21 @@ PINA_BIN="$(
 		'
 )"
 if [ -z "$PINA_BIN" ]; then
-	PINA_BIN="${CARGO_TARGET_DIR:-${CARGO_BUILD_TARGET_DIR:-$ROOT/target}}/debug/pina"
+	TARGET_DIR="$(
+		cargo metadata --format-version 1 --no-deps |
+			node -e '
+				const path = require("node:path");
+				const chunks = [];
+				process.stdin.on("data", (chunk) => chunks.push(chunk));
+				process.stdin.on("end", () => {
+					const metadata = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+					if (typeof metadata.target_directory === "string" && metadata.target_directory.length > 0) {
+						process.stdout.write(path.resolve(metadata.target_directory));
+					}
+				});
+			'
+	)"
+	PINA_BIN="${TARGET_DIR:-$ROOT/target}/debug/pina"
 fi
 
 for program_dir in "${EXAMPLES[@]}"; do

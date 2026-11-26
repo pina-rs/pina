@@ -14,6 +14,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveCargoTargetDir } from "./cargo-target-dir.ts";
 import {
 	DEFAULT_COMPUTE_UNIT_POLICY,
 	loadExampleInventory,
@@ -132,9 +133,7 @@ function main(): number {
 			}
 		}
 		if (pinaBinary === undefined) {
-			const targetDirectory = process.env.CARGO_TARGET_DIR ??
-				process.env.CARGO_BUILD_TARGET_DIR ??
-				join(workspaceRoot, "target");
+			const targetDirectory = resolveCargoTargetDir(workspaceRoot);
 			pinaBinary = join(
 				targetDirectory,
 				"debug",
