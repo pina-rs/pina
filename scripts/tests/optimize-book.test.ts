@@ -24,7 +24,7 @@ import {
 
 const REPO_ROOT = resolve(import.meta.dirname, "../..");
 
-test("minifyCss strips comments and preserves strings, hex escapes, calc, and descendant pseudo-classes", () => {
+test("minifyCss strips comments and preserves strings, hex escapes, escaped punctuation, calc, and descendant pseudo-classes", () => {
 	const css = `
 		/* comment */
 		pre > .buttons :hover {
@@ -34,15 +34,17 @@ viewBox="0 0 10 10"></svg>');
 		}
 		.\\31  .item { color: red; }
 		.\\31 .same { color: blue; }
+		.x\\> .y { color: green; }
+		a > b { color: black; }
 	`;
 	const out = minifyCss(css);
 	assert.equal(
 		out,
-		`pre>.buttons :hover{width:calc(100% - 12px);content:url('data:image/svg+xml,<svg viewBox="0 0 10 10"></svg>')}.\\31  .item{color:red}.\\31 .same{color:blue}`,
+		`pre>.buttons :hover{width:calc(100% - 12px);content:url('data:image/svg+xml,<svg viewBox="0 0 10 10"></svg>')}.\\31  .item{color:red}.\\31 .same{color:blue}.x\\> .y{color:green}a>b{color:black}`,
 	);
 });
 
-test("minifyJs preserves regex literals after control-flow conditions, operators, strings, and template literals", () => {
+test("minifyJs preserves regex literals after control-flow conditions, operators, strings, template literals, and all ECMAScript line terminators", () => {
 	const js = `
 		// line comment
 		const url = "https://pina.rs/docs";
@@ -57,6 +59,15 @@ world\`;
 		function add(a, b) {
 			return a + b;
 		}
+		function crComment() {
+			return/*\r*/ 1;
+		}
+		function lsComment() {
+			return/*\u2028*/ 2;
+		}
+		function psComment() {
+			return/*\u2029*/ 3;
+		}
 	`;
 	const out = minifyJs(js);
 	assert.doesNotThrow(() => new vm.Script(out));
@@ -67,9 +78,23 @@ world\`;
 	assert.match(out, /const quotient = \(a \+ b\) \/ 2;/);
 	assert.match(out, /`hello\nworld`/);
 	assert.doesNotMatch(out, /line comment|block/);
+	const sandbox: Record<string, unknown> = {
+		ok: false,
+		value: "/",
+		a: 2,
+		b: 4,
+	};
+	vm.runInNewContext(
+		`${out}\nglobalThis.__cr = crComment(); globalThis.__ls = lsComment(); globalThis.__ps = psComment(); globalThis.__sum = add(2, 3);`,
+		sandbox,
+	);
+	assert.equal(sandbox.__cr, undefined);
+	assert.equal(sandbox.__ls, undefined);
+	assert.equal(sandbox.__ps, undefined);
+	assert.equal(sandbox.__sum, 5);
 });
 
-test("minifyHtml preserves pre/code and quoted attribute whitespace while minifying inline style/script", () => {
+test("minifyHtml preserves pre/code and quoted attribute whitespace including tag-like text while minifying inline style/script", () => {
 	const html = `<!DOCTYPE html>
 	<html>
 		<head>
@@ -81,6 +106,7 @@ test("minifyHtml preserves pre/code and quoted attribute whitespace while minify
 		</head>
 		<body>
 			<input   type="text"   value="a  b"   title="line 1\n  line 2">
+			<p title="left>  <div right"   data-plain="hello  world">  Text  </p>
 			<p>Hello   <strong>world</strong>  and  <a href="/">links</a></p>
 			<pre><code>  keep   spaces\n  here</code></pre>
 		</body>
@@ -91,6 +117,10 @@ test("minifyHtml preserves pre/code and quoted attribute whitespace while minify
 	assert.match(
 		out,
 		/<input type="text" value="a  b" title="line 1\n  line 2">/,
+	);
+	assert.match(
+		out,
+		/<p title="left>  <div right" data-plain="hello  world">Text<\/p>/,
 	);
 	assert.match(out, /<pre><code>  keep   spaces\n  here<\/code><\/pre>/);
 	assert.match(out, /<strong>world<\/strong> and <a href="\/">links<\/a>/);
@@ -710,9 +740,10 @@ test("emitted lazy-search script retries failed fetches, discards cleared querie
 	const docListeners = new Map<string, Array<(e: unknown) => void>>();
 
 	let fetchCalls = 0;
-	let deferredResolve:
+	let deferredReject = null as ((err: Error) => void) | null;
+	let deferredResolve = null as
 		| ((val: { ok: boolean; json: () => Promise<unknown> }) => void)
-		| null = null;
+		| null;
 
 	const fetchStub = () => {
 		fetchCalls += 1;
@@ -720,6 +751,11 @@ test("emitted lazy-search script retries failed fetches, discards cleared querie
 			return Promise.reject(new Error("offline"));
 		}
 		if (fetchCalls === 2) {
+			return new Promise((_resolvePromise, rejectPromise) => {
+				deferredReject = rejectPromise;
+			});
+		}
+		if (fetchCalls === 3) {
 			return new Promise((resolvePromise) => {
 				deferredResolve = resolvePromise;
 			});
@@ -811,18 +847,31 @@ test("emitted lazy-search script retries failed fetches, discards cleared querie
 	// 1. Both consecutive text nodes containing "Pina" were highlighted via ?highlight=Pina.
 	assert.equal(content.querySelectorAll("mark.pina-hl").length, 2);
 
-	// 2. First search fails -> shows retryable error, does not permanently poison `loading`.
+	// 2. First search fails while query stays active -> shows retryable error, does not permanently poison `loading`.
 	bar.value = "pina";
 	bar.dispatch("input");
 	await flushMicrotasks();
 	assert.equal(fetchCalls, 1);
+	assert.equal(listOuter.classList.contains("hidden"), false);
 	assert.match(header.textContent, /Failed to load search index/);
 	assert.equal(list.querySelectorAll("button").length, 1);
 
-	// 3. Second search starts in-flight fetch; clearing the field before resolution keeps results empty.
+	// 3. Second search fails AFTER reader clears the field -> resets `loading` and keeps results hidden.
 	bar.value = "pina";
 	bar.dispatch("input");
 	assert.equal(fetchCalls, 2);
+	bar.value = "";
+	bar.dispatch("input");
+	assert.equal(listOuter.classList.contains("hidden"), true);
+	deferredReject!(new Error("late failure"));
+	await flushMicrotasks();
+	assert.equal(listOuter.classList.contains("hidden"), true);
+	assert.equal(list.children.length, 0);
+
+	// 4. Third search starts in-flight fetch; clearing the field before resolution keeps results empty.
+	bar.value = "pina";
+	bar.dispatch("input");
+	assert.equal(fetchCalls, 3);
 	bar.value = "";
 	bar.dispatch("input");
 	assert.equal(listOuter.classList.contains("hidden"), true);
@@ -834,16 +883,16 @@ test("emitted lazy-search script retries failed fetches, discards cleared querie
 	assert.equal(listOuter.classList.contains("hidden"), true);
 	assert.equal(list.children.length, 0);
 
-	// 4. Subsequent search reuses cached data (no 3rd fetch) and renders results cleanly.
+	// 5. Subsequent search reuses cached data (no 4th fetch) and renders results cleanly.
 	bar.value = "pina";
 	bar.dispatch("input");
 	await flushMicrotasks();
-	assert.equal(fetchCalls, 2);
+	assert.equal(fetchCalls, 3);
 	assert.equal(listOuter.classList.contains("hidden"), false);
 	assert.match(header.textContent, /1 search result for 'pina':/);
 	assert.equal(list.querySelectorAll("a")[0]?.textContent, "Intro");
 
-	// 5. Teaser matches raw text ("amp &") before HTML escaping without corrupting `&amp;`.
+	// 6. Teaser matches raw text ("amp &") before HTML escaping without corrupting `&amp;`.
 	bar.value = "amp";
 	bar.dispatch("input");
 	await flushMicrotasks();
@@ -985,4 +1034,110 @@ test("emitted lean book script retries failed search-script loads, keeps pending
 		assert.equal(tooltip.textContent, "Clipboard error!");
 		assert.equal(copyEnv.body.children.length, 0);
 	}
+});
+
+test("optimizeBook preserves cascade order for mixed additional-css = [custom.css, theme/override.css] and excludes @import theme sheets", () => {
+	const dir = mkdtempSync(join(tmpdir(), "pina-opt-cascade-"));
+	mkdirSync(join(dir, "css"));
+	mkdirSync(join(dir, "theme"));
+
+	writeFileSync(join(dir, "css/variables.css"), ":root { --bg: #fff; }");
+	writeFileSync(join(dir, "css/general.css"), "body { color: #111; }");
+	writeFileSync(join(dir, "theme/base.css"), ".banner { color: gray; }");
+	writeFileSync(
+		join(dir, "theme/with-import.css"),
+		`@import url("colors.css");\n.imported { color: purple; }`,
+	);
+	writeFileSync(join(dir, "custom.css"), ".banner { color: red; }");
+	writeFileSync(join(dir, "theme/override.css"), ".banner { color: blue; }");
+	writeFileSync(join(dir, "book.js"), "// book");
+	writeFileSync(
+		join(dir, "index.html"),
+		`<!DOCTYPE html><html><head>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/general.css">
+<link rel="stylesheet" href="theme/base.css">
+<link rel="stylesheet" href="custom.css">
+<link rel="stylesheet" href="theme/override.css">
+<link rel="stylesheet" href="theme/with-import.css">
+</head><body><div id="mdbook-body-container"><main><div class="banner">Hi</div></main><script src="book.js"></script></div></body></html>`,
+	);
+
+	const stats = optimizeBook(dir);
+	const html = readFileSync(join(dir, "index.html"), "utf8");
+
+	// Extract every linked stylesheet in final HTML document order and compute
+	// the last equal-specificity `.banner { color: ... }` rule to verify the
+	// later `theme/override.css` sheet still wins over `custom.css`.
+	const linkedHrefs = Array.from(
+		html.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*href="([^"]+)"/gi),
+		(m) => m[1],
+	);
+	assert.deepEqual(linkedHrefs, [
+		stats.bundleCssFile,
+		"custom.css",
+		"theme/override.css",
+		"theme/with-import.css",
+	]);
+
+	let winningBannerColor = "";
+	for (const href of linkedHrefs) {
+		const css = readFileSync(join(dir, href), "utf8");
+		for (const m of css.matchAll(/\.banner\s*\{\s*color\s*:\s*([^;}\s]+)/g)) {
+			winningBannerColor = m[1];
+		}
+	}
+	assert.equal(winningBannerColor, "blue");
+
+	// Contiguous ordinary `theme/base.css` was bundled and removed; `@import` and
+	// post-`custom.css` sheets stayed linked and on disk.
+	assert.equal(existsSync(join(dir, "theme/base.css")), false);
+	assert.equal(existsSync(join(dir, "custom.css")), true);
+	assert.equal(existsSync(join(dir, "theme/override.css")), true);
+	assert.equal(existsSync(join(dir, "theme/with-import.css")), true);
+	assert.doesNotMatch(
+		readFileSync(join(dir, stats.bundleCssFile), "utf8"),
+		/@import/,
+	);
+});
+
+test("optimizeBook rewrites unquoted stylesheet links and keeps superseded assets still referenced by any page", () => {
+	const dir = mkdtempSync(join(tmpdir(), "pina-opt-unquoted-"));
+	mkdirSync(join(dir, "css"));
+
+	writeFileSync(join(dir, "css/variables.css"), ":root { --bg: #fff; }");
+	writeFileSync(join(dir, "css/general.css"), "body { color: #111; }");
+	writeFileSync(join(dir, "book.js"), "// book");
+
+	// Chapter uses unquoted `<link rel=stylesheet href="css/general.css">` and `<link rel=stylesheet href=css/variables.css>`.
+	writeFileSync(
+		join(dir, "index.html"),
+		`<!DOCTYPE html><html><head>
+<link rel=stylesheet href=css/variables.css>
+<link rel=stylesheet href="css/general.css">
+</head><body><div id="mdbook-body-container"><main>Hello</main><script defer src=book.js></script></div></body></html>`,
+	);
+	// Standalone page still links directly to `css/general.css`.
+	writeFileSync(
+		join(dir, "standalone.html"),
+		`<!DOCTYPE html><html><head><link rel=stylesheet href="css/general.css"></head><body><main>Standalone</main></body></html>`,
+	);
+
+	const first = optimizeBook(dir);
+	const chapterHtml = readFileSync(join(dir, "index.html"), "utf8");
+	assert.match(chapterHtml, new RegExp(first.bundleCssFile));
+	assert.doesNotMatch(chapterHtml, /css\/variables\.css|css\/general\.css/);
+	assert.match(chapterHtml, new RegExp(`defer src="${first.bundleJsFile}"`));
+
+	// `css/variables.css` and `book.js` have zero remaining references -> deleted.
+	assert.equal(existsSync(join(dir, "css/variables.css")), false);
+	assert.equal(existsSync(join(dir, "book.js")), false);
+	// `css/general.css` is still referenced by `standalone.html` -> preserved!
+	assert.equal(existsSync(join(dir, "css/general.css")), true);
+
+	// Second run remains idempotent even with `css/general.css` kept on disk.
+	const second = optimizeBook(dir);
+	assert.equal(second.htmlFilesOptimized, 0);
+	assert.equal(second.bundleCssFile, first.bundleCssFile);
+	assert.equal(readFileSync(join(dir, "index.html"), "utf8"), chapterHtml);
 });

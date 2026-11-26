@@ -50,6 +50,10 @@ function isCssWhitespace(ch: string | undefined): boolean {
 	return ch === " " || ch === "\t" || ch === "\n" || ch === "\r" || ch === "\f";
 }
 
+function isJsLineTerminator(ch: string | undefined): boolean {
+	return ch === "\n" || ch === "\r" || ch === "\u2028" || ch === "\u2029";
+}
+
 function isValidJsScript(code: string): boolean {
 	try {
 		new vm.Script(code);
@@ -158,17 +162,18 @@ export function minifyCss(input: string): string {
 			continue;
 		}
 
-		// CSS escapes outside strings: preserve the single whitespace consumed by
-		// a hex escape (`\31 `) separately from any following selector whitespace
-		// so `.\31  .item` retains its descendant combinator.
+		// CSS escapes outside strings: emit each escape as a single token so
+		// escaped punctuation (e.g. `.x\> .y`) is never mistaken for an unescaped
+		// combinator and hex-escape terminators (e.g. `.\31  .item`) keep their
+		// required trailing space separate from selector whitespace.
 		if (ch === "\\") {
 			emitSpaceIfNeeded(ch);
-			out.push(ch);
+			let token = ch;
 			i += 1;
 			if (i < len && isCssHexDigit(input[i])) {
 				let hexCount = 0;
 				while (i < len && hexCount < 6 && isCssHexDigit(input[i])) {
-					out.push(input[i]);
+					token += input[i];
 					i += 1;
 					hexCount += 1;
 				}
@@ -178,12 +183,13 @@ export function minifyCss(input: string): string {
 					} else {
 						i += 1;
 					}
-					out.push(" ");
+					token += " ";
 				}
 			} else if (i < len) {
-				out.push(input[i]);
+				token += input[i];
 				i += 1;
 			}
+			out.push(token);
 			continue;
 		}
 
@@ -269,7 +275,7 @@ export function minifyJs(input: string): string {
 		// Line comment
 		if (ch === "/" && input[i + 1] === "/") {
 			i += 2;
-			while (i < len && input[i] !== "\n") {
+			while (i < len && !isJsLineTerminator(input[i])) {
 				i += 1;
 			}
 			continue;
@@ -280,7 +286,7 @@ export function minifyJs(input: string): string {
 			let j = i + 2;
 			let hadNewline = false;
 			while (j < len && !(input[j] === "*" && input[j + 1] === "/")) {
-				if (input[j] === "\n") {
+				if (isJsLineTerminator(input[j])) {
 					hadNewline = true;
 				}
 				j += 1;
@@ -388,7 +394,7 @@ export function minifyJs(input: string): string {
 					inClass = false;
 				} else if (c === "/" && !inClass) {
 					break;
-				} else if (c === "\n") {
+				} else if (isJsLineTerminator(c)) {
 					break;
 				}
 			}
@@ -417,10 +423,14 @@ export function minifyJs(input: string): string {
 			continue;
 		}
 
-		if (ch === "\n") {
+		if (isJsLineTerminator(ch)) {
+			if (ch === "\r" && input[i + 1] === "\n") {
+				i += 2;
+			} else {
+				i += 1;
+			}
 			flushLine();
 			lastNonWs = "\n";
-			i += 1;
 			continue;
 		}
 
@@ -478,27 +488,76 @@ export function minifyJs(input: string): string {
 }
 
 const STRUCTURAL_TAG_RE =
-	/^\/?(?:html|head|body|meta|link|title|base|style|script|header|nav|main|section|article|aside|footer|div|ul|ol|li|dl|dt|dd|table|thead|tbody|tfoot|tr|th|td|caption|colgroup|col|h[1-6]|p|blockquote|figure|figcaption|details|summary|form|fieldset|legend|hr|template|noscript|iframe|svg|g|defs|symbol|path|circle|rect|line|polygon|polyline|mdbook-sidebar-scrollbox)\b/i;
+	/^\/?(?:!doctype|html|head|body|meta|link|title|base|style|script|header|nav|main|section|article|aside|footer|div|ul|ol|li|dl|dt|dd|table|thead|tbody|tfoot|tr|th|td|caption|colgroup|col|h[1-6]|p|blockquote|figure|figcaption|details|summary|form|fieldset|legend|hr|template|noscript|iframe|svg|g|defs|symbol|path|circle|rect|line|polygon|polyline|mdbook-sidebar-scrollbox)$/i;
+
+const CONTAINER_TAG_RE =
+	/^(?:html|head|body|header|nav|main|section|article|aside|footer|div|ul|ol|li|table|thead|tbody|tr|th|td|h[1-6]|p|blockquote|details|summary|form|template|noscript|svg|g|defs|symbol)$/i;
+
+interface HtmlToken {
+	kind: "tag" | "text";
+	text: string;
+	tagToken: string;
+}
 
 /**
- * Collapses whitespace in text nodes and between tag attributes without ever
- * modifying whitespace inside quoted HTML attribute values.
+ * Tokenizes HTML outside raw blocks into quote-aware tags and text runs while
+ * stripping standard HTML comments (keeping conditional comments) so quoted
+ * attribute values containing `>`, `<`, spaces, or `<!--` are never altered.
  */
-function collapseHtmlWhitespaceOutsideAttributes(html: string): string {
-	const out: string[] = [];
+function tokenizeHtmlOutsideRawBlocks(
+	html: string,
+	collapseTagWs: boolean,
+): HtmlToken[] {
+	const tokens: HtmlToken[] = [];
+	const pushText = (chunk: string): void => {
+		if (!chunk) {
+			return;
+		}
+		const prev = tokens[tokens.length - 1];
+		if (prev && prev.kind === "text") {
+			prev.text += chunk;
+		} else {
+			tokens.push({ kind: "text", text: chunk, tagToken: "" });
+		}
+	};
+
 	const len = html.length;
 	let i = 0;
 
 	while (i < len) {
 		if (html[i] === "<") {
+			if (html.startsWith("<!--", i)) {
+				const end = html.indexOf("-->", i + 4);
+				if (end === -1) {
+					pushText(html.slice(i));
+					break;
+				}
+				if (html.startsWith("<!--[if", i)) {
+					tokens.push({
+						kind: "tag",
+						text: html.slice(i, end + 3),
+						tagToken: "",
+					});
+				}
+				i = end + 3;
+				continue;
+			}
+
+			const next = html[i + 1] ?? "";
+			if (!/[!/a-zA-Z?]/.test(next)) {
+				pushText("<");
+				i += 1;
+				continue;
+			}
+
 			let quote = "";
 			let tagPendingWs = false;
-			out.push("<");
+			const tagOut: string[] = ["<"];
 			i += 1;
 			while (i < len) {
 				const ch = html[i];
 				if (quote) {
-					out.push(ch);
+					tagOut.push(ch);
 					i += 1;
 					if (ch === quote) {
 						quote = "";
@@ -506,47 +565,55 @@ function collapseHtmlWhitespaceOutsideAttributes(html: string): string {
 					continue;
 				}
 				if (ch === '"' || ch === "'") {
-					if (tagPendingWs) {
-						out.push(" ");
+					if (collapseTagWs && tagPendingWs) {
+						tagOut.push(" ");
 						tagPendingWs = false;
 					}
 					quote = ch;
-					out.push(ch);
+					tagOut.push(ch);
 					i += 1;
 					continue;
 				}
 				if (ch === ">") {
 					tagPendingWs = false;
-					out.push(ch);
+					tagOut.push(ch);
 					i += 1;
 					break;
 				}
-				if (ch === " " || ch === "\t" || ch === "\r" || ch === "\n") {
+				if (
+					collapseTagWs &&
+					(ch === " " || ch === "\t" || ch === "\r" || ch === "\n")
+				) {
 					tagPendingWs = true;
 					i += 1;
 					continue;
 				}
-				if (tagPendingWs) {
-					out.push(" ");
+				if (collapseTagWs && tagPendingWs) {
+					tagOut.push(" ");
 					tagPendingWs = false;
 				}
-				out.push(ch);
+				tagOut.push(ch);
 				i += 1;
 			}
+			const tagText = tagOut.join("");
+			const nameMatch = /^<(\/?[a-zA-Z][a-zA-Z0-9-]*|!doctype)\b/i.exec(
+				tagText,
+			);
+			tokens.push({
+				kind: "tag",
+				text: tagText,
+				tagToken: nameMatch?.[1] ?? "",
+			});
 			continue;
 		}
 
 		const nextTag = html.indexOf("<", i);
 		const end = nextTag === -1 ? len : nextTag;
-		const text = html
-			.slice(i, end)
-			.replace(/[ \t]*[\r\n]+[ \t]*/g, " ")
-			.replace(/[ \t]{2,}/g, " ");
-		out.push(text);
+		pushText(html.slice(i, end));
 		i = end;
 	}
 
-	return out.join("");
+	return tokens;
 }
 
 function extractAndMinifyRawBlocks(input: string): {
@@ -557,7 +624,7 @@ function extractAndMinifyRawBlocks(input: string): {
 	const placeholder = (index: number) => `\u0000RAW${index}\u0000`;
 
 	const withPlaceholders = input.replace(
-		/<(pre|code|textarea|script|style)(\b[^>]*)>([\s\S]*?)<\/\1>/gi,
+		/<(pre|code|textarea|script|style)((?:\s+(?:[^>"']|"[^"]*"|'[^']*')*)?)>([\s\S]*?)<\/\1>/gi,
 		(full, tag: string, attrs: string, body: string) => {
 			const lower = tag.toLowerCase();
 			let replacement = full;
@@ -596,8 +663,8 @@ function restoreRawBlocks(html: string, rawBlocks: readonly string[]): string {
  */
 export function minifyStandaloneHtml(input: string): string {
 	const { withPlaceholders, rawBlocks } = extractAndMinifyRawBlocks(input);
-	const out = withPlaceholders.replace(/<!--(?!\[if)[\s\S]*?-->/g, "");
-	return restoreRawBlocks(out, rawBlocks).trim();
+	const tokens = tokenizeHtmlOutsideRawBlocks(withPlaceholders, false);
+	return restoreRawBlocks(tokens.map((t) => t.text).join(""), rawBlocks).trim();
 }
 
 /**
@@ -607,35 +674,45 @@ export function minifyStandaloneHtml(input: string): string {
  */
 export function minifyHtml(input: string): string {
 	const { withPlaceholders, rawBlocks } = extractAndMinifyRawBlocks(input);
+	const tokens = tokenizeHtmlOutsideRawBlocks(withPlaceholders, true);
 
-	// Strip HTML comments (keep conditional/IE comments if any exist).
-	let out = withPlaceholders.replace(/<!--(?!\[if)[\s\S]*?-->/g, "");
+	for (let k = 0; k < tokens.length; k += 1) {
+		const token = tokens[k];
+		if (token.kind !== "text") {
+			continue;
+		}
+		let text = token.text
+			.replace(/[ \t]*[\r\n]+[ \t]*/g, " ")
+			.replace(/[ \t]{2,}/g, " ");
+		const prev = k > 0 ? tokens[k - 1] : null;
+		const next = k + 1 < tokens.length ? tokens[k + 1] : null;
 
-	// Collapse whitespace between tags when at least one side is structural.
-	out = out.replace(
-		/>[ \t\r\n]+<(\/?[a-zA-Z0-9-]+)/g,
-		(_match, nextTag: string) => {
-			if (STRUCTURAL_TAG_RE.test(nextTag)) {
-				return `><${nextTag}`;
-			}
-			return `> <${nextTag}`;
-		},
-	);
+		if (
+			prev?.kind === "tag" &&
+			(CONTAINER_TAG_RE.test(prev.tagToken.replace(/^\//, "")) ||
+				prev.tagToken.toLowerCase() === "!doctype")
+		) {
+			text = text.replace(/^ /, "");
+		}
+		if (
+			next?.kind === "tag" &&
+			next.tagToken.startsWith("/") &&
+			CONTAINER_TAG_RE.test(next.tagToken.slice(1))
+		) {
+			text = text.replace(/ $/, "");
+		}
+		if (
+			text === " " &&
+			prev?.kind === "tag" &&
+			next?.kind === "tag" &&
+			STRUCTURAL_TAG_RE.test(next.tagToken)
+		) {
+			text = "";
+		}
+		token.text = text;
+	}
 
-	// Also collapse whitespace directly after closing structural tags before text or inline tags.
-	out = out.replace(
-		/<(\/?(?:html|head|body|header|nav|main|section|article|aside|footer|div|ul|ol|li|table|thead|tbody|tr|th|td|h[1-6]|p|blockquote|details|summary|form|template|noscript|svg|g|defs|symbol)\b[^>]*)>[ \t\r\n]+/gi,
-		"<$1>",
-	);
-	out = out.replace(
-		/[ \t\r\n]+<(\/(?:html|head|body|header|nav|main|section|article|aside|footer|div|ul|ol|li|table|thead|tbody|tr|th|td|h[1-6]|p|blockquote|details|summary|form|template|noscript|svg|g|defs|symbol))>/gi,
-		"<$1>",
-	);
-
-	// Collapse runs of whitespace in text nodes and tag delimiters without touching quoted attributes.
-	out = collapseHtmlWhitespaceOutsideAttributes(out);
-
-	return restoreRawBlocks(out, rawBlocks).trim();
+	return restoreRawBlocks(tokens.map((t) => t.text).join(""), rawBlocks).trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -1130,7 +1207,7 @@ loading=null;
 lastQuery="";
 outer.classList.remove("searching");
 console.error(err);
-showLoadError();
+if(bar.value.trim()){showLoadError();}
 return null;
 });
 }
@@ -1645,16 +1722,17 @@ export function rebaseCssUrls(
 		return css;
 	}
 	return css.replace(
-		/url\(\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|([^)'"\s][^)]*))\s*\)/g,
+		/url\(\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|([^)'"\s][^)]*))\s*\)/gi,
 		(full, dq?: string, sq?: string, unquoted?: string) => {
 			const quote = dq !== undefined ? '"' : sq !== undefined ? "'" : "";
 			const rawUrl = dq ?? sq ?? unquoted ?? "";
 			const trimmed = rawUrl.trim();
+			const lower = trimmed.toLowerCase();
 			if (
 				!trimmed ||
-				trimmed.startsWith("data:") ||
-				trimmed.startsWith("http:") ||
-				trimmed.startsWith("https:") ||
+				lower.startsWith("data:") ||
+				lower.startsWith("http:") ||
+				lower.startsWith("https:") ||
 				trimmed.startsWith("//") ||
 				trimmed.startsWith("/") ||
 				trimmed.startsWith("#")
@@ -1730,13 +1808,14 @@ function removeEmptyDir(dirPath: string): void {
 
 function resolveBookRelativeHref(href: string, prefix: string): string | null {
 	const cleaned = href.replace(/[?#][\s\S]*$/, "");
+	const lower = cleaned.toLowerCase();
 	if (
 		!cleaned ||
-		cleaned.startsWith("http:") ||
-		cleaned.startsWith("https:") ||
+		lower.startsWith("http:") ||
+		lower.startsWith("https:") ||
 		cleaned.startsWith("//") ||
 		cleaned.startsWith("/") ||
-		cleaned.startsWith("data:")
+		lower.startsWith("data:")
 	) {
 		return null;
 	}
@@ -1745,6 +1824,206 @@ function resolveBookRelativeHref(href: string, prefix: string): string | null {
 	}
 	const withoutPrefix = prefix ? cleaned.slice(prefix.length) : cleaned;
 	return posix.normalize(withoutPrefix);
+}
+
+function resolvePageRelativeAsset(
+	href: string,
+	pageRel: string,
+): string | null {
+	const cleaned = href.replace(/[?#][\s\S]*$/, "");
+	const lower = cleaned.toLowerCase();
+	if (
+		!cleaned ||
+		lower.startsWith("http:") ||
+		lower.startsWith("https:") ||
+		cleaned.startsWith("//") ||
+		cleaned.startsWith("/") ||
+		lower.startsWith("data:")
+	) {
+		return null;
+	}
+	const dir = posix.dirname(pageRel);
+	const resolved = dir === "."
+		? posix.normalize(cleaned)
+		: posix.normalize(posix.join(dir, cleaned));
+	if (resolved.startsWith("../") || resolved === "..") {
+		return null;
+	}
+	return resolved;
+}
+
+const LINK_TAG_RE = /<link\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
+const SCRIPT_OPEN_TAG_RE = /<script\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
+const EMPTY_SCRIPT_ELEM_RE =
+	/<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>\s*<\/script>\s*/gi;
+
+function parseHtmlTagAttributes(tag: string): Map<string, string> {
+	const attrs = new Map<string, string>();
+	const match = /^<[a-zA-Z][a-zA-Z0-9-]*([\s\S]*?)\/?>$/.exec(tag.trim());
+	if (!match) {
+		return attrs;
+	}
+	const attrRe =
+		/([a-zA-Z_:][a-zA-Z0-9_.:-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+	for (const m of match[1].matchAll(attrRe)) {
+		const name = m[1].toLowerCase();
+		const value = m[2] ?? m[3] ?? m[4] ?? "";
+		if (!attrs.has(name)) {
+			attrs.set(name, value);
+		}
+	}
+	return attrs;
+}
+
+function isStylesheetRel(rel: string | undefined): boolean {
+	if (!rel) {
+		return false;
+	}
+	const tokens = rel.toLowerCase().split(/\s+/).filter(Boolean);
+	return tokens.includes("stylesheet") && !tokens.includes("alternate");
+}
+
+function hasCssImportRule(css: string): boolean {
+	const len = css.length;
+	let i = 0;
+	while (i < len) {
+		const ch = css[i];
+		if (ch === "/" && css[i + 1] === "*") {
+			i += 2;
+			while (i < len && !(css[i] === "*" && css[i + 1] === "/")) {
+				i += 1;
+			}
+			i += 2;
+			continue;
+		}
+		if (ch === '"' || ch === "'") {
+			const quote = ch;
+			i += 1;
+			while (i < len) {
+				const c = css[i];
+				if (c === "\\" && i + 1 < len) {
+					i += 2;
+					continue;
+				}
+				i += 1;
+				if (c === quote) {
+					break;
+				}
+			}
+			continue;
+		}
+		if (ch === "@" && css.slice(i, i + 7).toLowerCase() === "@import") {
+			const next = css[i + 7] ?? "";
+			if (!/[a-zA-Z0-9_-]/.test(next)) {
+				return true;
+			}
+		}
+		i += 1;
+	}
+	return false;
+}
+
+function collectReferencedAssets(
+	html: string,
+	pageRel: string,
+	refs: Set<string>,
+): void {
+	for (const match of html.matchAll(LINK_TAG_RE)) {
+		const href = parseHtmlTagAttributes(match[0]).get("href");
+		if (!href) {
+			continue;
+		}
+		const resolved = resolvePageRelativeAsset(href, pageRel);
+		if (resolved) {
+			refs.add(resolved);
+		}
+	}
+	for (const match of html.matchAll(SCRIPT_OPEN_TAG_RE)) {
+		const src = parseHtmlTagAttributes(match[0]).get("src");
+		if (!src) {
+			continue;
+		}
+		const resolved = resolvePageRelativeAsset(src, pageRel);
+		if (resolved) {
+			refs.add(resolved);
+		}
+	}
+}
+
+/**
+ * Selects only `theme/*.css` files that contain no `@import` rules and appear
+ * contiguously with the built-in stylesheets before any unbundled stylesheet
+ * link so bundling never breaks `@import` or alters CSS cascade order (e.g.
+ * `additional-css = ["custom.css", "theme/override.css"]`).
+ */
+function selectContiguousThemeCss(
+	root: string,
+	htmlFiles: readonly string[],
+	builtInCssSet: ReadonlySet<string>,
+	themeCssFiles: readonly string[],
+): string[] {
+	if (themeCssFiles.length === 0) {
+		return [];
+	}
+	const themeSet = new Set(themeCssFiles);
+	const blocked = new Set<string>(
+		themeCssFiles.filter((f) =>
+			hasCssImportRule(readFileSync(join(root, f), "utf8"))
+		),
+	);
+	const linkOrder: string[] = [];
+	const seenOrder = new Set<string>();
+
+	for (const relHtml of htmlFiles) {
+		if (relHtml === "toc.html") {
+			continue;
+		}
+		const html = readFileSync(join(root, relHtml), "utf8");
+		if (!html.includes("mdbook-body-container")) {
+			continue;
+		}
+		const dirRel = posix.dirname(relHtml);
+		const prefix = dirRel === "."
+			? ""
+			: `${"../".repeat(dirRel.split("/").length)}`;
+		let sawUnbundled = false;
+		for (const match of html.matchAll(LINK_TAG_RE)) {
+			const attrs = parseHtmlTagAttributes(match[0]);
+			if (!isStylesheetRel(attrs.get("rel"))) {
+				continue;
+			}
+			const href = attrs.get("href");
+			if (!href) {
+				continue;
+			}
+			const relTarget = resolveBookRelativeHref(href, prefix);
+			if (!relTarget) {
+				sawUnbundled = true;
+				continue;
+			}
+			if (builtInCssSet.has(relTarget)) {
+				continue;
+			}
+			if (themeSet.has(relTarget) && !blocked.has(relTarget)) {
+				if (sawUnbundled) {
+					blocked.add(relTarget);
+				} else if (!seenOrder.has(relTarget)) {
+					seenOrder.add(relTarget);
+					linkOrder.push(relTarget);
+				}
+			} else {
+				sawUnbundled = true;
+			}
+		}
+	}
+
+	const ordered = linkOrder.filter((f) => !blocked.has(f));
+	for (const f of themeCssFiles) {
+		if (!blocked.has(f) && !seenOrder.has(f)) {
+			ordered.push(f);
+		}
+	}
+	return ordered;
 }
 
 // ---------------------------------------------------------------------------
@@ -1804,39 +2083,43 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 	const pinaJs = findSingle(files, /^theme\/pina(?:-[a-f0-9]+)?\.js$/);
 	const isPinaBranded = pinaCss !== null && pinaJs !== null;
 
-	// Detect already-optimized output so a second invocation is a safe no-op.
+	const htmlFiles = files.filter((f) => f.endsWith(".html"));
+
+	// Detect already-optimized output so a second invocation is a safe no-op
+	// even when a standalone page intentionally retains an original asset.
 	const existingBundleCss = findSingle(
 		files,
 		/^assets\/book-[a-f0-9]{8}\.css$/,
 	);
 	const existingBundleJs = findSingle(files, /^assets\/book-[a-f0-9]{8}\.js$/);
-	const hasUnoptimizedSources = Boolean(
-		variablesCss ||
-			generalCss ||
-			chromeCss ||
-			bookJs ||
-			tocJs ||
-			highlightJs ||
-			searchIndexJs,
-	);
-	if ((existingBundleCss || existingBundleJs) && !hasUnoptimizedSources) {
-		return {
-			htmlFilesOptimized: 0,
-			bundleCssFile: existingBundleCss ?? "",
-			bundleJsFile: existingBundleJs ?? "",
-			searchDataFile: findSingle(
-				files,
-				/^assets\/search-data-[a-f0-9]{8}\.json$/,
-			),
-			searchJsFile: findSingle(files, /^assets\/search-[a-f0-9]{8}\.js$/),
-		};
+	if (existingBundleCss || existingBundleJs) {
+		const alreadyOptimized = htmlFiles.some((relHtml) => {
+			const text = readFileSync(join(root, relHtml), "utf8");
+			return (
+				(existingBundleCss !== null && text.includes(existingBundleCss)) ||
+				(existingBundleJs !== null && text.includes(existingBundleJs))
+			);
+		});
+		if (alreadyOptimized) {
+			return {
+				htmlFilesOptimized: 0,
+				bundleCssFile: existingBundleCss ?? "",
+				bundleJsFile: existingBundleJs ?? "",
+				searchDataFile: findSingle(
+					files,
+					/^assets\/search-data-[a-f0-9]{8}\.json$/,
+				),
+				searchJsFile: findSingle(files, /^assets\/search-[a-f0-9]{8}\.js$/),
+			};
+		}
 	}
 
 	const assetsDir = join(root, "assets");
 	mkdirSync(assetsDir, { recursive: true });
 
 	// 1. Bundle & minify discovered CSS into a single hashed stylesheet,
-	// tracking every file that the bundle actually supersedes.
+	// tracking every file that the bundle actually supersedes without reordering
+	// custom stylesheets or breaking `@import` rules.
 	const cssParts: string[] = [];
 	const supersededCssFiles = new Set<string>();
 	const bundleCssPlaceholder = "assets/book.css";
@@ -1900,8 +2183,26 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 		}
 	}
 
-	// Include any custom theme stylesheets (e.g. `theme/pina-*.css`).
-	const themeCssFiles = files.filter((f) => /^theme\/.*\.css$/.test(f));
+	// Include only contiguous custom theme stylesheets without `@import` rules
+	// so bundling never alters cascade order relative to retained `additional-css`.
+	const builtInCssSet = new Set<string>(
+		[
+			variablesCss,
+			generalCss,
+			chromeCss,
+			printCss,
+			fontsCss,
+			hlLightCss,
+			hlDarkCss,
+			hlAyuCss,
+		].filter((x): x is string => x !== null),
+	);
+	const themeCssFiles = selectContiguousThemeCss(
+		root,
+		htmlFiles,
+		builtInCssSet,
+		files.filter((f) => /^theme\/.*\.css$/.test(f)),
+	);
 	for (const cssFile of themeCssFiles) {
 		addCss(cssFile);
 	}
@@ -1973,8 +2274,18 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 	// 4. Load highlight.js once into a VM sandbox for build-time syntax highlighting.
 	const hljs = highlightJs ? loadHljs(root, highlightJs) : null;
 
-	// 5. Rewrite every HTML file in the built book.
-	const htmlFiles = files.filter((f) => f.endsWith(".html"));
+	// 5. Rewrite every HTML file in the built book and record remaining asset refs.
+	const remainingAssetRefs = new Set<string>();
+	const obsoleteScriptSet = new Set<string>(
+		[
+			elasticlunrJs,
+			markJs,
+			searcherJs,
+			clipboardJs,
+			highlightJs,
+			pinaJs,
+		].filter((x): x is string => x !== null),
+	);
 	let htmlFilesOptimized = 0;
 
 	for (const relHtml of htmlFiles) {
@@ -1987,7 +2298,9 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 		const isMdBookPage = html.includes("mdbook-body-container") ||
 			relHtml === "toc.html";
 		if (!isMdBookPage) {
-			writeFileSync(absHtml, minifyStandaloneHtml(html));
+			const minified = minifyStandaloneHtml(html);
+			writeFileSync(absHtml, minified);
+			collectReferencedAssets(minified, relHtml, remainingAssetRefs);
 			htmlFilesOptimized += 1;
 			continue;
 		}
@@ -1998,18 +2311,22 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 			: `${"../".repeat(dirRel.split("/").length)}`;
 		const homeHref = prefix === "" ? "./" : prefix;
 
-		// Replace only stylesheet `<link>` tags that the bundle actually supersedes,
-		// preserving custom `additional-css` outside `theme/` and external sheets.
+		// Replace only stylesheet `<link>` tags that the bundle actually supersedes
+		// (supporting quoted and unquoted `rel` / `href` attributes in any order).
 		if (bundleCssRel) {
 			let insertedBundle = false;
 			html = html.replace(
-				/<link\b[^>]*\brel=["']stylesheet["'][^>]*>\s*/gi,
+				new RegExp(`${LINK_TAG_RE.source}\\s*`, "gi"),
 				(fullTag) => {
-					const hrefMatch = /\bhref=["']([^"']+)["']/i.exec(fullTag);
-					if (!hrefMatch) {
+					const attrs = parseHtmlTagAttributes(fullTag);
+					if (!isStylesheetRel(attrs.get("rel"))) {
 						return fullTag;
 					}
-					const relTarget = resolveBookRelativeHref(hrefMatch[1], prefix);
+					const href = attrs.get("href");
+					if (!href) {
+						return fullTag;
+					}
+					const relTarget = resolveBookRelativeHref(href, prefix);
 					if (!relTarget || !supersededCssFiles.has(relTarget)) {
 						return fullTag;
 					}
@@ -2023,25 +2340,11 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 		}
 
 		if (relHtml === "toc.html") {
-			writeFileSync(absHtml, minifyHtml(html));
+			const minified = minifyHtml(html);
+			writeFileSync(absHtml, minified);
+			collectReferencedAssets(minified, relHtml, remainingAssetRefs);
 			htmlFilesOptimized += 1;
 			continue;
-		}
-
-		// Replace `<script src="...toc-*.js">` in `<head>` with the single
-		// deferred `assets/book-<hash>.js` bundle so download starts immediately
-		// without blocking HTML parsing or First Contentful Paint.
-		let insertedBookScript = false;
-		if (tocJs) {
-			html = html.replace(
-				new RegExp(
-					`<script\\s+src="${escapeRegex(prefix + tocJs)}"\\s*><\\/script>`,
-				),
-				() => {
-					insertedBookScript = true;
-					return `<script defer src="${prefix}${bundleJsRel}"></script>`;
-				},
-			);
 		}
 
 		// Drop `window.path_to_searchindex_js` (handled by compact JSON searcher).
@@ -2099,45 +2402,40 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 			}
 		}
 
-		// Remove obsolete synchronous `<script src="...">` tags and replace `book-*.js`
-		// with the single deferred lean runtime bundle.
-		const obsoleteScripts = [
-			elasticlunrJs,
-			markJs,
-			searcherJs,
-			clipboardJs,
-			highlightJs,
-			pinaJs,
-		].filter((x): x is string => x !== null);
+		// Rewrite `<script ... src=...>` tags by parsed `src` regardless of quoting
+		// or extra attributes (such as `defer` or `type`), replacing `toc.js` /
+		// `book.js` with the single deferred lean runtime bundle and dropping
+		// superseded scripts.
+		let insertedBookScript = false;
+		html = html.replace(EMPTY_SCRIPT_ELEM_RE, (fullTag, rawAttrs: string) => {
+			const rawSrc = parseHtmlTagAttributes(`<script${rawAttrs}>`).get("src");
+			if (!rawSrc) {
+				return fullTag;
+			}
+			const relTarget = resolveBookRelativeHref(rawSrc, prefix);
+			if (!relTarget) {
+				return fullTag;
+			}
+			if (obsoleteScriptSet.has(relTarget)) {
+				return "";
+			}
+			if ((tocJs && relTarget === tocJs) || (bookJs && relTarget === bookJs)) {
+				if (insertedBookScript) {
+					return "";
+				}
+				insertedBookScript = true;
+				return `<script defer src="${prefix}${bundleJsRel}"></script>`;
+			}
+			return fullTag;
+		});
 
-		for (const scriptRel of obsoleteScripts) {
-			html = html.replace(
-				new RegExp(
-					`<script\\s+src="${
-						escapeRegex(prefix + scriptRel)
-					}"\\s*><\\/script>\\s*`,
-				),
-				"",
-			);
-		}
-		if (bookJs) {
-			html = html.replace(
-				new RegExp(
-					`<script\\s+src="${
-						escapeRegex(prefix + bookJs)
-					}"\\s*><\\/script>\\s*`,
-				),
-				insertedBookScript
-					? ""
-					: `<script defer src="${prefix}${bundleJsRel}"></script>`,
-			);
-		}
-
-		writeFileSync(absHtml, minifyHtml(html));
+		const minified = minifyHtml(html);
+		writeFileSync(absHtml, minified);
+		collectReferencedAssets(minified, relHtml, remainingAssetRefs);
 		htmlFilesOptimized += 1;
 	}
 
-	// 6. Delete only assets actually superseded by the bundles.
+	// 6. Delete only superseded assets that no output HTML file still references.
 	const toDelete = [
 		highlightJs,
 		bookJs,
@@ -2151,7 +2449,7 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 		...(bundleCssRel ? Array.from(supersededCssFiles) : []),
 	];
 	for (const rel of toDelete) {
-		if (rel) {
+		if (rel && !remainingAssetRefs.has(rel)) {
 			removeIfExists(join(root, rel));
 		}
 	}
@@ -2165,10 +2463,6 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 		searchDataFile: searchDataRel,
 		searchJsFile: searchJsRel,
 	};
-}
-
-function escapeRegex(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function main(): number {
