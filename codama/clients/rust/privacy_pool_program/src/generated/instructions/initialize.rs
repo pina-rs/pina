@@ -39,27 +39,33 @@ impl Initialize {
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			pool_vault: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-vault".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			merkle_tree: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-tree".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			custodian_registry: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-custodians".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			requester_registry: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-requesters".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			disclosure_log: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-log".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 			program_data,
 		}
@@ -77,14 +83,35 @@ impl Initialize {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.authority, true));
-		accounts.push(solana_instruction::AccountMeta::new(self.pool_config, false));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.pool_config,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.merkle_tree, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.custodian_registry, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.requester_registry, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.disclosure_log, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.program_data, false));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.merkle_tree,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.custodian_registry,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.requester_registry,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.disclosure_log,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.program_data,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -100,14 +127,16 @@ pub struct InitializeInstructionData {
 }
 
 impl InitializeInstructionData {
-	pub fn new(configure: impl FnOnce(&mut InitializeInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut InitializeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<InitializeInstructionWireZc>()];
 		<InitializeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = INITIALIZE_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

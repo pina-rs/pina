@@ -38,17 +38,30 @@ pub struct WithdrawToken {
 }
 
 impl WithdrawToken {
-	pub fn new(payer: solana_pubkey::Pubkey, nullifier_record0: solana_pubkey::Pubkey, nullifier_record1: solana_pubkey::Pubkey, verifying_key_account: solana_pubkey::Pubkey, mint: solana_pubkey::Pubkey, vault_token_account: solana_pubkey::Pubkey, recipient_token_account: solana_pubkey::Pubkey, relayer_token_account: solana_pubkey::Pubkey, policy_cosigner: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		payer: solana_pubkey::Pubkey,
+		nullifier_record0: solana_pubkey::Pubkey,
+		nullifier_record1: solana_pubkey::Pubkey,
+		verifying_key_account: solana_pubkey::Pubkey,
+		mint: solana_pubkey::Pubkey,
+		vault_token_account: solana_pubkey::Pubkey,
+		recipient_token_account: solana_pubkey::Pubkey,
+		relayer_token_account: solana_pubkey::Pubkey,
+		policy_cosigner: solana_pubkey::Pubkey,
+		token_program: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			payer,
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			merkle_tree: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-tree".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			nullifier_record0,
 			nullifier_record1,
 			verifying_key_account,
@@ -56,7 +69,8 @@ impl WithdrawToken {
 			asset_vault: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-asset".as_bytes(), mint.as_ref()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			vault_token_account,
 			recipient_token_account,
 			relayer_token_account,
@@ -66,7 +80,10 @@ impl WithdrawToken {
 		}
 	}
 
-	pub fn instruction(&self, data: WithdrawTokenInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: WithdrawTokenInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -78,19 +95,57 @@ impl WithdrawToken {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(14 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.payer, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.pool_config, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.merkle_tree, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.nullifier_record0, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.nullifier_record1, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.verifying_key_account, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.asset_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.vault_token_account, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.recipient_token_account, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.relayer_token_account, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.policy_cosigner, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.pool_config,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.merkle_tree,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.nullifier_record0,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.nullifier_record1,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.verifying_key_account,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.mint, false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.asset_vault,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.vault_token_account,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.recipient_token_account,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.relayer_token_account,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.policy_cosigner,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.token_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -106,14 +161,16 @@ pub struct WithdrawTokenInstructionData {
 }
 
 impl WithdrawTokenInstructionData {
-	pub fn new(configure: impl FnOnce(&mut WithdrawTokenInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut WithdrawTokenInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<WithdrawTokenInstructionWireZc>()];
 		<WithdrawTokenInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = WITHDRAW_TOKEN_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

@@ -3,8 +3,19 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getTransferInstructionAsync, TRANSFER_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getTransferInstructionAsync,
+	TRANSFER_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
 export const transferCommand = registerGlobals(new Command("transfer"))
 	.description("transfer")
@@ -13,7 +24,10 @@ export const transferCommand = registerGlobals(new Command("transfer"))
 	.requiredOption("--nullifier0 <nullifier0>", "nullifier0")
 	.requiredOption("--nullifier1 <nullifier1>", "nullifier1")
 	.requiredOption("--root <root>", "root")
-	.requiredOption("--relayer-fee <relayerFee>", "Optional SOL relayer fee deducted from shielded inputs.")
+	.requiredOption(
+		"--relayer-fee <relayerFee>",
+		"Optional SOL relayer fee deducted from shielded inputs.",
+	)
 	.requiredOption("--out0-commitment <out0Commitment>", "out0Commitment")
 	.requiredOption("--out0-view-pubkey <out0ViewPubkey>", "out0ViewPubkey")
 	.requiredOption("--out0-envelope-len <out0EnvelopeLen>", "out0EnvelopeLen")
@@ -22,45 +36,84 @@ export const transferCommand = registerGlobals(new Command("transfer"))
 	.requiredOption("--out1-view-pubkey <out1ViewPubkey>", "out1ViewPubkey")
 	.requiredOption("--out1-envelope-len <out1EnvelopeLen>", "out1EnvelopeLen")
 	.requiredOption("--out1-envelope <out1Envelope>", "out1Envelope")
-	.requiredOption("--proof-a <proofA>", "192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).")
+	.requiredOption(
+		"--proof-a <proofA>",
+		"192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).",
+	)
 	.requiredOption("--proof-b <proofB>", "proofB")
 	.requiredOption("--proof-c <proofC>", "proofC")
-	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
-	.option("--pool-vault <poolVault>", "The `pool_vault` account [default: derived]")
-	.option("--merkle-tree <merkleTree>", "The `merkle_tree` account [default: derived]")
-	.requiredOption("--nullifier-record0 <nullifierRecord0>", "The `nullifier_record0` account")
-	.requiredOption("--nullifier-record1 <nullifierRecord1>", "The `nullifier_record1` account")
-	.requiredOption("--verifying-key-account <verifyingKeyAccount>", "The `verifying_key_account` account")
-	.requiredOption("--policy-cosigner <policyCosigner>", "The `policy_cosigner` account")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
+		"--pool-vault <poolVault>",
+		"The `pool_vault` account [default: derived]",
+	)
+	.option(
+		"--merkle-tree <merkleTree>",
+		"The `merkle_tree` account [default: derived]",
+	)
+	.requiredOption(
+		"--nullifier-record0 <nullifierRecord0>",
+		"The `nullifier_record0` account",
+	)
+	.requiredOption(
+		"--nullifier-record1 <nullifierRecord1>",
+		"The `nullifier_record1` account",
+	)
+	.requiredOption(
+		"--verifying-key-account <verifyingKeyAccount>",
+		"The `verifying_key_account` account",
+	)
+	.requiredOption(
+		"--policy-cosigner <policyCosigner>",
+		"The `policy_cosigner` account",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		nullifier0Bump: smallInteger("--nullifier0-bump", options.nullifier0Bump),
-		nullifier1Bump: smallInteger("--nullifier1-bump", options.nullifier1Bump),
-		nullifier0: base58("--nullifier0", options.nullifier0),
-		nullifier1: base58("--nullifier1", options.nullifier1),
-		root: base58("--root", options.root),
-		relayerFee: bigInteger("--relayer-fee", options.relayerFee),
-		out0Commitment: base58("--out0-commitment", options.out0Commitment),
-		out0ViewPubkey: base58("--out0-view-pubkey", options.out0ViewPubkey),
-		out0EnvelopeLen: smallInteger("--out0-envelope-len", options.out0EnvelopeLen),
-		out0Envelope: base58("--out0-envelope", options.out0Envelope),
-		out1Commitment: base58("--out1-commitment", options.out1Commitment),
-		out1ViewPubkey: base58("--out1-view-pubkey", options.out1ViewPubkey),
-		out1EnvelopeLen: smallInteger("--out1-envelope-len", options.out1EnvelopeLen),
-		out1Envelope: base58("--out1-envelope", options.out1Envelope),
-		proofA: base58("--proof-a", options.proofA),
-		proofB: base58("--proof-b", options.proofB),
-		proofC: base58("--proof-c", options.proofC),
-		payer: context.payer,
-		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
-		poolVault: options.poolVault === undefined ? undefined : pubkey("--pool-vault", options.poolVault),
-		merkleTree: options.merkleTree === undefined ? undefined : pubkey("--merkle-tree", options.merkleTree),
-		nullifierRecord0: pubkey("--nullifier-record0", options.nullifierRecord0),
-		nullifierRecord1: pubkey("--nullifier-record1", options.nullifierRecord1),
-		verifyingKeyAccount: pubkey("--verifying-key-account", options.verifyingKeyAccount),
-		policyCosigner: pubkey("--policy-cosigner", options.policyCosigner),
-	};
+		const input = {
+			nullifier0Bump: smallInteger("--nullifier0-bump", options.nullifier0Bump),
+			nullifier1Bump: smallInteger("--nullifier1-bump", options.nullifier1Bump),
+			nullifier0: base58("--nullifier0", options.nullifier0),
+			nullifier1: base58("--nullifier1", options.nullifier1),
+			root: base58("--root", options.root),
+			relayerFee: bigInteger("--relayer-fee", options.relayerFee),
+			out0Commitment: base58("--out0-commitment", options.out0Commitment),
+			out0ViewPubkey: base58("--out0-view-pubkey", options.out0ViewPubkey),
+			out0EnvelopeLen: smallInteger(
+				"--out0-envelope-len",
+				options.out0EnvelopeLen,
+			),
+			out0Envelope: base58("--out0-envelope", options.out0Envelope),
+			out1Commitment: base58("--out1-commitment", options.out1Commitment),
+			out1ViewPubkey: base58("--out1-view-pubkey", options.out1ViewPubkey),
+			out1EnvelopeLen: smallInteger(
+				"--out1-envelope-len",
+				options.out1EnvelopeLen,
+			),
+			out1Envelope: base58("--out1-envelope", options.out1Envelope),
+			proofA: base58("--proof-a", options.proofA),
+			proofB: base58("--proof-b", options.proofB),
+			proofC: base58("--proof-c", options.proofC),
+			payer: context.payer,
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			poolVault: options.poolVault === undefined
+				? undefined
+				: pubkey("--pool-vault", options.poolVault),
+			merkleTree: options.merkleTree === undefined
+				? undefined
+				: pubkey("--merkle-tree", options.merkleTree),
+			nullifierRecord0: pubkey("--nullifier-record0", options.nullifierRecord0),
+			nullifierRecord1: pubkey("--nullifier-record1", options.nullifierRecord1),
+			verifyingKeyAccount: pubkey(
+				"--verifying-key-account",
+				options.verifyingKeyAccount,
+			),
+			policyCosigner: pubkey("--policy-cosigner", options.policyCosigner),
+		};
 		const instruction = await getTransferInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

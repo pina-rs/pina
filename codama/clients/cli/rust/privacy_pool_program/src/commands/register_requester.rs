@@ -10,12 +10,12 @@
 )]
 
 use clap::Args;
-
-use crate::context::CliContext;
-use crate::context::CliError;
 use privacy_pool_program_client::instructions::RegisterRequester;
 use privacy_pool_program_client::instructions::RegisterRequesterInstructionData;
 use solana_sdk::pubkey::Pubkey;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct RegisterRequesterArgs {
@@ -36,33 +36,42 @@ pub(crate) fn run(context: &CliContext, args: RegisterRequesterArgs) -> Result<(
 	let authority = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-config".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let requester_registry = match &args.requester_registry {
 		Some(value) => CliContext::pubkey("--requester_registry", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-requesters".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-requesters".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let data = RegisterRequesterInstructionData::new(|data| {
 		data.requester = requester;
 		data.max_tier = args.max_tier;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = RegisterRequester {
-		authority: authority,
-		pool_config: pool_config,
-		requester_registry: requester_registry,
+		authority,
+		pool_config,
+		requester_registry,
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT),
+	)
 }

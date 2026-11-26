@@ -10,12 +10,12 @@
 )]
 
 use clap::Args;
-
-use crate::context::CliContext;
-use crate::context::CliError;
 use privacy_pool_program_client::instructions::Transfer;
 use privacy_pool_program_client::instructions::TransferInstructionData;
 use solana_sdk::pubkey::Pubkey;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct TransferArgs {
@@ -94,31 +94,38 @@ pub(crate) fn run(context: &CliContext, args: TransferArgs) -> Result<(), CliErr
 	let payer = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-config".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let pool_vault = match &args.pool_vault {
 		Some(value) => CliContext::pubkey("--pool_vault", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-vault".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-vault".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let merkle_tree = match &args.merkle_tree {
 		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-tree".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-tree".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let nullifier_record0 = CliContext::pubkey("--nullifier_record0", &args.nullifier_record0)?;
 	let nullifier_record1 = CliContext::pubkey("--nullifier_record1", &args.nullifier_record1)?;
-	let verifying_key_account = CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
+	let verifying_key_account =
+		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
 	let policy_cosigner = CliContext::pubkey("--policy_cosigner", &args.policy_cosigner)?;
 	let data = TransferInstructionData::new(|data| {
 		data.nullifier0_bump = args.nullifier0_bump;
@@ -139,21 +146,26 @@ pub(crate) fn run(context: &CliContext, args: TransferArgs) -> Result<(), CliErr
 		data.proof_b = proof_b;
 		data.proof_c = proof_c;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = Transfer {
-		payer: payer,
-		pool_config: pool_config,
-		pool_vault: pool_vault,
-		merkle_tree: merkle_tree,
-		nullifier_record0: nullifier_record0,
-		nullifier_record1: nullifier_record1,
-		verifying_key_account: verifying_key_account,
-		policy_cosigner: policy_cosigner,
+		payer,
+		pool_config,
+		pool_vault,
+		merkle_tree,
+		nullifier_record0,
+		nullifier_record1,
+		verifying_key_account,
+		policy_cosigner,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::TRANSFER_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::TRANSFER_COMPUTE_UNIT_LIMIT),
+	)
 }

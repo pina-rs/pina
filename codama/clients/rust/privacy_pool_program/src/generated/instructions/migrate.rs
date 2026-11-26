@@ -76,7 +76,8 @@ impl Migrate {
 			));
 		}
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.system_program.unwrap_or(solana_pubkey::Pubkey::new_from_array([0; 32])),
+			self.system_program
+				.unwrap_or(solana_pubkey::Pubkey::new_from_array([0; 32])),
 			false,
 		));
 		if let Some(pool_config) = self.pool_config {
@@ -104,7 +105,10 @@ impl Migrate {
 			));
 		}
 		if let Some(nullifier_record) = self.nullifier_record {
-			accounts.push(solana_instruction::AccountMeta::new(nullifier_record, false));
+			accounts.push(solana_instruction::AccountMeta::new(
+				nullifier_record,
+				false,
+			));
 		} else {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(
 				crate::PRIVACY_POOL_PROGRAM_ID,
@@ -112,7 +116,10 @@ impl Migrate {
 			));
 		}
 		if let Some(custodian_registry) = self.custodian_registry {
-			accounts.push(solana_instruction::AccountMeta::new(custodian_registry, false));
+			accounts.push(solana_instruction::AccountMeta::new(
+				custodian_registry,
+				false,
+			));
 		} else {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(
 				crate::PRIVACY_POOL_PROGRAM_ID,
@@ -120,7 +127,10 @@ impl Migrate {
 			));
 		}
 		if let Some(requester_registry) = self.requester_registry {
-			accounts.push(solana_instruction::AccountMeta::new(requester_registry, false));
+			accounts.push(solana_instruction::AccountMeta::new(
+				requester_registry,
+				false,
+			));
 		} else {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(
 				crate::PRIVACY_POOL_PROGRAM_ID,
@@ -136,7 +146,10 @@ impl Migrate {
 			));
 		}
 		if let Some(disclosure_request) = self.disclosure_request {
-			accounts.push(solana_instruction::AccountMeta::new(disclosure_request, false));
+			accounts.push(solana_instruction::AccountMeta::new(
+				disclosure_request,
+				false,
+			));
 		} else {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(
 				crate::PRIVACY_POOL_PROGRAM_ID,
@@ -152,7 +165,10 @@ impl Migrate {
 			));
 		}
 		if let Some(verifying_key_account) = self.verifying_key_account {
-			accounts.push(solana_instruction::AccountMeta::new(verifying_key_account, false));
+			accounts.push(solana_instruction::AccountMeta::new(
+				verifying_key_account,
+				false,
+			));
 		} else {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(
 				crate::PRIVACY_POOL_PROGRAM_ID,

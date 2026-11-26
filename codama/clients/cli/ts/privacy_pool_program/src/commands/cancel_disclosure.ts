@@ -3,20 +3,39 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getCancelDisclosureInstruction, CANCEL_DISCLOSURE_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	CANCEL_DISCLOSURE_COMPUTE_UNIT_LIMIT,
+	getCancelDisclosureInstruction,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const cancelDisclosureCommand = registerGlobals(new Command("cancel_disclosure"))
+export const cancelDisclosureCommand = registerGlobals(
+	new Command("cancel_disclosure"),
+)
 	.description("cancelDisclosure")
 	.requiredOption("--reserved <reserved>", "reserved")
-	.requiredOption("--disclosure-request <disclosureRequest>", "The `disclosure_request` account")
+	.requiredOption(
+		"--disclosure-request <disclosureRequest>",
+		"The `disclosure_request` account",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		reserved: smallInteger("--reserved", options.reserved),
-		requester: context.payer,
-		disclosureRequest: pubkey("--disclosure-request", options.disclosureRequest),
-	};
+		const input = {
+			reserved: smallInteger("--reserved", options.reserved),
+			requester: context.payer,
+			disclosureRequest: pubkey(
+				"--disclosure-request",
+				options.disclosureRequest,
+			),
+		};
 		const instruction = getCancelDisclosureInstruction(
 			...[input],
 			{ programAddress: context.programAddress },

@@ -6,118 +6,389 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getAddressDecoder,
+	getAddressEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type HasAddress,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	transformEncoder,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
+	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import { findPoolConfigPda, findRequesterRegistryPda } from "../pdas";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getAddressDecoder, getAddressEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type HasAddress, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, type InstructionAccountInput, type InstructionAccountInputAddress, type InstructionSignerInput, type ResolvedInstructionAccount, type ResolvedInstructionAccountMeta } from '@solana/program-client-core';
-import { findPoolConfigPda, findRequesterRegistryPda } from '../pdas';
-import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const REGISTER_REQUESTER_DISCRIMINATOR = 3;
 
-export function getRegisterRequesterDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(REGISTER_REQUESTER_DISCRIMINATOR); }
-
-export type RegisterRequesterInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountAuthority extends string | AccountMeta<string> = string, TAccountPoolConfig extends string | AccountMeta<string> = string, TAccountRequesterRegistry extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountAuthority extends string ? ReadonlySignerAccount<TAccountAuthority> & AccountSignerMeta<TAccountAuthority> : TAccountAuthority, TAccountPoolConfig extends string ? ReadonlyAccount<TAccountPoolConfig> : TAccountPoolConfig, TAccountRequesterRegistry extends string ? WritableAccount<TAccountRequesterRegistry> : TAccountRequesterRegistry, ...TRemainingAccounts]>;
-
-export type RegisterRequesterInstructionData = { discriminator: number; requester: Address; maxTier: number;  };
-
-export type RegisterRequesterInstructionDataArgs = { requester: Address | HasAddress; maxTier: number;  };
-
-export function getRegisterRequesterInstructionDataEncoder(): FixedSizeEncoder<RegisterRequesterInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['requester', getAddressEncoder()], ['maxTier', getU8Encoder()]]), (value) => ({ ...value, discriminator: 3 }));
+export function getRegisterRequesterDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(REGISTER_REQUESTER_DISCRIMINATOR);
 }
 
-export function getRegisterRequesterInstructionDataDecoder(): FixedSizeDecoder<RegisterRequesterInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(REGISTER_REQUESTER_DISCRIMINATOR, getU8Decoder())], ['requester', getAddressDecoder()], ['maxTier', getU8Decoder()]]);
-}
+export type RegisterRequesterInstruction<
+	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+	TAccountAuthority extends string | AccountMeta<string> = string,
+	TAccountPoolConfig extends string | AccountMeta<string> = string,
+	TAccountRequesterRegistry extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountAuthority extends string ?
+					& ReadonlySignerAccount<TAccountAuthority>
+					& AccountSignerMeta<TAccountAuthority>
+				: TAccountAuthority,
+			TAccountPoolConfig extends string ? ReadonlyAccount<TAccountPoolConfig>
+				: TAccountPoolConfig,
+			TAccountRequesterRegistry extends string
+				? WritableAccount<TAccountRequesterRegistry>
+				: TAccountRequesterRegistry,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getRegisterRequesterInstructionDataCodec(): FixedSizeCodec<RegisterRequesterInstructionDataArgs, RegisterRequesterInstructionData> {
-    return combineCodec(getRegisterRequesterInstructionDataEncoder(), getRegisterRequesterInstructionDataDecoder());
-}
-
-export type RegisterRequesterAsyncInput<TAccountAuthority extends InstructionSignerInput = InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput, TAccountRequesterRegistry extends InstructionAccountInput = InstructionAccountInput> =  {
-  authority: TAccountAuthority;
-poolConfig?: TAccountPoolConfig;
-requesterRegistry?: TAccountRequesterRegistry;
-requester: RegisterRequesterInstructionDataArgs["requester"];
-maxTier: RegisterRequesterInstructionDataArgs["maxTier"];
-}
-
-export async function getRegisterRequesterInstructionAsync<TAccountAuthority extends InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput, TAccountRequesterRegistry extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: RegisterRequesterAsyncInput<TAccountAuthority, TAccountPoolConfig, TAccountRequesterRegistry>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): Promise<RegisterRequesterInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountRequesterRegistry, InstructionAccountInputAddress<TAccountRequesterRegistry>>>> {
-  // Program address.
-const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
-
-// Account meta helper.
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isSigner: true, isWritable: false }, poolConfig: { value: input.poolConfig ?? null, isSigner: false, isWritable: false }, requesterRegistry: { value: input.requesterRegistry ?? null, isSigner: false, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.poolConfig.value) {
-accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
-}
-if (!accounts.requesterRegistry.value) {
-accounts.requesterRegistry.value = await findRequesterRegistryPda({ programAddress });
-}
-
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("poolConfig", accounts.poolConfig), getAccountMeta("requesterRegistry", accounts.requesterRegistry)], data: getRegisterRequesterInstructionDataEncoder().encode(args as RegisterRequesterInstructionDataArgs), programAddress } as RegisterRequesterInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountRequesterRegistry, InstructionAccountInputAddress<TAccountRequesterRegistry>>>);
-}
-
-export type RegisterRequesterInput<TAccountAuthority extends InstructionSignerInput = InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput, TAccountRequesterRegistry extends InstructionAccountInput = InstructionAccountInput> =  {
-  authority: TAccountAuthority;
-poolConfig: TAccountPoolConfig;
-requesterRegistry: TAccountRequesterRegistry;
-requester: RegisterRequesterInstructionDataArgs["requester"];
-maxTier: RegisterRequesterInstructionDataArgs["maxTier"];
-}
-
-export function getRegisterRequesterInstruction<TAccountAuthority extends InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput, TAccountRequesterRegistry extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: RegisterRequesterInput<TAccountAuthority, TAccountPoolConfig, TAccountRequesterRegistry>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): RegisterRequesterInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountRequesterRegistry, InstructionAccountInputAddress<TAccountRequesterRegistry>>> {
-  // Program address.
-const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
-
-// Account meta helper.
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-
- // Original accounts.
-const originalAccounts = { authority: { value: input.authority ?? null, isSigner: true, isWritable: false }, poolConfig: { value: input.poolConfig ?? null, isSigner: false, isWritable: false }, requesterRegistry: { value: input.requesterRegistry ?? null, isSigner: false, isWritable: true } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-
-
-return Object.freeze({ accounts: [getAccountMeta("authority", accounts.authority), getAccountMeta("poolConfig", accounts.poolConfig), getAccountMeta("requesterRegistry", accounts.requesterRegistry)], data: getRegisterRequesterInstructionDataEncoder().encode(args as RegisterRequesterInstructionDataArgs), programAddress } as RegisterRequesterInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountAuthority, InstructionAccountInputAddress<TAccountAuthority>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountRequesterRegistry, InstructionAccountInputAddress<TAccountRequesterRegistry>>>);
-}
-
-export type ParsedRegisterRequesterInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-authority: TAccountMetas[0];
-poolConfig: TAccountMetas[1];
-requesterRegistry: TAccountMetas[2];
+export type RegisterRequesterInstructionData = {
+	discriminator: number;
+	requester: Address;
+	maxTier: number;
 };
-data: RegisterRequesterInstructionData; };
 
-export function parseRegisterRequesterInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedRegisterRequesterInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+export type RegisterRequesterInstructionDataArgs = {
+	requester: Address | HasAddress;
+	maxTier: number;
+};
+
+export function getRegisterRequesterInstructionDataEncoder(): FixedSizeEncoder<
+	RegisterRequesterInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"requester",
+			getAddressEncoder(),
+		], ["maxTier", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 3 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getRegisterRequesterInstructionDataDecoder(): FixedSizeDecoder<
+	RegisterRequesterInstructionData
+> {
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				REGISTER_REQUESTER_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["requester", getAddressDecoder()],
+		["maxTier", getU8Decoder()],
+	]);
 }
-  return { programAddress: instruction.programAddress, accounts: { authority: getNextAccount(), poolConfig: getNextAccount(), requesterRegistry: getNextAccount() }, data: getRegisterRequesterInstructionDataDecoder().decode(instruction.data) };
+
+export function getRegisterRequesterInstructionDataCodec(): FixedSizeCodec<
+	RegisterRequesterInstructionDataArgs,
+	RegisterRequesterInstructionData
+> {
+	return combineCodec(
+		getRegisterRequesterInstructionDataEncoder(),
+		getRegisterRequesterInstructionDataDecoder(),
+	);
+}
+
+export type RegisterRequesterAsyncInput<
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+> = {
+	authority: TAccountAuthority;
+	poolConfig?: TAccountPoolConfig;
+	requesterRegistry?: TAccountRequesterRegistry;
+	requester: RegisterRequesterInstructionDataArgs["requester"];
+	maxTier: RegisterRequesterInstructionDataArgs["maxTier"];
+};
+
+export async function getRegisterRequesterInstructionAsync<
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RegisterRequesterAsyncInput<
+		TAccountAuthority,
+		TAccountPoolConfig,
+		TAccountRequesterRegistry
+	>,
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
+): Promise<
+	RegisterRequesterInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>
+	>
+> {
+	// Program address.
+	const programAddressInput = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		requesterRegistry: {
+			value: input.requesterRegistry ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.poolConfig.value) {
+		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+	}
+	if (!accounts.requesterRegistry.value) {
+		accounts.requesterRegistry.value = await findRequesterRegistryPda({
+			programAddress,
+		});
+	}
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
+		],
+		data: getRegisterRequesterInstructionDataEncoder().encode(
+			args as RegisterRequesterInstructionDataArgs,
+		),
+		programAddress,
+	} as RegisterRequesterInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>
+	>);
+}
+
+export type RegisterRequesterInput<
+	TAccountAuthority extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+> = {
+	authority: TAccountAuthority;
+	poolConfig: TAccountPoolConfig;
+	requesterRegistry: TAccountRequesterRegistry;
+	requester: RegisterRequesterInstructionDataArgs["requester"];
+	maxTier: RegisterRequesterInstructionDataArgs["maxTier"];
+};
+
+export function getRegisterRequesterInstruction<
+	TAccountAuthority extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RegisterRequesterInput<
+		TAccountAuthority,
+		TAccountPoolConfig,
+		TAccountRequesterRegistry
+	>,
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
+): RegisterRequesterInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountAuthority,
+		InstructionAccountInputAddress<TAccountAuthority>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolConfig,
+		InstructionAccountInputAddress<TAccountPoolConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRequesterRegistry,
+		InstructionAccountInputAddress<TAccountRequesterRegistry>
+	>
+> {
+	// Program address.
+	const programAddressInput = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		authority: {
+			value: input.authority ?? null,
+			isSigner: true,
+			isWritable: false,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		requesterRegistry: {
+			value: input.requesterRegistry ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("authority", accounts.authority),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
+		],
+		data: getRegisterRequesterInstructionDataEncoder().encode(
+			args as RegisterRequesterInstructionDataArgs,
+		),
+		programAddress,
+	} as RegisterRequesterInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountAuthority,
+			InstructionAccountInputAddress<TAccountAuthority>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>
+	>);
+}
+
+export type ParsedRegisterRequesterInstruction<
+	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		authority: TAccountMetas[0];
+		poolConfig: TAccountMetas[1];
+		requesterRegistry: TAccountMetas[2];
+	};
+	data: RegisterRequesterInstructionData;
+};
+
+export function parseRegisterRequesterInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedRegisterRequesterInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			authority: getNextAccount(),
+			poolConfig: getNextAccount(),
+			requesterRegistry: getNextAccount(),
+		},
+		data: getRegisterRequesterInstructionDataDecoder().decode(instruction.data),
+	};
 }

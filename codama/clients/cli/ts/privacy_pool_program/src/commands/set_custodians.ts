@@ -3,22 +3,45 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getSetCustodiansInstructionAsync, SET_CUSTODIANS_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getSetCustodiansInstructionAsync,
+	SET_CUSTODIANS_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const setCustodiansCommand = registerGlobals(new Command("set_custodians"))
+export const setCustodiansCommand = registerGlobals(
+	new Command("set_custodians"),
+)
 	.description("setCustodians")
 	.requiredOption("--custodians <custodians>", "custodians")
-	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
-	.option("--custodian-registry <custodianRegistry>", "The `custodian_registry` account [default: derived]")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
+		"--custodian-registry <custodianRegistry>",
+		"The `custodian_registry` account [default: derived]",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		custodians: base58("--custodians", options.custodians),
-		authority: context.payer,
-		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
-		custodianRegistry: options.custodianRegistry === undefined ? undefined : pubkey("--custodian-registry", options.custodianRegistry),
-	};
+		const input = {
+			custodians: base58("--custodians", options.custodians),
+			authority: context.payer,
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			custodianRegistry: options.custodianRegistry === undefined
+				? undefined
+				: pubkey("--custodian-registry", options.custodianRegistry),
+		};
 		const instruction = await getSetCustodiansInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

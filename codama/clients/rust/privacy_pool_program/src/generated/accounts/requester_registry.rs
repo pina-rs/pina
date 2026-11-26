@@ -12,7 +12,7 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct RequesterRegistry {
-/// Entities allowed to file tier-1 and tier-2 disclosure requests.
+	/// Entities allowed to file tier-1 and tier-2 disclosure requests.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
@@ -44,7 +44,9 @@ impl RequesterRegistry {
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&RequesterRegistryZc, solana_program_error::ProgramError> {
+	pub fn from_bytes(
+		data: &[u8],
+	) -> Result<&RequesterRegistryZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REQUESTER_REGISTRY_DISCRIMINATOR {
@@ -56,7 +58,9 @@ impl RequesterRegistry {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut RequesterRegistryZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut RequesterRegistryZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != REQUESTER_REGISTRY_DISCRIMINATOR {
@@ -72,24 +76,18 @@ impl RequesterRegistry {
 impl RequesterRegistry {
 	pub fn find_pda() -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&[
-				"privacy-pool-requesters".as_bytes(),
-			],
+			&["privacy-pool-requesters".as_bytes()],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 
 	pub fn create_pda(bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&[
-				"privacy-pool-requesters".as_bytes(),
-				&[bump],
-			],
+			&["privacy-pool-requesters".as_bytes(), &[bump]],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 }
-
 
 /// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
 /// [`REQUESTER_REGISTRY_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
@@ -98,7 +96,6 @@ impl RequesterRegistry {
 pub fn requester_registry_needs_migration(_data: &[u8]) -> bool {
 	false
 }
-
 
 /// Why `RequesterRegistry::try_from_bytes` rejected account bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -115,14 +112,18 @@ impl core::fmt::Display for RequesterRegistryVersionError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::InvalidData => write!(f, "invalid RequesterRegistry account data"),
-			Self::Stale { stored } => write!(
-				f,
-				"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
-			),
-			Self::Future { stored } => write!(
-				f,
-				"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
-			),
+			Self::Stale { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
+				)
+			}
+			Self::Future { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
+				)
+			}
 		}
 	}
 }
@@ -138,7 +139,9 @@ impl RequesterRegistry {
 			return Err(RequesterRegistryVersionError::InvalidData);
 		}
 		if account.migration_version > REQUESTER_REGISTRY_MIGRATION_VERSION {
-			return Err(RequesterRegistryVersionError::Future { stored: account.migration_version });
+			return Err(RequesterRegistryVersionError::Future {
+				stored: account.migration_version,
+			});
 		}
 		Ok(account)
 	}
@@ -157,9 +160,14 @@ mod requester_registry_version_error_tests {
 
 	#[test]
 	fn stale_and_future_versions_are_distinguishable() {
-		let error = RequesterRegistry::try_from_bytes(&envelope(1 as u8)).err().expect("a future envelope must fail");
+		let error = RequesterRegistry::try_from_bytes(&envelope(1 as u8))
+			.err()
+			.expect("a future envelope must fail");
 		assert_eq!(error, RequesterRegistryVersionError::Future { stored: 1 });
-		assert_eq!(RequesterRegistryVersionError::Future { stored: 1 }.to_string(), "migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)");
+		assert_eq!(
+			RequesterRegistryVersionError::Future { stored: 1 }.to_string(),
+			"migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)"
+		);
 		assert!(
 			RequesterRegistry::try_from_bytes(&envelope(0 as u8)).is_ok(),
 			"the current version must decode",

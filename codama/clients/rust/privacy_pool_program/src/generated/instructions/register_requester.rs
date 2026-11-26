@@ -33,15 +33,20 @@ impl RegisterRequester {
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			requester_registry: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-requesters".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 		}
 	}
 
-	pub fn instruction(&self, data: RegisterRequesterInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: RegisterRequesterInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -52,9 +57,18 @@ impl RegisterRequester {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.pool_config, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.requester_registry, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.pool_config,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.requester_registry,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -70,14 +84,16 @@ pub struct RegisterRequesterInstructionData {
 }
 
 impl RegisterRequesterInstructionData {
-	pub fn new(configure: impl FnOnce(&mut RegisterRequesterInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut RegisterRequesterInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<RegisterRequesterInstructionWireZc>()];
 		<RegisterRequesterInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REGISTER_REQUESTER_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

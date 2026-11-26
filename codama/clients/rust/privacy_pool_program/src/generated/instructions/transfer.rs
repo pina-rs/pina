@@ -34,21 +34,30 @@ pub struct Transfer {
 }
 
 impl Transfer {
-	pub fn new(payer: solana_pubkey::Pubkey, nullifier_record0: solana_pubkey::Pubkey, nullifier_record1: solana_pubkey::Pubkey, verifying_key_account: solana_pubkey::Pubkey, policy_cosigner: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		payer: solana_pubkey::Pubkey,
+		nullifier_record0: solana_pubkey::Pubkey,
+		nullifier_record1: solana_pubkey::Pubkey,
+		verifying_key_account: solana_pubkey::Pubkey,
+		policy_cosigner: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			payer,
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			pool_vault: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-vault".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			merkle_tree: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-tree".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			nullifier_record0,
 			nullifier_record1,
 			verifying_key_account,
@@ -69,14 +78,35 @@ impl Transfer {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.payer, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.pool_config, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.pool_config,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.merkle_tree, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.nullifier_record0, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.nullifier_record1, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.verifying_key_account, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.policy_cosigner, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.merkle_tree,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.nullifier_record0,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.nullifier_record1,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.verifying_key_account,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.policy_cosigner,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -92,14 +122,16 @@ pub struct TransferInstructionData {
 }
 
 impl TransferInstructionData {
-	pub fn new(configure: impl FnOnce(&mut TransferInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut TransferInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<TransferInstructionWireZc>()];
 		<TransferInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = TRANSFER_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

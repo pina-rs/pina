@@ -7,4 +7,4 @@
  */
 
 export * from "./logs";
-export * from './noteEncryptedEvent';
+export * from "./noteEncryptedEvent";

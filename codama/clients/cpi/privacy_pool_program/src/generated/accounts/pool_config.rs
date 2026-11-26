@@ -6,7 +6,6 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::Address;
@@ -36,8 +35,7 @@ impl PoolConfig {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2
-			&& data[..2] == POOL_CONFIG_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == POOL_CONFIG_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -52,26 +50,23 @@ impl PoolConfig {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let authority = Address::new_from_array(data.get(cursor..cursor + 32)?
-		.try_into().ok()?);
+		let authority = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let custodian_threshold: u16 = u16::from_le_bytes(data.get(cursor..cursor + 2)?
-		.try_into().ok()?);
+		let custodian_threshold: u16 =
+			u16::from_le_bytes(data.get(cursor..cursor + 2)?.try_into().ok()?);
 		cursor += 2;
-		let challenge_window_secs: u32 = u32::from_le_bytes(data.get(cursor..cursor + 4)?
-		.try_into().ok()?);
+		let challenge_window_secs: u32 =
+			u32::from_le_bytes(data.get(cursor..cursor + 4)?.try_into().ok()?);
 		cursor += 4;
-		let policy_flags: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let policy_flags: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let policy_cosigner = Address::new_from_array(data.get(cursor..cursor + 32)?
-		.try_into().ok()?);
+		let policy_cosigner =
+			Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let total_deposits: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
-		.try_into().ok()?);
+		let total_deposits: u64 =
+			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 
 		Some(PoolConfig {
 			bump,

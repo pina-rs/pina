@@ -13,10 +13,10 @@ use clap::Args;
 use clap::Subcommand;
 use serde_json::Value;
 use serde_json::json;
+use solana_sdk::pubkey::Pubkey;
 
 use crate::context::CliContext;
 use crate::context::CliError;
-use solana_sdk::pubkey::Pubkey;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -25,7 +25,7 @@ pub enum Command {
 	/// The pool's native SOL custody PDA.
 	PoolVault(PoolVaultArgs),
 	/// Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.
-	/// 
+	///
 	/// Holds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root
 	/// ring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.
 	MerkleTree(MerkleTreeArgs),
@@ -138,7 +138,6 @@ pub struct VerifyingKeyAccountArgs {
 	slot: Option<u64>,
 }
 
-
 pub(crate) fn run(context: &CliContext, command: Command) -> Result<(), CliError> {
 	match command {
 		Command::PoolConfig(args) => fetch_pool_config(context, args),
@@ -165,10 +164,12 @@ fn fetch_pool_config(context: &CliContext, args: PoolConfigArgs) -> Result<(), C
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::PoolConfig::from_bytes(&data) {
 		Ok(account) => pool_config_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "pool-config", &address, &value);
 	Ok(())
@@ -185,10 +186,12 @@ fn fetch_pool_vault(context: &CliContext, args: PoolVaultArgs) -> Result<(), Cli
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::PoolVault::from_bytes(&data) {
 		Ok(account) => pool_vault_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "pool-vault", &address, &value);
 	Ok(())
@@ -205,10 +208,12 @@ fn fetch_merkle_tree(context: &CliContext, args: MerkleTreeArgs) -> Result<(), C
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::MerkleTree::from_bytes(&data) {
 		Ok(account) => merkle_tree_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "merkle-tree", &address, &value);
 	Ok(())
@@ -218,10 +223,15 @@ fn fetch_nullifier_record(context: &CliContext, args: NullifierRecordArgs) -> Re
 	let address = match &args.address {
 		Some(value) => CliContext::pubkey("--address", value)?,
 		None => {
-				let nullifier = match &args.nullifier {
-					Some(value) => CliContext::pubkey("--nullifier", value)?,
-					None => return Err(CliError::MissingSeed { account: "nullifier-record".to_string(), seed: "--nullifier".to_string() }),
-				};
+			let nullifier = match &args.nullifier {
+				Some(value) => CliContext::pubkey("--nullifier", value)?,
+				None => {
+					return Err(CliError::MissingSeed {
+						account: "nullifier-record".to_string(),
+						seed: "--nullifier".to_string(),
+					});
+				}
+			};
 			let seeds: &[&[u8]] = &["privacy-pool-nullifier".as_bytes(), nullifier.as_ref()];
 			Pubkey::find_program_address(seeds, &context.program_address).0
 		}
@@ -229,16 +239,21 @@ fn fetch_nullifier_record(context: &CliContext, args: NullifierRecordArgs) -> Re
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::NullifierRecord::from_bytes(&data) {
 		Ok(account) => nullifier_record_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "nullifier-record", &address, &value);
 	Ok(())
 }
 
-fn fetch_custodian_registry(context: &CliContext, args: CustodianRegistryArgs) -> Result<(), CliError> {
+fn fetch_custodian_registry(
+	context: &CliContext,
+	args: CustodianRegistryArgs,
+) -> Result<(), CliError> {
 	let address = match &args.address {
 		Some(value) => CliContext::pubkey("--address", value)?,
 		None => {
@@ -249,16 +264,21 @@ fn fetch_custodian_registry(context: &CliContext, args: CustodianRegistryArgs) -
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::CustodianRegistry::from_bytes(&data) {
 		Ok(account) => custodian_registry_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "custodian-registry", &address, &value);
 	Ok(())
 }
 
-fn fetch_requester_registry(context: &CliContext, args: RequesterRegistryArgs) -> Result<(), CliError> {
+fn fetch_requester_registry(
+	context: &CliContext,
+	args: RequesterRegistryArgs,
+) -> Result<(), CliError> {
 	let address = match &args.address {
 		Some(value) => CliContext::pubkey("--address", value)?,
 		None => {
@@ -269,10 +289,12 @@ fn fetch_requester_registry(context: &CliContext, args: RequesterRegistryArgs) -
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::RequesterRegistry::from_bytes(&data) {
 		Ok(account) => requester_registry_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "requester-registry", &address, &value);
 	Ok(())
@@ -282,10 +304,15 @@ fn fetch_asset_vault(context: &CliContext, args: AssetVaultArgs) -> Result<(), C
 	let address = match &args.address {
 		Some(value) => CliContext::pubkey("--address", value)?,
 		None => {
-				let mint = match &args.mint {
-					Some(value) => CliContext::pubkey("--mint", value)?,
-					None => return Err(CliError::MissingSeed { account: "asset-vault".to_string(), seed: "--mint".to_string() }),
-				};
+			let mint = match &args.mint {
+				Some(value) => CliContext::pubkey("--mint", value)?,
+				None => {
+					return Err(CliError::MissingSeed {
+						account: "asset-vault".to_string(),
+						seed: "--mint".to_string(),
+					});
+				}
+			};
 			let seeds: &[&[u8]] = &["privacy-pool-asset".as_bytes(), mint.as_ref()];
 			Pubkey::find_program_address(seeds, &context.program_address).0
 		}
@@ -293,36 +320,57 @@ fn fetch_asset_vault(context: &CliContext, args: AssetVaultArgs) -> Result<(), C
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::AssetVault::from_bytes(&data) {
 		Ok(account) => asset_vault_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "asset-vault", &address, &value);
 	Ok(())
 }
 
-fn fetch_disclosure_request(context: &CliContext, args: DisclosureRequestArgs) -> Result<(), CliError> {
+fn fetch_disclosure_request(
+	context: &CliContext,
+	args: DisclosureRequestArgs,
+) -> Result<(), CliError> {
 	let address = match &args.address {
 		Some(value) => CliContext::pubkey("--address", value)?,
 		None => {
-				let requester = match &args.requester {
-					Some(value) => CliContext::pubkey("--requester", value)?,
-					None => return Err(CliError::MissingSeed { account: "disclosure-request".to_string(), seed: "--requester".to_string() }),
-				};
-				let nonce = args.nonce.ok_or_else(|| CliError::MissingSeed { account: "disclosure-request".to_string(), seed: "--nonce".to_string() })?;
+			let requester = match &args.requester {
+				Some(value) => CliContext::pubkey("--requester", value)?,
+				None => {
+					return Err(CliError::MissingSeed {
+						account: "disclosure-request".to_string(),
+						seed: "--requester".to_string(),
+					});
+				}
+			};
+			let nonce = args.nonce.ok_or_else(|| {
+				CliError::MissingSeed {
+					account: "disclosure-request".to_string(),
+					seed: "--nonce".to_string(),
+				}
+			})?;
 			let nonce_bytes = nonce.to_le_bytes();
-			let seeds: &[&[u8]] = &["privacy-pool-request".as_bytes(), requester.as_ref(), nonce_bytes.as_ref()];
+			let seeds: &[&[u8]] = &[
+				"privacy-pool-request".as_bytes(),
+				requester.as_ref(),
+				nonce_bytes.as_ref(),
+			];
 			Pubkey::find_program_address(seeds, &context.program_address).0
 		}
 	};
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::DisclosureRequest::from_bytes(&data) {
 		Ok(account) => disclosure_request_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "disclosure-request", &address, &value);
 	Ok(())
@@ -339,32 +387,45 @@ fn fetch_disclosure_log(context: &CliContext, args: DisclosureLogArgs) -> Result
 	let data = context.fetch_account(&address)?;
 	let value = match privacy_pool_program_client::accounts::DisclosureLog::from_bytes(&data) {
 		Ok(account) => disclosure_log_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "disclosure-log", &address, &value);
 	Ok(())
 }
 
-fn fetch_verifying_key_account(context: &CliContext, args: VerifyingKeyAccountArgs) -> Result<(), CliError> {
+fn fetch_verifying_key_account(
+	context: &CliContext,
+	args: VerifyingKeyAccountArgs,
+) -> Result<(), CliError> {
 	let address = match &args.address {
 		Some(value) => CliContext::pubkey("--address", value)?,
 		None => {
-				let slot = args.slot.ok_or_else(|| CliError::MissingSeed { account: "verifying-key-account".to_string(), seed: "--slot".to_string() })?;
+			let slot = args.slot.ok_or_else(|| {
+				CliError::MissingSeed {
+					account: "verifying-key-account".to_string(),
+					seed: "--slot".to_string(),
+				}
+			})?;
 			let slot_bytes = slot.to_le_bytes();
 			let seeds: &[&[u8]] = &["privacy-pool-vkey".as_bytes(), slot_bytes.as_ref()];
 			Pubkey::find_program_address(seeds, &context.program_address).0
 		}
 	};
 	let data = context.fetch_account(&address)?;
-	let value = match privacy_pool_program_client::accounts::VerifyingKeyAccount::from_bytes(&data) {
+	let value = match privacy_pool_program_client::accounts::VerifyingKeyAccount::from_bytes(&data)
+	{
 		Ok(account) => verifying_key_account_json(account),
-		Err(error) => return Err(CliError::AccountDecode {
-			address: address.to_string(),
-			message: error.to_string(),
-		}),
+		Err(error) => {
+			return Err(CliError::AccountDecode {
+				address: address.to_string(),
+				message: error.to_string(),
+			});
+		}
 	};
 	print_value(context.json, "verifying-key-account", &address, &value);
 	Ok(())
@@ -398,20 +459,26 @@ fn merkle_tree_json(account: &privacy_pool_program_client::accounts::MerkleTreeZ
 	})
 }
 
-fn nullifier_record_json(account: &privacy_pool_program_client::accounts::NullifierRecordZc) -> Value {
+fn nullifier_record_json(
+	account: &privacy_pool_program_client::accounts::NullifierRecordZc,
+) -> Value {
 	json!({
 		"bump": account.bump,
 	})
 }
 
-fn custodian_registry_json(account: &privacy_pool_program_client::accounts::CustodianRegistryZc) -> Value {
+fn custodian_registry_json(
+	account: &privacy_pool_program_client::accounts::CustodianRegistryZc,
+) -> Value {
 	json!({
 		"bump": account.bump,
 		"custodians": account.custodians.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 	})
 }
 
-fn requester_registry_json(account: &privacy_pool_program_client::accounts::RequesterRegistryZc) -> Value {
+fn requester_registry_json(
+	account: &privacy_pool_program_client::accounts::RequesterRegistryZc,
+) -> Value {
 	json!({
 		"bump": account.bump,
 		"count": account.count,
@@ -429,7 +496,9 @@ fn asset_vault_json(account: &privacy_pool_program_client::accounts::AssetVaultZ
 	})
 }
 
-fn disclosure_request_json(account: &privacy_pool_program_client::accounts::DisclosureRequestZc) -> Value {
+fn disclosure_request_json(
+	account: &privacy_pool_program_client::accounts::DisclosureRequestZc,
+) -> Value {
 	json!({
 		"bump": account.bump,
 		"requester": account.requester.to_string(),
@@ -456,7 +525,9 @@ fn disclosure_log_json(account: &privacy_pool_program_client::accounts::Disclosu
 	})
 }
 
-fn verifying_key_account_json(account: &privacy_pool_program_client::accounts::VerifyingKeyAccountZc) -> Value {
+fn verifying_key_account_json(
+	account: &privacy_pool_program_client::accounts::VerifyingKeyAccountZc,
+) -> Value {
 	json!({
 		"bump": account.bump,
 		"slot": account.slot,
@@ -471,7 +542,10 @@ fn verifying_key_account_json(account: &privacy_pool_program_client::accounts::V
 
 fn print_value(json_output: bool, name: &str, address: &Pubkey, value: &Value) {
 	if json_output {
-		println!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
+		println!(
+			"{}",
+			serde_json::to_string_pretty(value).unwrap_or_default()
+		);
 		return;
 	}
 

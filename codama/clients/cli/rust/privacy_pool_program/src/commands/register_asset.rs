@@ -10,12 +10,12 @@
 )]
 
 use clap::Args;
-
-use crate::context::CliContext;
-use crate::context::CliError;
 use privacy_pool_program_client::instructions::RegisterAsset;
 use privacy_pool_program_client::instructions::RegisterAssetInstructionData;
 use solana_sdk::pubkey::Pubkey;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct RegisterAssetArgs {
@@ -40,29 +40,37 @@ pub(crate) fn run(context: &CliContext, args: RegisterAssetArgs) -> Result<(), C
 	let mint = CliContext::pubkey("--mint", &args.mint)?;
 	let asset_vault = match &args.asset_vault {
 		Some(value) => CliContext::pubkey("--asset_vault", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-asset".as_bytes(), mint.as_ref()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-asset".as_bytes(), mint.as_ref()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
-	let vault_token_account = CliContext::pubkey("--vault_token_account", &args.vault_token_account)?;
+	let vault_token_account =
+		CliContext::pubkey("--vault_token_account", &args.vault_token_account)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
 	let data = RegisterAssetInstructionData::new(|data| {
 		data.bump = args.bump;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = RegisterAsset {
-		payer: payer,
-		mint: mint,
-		asset_vault: asset_vault,
-		vault_token_account: vault_token_account,
-		token_program: token_program,
+		payer,
+		mint,
+		asset_vault,
+		vault_token_account,
+		token_program,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::REGISTER_ASSET_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::REGISTER_ASSET_COMPUTE_UNIT_LIMIT),
+	)
 }

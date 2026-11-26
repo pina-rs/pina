@@ -10,11 +10,11 @@
 )]
 
 use clap::Args;
+use privacy_pool_program_client::instructions::VerifyPolicy;
+use privacy_pool_program_client::instructions::VerifyPolicyInstructionData;
 
 use crate::context::CliContext;
 use crate::context::CliError;
-use privacy_pool_program_client::instructions::VerifyPolicy;
-use privacy_pool_program_client::instructions::VerifyPolicyInstructionData;
 
 #[derive(Debug, Args)]
 pub struct VerifyPolicyArgs {
@@ -38,20 +38,26 @@ pub(crate) fn run(context: &CliContext, args: VerifyPolicyArgs) -> Result<(), Cl
 	let proof_a = CliContext::bytes::<32>("--proof_a", &args.proof_a)?;
 	let proof_b = CliContext::bytes::<128>("--proof_b", &args.proof_b)?;
 	let proof_c = CliContext::bytes::<32>("--proof_c", &args.proof_c)?;
-	let verifying_key_account = CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
+	let verifying_key_account =
+		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
 	let data = VerifyPolicyInstructionData::new(|data| {
 		data.policy_hash = policy_hash;
 		data.proof_a = proof_a;
 		data.proof_b = proof_b;
 		data.proof_c = proof_c;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = VerifyPolicy {
-		verifying_key_account: verifying_key_account,
+		verifying_key_account,
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::VERIFY_POLICY_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::VERIFY_POLICY_COMPUTE_UNIT_LIMIT),
+	)
 }

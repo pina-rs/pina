@@ -6,80 +6,253 @@
  * @see https://github.com/codama-idl/codama
  */
 
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlySignerAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	transformEncoder,
+	type WritableAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
+	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
 import { getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlySignerAccount, type ReadonlyUint8Array, type WritableAccount } from '@solana/kit';
-import { getAccountMetaFactory, type InstructionAccountInput, type InstructionAccountInputAddress, type InstructionSignerInput, type ResolvedInstructionAccount, type ResolvedInstructionAccountMeta } from '@solana/program-client-core';
-import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const CHALLENGE_DISCLOSURE_DISCRIMINATOR = 9;
 
-export function getChallengeDisclosureDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(CHALLENGE_DISCLOSURE_DISCRIMINATOR); }
-
-export type ChallengeDisclosureInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountDisclosureRequest extends string | AccountMeta<string> = string, TAccountViewer extends string | AccountMeta<string> = string, TAccountClock extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountDisclosureRequest extends string ? WritableAccount<TAccountDisclosureRequest> : TAccountDisclosureRequest, TAccountViewer extends string ? ReadonlySignerAccount<TAccountViewer> & AccountSignerMeta<TAccountViewer> : TAccountViewer, TAccountClock extends string ? ReadonlyAccount<TAccountClock> : TAccountClock, ...TRemainingAccounts]>;
-
-export type ChallengeDisclosureInstructionData = { discriminator: number; reserved: number;  };
-
-export type ChallengeDisclosureInstructionDataArgs = { reserved: number;  };
-
-export function getChallengeDisclosureInstructionDataEncoder(): FixedSizeEncoder<ChallengeDisclosureInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['reserved', getU8Encoder()]]), (value) => ({ ...value, discriminator: 9 }));
+export function getChallengeDisclosureDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(CHALLENGE_DISCLOSURE_DISCRIMINATOR);
 }
 
-export function getChallengeDisclosureInstructionDataDecoder(): FixedSizeDecoder<ChallengeDisclosureInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(CHALLENGE_DISCLOSURE_DISCRIMINATOR, getU8Decoder())], ['reserved', getU8Decoder()]]);
-}
+export type ChallengeDisclosureInstruction<
+	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+	TAccountDisclosureRequest extends string | AccountMeta<string> = string,
+	TAccountViewer extends string | AccountMeta<string> = string,
+	TAccountClock extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountDisclosureRequest extends string
+				? WritableAccount<TAccountDisclosureRequest>
+				: TAccountDisclosureRequest,
+			TAccountViewer extends string ?
+					& ReadonlySignerAccount<TAccountViewer>
+					& AccountSignerMeta<TAccountViewer>
+				: TAccountViewer,
+			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
+				: TAccountClock,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getChallengeDisclosureInstructionDataCodec(): FixedSizeCodec<ChallengeDisclosureInstructionDataArgs, ChallengeDisclosureInstructionData> {
-    return combineCodec(getChallengeDisclosureInstructionDataEncoder(), getChallengeDisclosureInstructionDataDecoder());
-}
-
-export type ChallengeDisclosureInput<TAccountDisclosureRequest extends InstructionAccountInput = InstructionAccountInput, TAccountViewer extends InstructionSignerInput = InstructionSignerInput, TAccountClock extends InstructionAccountInput = InstructionAccountInput> =  {
-  disclosureRequest: TAccountDisclosureRequest;
-viewer: TAccountViewer;
-clock: TAccountClock;
-reserved: ChallengeDisclosureInstructionDataArgs["reserved"];
-}
-
-export function getChallengeDisclosureInstruction<TAccountDisclosureRequest extends InstructionAccountInput, TAccountViewer extends InstructionSignerInput, TAccountClock extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: ChallengeDisclosureInput<TAccountDisclosureRequest, TAccountViewer, TAccountClock>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): ChallengeDisclosureInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountDisclosureRequest, InstructionAccountInputAddress<TAccountDisclosureRequest>>, ResolvedInstructionAccountMeta<TAccountViewer, InstructionAccountInputAddress<TAccountViewer>>, ResolvedInstructionAccountMeta<TAccountClock, InstructionAccountInputAddress<TAccountClock>>> {
-  // Program address.
-const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
-
-// Account meta helper.
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-
- // Original accounts.
-const originalAccounts = { disclosureRequest: { value: input.disclosureRequest ?? null, isSigner: false, isWritable: true }, viewer: { value: input.viewer ?? null, isSigner: true, isWritable: false }, clock: { value: input.clock ?? null, isSigner: false, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-
-
-return Object.freeze({ accounts: [getAccountMeta("disclosureRequest", accounts.disclosureRequest), getAccountMeta("viewer", accounts.viewer), getAccountMeta("clock", accounts.clock)], data: getChallengeDisclosureInstructionDataEncoder().encode(args as ChallengeDisclosureInstructionDataArgs), programAddress } as ChallengeDisclosureInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountDisclosureRequest, InstructionAccountInputAddress<TAccountDisclosureRequest>>, ResolvedInstructionAccountMeta<TAccountViewer, InstructionAccountInputAddress<TAccountViewer>>, ResolvedInstructionAccountMeta<TAccountClock, InstructionAccountInputAddress<TAccountClock>>>);
-}
-
-export type ParsedChallengeDisclosureInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-disclosureRequest: TAccountMetas[0];
-viewer: TAccountMetas[1];
-clock: TAccountMetas[2];
+export type ChallengeDisclosureInstructionData = {
+	discriminator: number;
+	reserved: number;
 };
-data: ChallengeDisclosureInstructionData; };
 
-export function parseChallengeDisclosureInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedChallengeDisclosureInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 3) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 3 });
+export type ChallengeDisclosureInstructionDataArgs = { reserved: number };
+
+export function getChallengeDisclosureInstructionDataEncoder(): FixedSizeEncoder<
+	ChallengeDisclosureInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"reserved",
+			getU8Encoder(),
+		]]),
+		(value) => ({ ...value, discriminator: 9 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getChallengeDisclosureInstructionDataDecoder(): FixedSizeDecoder<
+	ChallengeDisclosureInstructionData
+> {
+	return getStructDecoder([[
+		"discriminator",
+		getPinaPodDiscriminatorDecoder(
+			CHALLENGE_DISCLOSURE_DISCRIMINATOR,
+			getU8Decoder(),
+		),
+	], ["reserved", getU8Decoder()]]);
 }
-  return { programAddress: instruction.programAddress, accounts: { disclosureRequest: getNextAccount(), viewer: getNextAccount(), clock: getNextAccount() }, data: getChallengeDisclosureInstructionDataDecoder().decode(instruction.data) };
+
+export function getChallengeDisclosureInstructionDataCodec(): FixedSizeCodec<
+	ChallengeDisclosureInstructionDataArgs,
+	ChallengeDisclosureInstructionData
+> {
+	return combineCodec(
+		getChallengeDisclosureInstructionDataEncoder(),
+		getChallengeDisclosureInstructionDataDecoder(),
+	);
+}
+
+export type ChallengeDisclosureInput<
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountViewer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+> = {
+	disclosureRequest: TAccountDisclosureRequest;
+	viewer: TAccountViewer;
+	clock: TAccountClock;
+	reserved: ChallengeDisclosureInstructionDataArgs["reserved"];
+};
+
+export function getChallengeDisclosureInstruction<
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountViewer extends InstructionSignerInput,
+	TAccountClock extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: ChallengeDisclosureInput<
+		TAccountDisclosureRequest,
+		TAccountViewer,
+		TAccountClock
+	>,
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
+): ChallengeDisclosureInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureRequest,
+		InstructionAccountInputAddress<TAccountDisclosureRequest>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountViewer,
+		InstructionAccountInputAddress<TAccountViewer>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>
+> {
+	// Program address.
+	const programAddressInput = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		disclosureRequest: {
+			value: input.disclosureRequest ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		viewer: { value: input.viewer ?? null, isSigner: true, isWritable: false },
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
+			getAccountMeta("viewer", accounts.viewer),
+			getAccountMeta("clock", accounts.clock),
+		],
+		data: getChallengeDisclosureInstructionDataEncoder().encode(
+			args as ChallengeDisclosureInstructionDataArgs,
+		),
+		programAddress,
+	} as ChallengeDisclosureInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountViewer,
+			InstructionAccountInputAddress<TAccountViewer>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
+	>);
+}
+
+export type ParsedChallengeDisclosureInstruction<
+	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		disclosureRequest: TAccountMetas[0];
+		viewer: TAccountMetas[1];
+		clock: TAccountMetas[2];
+	};
+	data: ChallengeDisclosureInstructionData;
+};
+
+export function parseChallengeDisclosureInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedChallengeDisclosureInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 3) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 3,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			disclosureRequest: getNextAccount(),
+			viewer: getNextAccount(),
+			clock: getNextAccount(),
+		},
+		data: getChallengeDisclosureInstructionDataDecoder().decode(
+			instruction.data,
+		),
+	};
 }

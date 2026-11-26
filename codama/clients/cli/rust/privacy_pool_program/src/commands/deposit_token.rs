@@ -10,12 +10,12 @@
 )]
 
 use clap::Args;
-
-use crate::context::CliContext;
-use crate::context::CliError;
 use privacy_pool_program_client::instructions::DepositToken;
 use privacy_pool_program_client::instructions::DepositTokenInstructionData;
 use solana_sdk::pubkey::Pubkey;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct DepositTokenArgs {
@@ -62,31 +62,39 @@ pub(crate) fn run(context: &CliContext, args: DepositTokenArgs) -> Result<(), Cl
 	let depositor = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-config".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let merkle_tree = match &args.merkle_tree {
 		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-tree".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-tree".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let mint = CliContext::pubkey("--mint", &args.mint)?;
 	let asset_vault = match &args.asset_vault {
 		Some(value) => CliContext::pubkey("--asset_vault", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-asset".as_bytes(), mint.as_ref()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-asset".as_bytes(), mint.as_ref()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
-	let depositor_token_account = CliContext::pubkey("--depositor_token_account", &args.depositor_token_account)?;
-	let vault_token_account = CliContext::pubkey("--vault_token_account", &args.vault_token_account)?;
+	let depositor_token_account =
+		CliContext::pubkey("--depositor_token_account", &args.depositor_token_account)?;
+	let vault_token_account =
+		CliContext::pubkey("--vault_token_account", &args.vault_token_account)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
 	let data = DepositTokenInstructionData::new(|data| {
 		data.amount.set(args.amount);
@@ -96,20 +104,25 @@ pub(crate) fn run(context: &CliContext, args: DepositTokenArgs) -> Result<(), Cl
 		data.envelope = envelope;
 		data.shares = shares;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = DepositToken {
-		depositor: depositor,
-		pool_config: pool_config,
-		merkle_tree: merkle_tree,
-		mint: mint,
-		asset_vault: asset_vault,
-		depositor_token_account: depositor_token_account,
-		vault_token_account: vault_token_account,
-		token_program: token_program,
+		depositor,
+		pool_config,
+		merkle_tree,
+		mint,
+		asset_vault,
+		depositor_token_account,
+		vault_token_account,
+		token_program,
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::DEPOSIT_TOKEN_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::DEPOSIT_TOKEN_COMPUTE_UNIT_LIMIT),
+	)
 }

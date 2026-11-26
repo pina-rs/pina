@@ -4,232 +4,301 @@
 
 import { Command } from "commander";
 import {
-	findPoolConfigPda,
-	findPoolVaultPda,
-	findMerkleTreePda,
-	findNullifierRecordPda,
-	findCustodianRegistryPda,
-	findRequesterRegistryPda,
-	findAssetVaultPda,
-	findDisclosureRequestPda,
-	findDisclosureLogPda,
-	findVerifyingKeyAccountPda,
-	fetchPoolConfig,
-	fetchPoolVault,
+	fetchAssetVault,
+	fetchCustodianRegistry,
+	fetchDisclosureLog,
+	fetchDisclosureRequest,
 	fetchMerkleTree,
 	fetchNullifierRecord,
-	fetchCustodianRegistry,
+	fetchPoolConfig,
+	fetchPoolVault,
 	fetchRequesterRegistry,
-	fetchAssetVault,
-	fetchDisclosureRequest,
-	fetchDisclosureLog,
 	fetchVerifyingKeyAccount,
+	findAssetVaultPda,
+	findCustodianRegistryPda,
+	findDisclosureLogPda,
+	findDisclosureRequestPda,
+	findMerkleTreePda,
+	findNullifierRecordPda,
+	findPoolConfigPda,
+	findPoolVaultPda,
+	findRequesterRegistryPda,
+	findVerifyingKeyAccountPda,
 } from "./client";
-import { CliContext, CliError, bigInteger, pubkey, registerGlobals } from "./context";
+import {
+	bigInteger,
+	CliContext,
+	CliError,
+	pubkey,
+	registerGlobals,
+} from "./context";
 
 export const fetchCommand = registerGlobals(new Command("fetch"))
 	.description("Fetch and decode program accounts.")
-		.addCommand(
-				registerGlobals(new Command("pool-config"))
-					.description("Global pool configuration, governance root, and Custom Ring policy flags.")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-const address = options.address === undefined
-						? (await findPoolConfigPda({
-							programAddress: context.programAddress,
-						}))[0]
-						: pubkey("--address", options.address as string);
-						const account = await fetchPoolConfig(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "pool-config", address, account.data);
-					}),
+	.addCommand(
+		registerGlobals(new Command("pool-config"))
+			.description(
+				"Global pool configuration, governance root, and Custom Ring policy flags.",
 			)
-		.addCommand(
-				registerGlobals(new Command("pool-vault"))
-					.description("The pool's native SOL custody PDA.")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-const address = options.address === undefined
-						? (await findPoolVaultPda({
-							programAddress: context.programAddress,
-						}))[0]
-						: pubkey("--address", options.address as string);
-						const account = await fetchPoolVault(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "pool-vault", address, account.data);
-					}),
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
 			)
-		.addCommand(
-				registerGlobals(new Command("merkle-tree"))
-					.description("Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.\n\nHolds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root\nring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-const address = options.address === undefined
-						? (await findMerkleTreePda({
-							programAddress: context.programAddress,
-						}))[0]
-						: pubkey("--address", options.address as string);
-						const account = await fetchMerkleTree(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "merkle-tree", address, account.data);
-					}),
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const address = options.address === undefined
+					? (await findPoolConfigPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
+				const account = await fetchPoolConfig(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "pool-config", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("pool-vault"))
+			.description("The pool's native SOL custody PDA.")
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
 			)
-		.addCommand(
-				registerGlobals(new Command("nullifier-record"))
-					.description("Per-nullifier spent marker PDA. Existence proves the nullifier was spent in\n$O(1)$ without a global nullifier write-lock hotspot or fixed capacity cap.")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-				.requiredOption("--nullifier <nullifier>", "PDA seed `nullifier`.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-	const nullifier = pubkey("--nullifier", options.nullifier as string);
-					const address = options.address ??
-						(await findNullifierRecordPda({ nullifier }, { programAddress: context.programAddress }))[0];
-						const account = await fetchNullifierRecord(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "nullifier-record", address, account.data);
-					}),
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const address = options.address === undefined
+					? (await findPoolVaultPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
+				const account = await fetchPoolVault(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "pool-vault", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("merkle-tree"))
+			.description(
+				"Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.\n\nHolds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root\nring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.",
 			)
-		.addCommand(
-				registerGlobals(new Command("custodian-registry"))
-					.description("The disclosure committee.")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-const address = options.address === undefined
-						? (await findCustodianRegistryPda({
-							programAddress: context.programAddress,
-						}))[0]
-						: pubkey("--address", options.address as string);
-						const account = await fetchCustodianRegistry(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "custodian-registry", address, account.data);
-					}),
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
 			)
-		.addCommand(
-				registerGlobals(new Command("requester-registry"))
-					.description("Entities allowed to file tier-1 and tier-2 disclosure requests.")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-const address = options.address === undefined
-						? (await findRequesterRegistryPda({
-							programAddress: context.programAddress,
-						}))[0]
-						: pubkey("--address", options.address as string);
-						const account = await fetchRequesterRegistry(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "requester-registry", address, account.data);
-					}),
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const address = options.address === undefined
+					? (await findMerkleTreePda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
+				const account = await fetchMerkleTree(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "merkle-tree", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("nullifier-record"))
+			.description(
+				"Per-nullifier spent marker PDA. Existence proves the nullifier was spent in\n$O(1)$ without a global nullifier write-lock hotspot or fixed capacity cap.",
 			)
-		.addCommand(
-				registerGlobals(new Command("asset-vault"))
-					.description("Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL\nInterface PDA).")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-				.requiredOption("--mint <mint>", "PDA seed `mint`.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-	const mint = pubkey("--mint", options.mint as string);
-					const address = options.address ??
-						(await findAssetVaultPda({ mint }, { programAddress: context.programAddress }))[0];
-						const account = await fetchAssetVault(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "asset-vault", address, account.data);
-					}),
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
 			)
-		.addCommand(
-				registerGlobals(new Command("disclosure-request"))
-					.description("One disclosure request and its state machine. Stores `view_pubkey` after\n`RequestDisclosure` authenticates it against the Merkle tree so\n`GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-				.requiredOption("--requester <requester>", "PDA seed `requester`.")
-				.requiredOption("--nonce <nonce>", "PDA seed `nonce`.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-	const requester = pubkey("--requester", options.requester as string);
-	const nonce = bigInteger("--nonce", options.nonce as string);
-					const address = options.address ??
-						(await findDisclosureRequestPda({ requester, nonce }, { programAddress: context.programAddress }))[0];
-						const account = await fetchDisclosureRequest(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "disclosure-request", address, account.data);
-					}),
+			.requiredOption("--nullifier <nullifier>", "PDA seed `nullifier`.")
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const nullifier = pubkey("--nullifier", options.nullifier as string);
+				const address = options.address ??
+					(await findNullifierRecordPda({ nullifier }, {
+						programAddress: context.programAddress,
+					}))[0];
+				const account = await fetchNullifierRecord(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "nullifier-record", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("custodian-registry"))
+			.description("The disclosure committee.")
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
 			)
-		.addCommand(
-				registerGlobals(new Command("disclosure-log"))
-					.description("Append-only public record of executed disclosures. Stores a salted\n`scope_hash` rather than raw note commitments so observers cannot link log\nentries back to shielded notes.")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-const address = options.address === undefined
-						? (await findDisclosureLogPda({
-							programAddress: context.programAddress,
-						}))[0]
-						: pubkey("--address", options.address as string);
-						const account = await fetchDisclosureLog(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "disclosure-log", address, account.data);
-					}),
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const address = options.address === undefined
+					? (await findCustodianRegistryPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
+				const account = await fetchCustodianRegistry(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "custodian-registry", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("requester-registry"))
+			.description(
+				"Entities allowed to file tier-1 and tier-2 disclosure requests.",
 			)
-		.addCommand(
-				registerGlobals(new Command("verifying-key-account"))
-					.description("Single-input Groth16 verifying key. Every circuit compresses its statement\ninto one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are\nstored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).")
-				.option("--address <address>", "Account address; overrides PDA derivation.")
-				.requiredOption("--slot <slot>", "PDA seed `slot`.")
-					.action(async (options) => {
-						const context = await CliContext.create(options);
-	const slot = bigInteger("--slot", options.slot as string);
-					const address = options.address ??
-						(await findVerifyingKeyAccountPda({ slot }, { programAddress: context.programAddress }))[0];
-						const account = await fetchVerifyingKeyAccount(context.rpc, address);
-						if (account.programAddress !== context.programAddress) {
-							throw new CliError(
-								`account ${address} belongs to ${account.programAddress}, not the configured program`,
-							);
-						}
-						printAccount(context.json, "verifying-key-account", address, account.data);
-					}),
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
 			)
-	;
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const address = options.address === undefined
+					? (await findRequesterRegistryPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
+				const account = await fetchRequesterRegistry(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "requester-registry", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("asset-vault"))
+			.description(
+				"Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL\nInterface PDA).",
+			)
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
+			)
+			.requiredOption("--mint <mint>", "PDA seed `mint`.")
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const mint = pubkey("--mint", options.mint as string);
+				const address = options.address ??
+					(await findAssetVaultPda({ mint }, {
+						programAddress: context.programAddress,
+					}))[0];
+				const account = await fetchAssetVault(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "asset-vault", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("disclosure-request"))
+			.description(
+				"One disclosure request and its state machine. Stores `view_pubkey` after\n`RequestDisclosure` authenticates it against the Merkle tree so\n`GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.",
+			)
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
+			)
+			.requiredOption("--requester <requester>", "PDA seed `requester`.")
+			.requiredOption("--nonce <nonce>", "PDA seed `nonce`.")
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const requester = pubkey("--requester", options.requester as string);
+				const nonce = bigInteger("--nonce", options.nonce as string);
+				const address = options.address ??
+					(await findDisclosureRequestPda({ requester, nonce }, {
+						programAddress: context.programAddress,
+					}))[0];
+				const account = await fetchDisclosureRequest(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "disclosure-request", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("disclosure-log"))
+			.description(
+				"Append-only public record of executed disclosures. Stores a salted\n`scope_hash` rather than raw note commitments so observers cannot link log\nentries back to shielded notes.",
+			)
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
+			)
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const address = options.address === undefined
+					? (await findDisclosureLogPda({
+						programAddress: context.programAddress,
+					}))[0]
+					: pubkey("--address", options.address as string);
+				const account = await fetchDisclosureLog(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(context.json, "disclosure-log", address, account.data);
+			}),
+	)
+	.addCommand(
+		registerGlobals(new Command("verifying-key-account"))
+			.description(
+				"Single-input Groth16 verifying key. Every circuit compresses its statement\ninto one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are\nstored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).",
+			)
+			.option(
+				"--address <address>",
+				"Account address; overrides PDA derivation.",
+			)
+			.requiredOption("--slot <slot>", "PDA seed `slot`.")
+			.action(async (options) => {
+				const context = await CliContext.create(options);
+				const slot = bigInteger("--slot", options.slot as string);
+				const address = options.address ??
+					(await findVerifyingKeyAccountPda({ slot }, {
+						programAddress: context.programAddress,
+					}))[0];
+				const account = await fetchVerifyingKeyAccount(context.rpc, address);
+				if (account.programAddress !== context.programAddress) {
+					throw new CliError(
+						`account ${address} belongs to ${account.programAddress}, not the configured program`,
+					);
+				}
+				printAccount(
+					context.json,
+					"verifying-key-account",
+					address,
+					account.data,
+				);
+			}),
+	);
 
-function printAccount(json: boolean, name: string, address: string, data: unknown): void {
+function printAccount(
+	json: boolean,
+	name: string,
+	address: string,
+	data: unknown,
+): void {
 	if (json) {
 		console.log(JSON.stringify({ address, ...(data as object) }, null, "\t"));
 		return;

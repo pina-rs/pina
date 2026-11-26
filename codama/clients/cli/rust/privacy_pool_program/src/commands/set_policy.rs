@@ -10,12 +10,12 @@
 )]
 
 use clap::Args;
-
-use crate::context::CliContext;
-use crate::context::CliError;
 use privacy_pool_program_client::instructions::SetPolicy;
 use privacy_pool_program_client::instructions::SetPolicyInstructionData;
 use solana_sdk::pubkey::Pubkey;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct SetPolicyArgs {
@@ -33,24 +33,31 @@ pub(crate) fn run(context: &CliContext, args: SetPolicyArgs) -> Result<(), CliEr
 	let authority = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-config".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let data = SetPolicyInstructionData::new(|data| {
 		data.policy_flags = args.policy_flags;
 		data.policy_cosigner = policy_cosigner;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = SetPolicy {
-		authority: authority,
-		pool_config: pool_config,
+		authority,
+		pool_config,
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::SET_POLICY_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::SET_POLICY_COMPUTE_UNIT_LIMIT),
+	)
 }

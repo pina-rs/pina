@@ -6,136 +6,240 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getPinaPodDiscriminatorDecoder, getPinaPodMigrationVersionDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getStructDecoder, getStructEncoder, getU16Decoder, getU16Encoder, getU32Decoder, getU32Encoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type ClientWithRpc, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findPoolConfigPda } from '../pdas';
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	type ClientWithRpc,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	type GetAccountInfoApi,
+	getAddressDecoder,
+	getAddressEncoder,
+	type GetMultipleAccountsApi,
+	getStructDecoder,
+	getStructEncoder,
+	getU16Decoder,
+	getU16Encoder,
+	getU32Decoder,
+	getU32Encoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type HasAddress,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { findPoolConfigPda } from "../pdas";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const POOL_CONFIG_DISCRIMINATOR = 1;
 
-export function getPoolConfigDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(POOL_CONFIG_DISCRIMINATOR); }
+export function getPoolConfigDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(POOL_CONFIG_DISCRIMINATOR);
+}
 
 export const POOL_CONFIG_DISCRIMINATOR2 = 0;
 
-export function getPoolConfigDiscriminator2Bytes(): ReadonlyUint8Array { return getU8Encoder().encode(POOL_CONFIG_DISCRIMINATOR2); }
+export function getPoolConfigDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(POOL_CONFIG_DISCRIMINATOR2);
+}
 
 /** Global pool configuration, governance root, and Custom Ring policy flags. */
-export type PoolConfig = { discriminator: number; migrationVersion: number; bump: number; 
-/**
- * Governance key that rotates custodians, requesters, verifying keys, and
- * Custom Ring policy settings.
- */
-authority: Address; 
-/** Custodian approvals required to execute a disclosure. */
-custodianThreshold: number; 
-/** Tier-1 challenge window length in seconds. */
-challengeWindowSecs: number; 
-/** Custom Ring policy bitmask (`POLICY_PAUSED`, `POLICY_REQUIRE_COSIGNER`). */
-policyFlags: number; 
-/**
- * Required co-signer or Custom Ring program PDA when
- * `POLICY_REQUIRE_COSIGNER` is active.
- */
-policyCosigner: Address; 
-/** Lifetime deposit count, for analysis only. */
-totalDeposits: bigint;  };
+export type PoolConfig = {
+	discriminator: number;
+	migrationVersion: number;
+	bump: number;
+	/**
+	 * Governance key that rotates custodians, requesters, verifying keys, and
+	 * Custom Ring policy settings.
+	 */
+	authority: Address;
+	/** Custodian approvals required to execute a disclosure. */
+	custodianThreshold: number;
+	/** Tier-1 challenge window length in seconds. */
+	challengeWindowSecs: number;
+	/** Custom Ring policy bitmask (`POLICY_PAUSED`, `POLICY_REQUIRE_COSIGNER`). */
+	policyFlags: number;
+	/**
+	 * Required co-signer or Custom Ring program PDA when
+	 * `POLICY_REQUIRE_COSIGNER` is active.
+	 */
+	policyCosigner: Address;
+	/** Lifetime deposit count, for analysis only. */
+	totalDeposits: bigint;
+};
 
-export type PoolConfigArgs = { bump: number; 
-/**
- * Governance key that rotates custodians, requesters, verifying keys, and
- * Custom Ring policy settings.
- */
-authority: Address | HasAddress; 
-/** Custodian approvals required to execute a disclosure. */
-custodianThreshold: number; 
-/** Tier-1 challenge window length in seconds. */
-challengeWindowSecs: number; 
-/** Custom Ring policy bitmask (`POLICY_PAUSED`, `POLICY_REQUIRE_COSIGNER`). */
-policyFlags: number; 
-/**
- * Required co-signer or Custom Ring program PDA when
- * `POLICY_REQUIRE_COSIGNER` is active.
- */
-policyCosigner: Address | HasAddress; 
-/** Lifetime deposit count, for analysis only. */
-totalDeposits: number | bigint;  };
+export type PoolConfigArgs = {
+	bump: number;
+	/**
+	 * Governance key that rotates custodians, requesters, verifying keys, and
+	 * Custom Ring policy settings.
+	 */
+	authority: Address | HasAddress;
+	/** Custodian approvals required to execute a disclosure. */
+	custodianThreshold: number;
+	/** Tier-1 challenge window length in seconds. */
+	challengeWindowSecs: number;
+	/** Custom Ring policy bitmask (`POLICY_PAUSED`, `POLICY_REQUIRE_COSIGNER`). */
+	policyFlags: number;
+	/**
+	 * Required co-signer or Custom Ring program PDA when
+	 * `POLICY_REQUIRE_COSIGNER` is active.
+	 */
+	policyCosigner: Address | HasAddress;
+	/** Lifetime deposit count, for analysis only. */
+	totalDeposits: number | bigint;
+};
 
 /** Gets the encoder for {@link PoolConfigArgs} account data. */
 export function getPoolConfigEncoder(): FixedSizeEncoder<PoolConfigArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['migrationVersion', getU8Encoder()], ['bump', getU8Encoder()], ['authority', getAddressEncoder()], ['custodianThreshold', getU16Encoder()], ['challengeWindowSecs', getU32Encoder()], ['policyFlags', getU8Encoder()], ['policyCosigner', getAddressEncoder()], ['totalDeposits', getU64Encoder()]]), (value) => ({ ...value, discriminator: 1, migrationVersion: 0 }));
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["authority", getAddressEncoder()],
+			["custodianThreshold", getU16Encoder()],
+			["challengeWindowSecs", getU32Encoder()],
+			["policyFlags", getU8Encoder()],
+			["policyCosigner", getAddressEncoder()],
+			["totalDeposits", getU64Encoder()],
+		]),
+		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
+	);
 }
 
 /** Gets the decoder for {@link PoolConfig} account data. */
 export function getPoolConfigDecoder(): FixedSizeDecoder<PoolConfig> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(POOL_CONFIG_DISCRIMINATOR, getU8Decoder())], ['migrationVersion', getPinaPodMigrationVersionDecoder(0, getU8Decoder())], ['bump', getU8Decoder()], ['authority', getAddressDecoder()], ['custodianThreshold', getU16Decoder()], ['challengeWindowSecs', getU32Decoder()], ['policyFlags', getU8Decoder()], ['policyCosigner', getAddressDecoder()], ['totalDeposits', getU64Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(POOL_CONFIG_DISCRIMINATOR, getU8Decoder()),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["bump", getU8Decoder()],
+		["authority", getAddressDecoder()],
+		["custodianThreshold", getU16Decoder()],
+		["challengeWindowSecs", getU32Decoder()],
+		["policyFlags", getU8Decoder()],
+		["policyCosigner", getAddressDecoder()],
+		["totalDeposits", getU64Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link PoolConfig} account data. */
-export function getPoolConfigCodec(): FixedSizeCodec<PoolConfigArgs, PoolConfig> {
-    return combineCodec(getPoolConfigEncoder(), getPoolConfigDecoder());
+export function getPoolConfigCodec(): FixedSizeCodec<
+	PoolConfigArgs,
+	PoolConfig
+> {
+	return combineCodec(getPoolConfigEncoder(), getPoolConfigDecoder());
 }
 
-export function decodePoolConfig<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<PoolConfig, TAddress>;
-export function decodePoolConfig<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<PoolConfig, TAddress>;
-export function decodePoolConfig<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<PoolConfig, TAddress> | MaybeAccount<PoolConfig, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getPoolConfigDecoder());
+export function decodePoolConfig<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<PoolConfig, TAddress>;
+export function decodePoolConfig<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<PoolConfig, TAddress>;
+export function decodePoolConfig<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<PoolConfig, TAddress> | MaybeAccount<PoolConfig, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getPoolConfigDecoder(),
+	);
 }
 
 export async function fetchPoolConfig<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<PoolConfig, TAddress>> {
-  const maybeAccount = await fetchMaybePoolConfig(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybePoolConfig(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybePoolConfig<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<PoolConfig, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount('rpc' in rpc ? rpc.rpc : rpc, typeof address === 'string' ? address : address.address, config);
-  return decodePoolConfig(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
+	return decodePoolConfig(maybeAccount);
 }
 
 export async function fetchAllPoolConfig(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<PoolConfig>[]> {
-  const maybeAccounts = await fetchAllMaybePoolConfig(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybePoolConfig(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybePoolConfig(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<PoolConfig>[]> {
-  const maybeAccounts = await fetchEncodedAccounts('rpc' in rpc ? rpc.rpc : rpc, addresses.map((a) => (typeof a === 'string' ? a : a.address)), config);
-  return maybeAccounts.map((maybeAccount) => decodePoolConfig(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
+	return maybeAccounts.map((maybeAccount) => decodePoolConfig(maybeAccount));
 }
 
 export async function fetchPoolConfigFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<PoolConfig>> {
-  const maybeAccount = await fetchMaybePoolConfigFromSeeds(rpc, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybePoolConfigFromSeeds(rpc, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybePoolConfigFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<PoolConfig>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findPoolConfigPda({ programAddress });
-  return await fetchMaybePoolConfig(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findPoolConfigPda({ programAddress });
+	return await fetchMaybePoolConfig(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */

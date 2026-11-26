@@ -3,36 +3,63 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getSetVerificationKeyInstructionAsync, SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getSetVerificationKeyInstructionAsync,
+	SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const setVerificationKeyCommand = registerGlobals(new Command("set_verification_key"))
+export const setVerificationKeyCommand = registerGlobals(
+	new Command("set_verification_key"),
+)
 	.description("setVerificationKey")
 	.requiredOption("--bump <bump>", "bump")
-	.requiredOption("--slot <slot>", "Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`].")
+	.requiredOption(
+		"--slot <slot>",
+		"Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`].",
+	)
 	.requiredOption("--alpha-g1 <alphaG1>", "alphaG1")
 	.requiredOption("--beta-g2 <betaG2>", "betaG2")
 	.requiredOption("--gamma-g2 <gammaG2>", "gammaG2")
 	.requiredOption("--delta-g2 <deltaG2>", "deltaG2")
 	.requiredOption("--ic0 <ic0>", "ic0")
 	.requiredOption("--ic1 <ic1>", "ic1")
-	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
-	.requiredOption("--verifying-key-account <verifyingKeyAccount>", "The `verifying_key_account` account")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.requiredOption(
+		"--verifying-key-account <verifyingKeyAccount>",
+		"The `verifying_key_account` account",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		bump: smallInteger("--bump", options.bump),
-		slot: smallInteger("--slot", options.slot),
-		alphaG1: base58("--alpha-g1", options.alphaG1),
-		betaG2: base58("--beta-g2", options.betaG2),
-		gammaG2: base58("--gamma-g2", options.gammaG2),
-		deltaG2: base58("--delta-g2", options.deltaG2),
-		ic0: base58("--ic0", options.ic0),
-		ic1: base58("--ic1", options.ic1),
-		authority: context.payer,
-		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
-		verifyingKeyAccount: pubkey("--verifying-key-account", options.verifyingKeyAccount),
-	};
+		const input = {
+			bump: smallInteger("--bump", options.bump),
+			slot: smallInteger("--slot", options.slot),
+			alphaG1: base58("--alpha-g1", options.alphaG1),
+			betaG2: base58("--beta-g2", options.betaG2),
+			gammaG2: base58("--gamma-g2", options.gammaG2),
+			deltaG2: base58("--delta-g2", options.deltaG2),
+			ic0: base58("--ic0", options.ic0),
+			ic1: base58("--ic1", options.ic1),
+			authority: context.payer,
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			verifyingKeyAccount: pubkey(
+				"--verifying-key-account",
+				options.verifyingKeyAccount,
+			),
+		};
 		const instruction = await getSetVerificationKeyInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

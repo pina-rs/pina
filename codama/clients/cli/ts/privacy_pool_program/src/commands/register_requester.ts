@@ -3,24 +3,47 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getRegisterRequesterInstructionAsync, REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getRegisterRequesterInstructionAsync,
+	REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const registerRequesterCommand = registerGlobals(new Command("register_requester"))
+export const registerRequesterCommand = registerGlobals(
+	new Command("register_requester"),
+)
 	.description("registerRequester")
 	.requiredOption("--requester <requester>", "requester")
 	.requiredOption("--max-tier <maxTier>", "maxTier")
-	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
-	.option("--requester-registry <requesterRegistry>", "The `requester_registry` account [default: derived]")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
+		"--requester-registry <requesterRegistry>",
+		"The `requester_registry` account [default: derived]",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		requester: pubkey("--requester", options.requester),
-		maxTier: smallInteger("--max-tier", options.maxTier),
-		authority: context.payer,
-		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
-		requesterRegistry: options.requesterRegistry === undefined ? undefined : pubkey("--requester-registry", options.requesterRegistry),
-	};
+		const input = {
+			requester: pubkey("--requester", options.requester),
+			maxTier: smallInteger("--max-tier", options.maxTier),
+			authority: context.payer,
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			requesterRegistry: options.requesterRegistry === undefined
+				? undefined
+				: pubkey("--requester-registry", options.requesterRegistry),
+		};
 		const instruction = await getRegisterRequesterInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

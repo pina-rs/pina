@@ -4,22 +4,22 @@
 
 import {
 	type Address,
-	type BlockhashLifetimeConstraint,
-	type Instruction,
-	type KeyPairSigner,
 	appendTransactionMessageInstructions,
+	type BlockhashLifetimeConstraint,
 	createKeyPairSignerFromBytes,
 	createSolanaRpc,
+	createTransactionMessage,
+	getBase58Decoder,
 	getBase64EncodedWireTransaction,
+	type Instruction,
 	isAddress,
+	type KeyPairSigner,
 	pipe,
 	setTransactionMessageComputeUnitLimit,
 	setTransactionMessageFeePayerSigner,
 	setTransactionMessageLifetimeUsingBlockhash,
-	getBase58Decoder,
 	signAndSendTransactionMessageWithSigners,
 	signTransactionMessageWithSigners,
-	createTransactionMessage,
 } from "@solana/kit";
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
@@ -50,12 +50,21 @@ export const MAX_COMPUTE_UNIT_LIMIT = 1_400_000;
 /** Registers the shared global options on one commander command. */
 export function registerGlobals(command: Command): Command {
 	return command
-		.option("-u, --url <url>", "RPC endpoint: mainnet, devnet, testnet, localhost, or an https URL.")
+		.option(
+			"-u, --url <url>",
+			"RPC endpoint: mainnet, devnet, testnet, localhost, or an https URL.",
+		)
 		.option("-k, --keypair <path>", "Payer keypair JSON file.")
 		.option("--program-id <address>", "Override the on-chain program address.")
-		.option("--simulate", "Simulate the transaction and print logs instead of sending.")
+		.option(
+			"--simulate",
+			"Simulate the transaction and print logs instead of sending.",
+		)
 		.option("--json", "Print machine-readable JSON output.")
-		.option("--compute-unit-limit <units>", "Compute unit limit to request instead of the one recorded for the instruction.");
+		.option(
+			"--compute-unit-limit <units>",
+			"Compute unit limit to request instead of the one recorded for the instruction.",
+		);
 }
 
 export class CliError extends Error {}
@@ -90,15 +99,26 @@ export class CliContext {
 
 	static async create(options: GlobalOptions): Promise<CliContext> {
 		const url = options.url ?? process.env.SOLANA_URL ?? "devnet";
-		const keypair = options.keypair ?? process.env.PINA_KEYPAIR ?? "~/.config/solana/id.json";
+		const keypair = options.keypair ?? process.env.PINA_KEYPAIR ??
+			"~/.config/solana/id.json";
 		const endpoint = resolveEndpoint(url);
-		const rpc = createSolanaRpc(endpoint as Parameters<typeof createSolanaRpc>[0]);
+		const rpc = createSolanaRpc(
+			endpoint as Parameters<typeof createSolanaRpc>[0],
+		);
 		const payer = await loadKeypair(keypair);
 		const programAddress = options.programId
 			? pubkey("--program-id", options.programId)
 			: ("DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D" as Address);
 		const computeUnitLimit = parseComputeUnitLimit(options.computeUnitLimit);
-		return new CliContext(rpc, payer, programAddress, options.simulate ?? false, options.json ?? false, computeUnitLimit, clusterOf(endpoint));
+		return new CliContext(
+			rpc,
+			payer,
+			programAddress,
+			options.simulate ?? false,
+			options.json ?? false,
+			computeUnitLimit,
+			clusterOf(endpoint),
+		);
 	}
 
 	/**
@@ -113,7 +133,12 @@ export class CliContext {
 		const { value: latestBlockhash } = await this.rpc
 			.getLatestBlockhash()
 			.send();
-		const message = buildTransactionMessage(this.payer, latestBlockhash, instruction, computeUnitLimit);
+		const message = buildTransactionMessage(
+			this.payer,
+			latestBlockhash,
+			instruction,
+			computeUnitLimit,
+		);
 
 		if (this.simulate) {
 			const transaction = await signTransactionMessageWithSigners(message);
@@ -129,9 +154,17 @@ export class CliContext {
 			const logs = result.logs ?? [];
 			// The RPC reports consumption as a bigint, which JSON cannot encode;
 			// it never exceeds the transaction limit, so a number is exact.
-			const unitsConsumed = result.unitsConsumed === undefined ? null : Number(result.unitsConsumed);
+			const unitsConsumed = result.unitsConsumed === undefined
+				? null
+				: Number(result.unitsConsumed);
 			if (this.json) {
-				console.log(JSON.stringify({ logs, unitsConsumed, computeUnitLimit: computeUnitLimit ?? null }));
+				console.log(
+					JSON.stringify({
+						logs,
+						unitsConsumed,
+						computeUnitLimit: computeUnitLimit ?? null,
+					}),
+				);
 			} else {
 				for (const log of logs) {
 					console.log(log);
@@ -142,13 +175,17 @@ export class CliContext {
 			}
 			if (result.err != null) {
 				throw new CliError(
-					`the transaction failed: ${JSON.stringify(result.err)}\n${logs.join("\n")}`,
+					`the transaction failed: ${JSON.stringify(result.err)}\n${
+						logs.join("\n")
+					}`,
 				);
 			}
 			return;
 		}
 
-		const signatureBytes = await signAndSendTransactionMessageWithSigners(message);
+		const signatureBytes = await signAndSendTransactionMessageWithSigners(
+			message,
+		);
 		const signature58 = getBase58Decoder().decode(signatureBytes);
 		if (this.json) {
 			console.log(JSON.stringify({ signature: signature58 }));
@@ -183,7 +220,9 @@ export function buildTransactionMessage(
  * Parse `--compute-unit-limit`: a whole number of compute units from 1 to
  * the transaction maximum, or `undefined` when the flag is absent.
  */
-export function parseComputeUnitLimit(value: string | undefined): number | undefined {
+export function parseComputeUnitLimit(
+	value: string | undefined,
+): number | undefined {
 	if (value === undefined) {
 		return undefined;
 	}
@@ -197,7 +236,10 @@ export function parseComputeUnitLimit(value: string | undefined): number | undef
 }
 
 /** How much of the requested budget a simulation consumed. */
-export function consumptionSummary(consumed: number, computeUnitLimit: number | undefined): string {
+export function consumptionSummary(
+	consumed: number,
+	computeUnitLimit: number | undefined,
+): string {
 	return computeUnitLimit === undefined
 		? `Consumed ${consumed} compute units (no limit requested; the runtime default applies)`
 		: `Consumed ${consumed} of ${computeUnitLimit} requested compute units`;
@@ -233,7 +275,8 @@ export function base58Vec(flag: string, value: string): number[] {
 
 export function base58(flag: string, value: string): Uint8Array {
 	try {
-		const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+		const ALPHABET =
+			"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 		let num = 0n;
 		for (const character of value) {
 			const digit = ALPHABET.indexOf(character);
@@ -282,7 +325,9 @@ function clusterOf(endpoint: string): string {
 }
 
 async function loadKeypair(path: string): Promise<KeyPairSigner> {
-	const expanded = path.startsWith("~/") ? `${homedir()}/${path.slice(2)}` : path;
+	const expanded = path.startsWith("~/")
+		? `${homedir()}/${path.slice(2)}`
+		: path;
 	const bytes = JSON.parse(readFileSync(expanded, "utf8")) as unknown;
 	if (!Array.isArray(bytes) || bytes.length !== 64) {
 		throw new CliError(
@@ -292,10 +337,12 @@ async function loadKeypair(path: string): Promise<KeyPairSigner> {
 	// A value outside 0-255 would be silently wrapped by `Uint8Array`,
 	// producing a different signer than the file asked for.
 	for (const byte of bytes) {
-		if (!Number.isInteger(byte) || (byte as number) < 0 || (byte as number) > 255) {
+		if (
+			!Number.isInteger(byte) || (byte as number) < 0 || (byte as number) > 255
+		) {
 			throw new CliError(
-			`could not load payer keypair \`${expanded}\`: every byte must be an integer from 0 to 255`,
-		);
+				`could not load payer keypair \`${expanded}\`: every byte must be an integer from 0 to 255`,
+			);
 		}
 	}
 	return await createKeyPairSignerFromBytes(new Uint8Array(bytes as number[]));

@@ -6,153 +6,615 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type AccountSignerMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array, type WritableAccount, type WritableSignerAccount } from '@solana/kit';
-import { getAccountMetaFactory, type InstructionAccountInput, type InstructionAccountInputAddress, type InstructionSignerInput, type ResolvedInstructionAccount, type ResolvedInstructionAccountMeta } from '@solana/program-client-core';
-import { findMerkleTreePda, findPoolConfigPda, findRequesterRegistryPda } from '../pdas';
-import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type AccountSignerMeta,
+	type Address,
+	combineCodec,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	getBytesDecoder,
+	getBytesEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	transformEncoder,
+	type WritableAccount,
+	type WritableSignerAccount,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type InstructionSignerInput,
+	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+	findMerkleTreePda,
+	findPoolConfigPda,
+	findRequesterRegistryPda,
+} from "../pdas";
+import {
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
+import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const REQUEST_DISCLOSURE_DISCRIMINATOR = 7;
 
-export function getRequestDisclosureDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(REQUEST_DISCLOSURE_DISCRIMINATOR); }
-
-export type RequestDisclosureInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountRequester extends string | AccountMeta<string> = string, TAccountPoolConfig extends string | AccountMeta<string> = string, TAccountRequesterRegistry extends string | AccountMeta<string> = string, TAccountMerkleTree extends string | AccountMeta<string> = string, TAccountDisclosureRequest extends string | AccountMeta<string> = string, TAccountSystemProgram extends string | AccountMeta<string> = string, TAccountClock extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountRequester extends string ? WritableSignerAccount<TAccountRequester> & AccountSignerMeta<TAccountRequester> : TAccountRequester, TAccountPoolConfig extends string ? ReadonlyAccount<TAccountPoolConfig> : TAccountPoolConfig, TAccountRequesterRegistry extends string ? ReadonlyAccount<TAccountRequesterRegistry> : TAccountRequesterRegistry, TAccountMerkleTree extends string ? ReadonlyAccount<TAccountMerkleTree> : TAccountMerkleTree, TAccountDisclosureRequest extends string ? WritableAccount<TAccountDisclosureRequest> : TAccountDisclosureRequest, TAccountSystemProgram extends string ? ReadonlyAccount<TAccountSystemProgram> : TAccountSystemProgram, TAccountClock extends string ? ReadonlyAccount<TAccountClock> : TAccountClock, ...TRemainingAccounts]>;
-
-export type RequestDisclosureInstructionData = { discriminator: number; bump: number; nonce: bigint; tier: number; commitment: ReadonlyUint8Array; 
-/** Claimed consent key for `commitment`, authenticated via `path_elements`. */
-viewPubkey: ReadonlyUint8Array; leafIndex: bigint; pathElements: ReadonlyUint8Array; noticeLen: number; notice: ReadonlyUint8Array; legalBasisHash: ReadonlyUint8Array;  };
-
-export type RequestDisclosureInstructionDataArgs = { bump: number; nonce: number | bigint; tier: number; commitment: ReadonlyUint8Array; 
-/** Claimed consent key for `commitment`, authenticated via `path_elements`. */
-viewPubkey: ReadonlyUint8Array; leafIndex: number | bigint; pathElements: ReadonlyUint8Array; noticeLen: number; notice: ReadonlyUint8Array; legalBasisHash: ReadonlyUint8Array;  };
-
-export function getRequestDisclosureInstructionDataEncoder(): FixedSizeEncoder<RequestDisclosureInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['bump', getU8Encoder()], ['nonce', getU64Encoder()], ['tier', getU8Encoder()], ['commitment', fixPinaPodEncoderSize(getBytesEncoder(), 32)], ['viewPubkey', fixPinaPodEncoderSize(getBytesEncoder(), 32)], ['leafIndex', getU64Encoder()], ['pathElements', fixPinaPodEncoderSize(getBytesEncoder(), 512)], ['noticeLen', getU8Encoder()], ['notice', fixPinaPodEncoderSize(getBytesEncoder(), 96)], ['legalBasisHash', fixPinaPodEncoderSize(getBytesEncoder(), 32)]]), (value) => ({ ...value, discriminator: 7 }));
+export function getRequestDisclosureDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(REQUEST_DISCLOSURE_DISCRIMINATOR);
 }
 
-export function getRequestDisclosureInstructionDataDecoder(): FixedSizeDecoder<RequestDisclosureInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(REQUEST_DISCLOSURE_DISCRIMINATOR, getU8Decoder())], ['bump', getU8Decoder()], ['nonce', getU64Decoder()], ['tier', getU8Decoder()], ['commitment', fixDecoderSize(getBytesDecoder(), 32)], ['viewPubkey', fixDecoderSize(getBytesDecoder(), 32)], ['leafIndex', getU64Decoder()], ['pathElements', fixDecoderSize(getBytesDecoder(), 512)], ['noticeLen', getU8Decoder()], ['notice', fixDecoderSize(getBytesDecoder(), 96)], ['legalBasisHash', fixDecoderSize(getBytesDecoder(), 32)]]);
-}
+export type RequestDisclosureInstruction<
+	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+	TAccountRequester extends string | AccountMeta<string> = string,
+	TAccountPoolConfig extends string | AccountMeta<string> = string,
+	TAccountRequesterRegistry extends string | AccountMeta<string> = string,
+	TAccountMerkleTree extends string | AccountMeta<string> = string,
+	TAccountDisclosureRequest extends string | AccountMeta<string> = string,
+	TAccountSystemProgram extends string | AccountMeta<string> = string,
+	TAccountClock extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountRequester extends string ?
+					& WritableSignerAccount<TAccountRequester>
+					& AccountSignerMeta<TAccountRequester>
+				: TAccountRequester,
+			TAccountPoolConfig extends string ? ReadonlyAccount<TAccountPoolConfig>
+				: TAccountPoolConfig,
+			TAccountRequesterRegistry extends string
+				? ReadonlyAccount<TAccountRequesterRegistry>
+				: TAccountRequesterRegistry,
+			TAccountMerkleTree extends string ? ReadonlyAccount<TAccountMerkleTree>
+				: TAccountMerkleTree,
+			TAccountDisclosureRequest extends string
+				? WritableAccount<TAccountDisclosureRequest>
+				: TAccountDisclosureRequest,
+			TAccountSystemProgram extends string
+				? ReadonlyAccount<TAccountSystemProgram>
+				: TAccountSystemProgram,
+			TAccountClock extends string ? ReadonlyAccount<TAccountClock>
+				: TAccountClock,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getRequestDisclosureInstructionDataCodec(): FixedSizeCodec<RequestDisclosureInstructionDataArgs, RequestDisclosureInstructionData> {
-    return combineCodec(getRequestDisclosureInstructionDataEncoder(), getRequestDisclosureInstructionDataDecoder());
-}
-
-export type RequestDisclosureAsyncInput<TAccountRequester extends InstructionSignerInput = InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput, TAccountRequesterRegistry extends InstructionAccountInput = InstructionAccountInput, TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput, TAccountDisclosureRequest extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput, TAccountClock extends InstructionAccountInput = InstructionAccountInput> =  {
-  requester: TAccountRequester;
-poolConfig?: TAccountPoolConfig;
-requesterRegistry?: TAccountRequesterRegistry;
-merkleTree?: TAccountMerkleTree;
-disclosureRequest: TAccountDisclosureRequest;
-systemProgram: TAccountSystemProgram;
-clock: TAccountClock;
-bump: RequestDisclosureInstructionDataArgs["bump"];
-nonce: RequestDisclosureInstructionDataArgs["nonce"];
-tier: RequestDisclosureInstructionDataArgs["tier"];
-commitment: RequestDisclosureInstructionDataArgs["commitment"];
-viewPubkey: RequestDisclosureInstructionDataArgs["viewPubkey"];
-leafIndex: RequestDisclosureInstructionDataArgs["leafIndex"];
-pathElements: RequestDisclosureInstructionDataArgs["pathElements"];
-noticeLen: RequestDisclosureInstructionDataArgs["noticeLen"];
-notice: RequestDisclosureInstructionDataArgs["notice"];
-legalBasisHash: RequestDisclosureInstructionDataArgs["legalBasisHash"];
-}
-
-export async function getRequestDisclosureInstructionAsync<TAccountRequester extends InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput, TAccountRequesterRegistry extends InstructionAccountInput, TAccountMerkleTree extends InstructionAccountInput, TAccountDisclosureRequest extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TAccountClock extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: RequestDisclosureAsyncInput<TAccountRequester, TAccountPoolConfig, TAccountRequesterRegistry, TAccountMerkleTree, TAccountDisclosureRequest, TAccountSystemProgram, TAccountClock>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): Promise<RequestDisclosureInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountRequester, InstructionAccountInputAddress<TAccountRequester>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountRequesterRegistry, InstructionAccountInputAddress<TAccountRequesterRegistry>>, ResolvedInstructionAccountMeta<TAccountMerkleTree, InstructionAccountInputAddress<TAccountMerkleTree>>, ResolvedInstructionAccountMeta<TAccountDisclosureRequest, InstructionAccountInputAddress<TAccountDisclosureRequest>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>, ResolvedInstructionAccountMeta<TAccountClock, InstructionAccountInputAddress<TAccountClock>>>> {
-  // Program address.
-const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
-
-// Account meta helper.
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-
- // Original accounts.
-const originalAccounts = { requester: { value: input.requester ?? null, isSigner: true, isWritable: true }, poolConfig: { value: input.poolConfig ?? null, isSigner: false, isWritable: false }, requesterRegistry: { value: input.requesterRegistry ?? null, isSigner: false, isWritable: false }, merkleTree: { value: input.merkleTree ?? null, isSigner: false, isWritable: false }, disclosureRequest: { value: input.disclosureRequest ?? null, isSigner: false, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false }, clock: { value: input.clock ?? null, isSigner: false, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-// Resolve default values.
-if (!accounts.poolConfig.value) {
-accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
-}
-if (!accounts.requesterRegistry.value) {
-accounts.requesterRegistry.value = await findRequesterRegistryPda({ programAddress });
-}
-if (!accounts.merkleTree.value) {
-accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
-}
-
-return Object.freeze({ accounts: [getAccountMeta("requester", accounts.requester), getAccountMeta("poolConfig", accounts.poolConfig), getAccountMeta("requesterRegistry", accounts.requesterRegistry), getAccountMeta("merkleTree", accounts.merkleTree), getAccountMeta("disclosureRequest", accounts.disclosureRequest), getAccountMeta("systemProgram", accounts.systemProgram), getAccountMeta("clock", accounts.clock)], data: getRequestDisclosureInstructionDataEncoder().encode(args as RequestDisclosureInstructionDataArgs), programAddress } as RequestDisclosureInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountRequester, InstructionAccountInputAddress<TAccountRequester>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountRequesterRegistry, InstructionAccountInputAddress<TAccountRequesterRegistry>>, ResolvedInstructionAccountMeta<TAccountMerkleTree, InstructionAccountInputAddress<TAccountMerkleTree>>, ResolvedInstructionAccountMeta<TAccountDisclosureRequest, InstructionAccountInputAddress<TAccountDisclosureRequest>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>, ResolvedInstructionAccountMeta<TAccountClock, InstructionAccountInputAddress<TAccountClock>>>);
-}
-
-export type RequestDisclosureInput<TAccountRequester extends InstructionSignerInput = InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput, TAccountRequesterRegistry extends InstructionAccountInput = InstructionAccountInput, TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput, TAccountDisclosureRequest extends InstructionAccountInput = InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput = InstructionAccountInput, TAccountClock extends InstructionAccountInput = InstructionAccountInput> =  {
-  requester: TAccountRequester;
-poolConfig: TAccountPoolConfig;
-requesterRegistry: TAccountRequesterRegistry;
-merkleTree: TAccountMerkleTree;
-disclosureRequest: TAccountDisclosureRequest;
-systemProgram: TAccountSystemProgram;
-clock: TAccountClock;
-bump: RequestDisclosureInstructionDataArgs["bump"];
-nonce: RequestDisclosureInstructionDataArgs["nonce"];
-tier: RequestDisclosureInstructionDataArgs["tier"];
-commitment: RequestDisclosureInstructionDataArgs["commitment"];
-viewPubkey: RequestDisclosureInstructionDataArgs["viewPubkey"];
-leafIndex: RequestDisclosureInstructionDataArgs["leafIndex"];
-pathElements: RequestDisclosureInstructionDataArgs["pathElements"];
-noticeLen: RequestDisclosureInstructionDataArgs["noticeLen"];
-notice: RequestDisclosureInstructionDataArgs["notice"];
-legalBasisHash: RequestDisclosureInstructionDataArgs["legalBasisHash"];
-}
-
-export function getRequestDisclosureInstruction<TAccountRequester extends InstructionSignerInput, TAccountPoolConfig extends InstructionAccountInput, TAccountRequesterRegistry extends InstructionAccountInput, TAccountMerkleTree extends InstructionAccountInput, TAccountDisclosureRequest extends InstructionAccountInput, TAccountSystemProgram extends InstructionAccountInput, TAccountClock extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: RequestDisclosureInput<TAccountRequester, TAccountPoolConfig, TAccountRequesterRegistry, TAccountMerkleTree, TAccountDisclosureRequest, TAccountSystemProgram, TAccountClock>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): RequestDisclosureInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountRequester, InstructionAccountInputAddress<TAccountRequester>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountRequesterRegistry, InstructionAccountInputAddress<TAccountRequesterRegistry>>, ResolvedInstructionAccountMeta<TAccountMerkleTree, InstructionAccountInputAddress<TAccountMerkleTree>>, ResolvedInstructionAccountMeta<TAccountDisclosureRequest, InstructionAccountInputAddress<TAccountDisclosureRequest>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>, ResolvedInstructionAccountMeta<TAccountClock, InstructionAccountInputAddress<TAccountClock>>> {
-  // Program address.
-const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
-
-// Account meta helper.
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-
- // Original accounts.
-const originalAccounts = { requester: { value: input.requester ?? null, isSigner: true, isWritable: true }, poolConfig: { value: input.poolConfig ?? null, isSigner: false, isWritable: false }, requesterRegistry: { value: input.requesterRegistry ?? null, isSigner: false, isWritable: false }, merkleTree: { value: input.merkleTree ?? null, isSigner: false, isWritable: false }, disclosureRequest: { value: input.disclosureRequest ?? null, isSigner: false, isWritable: true }, systemProgram: { value: input.systemProgram ?? null, isSigner: false, isWritable: false }, clock: { value: input.clock ?? null, isSigner: false, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-
-
-return Object.freeze({ accounts: [getAccountMeta("requester", accounts.requester), getAccountMeta("poolConfig", accounts.poolConfig), getAccountMeta("requesterRegistry", accounts.requesterRegistry), getAccountMeta("merkleTree", accounts.merkleTree), getAccountMeta("disclosureRequest", accounts.disclosureRequest), getAccountMeta("systemProgram", accounts.systemProgram), getAccountMeta("clock", accounts.clock)], data: getRequestDisclosureInstructionDataEncoder().encode(args as RequestDisclosureInstructionDataArgs), programAddress } as RequestDisclosureInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountRequester, InstructionAccountInputAddress<TAccountRequester>>, ResolvedInstructionAccountMeta<TAccountPoolConfig, InstructionAccountInputAddress<TAccountPoolConfig>>, ResolvedInstructionAccountMeta<TAccountRequesterRegistry, InstructionAccountInputAddress<TAccountRequesterRegistry>>, ResolvedInstructionAccountMeta<TAccountMerkleTree, InstructionAccountInputAddress<TAccountMerkleTree>>, ResolvedInstructionAccountMeta<TAccountDisclosureRequest, InstructionAccountInputAddress<TAccountDisclosureRequest>>, ResolvedInstructionAccountMeta<TAccountSystemProgram, InstructionAccountInputAddress<TAccountSystemProgram>>, ResolvedInstructionAccountMeta<TAccountClock, InstructionAccountInputAddress<TAccountClock>>>);
-}
-
-export type ParsedRequestDisclosureInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-requester: TAccountMetas[0];
-poolConfig: TAccountMetas[1];
-requesterRegistry: TAccountMetas[2];
-merkleTree: TAccountMetas[3];
-disclosureRequest: TAccountMetas[4];
-systemProgram: TAccountMetas[5];
-clock: TAccountMetas[6];
+export type RequestDisclosureInstructionData = {
+	discriminator: number;
+	bump: number;
+	nonce: bigint;
+	tier: number;
+	commitment: ReadonlyUint8Array;
+	/** Claimed consent key for `commitment`, authenticated via `path_elements`. */
+	viewPubkey: ReadonlyUint8Array;
+	leafIndex: bigint;
+	pathElements: ReadonlyUint8Array;
+	noticeLen: number;
+	notice: ReadonlyUint8Array;
+	legalBasisHash: ReadonlyUint8Array;
 };
-data: RequestDisclosureInstructionData; };
 
-export function parseRequestDisclosureInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedRequestDisclosureInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 7) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 7 });
+export type RequestDisclosureInstructionDataArgs = {
+	bump: number;
+	nonce: number | bigint;
+	tier: number;
+	commitment: ReadonlyUint8Array;
+	/** Claimed consent key for `commitment`, authenticated via `path_elements`. */
+	viewPubkey: ReadonlyUint8Array;
+	leafIndex: number | bigint;
+	pathElements: ReadonlyUint8Array;
+	noticeLen: number;
+	notice: ReadonlyUint8Array;
+	legalBasisHash: ReadonlyUint8Array;
+};
+
+export function getRequestDisclosureInstructionDataEncoder(): FixedSizeEncoder<
+	RequestDisclosureInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["nonce", getU64Encoder()],
+			["tier", getU8Encoder()],
+			["commitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["viewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["leafIndex", getU64Encoder()],
+			["pathElements", fixPinaPodEncoderSize(getBytesEncoder(), 512)],
+			["noticeLen", getU8Encoder()],
+			["notice", fixPinaPodEncoderSize(getBytesEncoder(), 96)],
+			["legalBasisHash", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+		]),
+		(value) => ({ ...value, discriminator: 7 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getRequestDisclosureInstructionDataDecoder(): FixedSizeDecoder<
+	RequestDisclosureInstructionData
+> {
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				REQUEST_DISCLOSURE_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["bump", getU8Decoder()],
+		["nonce", getU64Decoder()],
+		["tier", getU8Decoder()],
+		["commitment", fixDecoderSize(getBytesDecoder(), 32)],
+		["viewPubkey", fixDecoderSize(getBytesDecoder(), 32)],
+		["leafIndex", getU64Decoder()],
+		["pathElements", fixDecoderSize(getBytesDecoder(), 512)],
+		["noticeLen", getU8Decoder()],
+		["notice", fixDecoderSize(getBytesDecoder(), 96)],
+		["legalBasisHash", fixDecoderSize(getBytesDecoder(), 32)],
+	]);
 }
-  return { programAddress: instruction.programAddress, accounts: { requester: getNextAccount(), poolConfig: getNextAccount(), requesterRegistry: getNextAccount(), merkleTree: getNextAccount(), disclosureRequest: getNextAccount(), systemProgram: getNextAccount(), clock: getNextAccount() }, data: getRequestDisclosureInstructionDataDecoder().decode(instruction.data) };
+
+export function getRequestDisclosureInstructionDataCodec(): FixedSizeCodec<
+	RequestDisclosureInstructionDataArgs,
+	RequestDisclosureInstructionData
+> {
+	return combineCodec(
+		getRequestDisclosureInstructionDataEncoder(),
+		getRequestDisclosureInstructionDataDecoder(),
+	);
+}
+
+export type RequestDisclosureAsyncInput<
+	TAccountRequester extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+> = {
+	requester: TAccountRequester;
+	poolConfig?: TAccountPoolConfig;
+	requesterRegistry?: TAccountRequesterRegistry;
+	merkleTree?: TAccountMerkleTree;
+	disclosureRequest: TAccountDisclosureRequest;
+	systemProgram: TAccountSystemProgram;
+	clock: TAccountClock;
+	bump: RequestDisclosureInstructionDataArgs["bump"];
+	nonce: RequestDisclosureInstructionDataArgs["nonce"];
+	tier: RequestDisclosureInstructionDataArgs["tier"];
+	commitment: RequestDisclosureInstructionDataArgs["commitment"];
+	viewPubkey: RequestDisclosureInstructionDataArgs["viewPubkey"];
+	leafIndex: RequestDisclosureInstructionDataArgs["leafIndex"];
+	pathElements: RequestDisclosureInstructionDataArgs["pathElements"];
+	noticeLen: RequestDisclosureInstructionDataArgs["noticeLen"];
+	notice: RequestDisclosureInstructionDataArgs["notice"];
+	legalBasisHash: RequestDisclosureInstructionDataArgs["legalBasisHash"];
+};
+
+export async function getRequestDisclosureInstructionAsync<
+	TAccountRequester extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RequestDisclosureAsyncInput<
+		TAccountRequester,
+		TAccountPoolConfig,
+		TAccountRequesterRegistry,
+		TAccountMerkleTree,
+		TAccountDisclosureRequest,
+		TAccountSystemProgram,
+		TAccountClock
+	>,
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
+): Promise<
+	RequestDisclosureInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountRequester,
+			InstructionAccountInputAddress<TAccountRequester>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
+	>
+> {
+	// Program address.
+	const programAddressInput = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		requester: {
+			value: input.requester ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		requesterRegistry: {
+			value: input.requesterRegistry ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		merkleTree: {
+			value: input.merkleTree ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		disclosureRequest: {
+			value: input.disclosureRequest ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.poolConfig.value) {
+		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+	}
+	if (!accounts.requesterRegistry.value) {
+		accounts.requesterRegistry.value = await findRequesterRegistryPda({
+			programAddress,
+		});
+	}
+	if (!accounts.merkleTree.value) {
+		accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
+	}
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("requester", accounts.requester),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
+			getAccountMeta("merkleTree", accounts.merkleTree),
+			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("clock", accounts.clock),
+		],
+		data: getRequestDisclosureInstructionDataEncoder().encode(
+			args as RequestDisclosureInstructionDataArgs,
+		),
+		programAddress,
+	} as RequestDisclosureInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountRequester,
+			InstructionAccountInputAddress<TAccountRequester>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
+	>);
+}
+
+export type RequestDisclosureInput<
+	TAccountRequester extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput = InstructionAccountInput,
+> = {
+	requester: TAccountRequester;
+	poolConfig: TAccountPoolConfig;
+	requesterRegistry: TAccountRequesterRegistry;
+	merkleTree: TAccountMerkleTree;
+	disclosureRequest: TAccountDisclosureRequest;
+	systemProgram: TAccountSystemProgram;
+	clock: TAccountClock;
+	bump: RequestDisclosureInstructionDataArgs["bump"];
+	nonce: RequestDisclosureInstructionDataArgs["nonce"];
+	tier: RequestDisclosureInstructionDataArgs["tier"];
+	commitment: RequestDisclosureInstructionDataArgs["commitment"];
+	viewPubkey: RequestDisclosureInstructionDataArgs["viewPubkey"];
+	leafIndex: RequestDisclosureInstructionDataArgs["leafIndex"];
+	pathElements: RequestDisclosureInstructionDataArgs["pathElements"];
+	noticeLen: RequestDisclosureInstructionDataArgs["noticeLen"];
+	notice: RequestDisclosureInstructionDataArgs["notice"];
+	legalBasisHash: RequestDisclosureInstructionDataArgs["legalBasisHash"];
+};
+
+export function getRequestDisclosureInstruction<
+	TAccountRequester extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountRequesterRegistry extends InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput,
+	TAccountDisclosureRequest extends InstructionAccountInput,
+	TAccountSystemProgram extends InstructionAccountInput,
+	TAccountClock extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: RequestDisclosureInput<
+		TAccountRequester,
+		TAccountPoolConfig,
+		TAccountRequesterRegistry,
+		TAccountMerkleTree,
+		TAccountDisclosureRequest,
+		TAccountSystemProgram,
+		TAccountClock
+	>,
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
+): RequestDisclosureInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountRequester,
+		InstructionAccountInputAddress<TAccountRequester>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountPoolConfig,
+		InstructionAccountInputAddress<TAccountPoolConfig>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountRequesterRegistry,
+		InstructionAccountInputAddress<TAccountRequesterRegistry>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountMerkleTree,
+		InstructionAccountInputAddress<TAccountMerkleTree>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountDisclosureRequest,
+		InstructionAccountInputAddress<TAccountDisclosureRequest>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountSystemProgram,
+		InstructionAccountInputAddress<TAccountSystemProgram>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountClock,
+		InstructionAccountInputAddress<TAccountClock>
+	>
+> {
+	// Program address.
+	const programAddressInput = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		requester: {
+			value: input.requester ?? null,
+			isSigner: true,
+			isWritable: true,
+		},
+		poolConfig: {
+			value: input.poolConfig ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		requesterRegistry: {
+			value: input.requesterRegistry ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		merkleTree: {
+			value: input.merkleTree ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		disclosureRequest: {
+			value: input.disclosureRequest ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		systemProgram: {
+			value: input.systemProgram ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+		clock: { value: input.clock ?? null, isSigner: false, isWritable: false },
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("requester", accounts.requester),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
+			getAccountMeta("merkleTree", accounts.merkleTree),
+			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
+			getAccountMeta("systemProgram", accounts.systemProgram),
+			getAccountMeta("clock", accounts.clock),
+		],
+		data: getRequestDisclosureInstructionDataEncoder().encode(
+			args as RequestDisclosureInstructionDataArgs,
+		),
+		programAddress,
+	} as RequestDisclosureInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountRequester,
+			InstructionAccountInputAddress<TAccountRequester>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountPoolConfig,
+			InstructionAccountInputAddress<TAccountPoolConfig>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountRequesterRegistry,
+			InstructionAccountInputAddress<TAccountRequesterRegistry>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountDisclosureRequest,
+			InstructionAccountInputAddress<TAccountDisclosureRequest>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountSystemProgram,
+			InstructionAccountInputAddress<TAccountSystemProgram>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountClock,
+			InstructionAccountInputAddress<TAccountClock>
+		>
+	>);
+}
+
+export type ParsedRequestDisclosureInstruction<
+	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		requester: TAccountMetas[0];
+		poolConfig: TAccountMetas[1];
+		requesterRegistry: TAccountMetas[2];
+		merkleTree: TAccountMetas[3];
+		disclosureRequest: TAccountMetas[4];
+		systemProgram: TAccountMetas[5];
+		clock: TAccountMetas[6];
+	};
+	data: RequestDisclosureInstructionData;
+};
+
+export function parseRequestDisclosureInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedRequestDisclosureInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 7) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 7,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: {
+			requester: getNextAccount(),
+			poolConfig: getNextAccount(),
+			requesterRegistry: getNextAccount(),
+			merkleTree: getNextAccount(),
+			disclosureRequest: getNextAccount(),
+			systemProgram: getNextAccount(),
+			clock: getNextAccount(),
+		},
+		data: getRequestDisclosureInstructionDataDecoder().decode(instruction.data),
+	};
 }

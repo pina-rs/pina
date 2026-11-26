@@ -6,7 +6,6 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::Address;
@@ -45,8 +44,7 @@ impl DisclosureRequest {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2
-			&& data[..2] == DISCLOSURE_REQUEST_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == DISCLOSURE_REQUEST_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -61,47 +59,34 @@ impl DisclosureRequest {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let requester = Address::new_from_array(data.get(cursor..cursor + 32)?
-		.try_into().ok()?);
+		let requester = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let nonce: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
-		.try_into().ok()?);
+		let nonce: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let tier: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let tier: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let commitment: [u8; 32] = data.get(cursor..cursor + 32)?
-		.try_into().ok()?;
+		let commitment: [u8; 32] = data.get(cursor..cursor + 32)?.try_into().ok()?;
 		cursor += 32;
-		let view_pubkey: [u8; 32] = data.get(cursor..cursor + 32)?
-		.try_into().ok()?;
+		let view_pubkey: [u8; 32] = data.get(cursor..cursor + 32)?.try_into().ok()?;
 		cursor += 32;
-		let notice_len: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let notice_len: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let notice: [u8; 96] = data.get(cursor..cursor + 96)?
-		.try_into().ok()?;
+		let notice: [u8; 96] = data.get(cursor..cursor + 96)?.try_into().ok()?;
 		cursor += 96;
-		let legal_basis_hash: [u8; 32] = data.get(cursor..cursor + 32)?
-		.try_into().ok()?;
+		let legal_basis_hash: [u8; 32] = data.get(cursor..cursor + 32)?.try_into().ok()?;
 		cursor += 32;
-		let created_at: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
-		.try_into().ok()?);
+		let created_at: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let challenge_deadline: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
-		.try_into().ok()?);
+		let challenge_deadline: u64 =
+			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let status: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let status: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let granted: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let granted: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let approvals: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let approvals: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 
 		Some(DisclosureRequest {
 			bump,

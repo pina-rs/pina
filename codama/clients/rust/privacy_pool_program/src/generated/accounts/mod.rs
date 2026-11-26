@@ -8,24 +8,24 @@
 	clippy::too_many_arguments
 )]
 
-pub(crate) mod r#pool_config;
-pub(crate) mod r#pool_vault;
+pub(crate) mod r#asset_vault;
+pub(crate) mod r#custodian_registry;
+pub(crate) mod r#disclosure_log;
+pub(crate) mod r#disclosure_request;
 pub(crate) mod r#merkle_tree;
 pub(crate) mod r#nullifier_record;
-pub(crate) mod r#custodian_registry;
+pub(crate) mod r#pool_config;
+pub(crate) mod r#pool_vault;
 pub(crate) mod r#requester_registry;
-pub(crate) mod r#asset_vault;
-pub(crate) mod r#disclosure_request;
-pub(crate) mod r#disclosure_log;
 pub(crate) mod r#verifying_key_account;
 
-pub use self::r#pool_config::*;
-pub use self::r#pool_vault::*;
+pub use self::r#asset_vault::*;
+pub use self::r#custodian_registry::*;
+pub use self::r#disclosure_log::*;
+pub use self::r#disclosure_request::*;
 pub use self::r#merkle_tree::*;
 pub use self::r#nullifier_record::*;
-pub use self::r#custodian_registry::*;
+pub use self::r#pool_config::*;
+pub use self::r#pool_vault::*;
 pub use self::r#requester_registry::*;
-pub use self::r#asset_vault::*;
-pub use self::r#disclosure_request::*;
-pub use self::r#disclosure_log::*;
 pub use self::r#verifying_key_account::*;

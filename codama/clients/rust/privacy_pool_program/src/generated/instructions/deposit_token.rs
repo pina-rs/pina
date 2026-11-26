@@ -32,29 +32,41 @@ pub struct DepositToken {
 }
 
 impl DepositToken {
-	pub fn new(depositor: solana_pubkey::Pubkey, mint: solana_pubkey::Pubkey, depositor_token_account: solana_pubkey::Pubkey, vault_token_account: solana_pubkey::Pubkey, token_program: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		depositor: solana_pubkey::Pubkey,
+		mint: solana_pubkey::Pubkey,
+		depositor_token_account: solana_pubkey::Pubkey,
+		vault_token_account: solana_pubkey::Pubkey,
+		token_program: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			depositor,
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			merkle_tree: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-tree".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			mint,
 			asset_vault: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-asset".as_bytes(), mint.as_ref()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			depositor_token_account,
 			vault_token_account,
 			token_program,
 		}
 	}
 
-	pub fn instruction(&self, data: DepositTokenInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: DepositTokenInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -66,13 +78,33 @@ impl DepositToken {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(8 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.depositor, true));
-		accounts.push(solana_instruction::AccountMeta::new(self.pool_config, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.merkle_tree, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.mint, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.asset_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.depositor_token_account, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.vault_token_account, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.token_program, false));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.pool_config,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.merkle_tree,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.mint, false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.asset_vault,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.depositor_token_account,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.vault_token_account,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.token_program,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -88,14 +120,16 @@ pub struct DepositTokenInstructionData {
 }
 
 impl DepositTokenInstructionData {
-	pub fn new(configure: impl FnOnce(&mut DepositTokenInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut DepositTokenInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<DepositTokenInstructionWireZc>()];
 		<DepositTokenInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = DEPOSIT_TOKEN_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

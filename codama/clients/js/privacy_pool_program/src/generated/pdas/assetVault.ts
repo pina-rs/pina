@@ -6,14 +6,37 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getAddressEncoder, getProgramDerivedAddress, getUtf8Encoder, type Address, type HasAddress, type ProgramDerivedAddress } from '@solana/kit';
+import {
+	type Address,
+	getAddressEncoder,
+	getProgramDerivedAddress,
+	getUtf8Encoder,
+	type HasAddress,
+	type ProgramDerivedAddress,
+} from "@solana/kit";
 
 export type AssetVaultSeeds = {
-mint: Address | HasAddress;
+	mint: Address | HasAddress;
 };
 
-export async function findAssetVaultPda(seeds: AssetVaultSeeds, config: { programAddress?: Address | HasAddress | undefined } = {}): Promise<ProgramDerivedAddress> {
-  const { programAddress: programAddressInput = 'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D' as Address<'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D'> } = config;
-  const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
-  return await getProgramDerivedAddress({ programAddress, seeds: [getUtf8Encoder().encode("privacy-pool-asset"), getAddressEncoder().encode(seeds.mint)]});
+export async function findAssetVaultPda(
+	seeds: AssetVaultSeeds,
+	config: { programAddress?: Address | HasAddress | undefined } = {},
+): Promise<ProgramDerivedAddress> {
+	const {
+		programAddress: programAddressInput =
+			"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D" as Address<
+				"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D"
+			>,
+	} = config;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
+	return await getProgramDerivedAddress({
+		programAddress,
+		seeds: [
+			getUtf8Encoder().encode("privacy-pool-asset"),
+			getAddressEncoder().encode(seeds.mint),
+		],
+	});
 }

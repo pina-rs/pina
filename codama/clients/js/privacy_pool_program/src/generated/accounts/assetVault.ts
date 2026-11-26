@@ -6,103 +6,203 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getPinaPodDiscriminatorDecoder, getPinaPodMigrationVersionDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getAddressDecoder, getAddressEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type ClientWithRpc, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findAssetVaultPda, type AssetVaultSeeds } from '../pdas';
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	type ClientWithRpc,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	type GetAccountInfoApi,
+	getAddressDecoder,
+	getAddressEncoder,
+	type GetMultipleAccountsApi,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type HasAddress,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { type AssetVaultSeeds, findAssetVaultPda } from "../pdas";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const ASSET_VAULT_DISCRIMINATOR = 8;
 
-export function getAssetVaultDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(ASSET_VAULT_DISCRIMINATOR); }
+export function getAssetVaultDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ASSET_VAULT_DISCRIMINATOR);
+}
 
 export const ASSET_VAULT_DISCRIMINATOR2 = 0;
 
-export function getAssetVaultDiscriminator2Bytes(): ReadonlyUint8Array { return getU8Encoder().encode(ASSET_VAULT_DISCRIMINATOR2); }
+export function getAssetVaultDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ASSET_VAULT_DISCRIMINATOR2);
+}
 
 /**
  * Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL
  * Interface PDA).
  */
-export type AssetVault = { discriminator: number; migrationVersion: number; bump: number; mint: Address; tokenProgram: Address; vaultTokenAccount: Address;  };
+export type AssetVault = {
+	discriminator: number;
+	migrationVersion: number;
+	bump: number;
+	mint: Address;
+	tokenProgram: Address;
+	vaultTokenAccount: Address;
+};
 
-export type AssetVaultArgs = { bump: number; mint: Address | HasAddress; tokenProgram: Address | HasAddress; vaultTokenAccount: Address | HasAddress;  };
+export type AssetVaultArgs = {
+	bump: number;
+	mint: Address | HasAddress;
+	tokenProgram: Address | HasAddress;
+	vaultTokenAccount: Address | HasAddress;
+};
 
 /** Gets the encoder for {@link AssetVaultArgs} account data. */
 export function getAssetVaultEncoder(): FixedSizeEncoder<AssetVaultArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['migrationVersion', getU8Encoder()], ['bump', getU8Encoder()], ['mint', getAddressEncoder()], ['tokenProgram', getAddressEncoder()], ['vaultTokenAccount', getAddressEncoder()]]), (value) => ({ ...value, discriminator: 8, migrationVersion: 0 }));
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["mint", getAddressEncoder()],
+			["tokenProgram", getAddressEncoder()],
+			["vaultTokenAccount", getAddressEncoder()],
+		]),
+		(value) => ({ ...value, discriminator: 8, migrationVersion: 0 }),
+	);
 }
 
 /** Gets the decoder for {@link AssetVault} account data. */
 export function getAssetVaultDecoder(): FixedSizeDecoder<AssetVault> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(ASSET_VAULT_DISCRIMINATOR, getU8Decoder())], ['migrationVersion', getPinaPodMigrationVersionDecoder(0, getU8Decoder())], ['bump', getU8Decoder()], ['mint', getAddressDecoder()], ['tokenProgram', getAddressDecoder()], ['vaultTokenAccount', getAddressDecoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(ASSET_VAULT_DISCRIMINATOR, getU8Decoder()),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["bump", getU8Decoder()],
+		["mint", getAddressDecoder()],
+		["tokenProgram", getAddressDecoder()],
+		["vaultTokenAccount", getAddressDecoder()],
+	]);
 }
 
 /** Gets the codec for {@link AssetVault} account data. */
-export function getAssetVaultCodec(): FixedSizeCodec<AssetVaultArgs, AssetVault> {
-    return combineCodec(getAssetVaultEncoder(), getAssetVaultDecoder());
+export function getAssetVaultCodec(): FixedSizeCodec<
+	AssetVaultArgs,
+	AssetVault
+> {
+	return combineCodec(getAssetVaultEncoder(), getAssetVaultDecoder());
 }
 
-export function decodeAssetVault<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<AssetVault, TAddress>;
-export function decodeAssetVault<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<AssetVault, TAddress>;
-export function decodeAssetVault<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<AssetVault, TAddress> | MaybeAccount<AssetVault, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getAssetVaultDecoder());
+export function decodeAssetVault<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<AssetVault, TAddress>;
+export function decodeAssetVault<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<AssetVault, TAddress>;
+export function decodeAssetVault<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<AssetVault, TAddress> | MaybeAccount<AssetVault, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getAssetVaultDecoder(),
+	);
 }
 
 export async function fetchAssetVault<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<AssetVault, TAddress>> {
-  const maybeAccount = await fetchMaybeAssetVault(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeAssetVault(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeAssetVault<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<AssetVault, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount('rpc' in rpc ? rpc.rpc : rpc, typeof address === 'string' ? address : address.address, config);
-  return decodeAssetVault(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
+	return decodeAssetVault(maybeAccount);
 }
 
 export async function fetchAllAssetVault(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<AssetVault>[]> {
-  const maybeAccounts = await fetchAllMaybeAssetVault(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybeAssetVault(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybeAssetVault(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<AssetVault>[]> {
-  const maybeAccounts = await fetchEncodedAccounts('rpc' in rpc ? rpc.rpc : rpc, addresses.map((a) => (typeof a === 'string' ? a : a.address)), config);
-  return maybeAccounts.map((maybeAccount) => decodeAssetVault(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
+	return maybeAccounts.map((maybeAccount) => decodeAssetVault(maybeAccount));
 }
 
 export async function fetchAssetVaultFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  seeds: AssetVaultSeeds,
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	seeds: AssetVaultSeeds,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<AssetVault>> {
-  const maybeAccount = await fetchMaybeAssetVaultFromSeeds(rpc, seeds, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeAssetVaultFromSeeds(rpc, seeds, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeAssetVaultFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  seeds: AssetVaultSeeds,
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	seeds: AssetVaultSeeds,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<AssetVault>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findAssetVaultPda(seeds, { programAddress });
-  return await fetchMaybeAssetVault(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findAssetVaultPda(seeds, { programAddress });
+	return await fetchMaybeAssetVault(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */

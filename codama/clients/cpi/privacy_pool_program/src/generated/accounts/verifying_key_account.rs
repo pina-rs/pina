@@ -6,7 +6,6 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 
 #[allow(unused_imports)]
@@ -37,8 +36,7 @@ impl VerifyingKeyAccount {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2
-			&& data[..2] == VERIFYING_KEY_ACCOUNT_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == VERIFYING_KEY_ACCOUNT_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -53,29 +51,21 @@ impl VerifyingKeyAccount {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let slot: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let slot: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let alpha_g1: [u8; 64] = data.get(cursor..cursor + 64)?
-		.try_into().ok()?;
+		let alpha_g1: [u8; 64] = data.get(cursor..cursor + 64)?.try_into().ok()?;
 		cursor += 64;
-		let beta_g2: [u8; 128] = data.get(cursor..cursor + 128)?
-		.try_into().ok()?;
+		let beta_g2: [u8; 128] = data.get(cursor..cursor + 128)?.try_into().ok()?;
 		cursor += 128;
-		let gamma_g2: [u8; 128] = data.get(cursor..cursor + 128)?
-		.try_into().ok()?;
+		let gamma_g2: [u8; 128] = data.get(cursor..cursor + 128)?.try_into().ok()?;
 		cursor += 128;
-		let delta_g2: [u8; 128] = data.get(cursor..cursor + 128)?
-		.try_into().ok()?;
+		let delta_g2: [u8; 128] = data.get(cursor..cursor + 128)?.try_into().ok()?;
 		cursor += 128;
-		let ic0: [u8; 64] = data.get(cursor..cursor + 64)?
-		.try_into().ok()?;
+		let ic0: [u8; 64] = data.get(cursor..cursor + 64)?.try_into().ok()?;
 		cursor += 64;
-		let ic1: [u8; 64] = data.get(cursor..cursor + 64)?
-		.try_into().ok()?;
+		let ic1: [u8; 64] = data.get(cursor..cursor + 64)?.try_into().ok()?;
 
 		Some(VerifyingKeyAccount {
 			bump,

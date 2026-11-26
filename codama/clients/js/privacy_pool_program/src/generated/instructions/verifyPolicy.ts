@@ -6,87 +6,234 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder } from "../pinaPodCodecs";
-import { combineCodec, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, SolanaError, transformEncoder, type AccountMeta, type Address, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type Instruction, type InstructionWithAccounts, type InstructionWithData, type ReadonlyAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { getAccountMetaFactory, type InstructionAccountInput, type InstructionAccountInputAddress, type ResolvedInstructionAccount, type ResolvedInstructionAccountMeta } from '@solana/program-client-core';
-import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from '../programs';
+import {
+	type AccountMeta,
+	type Address,
+	combineCodec,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	getBytesDecoder,
+	getBytesEncoder,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type Instruction,
+	type InstructionWithAccounts,
+	type InstructionWithData,
+	type ReadonlyAccount,
+	type ReadonlyUint8Array,
+	SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+	SolanaError,
+	transformEncoder,
+} from "@solana/kit";
+import {
+	getAccountMetaFactory,
+	type InstructionAccountInput,
+	type InstructionAccountInputAddress,
+	type ResolvedInstructionAccount,
+	type ResolvedInstructionAccountMeta,
+} from "@solana/program-client-core";
+import {
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+} from "../pinaPodCodecs";
+import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 
 export const VERIFY_POLICY_DISCRIMINATOR = 17;
 
-export function getVerifyPolicyDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(VERIFY_POLICY_DISCRIMINATOR); }
-
-export type VerifyPolicyInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountVerifyingKeyAccount extends string | AccountMeta<string> = string, TRemainingAccounts extends readonly AccountMeta<string>[] = []> =
-Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array> & InstructionWithAccounts<[TAccountVerifyingKeyAccount extends string ? ReadonlyAccount<TAccountVerifyingKeyAccount> : TAccountVerifyingKeyAccount, ...TRemainingAccounts]>;
-
-export type VerifyPolicyInstructionData = { discriminator: number; 
-/** Single BN254 scalar representing the Custom Ring policy statement. */
-policyHash: ReadonlyUint8Array; 
-/** 192-byte compressed Groth16 policy proof (`A: 32B, B: 128B, C: 32B`). */
-proofA: ReadonlyUint8Array; proofB: ReadonlyUint8Array; proofC: ReadonlyUint8Array;  };
-
-export type VerifyPolicyInstructionDataArgs = { 
-/** Single BN254 scalar representing the Custom Ring policy statement. */
-policyHash: ReadonlyUint8Array; 
-/** 192-byte compressed Groth16 policy proof (`A: 32B, B: 128B, C: 32B`). */
-proofA: ReadonlyUint8Array; proofB: ReadonlyUint8Array; proofC: ReadonlyUint8Array;  };
-
-export function getVerifyPolicyInstructionDataEncoder(): FixedSizeEncoder<VerifyPolicyInstructionDataArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['policyHash', fixPinaPodEncoderSize(getBytesEncoder(), 32)], ['proofA', fixPinaPodEncoderSize(getBytesEncoder(), 32)], ['proofB', fixPinaPodEncoderSize(getBytesEncoder(), 128)], ['proofC', fixPinaPodEncoderSize(getBytesEncoder(), 32)]]), (value) => ({ ...value, discriminator: 17 }));
+export function getVerifyPolicyDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(VERIFY_POLICY_DISCRIMINATOR);
 }
 
-export function getVerifyPolicyInstructionDataDecoder(): FixedSizeDecoder<VerifyPolicyInstructionData> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(VERIFY_POLICY_DISCRIMINATOR, getU8Decoder())], ['policyHash', fixDecoderSize(getBytesDecoder(), 32)], ['proofA', fixDecoderSize(getBytesDecoder(), 32)], ['proofB', fixDecoderSize(getBytesDecoder(), 128)], ['proofC', fixDecoderSize(getBytesDecoder(), 32)]]);
-}
+export type VerifyPolicyInstruction<
+	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+	TAccountVerifyingKeyAccount extends string | AccountMeta<string> = string,
+	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
+> =
+	& Instruction<TProgram>
+	& InstructionWithData<ReadonlyUint8Array>
+	& InstructionWithAccounts<
+		[
+			TAccountVerifyingKeyAccount extends string
+				? ReadonlyAccount<TAccountVerifyingKeyAccount>
+				: TAccountVerifyingKeyAccount,
+			...TRemainingAccounts,
+		]
+	>;
 
-export function getVerifyPolicyInstructionDataCodec(): FixedSizeCodec<VerifyPolicyInstructionDataArgs, VerifyPolicyInstructionData> {
-    return combineCodec(getVerifyPolicyInstructionDataEncoder(), getVerifyPolicyInstructionDataDecoder());
-}
-
-export type VerifyPolicyInput<TAccountVerifyingKeyAccount extends InstructionAccountInput = InstructionAccountInput> =  {
-  verifyingKeyAccount: TAccountVerifyingKeyAccount;
-policyHash: VerifyPolicyInstructionDataArgs["policyHash"];
-proofA: VerifyPolicyInstructionDataArgs["proofA"];
-proofB: VerifyPolicyInstructionDataArgs["proofB"];
-proofC: VerifyPolicyInstructionDataArgs["proofC"];
-}
-
-export function getVerifyPolicyInstruction<TAccountVerifyingKeyAccount extends InstructionAccountInput, TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS>(input: VerifyPolicyInput<TAccountVerifyingKeyAccount>, config?: { programAddress?: TProgramAddress | { readonly address: TProgramAddress } } ): VerifyPolicyInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountVerifyingKeyAccount, InstructionAccountInputAddress<TAccountVerifyingKeyAccount>>> {
-  // Program address.
-const programAddressInput = config?.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
-const programAddress = typeof programAddressInput === 'string' ? programAddressInput : programAddressInput.address;
-
-// Account meta helper.
-const getAccountMeta = getAccountMetaFactory(programAddress, 'programId');
-
- // Original accounts.
-const originalAccounts = { verifyingKeyAccount: { value: input.verifyingKeyAccount ?? null, isSigner: false, isWritable: false } }
-const accounts = originalAccounts as Record<keyof typeof originalAccounts, ResolvedInstructionAccount>;
-
-
-// Original args.
-const args = { ...input,  };
-
-
-
-
-return Object.freeze({ accounts: [getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount)], data: getVerifyPolicyInstructionDataEncoder().encode(args as VerifyPolicyInstructionDataArgs), programAddress } as VerifyPolicyInstruction<TProgramAddress, ResolvedInstructionAccountMeta<TAccountVerifyingKeyAccount, InstructionAccountInputAddress<TAccountVerifyingKeyAccount>>>);
-}
-
-export type ParsedVerifyPolicyInstruction<TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS, TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[]> = { programAddress: Address<TProgram>;
-accounts: {
-verifyingKeyAccount: TAccountMetas[0];
+export type VerifyPolicyInstructionData = {
+	discriminator: number;
+	/** Single BN254 scalar representing the Custom Ring policy statement. */
+	policyHash: ReadonlyUint8Array;
+	/** 192-byte compressed Groth16 policy proof (`A: 32B, B: 128B, C: 32B`). */
+	proofA: ReadonlyUint8Array;
+	proofB: ReadonlyUint8Array;
+	proofC: ReadonlyUint8Array;
 };
-data: VerifyPolicyInstructionData; };
 
-export function parseVerifyPolicyInstruction<TProgram extends string, TAccountMetas extends readonly AccountMeta[]>(instruction: Instruction<TProgram> & InstructionWithAccounts<TAccountMetas> & InstructionWithData<ReadonlyUint8Array>): ParsedVerifyPolicyInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 1) {
-  throw new SolanaError(SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS, { actualAccountMetas: instruction.accounts.length, expectedAccountMetas: 1 });
+export type VerifyPolicyInstructionDataArgs = {
+	/** Single BN254 scalar representing the Custom Ring policy statement. */
+	policyHash: ReadonlyUint8Array;
+	/** 192-byte compressed Groth16 policy proof (`A: 32B, B: 128B, C: 32B`). */
+	proofA: ReadonlyUint8Array;
+	proofB: ReadonlyUint8Array;
+	proofC: ReadonlyUint8Array;
+};
+
+export function getVerifyPolicyInstructionDataEncoder(): FixedSizeEncoder<
+	VerifyPolicyInstructionDataArgs
+> {
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["policyHash", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["proofA", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["proofB", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
+			["proofC", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+		]),
+		(value) => ({ ...value, discriminator: 17 }),
+	);
 }
-let accountIndex = 0;
-const getNextAccount = () => {
-  const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
-  accountIndex += 1;
-  return accountMeta;
+
+export function getVerifyPolicyInstructionDataDecoder(): FixedSizeDecoder<
+	VerifyPolicyInstructionData
+> {
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				VERIFY_POLICY_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["policyHash", fixDecoderSize(getBytesDecoder(), 32)],
+		["proofA", fixDecoderSize(getBytesDecoder(), 32)],
+		["proofB", fixDecoderSize(getBytesDecoder(), 128)],
+		["proofC", fixDecoderSize(getBytesDecoder(), 32)],
+	]);
 }
-  return { programAddress: instruction.programAddress, accounts: { verifyingKeyAccount: getNextAccount() }, data: getVerifyPolicyInstructionDataDecoder().decode(instruction.data) };
+
+export function getVerifyPolicyInstructionDataCodec(): FixedSizeCodec<
+	VerifyPolicyInstructionDataArgs,
+	VerifyPolicyInstructionData
+> {
+	return combineCodec(
+		getVerifyPolicyInstructionDataEncoder(),
+		getVerifyPolicyInstructionDataDecoder(),
+	);
+}
+
+export type VerifyPolicyInput<
+	TAccountVerifyingKeyAccount extends InstructionAccountInput =
+		InstructionAccountInput,
+> = {
+	verifyingKeyAccount: TAccountVerifyingKeyAccount;
+	policyHash: VerifyPolicyInstructionDataArgs["policyHash"];
+	proofA: VerifyPolicyInstructionDataArgs["proofA"];
+	proofB: VerifyPolicyInstructionDataArgs["proofB"];
+	proofC: VerifyPolicyInstructionDataArgs["proofC"];
+};
+
+export function getVerifyPolicyInstruction<
+	TAccountVerifyingKeyAccount extends InstructionAccountInput,
+	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+>(
+	input: VerifyPolicyInput<TAccountVerifyingKeyAccount>,
+	config?: {
+		programAddress?: TProgramAddress | { readonly address: TProgramAddress };
+	},
+): VerifyPolicyInstruction<
+	TProgramAddress,
+	ResolvedInstructionAccountMeta<
+		TAccountVerifyingKeyAccount,
+		InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
+	>
+> {
+	// Program address.
+	const programAddressInput = config?.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = typeof programAddressInput === "string"
+		? programAddressInput
+		: programAddressInput.address;
+
+	// Account meta helper.
+	const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+	// Original accounts.
+	const originalAccounts = {
+		verifyingKeyAccount: {
+			value: input.verifyingKeyAccount ?? null,
+			isSigner: false,
+			isWritable: false,
+		},
+	};
+	const accounts = originalAccounts as Record<
+		keyof typeof originalAccounts,
+		ResolvedInstructionAccount
+	>;
+
+	// Original args.
+	const args = { ...input };
+
+	return Object.freeze({
+		accounts: [
+			getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount),
+		],
+		data: getVerifyPolicyInstructionDataEncoder().encode(
+			args as VerifyPolicyInstructionDataArgs,
+		),
+		programAddress,
+	} as VerifyPolicyInstruction<
+		TProgramAddress,
+		ResolvedInstructionAccountMeta<
+			TAccountVerifyingKeyAccount,
+			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
+		>
+	>);
+}
+
+export type ParsedVerifyPolicyInstruction<
+	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
+	TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
+> = {
+	programAddress: Address<TProgram>;
+	accounts: {
+		verifyingKeyAccount: TAccountMetas[0];
+	};
+	data: VerifyPolicyInstructionData;
+};
+
+export function parseVerifyPolicyInstruction<
+	TProgram extends string,
+	TAccountMetas extends readonly AccountMeta[],
+>(
+	instruction:
+		& Instruction<TProgram>
+		& InstructionWithAccounts<TAccountMetas>
+		& InstructionWithData<ReadonlyUint8Array>,
+): ParsedVerifyPolicyInstruction<TProgram, TAccountMetas> {
+	if (instruction.accounts.length < 1) {
+		throw new SolanaError(
+			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
+			{
+				actualAccountMetas: instruction.accounts.length,
+				expectedAccountMetas: 1,
+			},
+		);
+	}
+	let accountIndex = 0;
+	const getNextAccount = () => {
+		const accountMeta = (instruction.accounts as TAccountMetas)[accountIndex]!;
+		accountIndex += 1;
+		return accountMeta;
+	};
+	return {
+		programAddress: instruction.programAddress,
+		accounts: { verifyingKeyAccount: getNextAccount() },
+		data: getVerifyPolicyInstructionDataDecoder().decode(instruction.data),
+	};
 }

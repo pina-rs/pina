@@ -6,103 +6,205 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getPinaPodDiscriminatorDecoder, getPinaPodMigrationVersionDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type ClientWithRpc, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findNullifierRecordPda, type NullifierRecordSeeds } from '../pdas';
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	type ClientWithRpc,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type HasAddress,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { findNullifierRecordPda, type NullifierRecordSeeds } from "../pdas";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const NULLIFIER_RECORD_DISCRIMINATOR = 4;
 
-export function getNullifierRecordDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(NULLIFIER_RECORD_DISCRIMINATOR); }
+export function getNullifierRecordDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(NULLIFIER_RECORD_DISCRIMINATOR);
+}
 
 export const NULLIFIER_RECORD_DISCRIMINATOR2 = 0;
 
-export function getNullifierRecordDiscriminator2Bytes(): ReadonlyUint8Array { return getU8Encoder().encode(NULLIFIER_RECORD_DISCRIMINATOR2); }
+export function getNullifierRecordDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(NULLIFIER_RECORD_DISCRIMINATOR2);
+}
 
 /**
  * Per-nullifier spent marker PDA. Existence proves the nullifier was spent in
  * $O(1)$ without a global nullifier write-lock hotspot or fixed capacity cap.
  */
-export type NullifierRecord = { discriminator: number; migrationVersion: number; bump: number;  };
+export type NullifierRecord = {
+	discriminator: number;
+	migrationVersion: number;
+	bump: number;
+};
 
-export type NullifierRecordArgs = { bump: number;  };
+export type NullifierRecordArgs = { bump: number };
 
 /** Gets the encoder for {@link NullifierRecordArgs} account data. */
-export function getNullifierRecordEncoder(): FixedSizeEncoder<NullifierRecordArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['migrationVersion', getU8Encoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: 4, migrationVersion: 0 }));
+export function getNullifierRecordEncoder(): FixedSizeEncoder<
+	NullifierRecordArgs
+> {
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"migrationVersion",
+			getU8Encoder(),
+		], ["bump", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 4, migrationVersion: 0 }),
+	);
 }
 
 /** Gets the decoder for {@link NullifierRecord} account data. */
 export function getNullifierRecordDecoder(): FixedSizeDecoder<NullifierRecord> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(NULLIFIER_RECORD_DISCRIMINATOR, getU8Decoder())], ['migrationVersion', getPinaPodMigrationVersionDecoder(0, getU8Decoder())], ['bump', getU8Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(
+				NULLIFIER_RECORD_DISCRIMINATOR,
+				getU8Decoder(),
+			),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["bump", getU8Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link NullifierRecord} account data. */
-export function getNullifierRecordCodec(): FixedSizeCodec<NullifierRecordArgs, NullifierRecord> {
-    return combineCodec(getNullifierRecordEncoder(), getNullifierRecordDecoder());
+export function getNullifierRecordCodec(): FixedSizeCodec<
+	NullifierRecordArgs,
+	NullifierRecord
+> {
+	return combineCodec(getNullifierRecordEncoder(), getNullifierRecordDecoder());
 }
 
-export function decodeNullifierRecord<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<NullifierRecord, TAddress>;
-export function decodeNullifierRecord<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<NullifierRecord, TAddress>;
-export function decodeNullifierRecord<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<NullifierRecord, TAddress> | MaybeAccount<NullifierRecord, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getNullifierRecordDecoder());
+export function decodeNullifierRecord<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<NullifierRecord, TAddress>;
+export function decodeNullifierRecord<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<NullifierRecord, TAddress>;
+export function decodeNullifierRecord<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+):
+	| Account<NullifierRecord, TAddress>
+	| MaybeAccount<NullifierRecord, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getNullifierRecordDecoder(),
+	);
 }
 
 export async function fetchNullifierRecord<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<NullifierRecord, TAddress>> {
-  const maybeAccount = await fetchMaybeNullifierRecord(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeNullifierRecord(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
-export async function fetchMaybeNullifierRecord<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+export async function fetchMaybeNullifierRecord<
+	TAddress extends string = string,
+>(
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<NullifierRecord, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount('rpc' in rpc ? rpc.rpc : rpc, typeof address === 'string' ? address : address.address, config);
-  return decodeNullifierRecord(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
+	return decodeNullifierRecord(maybeAccount);
 }
 
 export async function fetchAllNullifierRecord(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<NullifierRecord>[]> {
-  const maybeAccounts = await fetchAllMaybeNullifierRecord(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybeNullifierRecord(
+		rpc,
+		addresses,
+		config,
+	);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybeNullifierRecord(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<NullifierRecord>[]> {
-  const maybeAccounts = await fetchEncodedAccounts('rpc' in rpc ? rpc.rpc : rpc, addresses.map((a) => (typeof a === 'string' ? a : a.address)), config);
-  return maybeAccounts.map((maybeAccount) => decodeNullifierRecord(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
+	return maybeAccounts.map((maybeAccount) =>
+		decodeNullifierRecord(maybeAccount)
+	);
 }
 
 export async function fetchNullifierRecordFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  seeds: NullifierRecordSeeds,
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	seeds: NullifierRecordSeeds,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<NullifierRecord>> {
-  const maybeAccount = await fetchMaybeNullifierRecordFromSeeds(rpc, seeds, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeNullifierRecordFromSeeds(
+		rpc,
+		seeds,
+		config,
+	);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeNullifierRecordFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  seeds: NullifierRecordSeeds,
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	seeds: NullifierRecordSeeds,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<NullifierRecord>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findNullifierRecordPda(seeds, { programAddress });
-  return await fetchMaybeNullifierRecord(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findNullifierRecordPda(seeds, { programAddress });
+	return await fetchMaybeNullifierRecord(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */
@@ -123,7 +225,9 @@ export const NULLIFIER_RECORD_MIGRATION_VERSION = 0;
  * }
  * ```
  */
-export function nullifierRecordNeedsMigration(data: ReadonlyUint8Array): boolean {
+export function nullifierRecordNeedsMigration(
+	data: ReadonlyUint8Array,
+): boolean {
 	if (data.length < 2) {
 		return false;
 	}

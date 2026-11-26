@@ -3,20 +3,39 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getGrantDisclosureInstruction, GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getGrantDisclosureInstruction,
+	GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const grantDisclosureCommand = registerGlobals(new Command("grant_disclosure"))
+export const grantDisclosureCommand = registerGlobals(
+	new Command("grant_disclosure"),
+)
 	.description("grantDisclosure")
 	.requiredOption("--reserved <reserved>", "reserved")
-	.requiredOption("--disclosure-request <disclosureRequest>", "The `disclosure_request` account")
+	.requiredOption(
+		"--disclosure-request <disclosureRequest>",
+		"The `disclosure_request` account",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		reserved: smallInteger("--reserved", options.reserved),
-		disclosureRequest: pubkey("--disclosure-request", options.disclosureRequest),
-		viewer: context.payer,
-	};
+		const input = {
+			reserved: smallInteger("--reserved", options.reserved),
+			disclosureRequest: pubkey(
+				"--disclosure-request",
+				options.disclosureRequest,
+			),
+			viewer: context.payer,
+		};
 		const instruction = getGrantDisclosureInstruction(
 			...[input],
 			{ programAddress: context.programAddress },

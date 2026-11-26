@@ -12,8 +12,8 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct AssetVault {
-/// Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL
-/// Interface PDA).
+	/// Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL
+	/// Interface PDA).
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
@@ -57,7 +57,9 @@ impl AssetVault {
 		Ok(account)
 	}
 
-	pub fn from_bytes_mut(data: &mut [u8]) -> Result<&mut AssetVaultZc, solana_program_error::ProgramError> {
+	pub fn from_bytes_mut(
+		data: &mut [u8],
+	) -> Result<&mut AssetVaultZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
 		if account.discriminator != ASSET_VAULT_DISCRIMINATOR {
@@ -73,26 +75,21 @@ impl AssetVault {
 impl AssetVault {
 	pub fn find_pda(mint: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&[
-				"privacy-pool-asset".as_bytes(),
-				mint.as_ref(),
-			],
+			&["privacy-pool-asset".as_bytes(), mint.as_ref()],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(mint: &solana_pubkey::Pubkey, bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(
+		mint: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&[
-				"privacy-pool-asset".as_bytes(),
-				mint.as_ref(),
-				&[bump],
-			],
+			&["privacy-pool-asset".as_bytes(), mint.as_ref(), &[bump]],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 }
-
 
 /// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
 /// [`ASSET_VAULT_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
@@ -101,7 +98,6 @@ impl AssetVault {
 pub fn asset_vault_needs_migration(_data: &[u8]) -> bool {
 	false
 }
-
 
 /// Why `AssetVault::try_from_bytes` rejected account bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -118,30 +114,34 @@ impl core::fmt::Display for AssetVaultVersionError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::InvalidData => write!(f, "invalid AssetVault account data"),
-			Self::Stale { stored } => write!(
-				f,
-				"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
-			),
-			Self::Future { stored } => write!(
-				f,
-				"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
-			),
+			Self::Stale { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 0, received {stored} (the data predates this client; migrate it by sending a transaction to the program, or decode it with a client generated from an older IDL)"
+				)
+			}
+			Self::Future { stored } => {
+				write!(
+					f,
+					"migration version mismatch: expected 0, received {stored} (the data was written by a newer program; upgrade this client)"
+				)
+			}
 		}
 	}
 }
 
 impl AssetVault {
 	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`AssetVault::from_bytes`].
-	pub fn try_from_bytes(
-		data: &[u8],
-	) -> Result<&AssetVaultZc, AssetVaultVersionError> {
+	pub fn try_from_bytes(data: &[u8]) -> Result<&AssetVaultZc, AssetVaultVersionError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| AssetVaultVersionError::InvalidData)?;
 		if account.discriminator != ASSET_VAULT_DISCRIMINATOR {
 			return Err(AssetVaultVersionError::InvalidData);
 		}
 		if account.migration_version > ASSET_VAULT_MIGRATION_VERSION {
-			return Err(AssetVaultVersionError::Future { stored: account.migration_version });
+			return Err(AssetVaultVersionError::Future {
+				stored: account.migration_version,
+			});
 		}
 		Ok(account)
 	}
@@ -160,9 +160,14 @@ mod asset_vault_version_error_tests {
 
 	#[test]
 	fn stale_and_future_versions_are_distinguishable() {
-		let error = AssetVault::try_from_bytes(&envelope(1 as u8)).err().expect("a future envelope must fail");
+		let error = AssetVault::try_from_bytes(&envelope(1 as u8))
+			.err()
+			.expect("a future envelope must fail");
 		assert_eq!(error, AssetVaultVersionError::Future { stored: 1 });
-		assert_eq!(AssetVaultVersionError::Future { stored: 1 }.to_string(), "migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)");
+		assert_eq!(
+			AssetVaultVersionError::Future { stored: 1 }.to_string(),
+			"migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)"
+		);
 		assert!(
 			AssetVault::try_from_bytes(&envelope(0 as u8)).is_ok(),
 			"the current version must decode",

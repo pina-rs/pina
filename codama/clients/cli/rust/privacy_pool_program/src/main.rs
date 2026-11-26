@@ -20,12 +20,12 @@ use context::CliContext;
 use solana_sdk::pubkey::Pubkey;
 
 /// A programmable, tiered-disclosure privacy pool built with pina.
-/// 
+///
 /// Combines Helius Solana Privacy Rings' production architecture with Pina's
 /// governed, publicly-logged disclosure state machine — all inside one
 /// `no_std` crate with no `unsafe` code outside `syscalls.rs` and zero
 /// required off-chain infrastructure:
-/// 
+///
 /// - **Per-nullifier PDAs ([`NullifierRecord`])** — $O(1)$ double-spend
 /// detection, unbounded spend capacity, and zero shared nullifier write-lock
 /// contention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.
@@ -106,7 +106,6 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-
 	Initialize(commands::InitializeArgs),
 
 	SetVerificationKey(commands::SetVerificationKeyArgs),

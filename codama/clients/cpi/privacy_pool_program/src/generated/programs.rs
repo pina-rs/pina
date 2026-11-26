@@ -12,12 +12,12 @@ use pina::CpiProgramId;
 use pina::Program;
 
 /// A programmable, tiered-disclosure privacy pool built with pina.
-/// 
+///
 /// Combines Helius Solana Privacy Rings' production architecture with Pina's
 /// governed, publicly-logged disclosure state machine — all inside one
 /// `no_std` crate with no `unsafe` code outside `syscalls.rs` and zero
 /// required off-chain infrastructure:
-/// 
+///
 /// - **Per-nullifier PDAs ([`NullifierRecord`])** — $O(1)$ double-spend
 /// detection, unbounded spend capacity, and zero shared nullifier write-lock
 /// contention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.
@@ -49,7 +49,8 @@ use pina::Program;
 /// co-signer / CPI authority gates ([`SetPolicy`]) plus composable ZK policy
 /// verification ([`VerifyPolicy`] on `VK_SLOT_POLICY`).
 #[allow(rustdoc::broken_intra_doc_links, clippy::doc_lazy_continuation)]
-pub const PRIVACY_POOL_PROGRAM_ID: Address = pina::address!("DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D");
+pub const PRIVACY_POOL_PROGRAM_ID: Address =
+	pina::address!("DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D");
 
 /// Marker for the `privacyPoolProgram` program used by generated CPI builders.
 #[derive(Clone, Copy, Debug)]
@@ -83,7 +84,10 @@ mod tests {
 	/// full rather than only through the constant.
 	#[test]
 	fn binds_the_expected_program_id() {
-		assert_eq!(PRIVACY_POOL_PROGRAM_ID, pina::address!("DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D"));
+		assert_eq!(
+			PRIVACY_POOL_PROGRAM_ID,
+			pina::address!("DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D")
+		);
 		assert_eq!(PrivacyPoolProgram::ID, PRIVACY_POOL_PROGRAM_ID);
 		assert!(is_expected_program(&PRIVACY_POOL_PROGRAM_ID));
 	}

@@ -3,26 +3,53 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getRegisterAssetInstructionAsync, REGISTER_ASSET_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getRegisterAssetInstructionAsync,
+	REGISTER_ASSET_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const registerAssetCommand = registerGlobals(new Command("register_asset"))
+export const registerAssetCommand = registerGlobals(
+	new Command("register_asset"),
+)
 	.description("registerAsset")
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--mint <mint>", "The `mint` account")
-	.option("--asset-vault <assetVault>", "The `asset_vault` account [default: derived]")
-	.requiredOption("--vault-token-account <vaultTokenAccount>", "The `vault_token_account` account")
-	.requiredOption("--token-program <tokenProgram>", "The `token_program` account")
+	.option(
+		"--asset-vault <assetVault>",
+		"The `asset_vault` account [default: derived]",
+	)
+	.requiredOption(
+		"--vault-token-account <vaultTokenAccount>",
+		"The `vault_token_account` account",
+	)
+	.requiredOption(
+		"--token-program <tokenProgram>",
+		"The `token_program` account",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		bump: smallInteger("--bump", options.bump),
-		payer: context.payer,
-		mint: pubkey("--mint", options.mint),
-		assetVault: options.assetVault === undefined ? undefined : pubkey("--asset-vault", options.assetVault),
-		vaultTokenAccount: pubkey("--vault-token-account", options.vaultTokenAccount),
-		tokenProgram: pubkey("--token-program", options.tokenProgram),
-	};
+		const input = {
+			bump: smallInteger("--bump", options.bump),
+			payer: context.payer,
+			mint: pubkey("--mint", options.mint),
+			assetVault: options.assetVault === undefined
+				? undefined
+				: pubkey("--asset-vault", options.assetVault),
+			vaultTokenAccount: pubkey(
+				"--vault-token-account",
+				options.vaultTokenAccount,
+			),
+			tokenProgram: pubkey("--token-program", options.tokenProgram),
+		};
 		const instruction = await getRegisterAssetInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

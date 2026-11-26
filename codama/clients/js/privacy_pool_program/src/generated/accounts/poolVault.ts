@@ -6,100 +6,178 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { getPinaPodDiscriminatorDecoder, getPinaPodMigrationVersionDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, getStructDecoder, getStructEncoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type ClientWithRpc, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findPoolVaultPda } from '../pdas';
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	type ClientWithRpc,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	type GetAccountInfoApi,
+	type GetMultipleAccountsApi,
+	getStructDecoder,
+	getStructEncoder,
+	getU8Decoder,
+	getU8Encoder,
+	type HasAddress,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { findPoolVaultPda } from "../pdas";
+import {
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const POOL_VAULT_DISCRIMINATOR = 2;
 
-export function getPoolVaultDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(POOL_VAULT_DISCRIMINATOR); }
+export function getPoolVaultDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(POOL_VAULT_DISCRIMINATOR);
+}
 
 export const POOL_VAULT_DISCRIMINATOR2 = 0;
 
-export function getPoolVaultDiscriminator2Bytes(): ReadonlyUint8Array { return getU8Encoder().encode(POOL_VAULT_DISCRIMINATOR2); }
+export function getPoolVaultDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(POOL_VAULT_DISCRIMINATOR2);
+}
 
 /** The pool's native SOL custody PDA. */
-export type PoolVault = { discriminator: number; migrationVersion: number; bump: number;  };
+export type PoolVault = {
+	discriminator: number;
+	migrationVersion: number;
+	bump: number;
+};
 
-export type PoolVaultArgs = { bump: number;  };
+export type PoolVaultArgs = { bump: number };
 
 /** Gets the encoder for {@link PoolVaultArgs} account data. */
 export function getPoolVaultEncoder(): FixedSizeEncoder<PoolVaultArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['migrationVersion', getU8Encoder()], ['bump', getU8Encoder()]]), (value) => ({ ...value, discriminator: 2, migrationVersion: 0 }));
+	return transformEncoder(
+		getStructEncoder([["discriminator", getU8Encoder()], [
+			"migrationVersion",
+			getU8Encoder(),
+		], ["bump", getU8Encoder()]]),
+		(value) => ({ ...value, discriminator: 2, migrationVersion: 0 }),
+	);
 }
 
 /** Gets the decoder for {@link PoolVault} account data. */
 export function getPoolVaultDecoder(): FixedSizeDecoder<PoolVault> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(POOL_VAULT_DISCRIMINATOR, getU8Decoder())], ['migrationVersion', getPinaPodMigrationVersionDecoder(0, getU8Decoder())], ['bump', getU8Decoder()]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(POOL_VAULT_DISCRIMINATOR, getU8Decoder()),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["bump", getU8Decoder()],
+	]);
 }
 
 /** Gets the codec for {@link PoolVault} account data. */
 export function getPoolVaultCodec(): FixedSizeCodec<PoolVaultArgs, PoolVault> {
-    return combineCodec(getPoolVaultEncoder(), getPoolVaultDecoder());
+	return combineCodec(getPoolVaultEncoder(), getPoolVaultDecoder());
 }
 
-export function decodePoolVault<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<PoolVault, TAddress>;
-export function decodePoolVault<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<PoolVault, TAddress>;
-export function decodePoolVault<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<PoolVault, TAddress> | MaybeAccount<PoolVault, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getPoolVaultDecoder());
+export function decodePoolVault<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<PoolVault, TAddress>;
+export function decodePoolVault<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<PoolVault, TAddress>;
+export function decodePoolVault<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<PoolVault, TAddress> | MaybeAccount<PoolVault, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getPoolVaultDecoder(),
+	);
 }
 
 export async function fetchPoolVault<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<PoolVault, TAddress>> {
-  const maybeAccount = await fetchMaybePoolVault(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybePoolVault(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybePoolVault<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<PoolVault, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount('rpc' in rpc ? rpc.rpc : rpc, typeof address === 'string' ? address : address.address, config);
-  return decodePoolVault(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
+	return decodePoolVault(maybeAccount);
 }
 
 export async function fetchAllPoolVault(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<PoolVault>[]> {
-  const maybeAccounts = await fetchAllMaybePoolVault(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybePoolVault(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybePoolVault(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<PoolVault>[]> {
-  const maybeAccounts = await fetchEncodedAccounts('rpc' in rpc ? rpc.rpc : rpc, addresses.map((a) => (typeof a === 'string' ? a : a.address)), config);
-  return maybeAccounts.map((maybeAccount) => decodePoolVault(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
+	return maybeAccounts.map((maybeAccount) => decodePoolVault(maybeAccount));
 }
 
 export async function fetchPoolVaultFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<PoolVault>> {
-  const maybeAccount = await fetchMaybePoolVaultFromSeeds(rpc, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybePoolVaultFromSeeds(rpc, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybePoolVaultFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<PoolVault>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findPoolVaultPda({ programAddress });
-  return await fetchMaybePoolVault(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findPoolVaultPda({ programAddress });
+	return await fetchMaybePoolVault(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */

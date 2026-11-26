@@ -3,22 +3,38 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getSetPolicyInstructionAsync, SET_POLICY_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getSetPolicyInstructionAsync,
+	SET_POLICY_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
 export const setPolicyCommand = registerGlobals(new Command("set_policy"))
 	.description("setPolicy")
 	.requiredOption("--policy-flags <policyFlags>", "policyFlags")
 	.requiredOption("--policy-cosigner <policyCosigner>", "policyCosigner")
-	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		policyFlags: smallInteger("--policy-flags", options.policyFlags),
-		policyCosigner: pubkey("--policy-cosigner", options.policyCosigner),
-		authority: context.payer,
-		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
-	};
+		const input = {
+			policyFlags: smallInteger("--policy-flags", options.policyFlags),
+			policyCosigner: pubkey("--policy-cosigner", options.policyCosigner),
+			authority: context.payer,
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+		};
 		const instruction = await getSetPolicyInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

@@ -10,11 +10,11 @@
 )]
 
 use clap::Args;
+use privacy_pool_program_client::instructions::ChallengeDisclosure;
+use privacy_pool_program_client::instructions::ChallengeDisclosureInstructionData;
 
 use crate::context::CliContext;
 use crate::context::CliError;
-use privacy_pool_program_client::instructions::ChallengeDisclosure;
-use privacy_pool_program_client::instructions::ChallengeDisclosureInstructionData;
 
 #[derive(Debug, Args)]
 pub struct ChallengeDisclosureArgs {
@@ -35,15 +35,20 @@ pub(crate) fn run(context: &CliContext, args: ChallengeDisclosureArgs) -> Result
 	let data = ChallengeDisclosureInstructionData::new(|data| {
 		data.reserved = args.reserved;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = ChallengeDisclosure {
-		disclosure_request: disclosure_request,
-		viewer: viewer,
-		clock: clock,
+		disclosure_request,
+		viewer,
+		clock,
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT),
+	)
 }

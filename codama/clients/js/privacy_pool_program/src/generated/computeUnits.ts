@@ -250,7 +250,9 @@ export const VERIFY_POLICY_COMPUTE_UNIT_LIMIT = 96500;
 const MAX_COMPUTE_UNIT_LIMIT = 1400000;
 
 /** Each measured instruction's discriminator and its recorded limit. */
-const COMPUTE_UNIT_LIMITS: ReadonlyArray<readonly [ReadonlyUint8Array, number]> = [
+const COMPUTE_UNIT_LIMITS: ReadonlyArray<
+	readonly [ReadonlyUint8Array, number]
+> = [
 	[new Uint8Array([0]), INITIALIZE_COMPUTE_UNIT_LIMIT],
 	[new Uint8Array([1]), SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT],
 	[new Uint8Array([2]), SET_CUSTODIANS_COMPUTE_UNIT_LIMIT],
@@ -293,7 +295,8 @@ export function getPrivacyPoolProgramComputeUnitLimit(
 	instructions: ReadonlyArray<Pick<Instruction, "data" | "programAddress">>,
 	config: { programAddress?: Address } = {},
 ): number | undefined {
-	const programAddress = config.programAddress ?? PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
+	const programAddress = config.programAddress ??
+		PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS;
 	let total = 0;
 	let counted = false;
 

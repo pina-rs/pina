@@ -6,14 +6,13 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
 /// Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.
-/// 
+///
 /// Holds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root
 /// ring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -35,8 +34,7 @@ impl MerkleTree {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2
-			&& data[..2] == MERKLE_TREE_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == MERKLE_TREE_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -51,20 +49,16 @@ impl MerkleTree {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let next_leaf_index: u64 = u64::from_le_bytes(data.get(cursor..cursor + 8)?
-		.try_into().ok()?);
+		let next_leaf_index: u64 =
+			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 		cursor += 8;
-		let filled_subtrees: [u8; 512] = data.get(cursor..cursor + 512)?
-		.try_into().ok()?;
+		let filled_subtrees: [u8; 512] = data.get(cursor..cursor + 512)?.try_into().ok()?;
 		cursor += 512;
-		let roots_len: u16 = u16::from_le_bytes(data.get(cursor..cursor + 2)?
-		.try_into().ok()?);
+		let roots_len: u16 = u16::from_le_bytes(data.get(cursor..cursor + 2)?.try_into().ok()?);
 		cursor += 2;
-		let roots: [u8; 1024] = data.get(cursor..cursor + 1024)?
-		.try_into().ok()?;
+		let roots: [u8; 1024] = data.get(cursor..cursor + 1024)?.try_into().ok()?;
 
 		Some(MerkleTree {
 			bump,

@@ -27,18 +27,25 @@ pub struct ResolveChallenge {
 }
 
 impl ResolveChallenge {
-	pub fn new(authority: solana_pubkey::Pubkey, disclosure_request: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		authority: solana_pubkey::Pubkey,
+		disclosure_request: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			authority,
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			disclosure_request,
 		}
 	}
 
-	pub fn instruction(&self, data: ResolveChallengeInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: ResolveChallengeInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -49,9 +56,18 @@ impl ResolveChallenge {
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(3 + remaining_accounts.len());
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.authority, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.pool_config, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.disclosure_request, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.authority,
+			true,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.pool_config,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.disclosure_request,
+			false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -67,14 +83,16 @@ pub struct ResolveChallengeInstructionData {
 }
 
 impl ResolveChallengeInstructionData {
-	pub fn new(configure: impl FnOnce(&mut ResolveChallengeInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut ResolveChallengeInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<ResolveChallengeInstructionWireZc>()];
 		<ResolveChallengeInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = RESOLVE_CHALLENGE_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

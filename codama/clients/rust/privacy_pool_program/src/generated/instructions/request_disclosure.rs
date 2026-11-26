@@ -31,28 +31,39 @@ pub struct RequestDisclosure {
 }
 
 impl RequestDisclosure {
-	pub fn new(requester: solana_pubkey::Pubkey, disclosure_request: solana_pubkey::Pubkey, system_program: solana_pubkey::Pubkey, clock: solana_pubkey::Pubkey) -> Self {
+	pub fn new(
+		requester: solana_pubkey::Pubkey,
+		disclosure_request: solana_pubkey::Pubkey,
+		system_program: solana_pubkey::Pubkey,
+		clock: solana_pubkey::Pubkey,
+	) -> Self {
 		Self {
 			requester,
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			requester_registry: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-requesters".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			merkle_tree: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-tree".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
-			).0,
+			)
+			.0,
 			disclosure_request,
 			system_program,
 			clock,
 		}
 	}
 
-	pub fn instruction(&self, data: RequestDisclosureInstructionData) -> solana_instruction::Instruction {
+	pub fn instruction(
+		&self,
+		data: RequestDisclosureInstructionData,
+	) -> solana_instruction::Instruction {
 		self.instruction_with_remaining_accounts(data, &[])
 	}
 
@@ -64,12 +75,29 @@ impl RequestDisclosure {
 	) -> solana_instruction::Instruction {
 		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
 		accounts.push(solana_instruction::AccountMeta::new(self.requester, true));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.pool_config, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.requester_registry, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.merkle_tree, false));
-		accounts.push(solana_instruction::AccountMeta::new(self.disclosure_request, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.system_program, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(self.clock, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.pool_config,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.requester_registry,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.merkle_tree,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.disclosure_request,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.system_program,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.clock, false,
+		));
 		accounts.extend_from_slice(remaining_accounts);
 		solana_instruction::Instruction {
 			program_id: crate::PRIVACY_POOL_PROGRAM_ID,
@@ -85,14 +113,16 @@ pub struct RequestDisclosureInstructionData {
 }
 
 impl RequestDisclosureInstructionData {
-	pub fn new(configure: impl FnOnce(&mut RequestDisclosureInstructionWireZc)) -> Result<Self, solana_program_error::ProgramError> {
+	pub fn new(
+		configure: impl FnOnce(&mut RequestDisclosureInstructionWireZc),
+	) -> Result<Self, solana_program_error::ProgramError> {
 		let mut bytes = vec![0u8; core::mem::size_of::<RequestDisclosureInstructionWireZc>()];
 		<RequestDisclosureInstructionWire as pina::PinaPodFixed>::initialize(&mut bytes, |data| {
 			configure(data);
 			data.discriminator = REQUEST_DISCLOSURE_DISCRIMINATOR;
 			Ok(())
 		})
-			.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
+		.map_err(|_| solana_program_error::ProgramError::InvalidInstructionData)?;
 		Ok(Self { bytes })
 	}
 }

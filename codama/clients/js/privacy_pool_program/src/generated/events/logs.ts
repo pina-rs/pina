@@ -41,17 +41,25 @@ export function decodeNoteEncryptedEventEvent(
 			`event migration version mismatch: expected 0, received ${sourceVersion} (decode it with the event for that version, or regenerate this client)`,
 		);
 	}
-	return { name: "noteEncryptedEvent", data: getNoteEncryptedEventEventDecoder().decode(bytes) };
+	return {
+		name: "noteEncryptedEvent",
+		data: getNoteEncryptedEventEventDecoder().decode(bytes),
+	};
 }
 
 /** One log entry that named this event. */
-export type DecodedNoteEncryptedEventEvent = { name: "noteEncryptedEvent"; data: NoteEncryptedEventEvent };
+export type DecodedNoteEncryptedEventEvent = {
+	name: "noteEncryptedEvent";
+	data: NoteEncryptedEventEvent;
+};
 
 /**
  * Decode a `Program data:` log line, or return `null` when the line is not
  * this event.
  */
-export function parseNoteEncryptedEventEventFromLog(log: string): DecodedNoteEncryptedEventEvent | null {
+export function parseNoteEncryptedEventEventFromLog(
+	log: string,
+): DecodedNoteEncryptedEventEvent | null {
 	const prefix = "Program data: ";
 	if (!log.startsWith(prefix)) {
 		return null;
@@ -72,7 +80,6 @@ export function parseNoteEncryptedEventEventFromLog(log: string): DecodedNoteEnc
 	return decodeNoteEncryptedEventEvent(bytes);
 }
 
-
 /**
  * Explain a `Program data:` line that names a migration-aware event but that
  * no generated event claimed, or return `null` for an unrelated line.
@@ -86,17 +93,19 @@ function unrecognizedEventVersion(log: string): string | null {
 	if (bytes.length >= 1 && bytes[0] === 1) {
 		return bytes.length < 2
 			? 'event "noteEncryptedEvent" log is too short for its version envelope'
-			: `event "noteEncryptedEvent" log carries migration version ${bytes[1]}, which this client cannot decode; regenerate it`;
+			: `event "noteEncryptedEvent" log carries migration version ${
+				bytes[1]
+			}, which this client cannot decode; regenerate it`;
 	}
 	return null;
 }
 
 /** Every event this program can emit, as decoded from a log line. */
-export type DecodedPrivacyPoolProgramEvent =
-	| DecodedNoteEncryptedEventEvent;
+export type DecodedPrivacyPoolProgramEvent = DecodedNoteEncryptedEventEvent;
 
 /** The program whose invocation frames emit the events decoded here. */
-export const PRIVACY_POOL_PROGRAM_EVENT_SOURCE_ADDRESS = "DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D";
+export const PRIVACY_POOL_PROGRAM_EVENT_SOURCE_ADDRESS =
+	"DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D";
 
 const PROGRAM_INVOKE_LOG = /^Program (\S+) invoke \[\d+\]$/;
 const PROGRAM_EXIT_LOG = /^Program (\S+) (?:success|failed: .*)$/;

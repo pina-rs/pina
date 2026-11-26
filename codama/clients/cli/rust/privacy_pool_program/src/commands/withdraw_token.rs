@@ -10,12 +10,12 @@
 )]
 
 use clap::Args;
-
-use crate::context::CliContext;
-use crate::context::CliError;
 use privacy_pool_program_client::instructions::WithdrawToken;
 use privacy_pool_program_client::instructions::WithdrawTokenInstructionData;
 use solana_sdk::pubkey::Pubkey;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct WithdrawTokenArgs {
@@ -89,8 +89,10 @@ pub(crate) fn run(context: &CliContext, args: WithdrawTokenArgs) -> Result<(), C
 	let nullifier0 = CliContext::bytes::<32>("--nullifier0", &args.nullifier0)?;
 	let nullifier1 = CliContext::bytes::<32>("--nullifier1", &args.nullifier1)?;
 	let root = CliContext::bytes::<32>("--root", &args.root)?;
-	let change_commitment = CliContext::bytes::<32>("--change_commitment", &args.change_commitment)?;
-	let change_view_pubkey = CliContext::bytes::<32>("--change_view_pubkey", &args.change_view_pubkey)?;
+	let change_commitment =
+		CliContext::bytes::<32>("--change_commitment", &args.change_commitment)?;
+	let change_view_pubkey =
+		CliContext::bytes::<32>("--change_view_pubkey", &args.change_view_pubkey)?;
 	let envelope = CliContext::bytes::<96>("--envelope", &args.envelope)?;
 	let proof_a = CliContext::bytes::<32>("--proof_a", &args.proof_a)?;
 	let proof_b = CliContext::bytes::<128>("--proof_b", &args.proof_b)?;
@@ -98,35 +100,45 @@ pub(crate) fn run(context: &CliContext, args: WithdrawTokenArgs) -> Result<(), C
 	let payer = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-config".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let merkle_tree = match &args.merkle_tree {
 		Some(value) => CliContext::pubkey("--merkle_tree", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-tree".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-tree".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
 	let nullifier_record0 = CliContext::pubkey("--nullifier_record0", &args.nullifier_record0)?;
 	let nullifier_record1 = CliContext::pubkey("--nullifier_record1", &args.nullifier_record1)?;
-	let verifying_key_account = CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
+	let verifying_key_account =
+		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
 	let mint = CliContext::pubkey("--mint", &args.mint)?;
 	let asset_vault = match &args.asset_vault {
 		Some(value) => CliContext::pubkey("--asset_vault", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-asset".as_bytes(), mint.as_ref()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-asset".as_bytes(), mint.as_ref()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
-	let vault_token_account = CliContext::pubkey("--vault_token_account", &args.vault_token_account)?;
-	let recipient_token_account = CliContext::pubkey("--recipient_token_account", &args.recipient_token_account)?;
-	let relayer_token_account = CliContext::pubkey("--relayer_token_account", &args.relayer_token_account)?;
+	let vault_token_account =
+		CliContext::pubkey("--vault_token_account", &args.vault_token_account)?;
+	let recipient_token_account =
+		CliContext::pubkey("--recipient_token_account", &args.recipient_token_account)?;
+	let relayer_token_account =
+		CliContext::pubkey("--relayer_token_account", &args.relayer_token_account)?;
 	let policy_cosigner = CliContext::pubkey("--policy_cosigner", &args.policy_cosigner)?;
 	let token_program = CliContext::pubkey("--token_program", &args.token_program)?;
 	let data = WithdrawTokenInstructionData::new(|data| {
@@ -145,26 +157,31 @@ pub(crate) fn run(context: &CliContext, args: WithdrawTokenArgs) -> Result<(), C
 		data.proof_b = proof_b;
 		data.proof_c = proof_c;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = WithdrawToken {
-		payer: payer,
-		pool_config: pool_config,
-		merkle_tree: merkle_tree,
-		nullifier_record0: nullifier_record0,
-		nullifier_record1: nullifier_record1,
-		verifying_key_account: verifying_key_account,
-		mint: mint,
-		asset_vault: asset_vault,
-		vault_token_account: vault_token_account,
-		recipient_token_account: recipient_token_account,
-		relayer_token_account: relayer_token_account,
-		policy_cosigner: policy_cosigner,
-		token_program: token_program,
+		payer,
+		pool_config,
+		merkle_tree,
+		nullifier_record0,
+		nullifier_record1,
+		verifying_key_account,
+		mint,
+		asset_vault,
+		vault_token_account,
+		recipient_token_account,
+		relayer_token_account,
+		policy_cosigner,
+		token_program,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::WITHDRAW_TOKEN_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::WITHDRAW_TOKEN_COMPUTE_UNIT_LIMIT),
+	)
 }

@@ -6,7 +6,6 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 
 #[allow(unused_imports)]
@@ -29,8 +28,7 @@ impl NullifierRecord {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2
-			&& data[..2] == NULLIFIER_RECORD_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == NULLIFIER_RECORD_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -45,11 +43,8 @@ impl NullifierRecord {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 
-		Some(NullifierRecord {
-			bump,
-		})
+		Some(NullifierRecord { bump })
 	}
 }

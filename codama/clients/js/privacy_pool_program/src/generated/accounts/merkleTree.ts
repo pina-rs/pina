@@ -6,17 +6,60 @@
  * @see https://github.com/codama-idl/codama
  */
 
-import { fixPinaPodEncoderSize, getPinaPodDiscriminatorDecoder, getPinaPodMigrationVersionDecoder } from "../pinaPodCodecs";
-import { assertAccountExists, assertAccountsExist, combineCodec, decodeAccount, fetchEncodedAccount, fetchEncodedAccounts, fixDecoderSize, fixEncoderSize, getBytesDecoder, getBytesEncoder, getStructDecoder, getStructEncoder, getU16Decoder, getU16Encoder, getU64Decoder, getU64Encoder, getU8Decoder, getU8Encoder, transformEncoder, type Account, type Address, type ClientWithRpc, type EncodedAccount, type FetchAccountConfig, type FetchAccountsConfig, type FixedSizeCodec, type FixedSizeDecoder, type FixedSizeEncoder, type GetAccountInfoApi, type GetMultipleAccountsApi, type HasAddress, type MaybeAccount, type MaybeEncodedAccount, type ReadonlyUint8Array } from '@solana/kit';
-import { findMerkleTreePda } from '../pdas';
+import {
+	type Account,
+	type Address,
+	assertAccountExists,
+	assertAccountsExist,
+	type ClientWithRpc,
+	combineCodec,
+	decodeAccount,
+	type EncodedAccount,
+	type FetchAccountConfig,
+	type FetchAccountsConfig,
+	fetchEncodedAccount,
+	fetchEncodedAccounts,
+	fixDecoderSize,
+	type FixedSizeCodec,
+	type FixedSizeDecoder,
+	type FixedSizeEncoder,
+	fixEncoderSize,
+	type GetAccountInfoApi,
+	getBytesDecoder,
+	getBytesEncoder,
+	type GetMultipleAccountsApi,
+	getStructDecoder,
+	getStructEncoder,
+	getU16Decoder,
+	getU16Encoder,
+	getU64Decoder,
+	getU64Encoder,
+	getU8Decoder,
+	getU8Encoder,
+	type HasAddress,
+	type MaybeAccount,
+	type MaybeEncodedAccount,
+	type ReadonlyUint8Array,
+	transformEncoder,
+} from "@solana/kit";
+import { findMerkleTreePda } from "../pdas";
+import {
+	fixPinaPodEncoderSize,
+	getPinaPodDiscriminatorDecoder,
+	getPinaPodMigrationVersionDecoder,
+} from "../pinaPodCodecs";
 
 export const MERKLE_TREE_DISCRIMINATOR = 3;
 
-export function getMerkleTreeDiscriminatorBytes(): ReadonlyUint8Array { return getU8Encoder().encode(MERKLE_TREE_DISCRIMINATOR); }
+export function getMerkleTreeDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(MERKLE_TREE_DISCRIMINATOR);
+}
 
 export const MERKLE_TREE_DISCRIMINATOR2 = 0;
 
-export function getMerkleTreeDiscriminator2Bytes(): ReadonlyUint8Array { return getU8Encoder().encode(MERKLE_TREE_DISCRIMINATOR2); }
+export function getMerkleTreeDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(MERKLE_TREE_DISCRIMINATOR2);
+}
 
 /**
  * Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.
@@ -24,103 +67,161 @@ export function getMerkleTreeDiscriminator2Bytes(): ReadonlyUint8Array { return 
  * Holds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root
  * ring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.
  */
-export type MerkleTree = { discriminator: number; migrationVersion: number; bump: number; 
-/** Number of leaves written so far. */
-nextLeafIndex: bigint; 
-/** Frontier of rightmost filled subtrees, one 32-byte hash per level. */
-filledSubtrees: ReadonlyUint8Array; 
-/** Roots currently in the ring; evictions hold it at capacity. */
-rootsLen: number; 
-/** Ring of 32 recent roots, oldest first. */
-roots: ReadonlyUint8Array;  };
+export type MerkleTree = {
+	discriminator: number;
+	migrationVersion: number;
+	bump: number;
+	/** Number of leaves written so far. */
+	nextLeafIndex: bigint;
+	/** Frontier of rightmost filled subtrees, one 32-byte hash per level. */
+	filledSubtrees: ReadonlyUint8Array;
+	/** Roots currently in the ring; evictions hold it at capacity. */
+	rootsLen: number;
+	/** Ring of 32 recent roots, oldest first. */
+	roots: ReadonlyUint8Array;
+};
 
-export type MerkleTreeArgs = { bump: number; 
-/** Number of leaves written so far. */
-nextLeafIndex: number | bigint; 
-/** Frontier of rightmost filled subtrees, one 32-byte hash per level. */
-filledSubtrees: ReadonlyUint8Array; 
-/** Roots currently in the ring; evictions hold it at capacity. */
-rootsLen: number; 
-/** Ring of 32 recent roots, oldest first. */
-roots: ReadonlyUint8Array;  };
+export type MerkleTreeArgs = {
+	bump: number;
+	/** Number of leaves written so far. */
+	nextLeafIndex: number | bigint;
+	/** Frontier of rightmost filled subtrees, one 32-byte hash per level. */
+	filledSubtrees: ReadonlyUint8Array;
+	/** Roots currently in the ring; evictions hold it at capacity. */
+	rootsLen: number;
+	/** Ring of 32 recent roots, oldest first. */
+	roots: ReadonlyUint8Array;
+};
 
 /** Gets the encoder for {@link MerkleTreeArgs} account data. */
 export function getMerkleTreeEncoder(): FixedSizeEncoder<MerkleTreeArgs> {
-    return transformEncoder(getStructEncoder([['discriminator', getU8Encoder()], ['migrationVersion', getU8Encoder()], ['bump', getU8Encoder()], ['nextLeafIndex', getU64Encoder()], ['filledSubtrees', fixPinaPodEncoderSize(getBytesEncoder(), 512)], ['rootsLen', getU16Encoder()], ['roots', fixPinaPodEncoderSize(getBytesEncoder(), 1024)]]), (value) => ({ ...value, discriminator: 3, migrationVersion: 0 }));
+	return transformEncoder(
+		getStructEncoder([
+			["discriminator", getU8Encoder()],
+			["migrationVersion", getU8Encoder()],
+			["bump", getU8Encoder()],
+			["nextLeafIndex", getU64Encoder()],
+			["filledSubtrees", fixPinaPodEncoderSize(getBytesEncoder(), 512)],
+			["rootsLen", getU16Encoder()],
+			["roots", fixPinaPodEncoderSize(getBytesEncoder(), 1024)],
+		]),
+		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
+	);
 }
 
 /** Gets the decoder for {@link MerkleTree} account data. */
 export function getMerkleTreeDecoder(): FixedSizeDecoder<MerkleTree> {
-    return getStructDecoder([['discriminator', getPinaPodDiscriminatorDecoder(MERKLE_TREE_DISCRIMINATOR, getU8Decoder())], ['migrationVersion', getPinaPodMigrationVersionDecoder(0, getU8Decoder())], ['bump', getU8Decoder()], ['nextLeafIndex', getU64Decoder()], ['filledSubtrees', fixDecoderSize(getBytesDecoder(), 512)], ['rootsLen', getU16Decoder()], ['roots', fixDecoderSize(getBytesDecoder(), 1024)]]);
+	return getStructDecoder([
+		[
+			"discriminator",
+			getPinaPodDiscriminatorDecoder(MERKLE_TREE_DISCRIMINATOR, getU8Decoder()),
+		],
+		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
+		["bump", getU8Decoder()],
+		["nextLeafIndex", getU64Decoder()],
+		["filledSubtrees", fixDecoderSize(getBytesDecoder(), 512)],
+		["rootsLen", getU16Decoder()],
+		["roots", fixDecoderSize(getBytesDecoder(), 1024)],
+	]);
 }
 
 /** Gets the codec for {@link MerkleTree} account data. */
-export function getMerkleTreeCodec(): FixedSizeCodec<MerkleTreeArgs, MerkleTree> {
-    return combineCodec(getMerkleTreeEncoder(), getMerkleTreeDecoder());
+export function getMerkleTreeCodec(): FixedSizeCodec<
+	MerkleTreeArgs,
+	MerkleTree
+> {
+	return combineCodec(getMerkleTreeEncoder(), getMerkleTreeDecoder());
 }
 
-export function decodeMerkleTree<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress>): Account<MerkleTree, TAddress>;
-export function decodeMerkleTree<TAddress extends string = string>(encodedAccount: MaybeEncodedAccount<TAddress>): MaybeAccount<MerkleTree, TAddress>;
-export function decodeMerkleTree<TAddress extends string = string>(encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>): Account<MerkleTree, TAddress> | MaybeAccount<MerkleTree, TAddress> {
-  return decodeAccount(encodedAccount as MaybeEncodedAccount<TAddress>, getMerkleTreeDecoder());
+export function decodeMerkleTree<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress>,
+): Account<MerkleTree, TAddress>;
+export function decodeMerkleTree<TAddress extends string = string>(
+	encodedAccount: MaybeEncodedAccount<TAddress>,
+): MaybeAccount<MerkleTree, TAddress>;
+export function decodeMerkleTree<TAddress extends string = string>(
+	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
+): Account<MerkleTree, TAddress> | MaybeAccount<MerkleTree, TAddress> {
+	return decodeAccount(
+		encodedAccount as MaybeEncodedAccount<TAddress>,
+		getMerkleTreeDecoder(),
+	);
 }
 
 export async function fetchMerkleTree<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<Account<MerkleTree, TAddress>> {
-  const maybeAccount = await fetchMaybeMerkleTree(rpc, address, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeMerkleTree(rpc, address, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeMerkleTree<TAddress extends string = string>(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  address: Address<TAddress> | HasAddress<TAddress>,
-  config?: FetchAccountConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	address: Address<TAddress> | HasAddress<TAddress>,
+	config?: FetchAccountConfig,
 ): Promise<MaybeAccount<MerkleTree, TAddress>> {
-  const maybeAccount = await fetchEncodedAccount('rpc' in rpc ? rpc.rpc : rpc, typeof address === 'string' ? address : address.address, config);
-  return decodeMerkleTree(maybeAccount);
+	const maybeAccount = await fetchEncodedAccount(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		typeof address === "string" ? address : address.address,
+		config,
+	);
+	return decodeMerkleTree(maybeAccount);
 }
 
 export async function fetchAllMerkleTree(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<Account<MerkleTree>[]> {
-  const maybeAccounts = await fetchAllMaybeMerkleTree(rpc, addresses, config);
-  assertAccountsExist(maybeAccounts);
-  return maybeAccounts;
+	const maybeAccounts = await fetchAllMaybeMerkleTree(rpc, addresses, config);
+	assertAccountsExist(maybeAccounts);
+	return maybeAccounts;
 }
 
 export async function fetchAllMaybeMerkleTree(
-  rpc: Parameters<typeof fetchEncodedAccounts>[0] | ClientWithRpc<GetMultipleAccountsApi>,
-  addresses: Array<Address | HasAddress>,
-  config?: FetchAccountsConfig,
+	rpc:
+		| Parameters<typeof fetchEncodedAccounts>[0]
+		| ClientWithRpc<GetMultipleAccountsApi>,
+	addresses: Array<Address | HasAddress>,
+	config?: FetchAccountsConfig,
 ): Promise<MaybeAccount<MerkleTree>[]> {
-  const maybeAccounts = await fetchEncodedAccounts('rpc' in rpc ? rpc.rpc : rpc, addresses.map((a) => (typeof a === 'string' ? a : a.address)), config);
-  return maybeAccounts.map((maybeAccount) => decodeMerkleTree(maybeAccount));
+	const maybeAccounts = await fetchEncodedAccounts(
+		"rpc" in rpc ? rpc.rpc : rpc,
+		addresses.map((a) => (typeof a === "string" ? a : a.address)),
+		config,
+	);
+	return maybeAccounts.map((maybeAccount) => decodeMerkleTree(maybeAccount));
 }
 
 export async function fetchMerkleTreeFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<Account<MerkleTree>> {
-  const maybeAccount = await fetchMaybeMerkleTreeFromSeeds(rpc, config);
-  assertAccountExists(maybeAccount);
-  return maybeAccount;
+	const maybeAccount = await fetchMaybeMerkleTreeFromSeeds(rpc, config);
+	assertAccountExists(maybeAccount);
+	return maybeAccount;
 }
 
 export async function fetchMaybeMerkleTreeFromSeeds(
-  rpc: Parameters<typeof fetchEncodedAccount>[0] | ClientWithRpc<GetAccountInfoApi>,
-  
-  config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
+	rpc:
+		| Parameters<typeof fetchEncodedAccount>[0]
+		| ClientWithRpc<GetAccountInfoApi>,
+	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
 ): Promise<MaybeAccount<MerkleTree>> {
-  const { programAddress, ...fetchConfig } = config;
-  const [address] = await findMerkleTreePda({ programAddress });
-  return await fetchMaybeMerkleTree(rpc, address, fetchConfig);
+	const { programAddress, ...fetchConfig } = config;
+	const [address] = await findMerkleTreePda({ programAddress });
+	return await fetchMaybeMerkleTree(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */

@@ -10,12 +10,12 @@
 )]
 
 use clap::Args;
-
-use crate::context::CliContext;
-use crate::context::CliError;
 use privacy_pool_program_client::instructions::SetVerificationKey;
 use privacy_pool_program_client::instructions::SetVerificationKeyInstructionData;
 use solana_sdk::pubkey::Pubkey;
+
+use crate::context::CliContext;
+use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct SetVerificationKeyArgs {
@@ -54,13 +54,16 @@ pub(crate) fn run(context: &CliContext, args: SetVerificationKeyArgs) -> Result<
 	let authority = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
-		None => Pubkey::find_program_address(
-			&["privacy-pool-config".as_bytes()],
-			&context.program_address,
-		)
-		.0,
+		None => {
+			Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&context.program_address,
+			)
+			.0
+		}
 	};
-	let verifying_key_account = CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
+	let verifying_key_account =
+		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
 	let data = SetVerificationKeyInstructionData::new(|data| {
 		data.bump = args.bump;
 		data.slot = args.slot;
@@ -71,16 +74,21 @@ pub(crate) fn run(context: &CliContext, args: SetVerificationKeyArgs) -> Result<
 		data.ic0 = ic0;
 		data.ic1 = ic1;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = SetVerificationKey {
-		authority: authority,
-		pool_config: pool_config,
-		verifying_key_account: verifying_key_account,
+		authority,
+		pool_config,
+		verifying_key_account,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT),
+	)
 }

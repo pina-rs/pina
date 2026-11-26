@@ -6,7 +6,6 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::Address;
@@ -34,8 +33,7 @@ impl AssetVault {
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
 	pub fn matches(data: &[u8]) -> bool {
-		data.len() >= 2
-			&& data[..2] == ASSET_VAULT_DISCRIMINATOR
+		data.len() >= 2 && data[..2] == ASSET_VAULT_DISCRIMINATOR
 	}
 
 	/// Reads this account's fields from the account's data.
@@ -50,17 +48,15 @@ impl AssetVault {
 		let mut cursor = 0usize;
 		cursor += 2;
 
-		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?
-		.try_into().ok()?);
+		let bump: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
-		let mint = Address::new_from_array(data.get(cursor..cursor + 32)?
-		.try_into().ok()?);
+		let mint = Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let token_program = Address::new_from_array(data.get(cursor..cursor + 32)?
-		.try_into().ok()?);
+		let token_program =
+			Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 		cursor += 32;
-		let vault_token_account = Address::new_from_array(data.get(cursor..cursor + 32)?
-		.try_into().ok()?);
+		let vault_token_account =
+			Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
 
 		Some(AssetVault {
 			bump,

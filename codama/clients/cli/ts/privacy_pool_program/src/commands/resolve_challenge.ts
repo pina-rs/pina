@@ -3,22 +3,46 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getResolveChallengeInstructionAsync, RESOLVE_CHALLENGE_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getResolveChallengeInstructionAsync,
+	RESOLVE_CHALLENGE_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const resolveChallengeCommand = registerGlobals(new Command("resolve_challenge"))
+export const resolveChallengeCommand = registerGlobals(
+	new Command("resolve_challenge"),
+)
 	.description("resolveChallenge")
 	.requiredOption("--approve <approve>", "approve")
-	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
-	.requiredOption("--disclosure-request <disclosureRequest>", "The `disclosure_request` account")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.requiredOption(
+		"--disclosure-request <disclosureRequest>",
+		"The `disclosure_request` account",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		approve: smallInteger("--approve", options.approve),
-		authority: context.payer,
-		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
-		disclosureRequest: pubkey("--disclosure-request", options.disclosureRequest),
-	};
+		const input = {
+			approve: smallInteger("--approve", options.approve),
+			authority: context.payer,
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			disclosureRequest: pubkey(
+				"--disclosure-request",
+				options.disclosureRequest,
+			),
+		};
 		const instruction = await getResolveChallengeInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

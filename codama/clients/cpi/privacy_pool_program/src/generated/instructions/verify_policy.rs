@@ -6,14 +6,13 @@
 	clippy::empty_line_after_doc_comments,
 	clippy::too_many_arguments
 )]
-
 #![allow(rustdoc::broken_intra_doc_links)]
 
 use pina::AccountView;
 use pina::CpiContext;
 use pina::CpiHandle;
-use pina::ProgramResult;
 use pina::ProgramError;
+use pina::ProgramResult;
 use pina::Signer;
 
 use crate::ProgramAccount;
@@ -80,9 +79,7 @@ impl<'account> VerifyPolicy<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 1] = [
-			CpiHandle::readonly(self.verifying_key_account),
-		];
+		let accounts: [CpiHandle<'_>; 1] = [CpiHandle::readonly(self.verifying_key_account)];
 		let data = self.ix.to_bytes()?;
 		let context = CpiContext::new(*program, accounts);
 

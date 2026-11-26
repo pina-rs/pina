@@ -3,8 +3,19 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getDepositTokenInstructionAsync, DEPOSIT_TOKEN_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	DEPOSIT_TOKEN_COMPUTE_UNIT_LIMIT,
+	getDepositTokenInstructionAsync,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
 export const depositTokenCommand = registerGlobals(new Command("deposit_token"))
 	.description("depositToken")
@@ -14,31 +25,61 @@ export const depositTokenCommand = registerGlobals(new Command("deposit_token"))
 	.requiredOption("--envelope-len <envelopeLen>", "envelopeLen")
 	.requiredOption("--envelope <envelope>", "envelope")
 	.requiredOption("--shares <shares>", "shares")
-	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
-	.option("--merkle-tree <merkleTree>", "The `merkle_tree` account [default: derived]")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
+		"--merkle-tree <merkleTree>",
+		"The `merkle_tree` account [default: derived]",
+	)
 	.requiredOption("--mint <mint>", "The `mint` account")
-	.option("--asset-vault <assetVault>", "The `asset_vault` account [default: derived]")
-	.requiredOption("--depositor-token-account <depositorTokenAccount>", "The `depositor_token_account` account")
-	.requiredOption("--vault-token-account <vaultTokenAccount>", "The `vault_token_account` account")
-	.requiredOption("--token-program <tokenProgram>", "The `token_program` account")
+	.option(
+		"--asset-vault <assetVault>",
+		"The `asset_vault` account [default: derived]",
+	)
+	.requiredOption(
+		"--depositor-token-account <depositorTokenAccount>",
+		"The `depositor_token_account` account",
+	)
+	.requiredOption(
+		"--vault-token-account <vaultTokenAccount>",
+		"The `vault_token_account` account",
+	)
+	.requiredOption(
+		"--token-program <tokenProgram>",
+		"The `token_program` account",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		amount: bigInteger("--amount", options.amount),
-		commitment: base58("--commitment", options.commitment),
-		viewPubkey: base58("--view-pubkey", options.viewPubkey),
-		envelopeLen: smallInteger("--envelope-len", options.envelopeLen),
-		envelope: base58("--envelope", options.envelope),
-		shares: base58("--shares", options.shares),
-		depositor: context.payer,
-		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
-		merkleTree: options.merkleTree === undefined ? undefined : pubkey("--merkle-tree", options.merkleTree),
-		mint: pubkey("--mint", options.mint),
-		assetVault: options.assetVault === undefined ? undefined : pubkey("--asset-vault", options.assetVault),
-		depositorTokenAccount: pubkey("--depositor-token-account", options.depositorTokenAccount),
-		vaultTokenAccount: pubkey("--vault-token-account", options.vaultTokenAccount),
-		tokenProgram: pubkey("--token-program", options.tokenProgram),
-	};
+		const input = {
+			amount: bigInteger("--amount", options.amount),
+			commitment: base58("--commitment", options.commitment),
+			viewPubkey: base58("--view-pubkey", options.viewPubkey),
+			envelopeLen: smallInteger("--envelope-len", options.envelopeLen),
+			envelope: base58("--envelope", options.envelope),
+			shares: base58("--shares", options.shares),
+			depositor: context.payer,
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			merkleTree: options.merkleTree === undefined
+				? undefined
+				: pubkey("--merkle-tree", options.merkleTree),
+			mint: pubkey("--mint", options.mint),
+			assetVault: options.assetVault === undefined
+				? undefined
+				: pubkey("--asset-vault", options.assetVault),
+			depositorTokenAccount: pubkey(
+				"--depositor-token-account",
+				options.depositorTokenAccount,
+			),
+			vaultTokenAccount: pubkey(
+				"--vault-token-account",
+				options.vaultTokenAccount,
+			),
+			tokenProgram: pubkey("--token-program", options.tokenProgram),
+		};
 		const instruction = await getDepositTokenInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

@@ -10,11 +10,11 @@
 )]
 
 use clap::Args;
+use privacy_pool_program_client::instructions::CancelDisclosure;
+use privacy_pool_program_client::instructions::CancelDisclosureInstructionData;
 
 use crate::context::CliContext;
 use crate::context::CliError;
-use privacy_pool_program_client::instructions::CancelDisclosure;
-use privacy_pool_program_client::instructions::CancelDisclosureInstructionData;
 
 #[derive(Debug, Args)]
 pub struct CancelDisclosureArgs {
@@ -31,14 +31,19 @@ pub(crate) fn run(context: &CliContext, args: CancelDisclosureArgs) -> Result<()
 	let data = CancelDisclosureInstructionData::new(|data| {
 		data.reserved = args.reserved;
 	})
-	.map_err(|_| CliError::InvalidData {
-		message: "instruction data rejected the provided arguments".to_string(),
+	.map_err(|_| {
+		CliError::InvalidData {
+			message: "instruction data rejected the provided arguments".to_string(),
+		}
 	})?;
 
 	let accounts = CancelDisclosure {
-		requester: requester,
-		disclosure_request: disclosure_request,
+		requester,
+		disclosure_request,
 	};
 
-	context.send(accounts.instruction(data), Some(privacy_pool_program_client::instructions::CANCEL_DISCLOSURE_COMPUTE_UNIT_LIMIT))
+	context.send(
+		accounts.instruction(data),
+		Some(privacy_pool_program_client::instructions::CANCEL_DISCLOSURE_COMPUTE_UNIT_LIMIT),
+	)
 }

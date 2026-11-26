@@ -3,10 +3,23 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getWithdrawTokenInstructionAsync, WITHDRAW_TOKEN_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	getWithdrawTokenInstructionAsync,
+	WITHDRAW_TOKEN_COMPUTE_UNIT_LIMIT,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const withdrawTokenCommand = registerGlobals(new Command("withdraw_token"))
+export const withdrawTokenCommand = registerGlobals(
+	new Command("withdraw_token"),
+)
 	.description("withdrawToken")
 	.requiredOption("--nullifier0-bump <nullifier0Bump>", "nullifier0Bump")
 	.requiredOption("--nullifier1-bump <nullifier1Bump>", "nullifier1Bump")
@@ -22,49 +35,103 @@ export const withdrawTokenCommand = registerGlobals(new Command("withdraw_token"
 	.requiredOption("--proof-a <proofA>", "proofA")
 	.requiredOption("--proof-b <proofB>", "proofB")
 	.requiredOption("--proof-c <proofC>", "proofC")
-	.option("--pool-config <poolConfig>", "The `pool_config` account [default: derived]")
-	.option("--merkle-tree <merkleTree>", "The `merkle_tree` account [default: derived]")
-	.requiredOption("--nullifier-record0 <nullifierRecord0>", "The `nullifier_record0` account")
-	.requiredOption("--nullifier-record1 <nullifierRecord1>", "The `nullifier_record1` account")
-	.requiredOption("--verifying-key-account <verifyingKeyAccount>", "The `verifying_key_account` account")
+	.option(
+		"--pool-config <poolConfig>",
+		"The `pool_config` account [default: derived]",
+	)
+	.option(
+		"--merkle-tree <merkleTree>",
+		"The `merkle_tree` account [default: derived]",
+	)
+	.requiredOption(
+		"--nullifier-record0 <nullifierRecord0>",
+		"The `nullifier_record0` account",
+	)
+	.requiredOption(
+		"--nullifier-record1 <nullifierRecord1>",
+		"The `nullifier_record1` account",
+	)
+	.requiredOption(
+		"--verifying-key-account <verifyingKeyAccount>",
+		"The `verifying_key_account` account",
+	)
 	.requiredOption("--mint <mint>", "The `mint` account")
-	.option("--asset-vault <assetVault>", "The `asset_vault` account [default: derived]")
-	.requiredOption("--vault-token-account <vaultTokenAccount>", "The `vault_token_account` account")
-	.requiredOption("--recipient-token-account <recipientTokenAccount>", "The `recipient_token_account` account")
-	.requiredOption("--relayer-token-account <relayerTokenAccount>", "The `relayer_token_account` account")
-	.requiredOption("--policy-cosigner <policyCosigner>", "The `policy_cosigner` account")
-	.requiredOption("--token-program <tokenProgram>", "The `token_program` account")
+	.option(
+		"--asset-vault <assetVault>",
+		"The `asset_vault` account [default: derived]",
+	)
+	.requiredOption(
+		"--vault-token-account <vaultTokenAccount>",
+		"The `vault_token_account` account",
+	)
+	.requiredOption(
+		"--recipient-token-account <recipientTokenAccount>",
+		"The `recipient_token_account` account",
+	)
+	.requiredOption(
+		"--relayer-token-account <relayerTokenAccount>",
+		"The `relayer_token_account` account",
+	)
+	.requiredOption(
+		"--policy-cosigner <policyCosigner>",
+		"The `policy_cosigner` account",
+	)
+	.requiredOption(
+		"--token-program <tokenProgram>",
+		"The `token_program` account",
+	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		nullifier0Bump: smallInteger("--nullifier0-bump", options.nullifier0Bump),
-		nullifier1Bump: smallInteger("--nullifier1-bump", options.nullifier1Bump),
-		nullifier0: base58("--nullifier0", options.nullifier0),
-		nullifier1: base58("--nullifier1", options.nullifier1),
-		root: base58("--root", options.root),
-		publicOut: bigInteger("--public-out", options.publicOut),
-		relayerFee: bigInteger("--relayer-fee", options.relayerFee),
-		changeCommitment: base58("--change-commitment", options.changeCommitment),
-		changeViewPubkey: base58("--change-view-pubkey", options.changeViewPubkey),
-		envelopeLen: smallInteger("--envelope-len", options.envelopeLen),
-		envelope: base58("--envelope", options.envelope),
-		proofA: base58("--proof-a", options.proofA),
-		proofB: base58("--proof-b", options.proofB),
-		proofC: base58("--proof-c", options.proofC),
-		payer: context.payer,
-		poolConfig: options.poolConfig === undefined ? undefined : pubkey("--pool-config", options.poolConfig),
-		merkleTree: options.merkleTree === undefined ? undefined : pubkey("--merkle-tree", options.merkleTree),
-		nullifierRecord0: pubkey("--nullifier-record0", options.nullifierRecord0),
-		nullifierRecord1: pubkey("--nullifier-record1", options.nullifierRecord1),
-		verifyingKeyAccount: pubkey("--verifying-key-account", options.verifyingKeyAccount),
-		mint: pubkey("--mint", options.mint),
-		assetVault: options.assetVault === undefined ? undefined : pubkey("--asset-vault", options.assetVault),
-		vaultTokenAccount: pubkey("--vault-token-account", options.vaultTokenAccount),
-		recipientTokenAccount: pubkey("--recipient-token-account", options.recipientTokenAccount),
-		relayerTokenAccount: pubkey("--relayer-token-account", options.relayerTokenAccount),
-		policyCosigner: pubkey("--policy-cosigner", options.policyCosigner),
-		tokenProgram: pubkey("--token-program", options.tokenProgram),
-	};
+		const input = {
+			nullifier0Bump: smallInteger("--nullifier0-bump", options.nullifier0Bump),
+			nullifier1Bump: smallInteger("--nullifier1-bump", options.nullifier1Bump),
+			nullifier0: base58("--nullifier0", options.nullifier0),
+			nullifier1: base58("--nullifier1", options.nullifier1),
+			root: base58("--root", options.root),
+			publicOut: bigInteger("--public-out", options.publicOut),
+			relayerFee: bigInteger("--relayer-fee", options.relayerFee),
+			changeCommitment: base58("--change-commitment", options.changeCommitment),
+			changeViewPubkey: base58(
+				"--change-view-pubkey",
+				options.changeViewPubkey,
+			),
+			envelopeLen: smallInteger("--envelope-len", options.envelopeLen),
+			envelope: base58("--envelope", options.envelope),
+			proofA: base58("--proof-a", options.proofA),
+			proofB: base58("--proof-b", options.proofB),
+			proofC: base58("--proof-c", options.proofC),
+			payer: context.payer,
+			poolConfig: options.poolConfig === undefined
+				? undefined
+				: pubkey("--pool-config", options.poolConfig),
+			merkleTree: options.merkleTree === undefined
+				? undefined
+				: pubkey("--merkle-tree", options.merkleTree),
+			nullifierRecord0: pubkey("--nullifier-record0", options.nullifierRecord0),
+			nullifierRecord1: pubkey("--nullifier-record1", options.nullifierRecord1),
+			verifyingKeyAccount: pubkey(
+				"--verifying-key-account",
+				options.verifyingKeyAccount,
+			),
+			mint: pubkey("--mint", options.mint),
+			assetVault: options.assetVault === undefined
+				? undefined
+				: pubkey("--asset-vault", options.assetVault),
+			vaultTokenAccount: pubkey(
+				"--vault-token-account",
+				options.vaultTokenAccount,
+			),
+			recipientTokenAccount: pubkey(
+				"--recipient-token-account",
+				options.recipientTokenAccount,
+			),
+			relayerTokenAccount: pubkey(
+				"--relayer-token-account",
+				options.relayerTokenAccount,
+			),
+			policyCosigner: pubkey("--policy-cosigner", options.policyCosigner),
+			tokenProgram: pubkey("--token-program", options.tokenProgram),
+		};
 		const instruction = await getWithdrawTokenInstructionAsync(
 			...[input],
 			{ programAddress: context.programAddress },

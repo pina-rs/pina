@@ -3,31 +3,33 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { initializeCommand } from "./commands/initialize.ts";
-import { setVerificationKeyCommand } from "./commands/set_verification_key.ts";
-import { setCustodiansCommand } from "./commands/set_custodians.ts";
-import { registerRequesterCommand } from "./commands/register_requester.ts";
-import { depositCommand } from "./commands/deposit.ts";
-import { withdrawCommand } from "./commands/withdraw.ts";
-import { transferCommand } from "./commands/transfer.ts";
-import { requestDisclosureCommand } from "./commands/request_disclosure.ts";
-import { grantDisclosureCommand } from "./commands/grant_disclosure.ts";
-import { challengeDisclosureCommand } from "./commands/challenge_disclosure.ts";
-import { resolveChallengeCommand } from "./commands/resolve_challenge.ts";
 import { approveDisclosureCommand } from "./commands/approve_disclosure.ts";
 import { cancelDisclosureCommand } from "./commands/cancel_disclosure.ts";
-import { registerAssetCommand } from "./commands/register_asset.ts";
+import { challengeDisclosureCommand } from "./commands/challenge_disclosure.ts";
+import { depositCommand } from "./commands/deposit.ts";
 import { depositTokenCommand } from "./commands/deposit_token.ts";
-import { withdrawTokenCommand } from "./commands/withdraw_token.ts";
+import { grantDisclosureCommand } from "./commands/grant_disclosure.ts";
+import { initializeCommand } from "./commands/initialize.ts";
+import { registerAssetCommand } from "./commands/register_asset.ts";
+import { registerRequesterCommand } from "./commands/register_requester.ts";
+import { requestDisclosureCommand } from "./commands/request_disclosure.ts";
+import { resolveChallengeCommand } from "./commands/resolve_challenge.ts";
+import { setCustodiansCommand } from "./commands/set_custodians.ts";
 import { setPolicyCommand } from "./commands/set_policy.ts";
+import { setVerificationKeyCommand } from "./commands/set_verification_key.ts";
+import { transferCommand } from "./commands/transfer.ts";
 import { verifyPolicyCommand } from "./commands/verify_policy.ts";
-import { fetchCommand } from "./fetch.ts";
+import { withdrawCommand } from "./commands/withdraw.ts";
+import { withdrawTokenCommand } from "./commands/withdraw_token.ts";
 import { registerGlobals } from "./context.ts";
+import { fetchCommand } from "./fetch.ts";
 
 const program = registerGlobals(new Command())
 	.name("privacy-pool-program-cli")
 	.version("0.1.0")
-	.description("A programmable, tiered-disclosure privacy pool built with pina.\n\nCombines Helius Solana Privacy Rings' production architecture with Pina's\ngoverned, publicly-logged disclosure state machine — all inside one\n`no_std` crate with no `unsafe` code outside `syscalls.rs` and zero\nrequired off-chain infrastructure:\n\n- **Per-nullifier PDAs ([`NullifierRecord`])** — $O(1)$ double-spend\ndetection, unbounded spend capacity, and zero shared nullifier write-lock\ncontention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.\n- **Depth-16 frontier Merkle tree ([`MerkleTree`])** — holds 65,536 leaves\nin a 512-byte frontier plus a 32-root ring using compile-time\n[`ZERO_HASHES`], eliminating runtime zero-hash recomputation on\ninitialization.\n- **Variable-amount 2-in-2-out join-split circuit** — one unified Groth16\ncircuit (`VK_SLOT_JOIN_SPLIT`) handles arbitrary-amount withdrawals,\nchange outputs, UTXO splits, and UTXO merges with 64-bit range checks and\nsingle-input `statement_hash` compression (one `g1_mul` + `g1_add`).\n- **SPL Token & Token-2022 escrows ([`AssetVault`])** — permissionless\nper-mint asset registration, variable-amount token deposits, and\njoin-split token withdrawals.\n- **128-byte compressed Groth16 proofs** — decompressed on-chain via\n`sol_alt_bn128_compression` before the four-pairing check.\n- **Relayer & fee-payer decoupling** — optional relayer address and fee\nbound into the Groth16 statement so users can pay fees out of shielded\nbalances without leaking a public fee payer.\n- **Real shielded keypair & X25519 + AEAD (`shielded` module)** — host-side\nRFC 7748 X25519 viewing keys, per-transaction viewing keys for selective\ndisclosure, and 2-of-3 GF(256) Shamir custodian shares.\n- **Rent-free note emission & privacy-preserving [`DisclosureLog`]** —\nencrypted note envelopes and shares emit via [`NoteEncryptedEvent`] with\nzero per-note PDA rent; [`RequestDisclosure`] authenticates `view_pubkey`\nvia Merkle membership; [`DisclosureLog`] stores a salted `scope_hash`\nrather than raw commitments; verifying keys support authority rotation.\n- **Custom Ring policy & composable CPI** — configurable pause and\nco-signer / CPI authority gates ([`SetPolicy`]) plus composable ZK policy\nverification ([`VerifyPolicy`] on `VK_SLOT_POLICY`).");
+	.description(
+		"A programmable, tiered-disclosure privacy pool built with pina.\n\nCombines Helius Solana Privacy Rings' production architecture with Pina's\ngoverned, publicly-logged disclosure state machine — all inside one\n`no_std` crate with no `unsafe` code outside `syscalls.rs` and zero\nrequired off-chain infrastructure:\n\n- **Per-nullifier PDAs ([`NullifierRecord`])** — $O(1)$ double-spend\ndetection, unbounded spend capacity, and zero shared nullifier write-lock\ncontention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.\n- **Depth-16 frontier Merkle tree ([`MerkleTree`])** — holds 65,536 leaves\nin a 512-byte frontier plus a 32-root ring using compile-time\n[`ZERO_HASHES`], eliminating runtime zero-hash recomputation on\ninitialization.\n- **Variable-amount 2-in-2-out join-split circuit** — one unified Groth16\ncircuit (`VK_SLOT_JOIN_SPLIT`) handles arbitrary-amount withdrawals,\nchange outputs, UTXO splits, and UTXO merges with 64-bit range checks and\nsingle-input `statement_hash` compression (one `g1_mul` + `g1_add`).\n- **SPL Token & Token-2022 escrows ([`AssetVault`])** — permissionless\nper-mint asset registration, variable-amount token deposits, and\njoin-split token withdrawals.\n- **128-byte compressed Groth16 proofs** — decompressed on-chain via\n`sol_alt_bn128_compression` before the four-pairing check.\n- **Relayer & fee-payer decoupling** — optional relayer address and fee\nbound into the Groth16 statement so users can pay fees out of shielded\nbalances without leaking a public fee payer.\n- **Real shielded keypair & X25519 + AEAD (`shielded` module)** — host-side\nRFC 7748 X25519 viewing keys, per-transaction viewing keys for selective\ndisclosure, and 2-of-3 GF(256) Shamir custodian shares.\n- **Rent-free note emission & privacy-preserving [`DisclosureLog`]** —\nencrypted note envelopes and shares emit via [`NoteEncryptedEvent`] with\nzero per-note PDA rent; [`RequestDisclosure`] authenticates `view_pubkey`\nvia Merkle membership; [`DisclosureLog`] stores a salted `scope_hash`\nrather than raw commitments; verifying keys support authority rotation.\n- **Custom Ring policy & composable CPI** — configurable pause and\nco-signer / CPI authority gates ([`SetPolicy`]) plus composable ZK policy\nverification ([`VerifyPolicy`] on `VK_SLOT_POLICY`).",
+	);
 program.addCommand(initializeCommand);
 program.addCommand(setVerificationKeyCommand);
 program.addCommand(setCustodiansCommand);

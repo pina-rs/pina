@@ -3,22 +3,41 @@
 // Regenerate it from the program IDL instead.
 
 import { Command } from "commander";
-import { getChallengeDisclosureInstruction, CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT } from "../client";
-import { CliContext, base58, base58Vec, bigInteger, pubkey, registerGlobals, smallInteger } from "../context";
+import {
+	CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT,
+	getChallengeDisclosureInstruction,
+} from "../client";
+import {
+	base58,
+	base58Vec,
+	bigInteger,
+	CliContext,
+	pubkey,
+	registerGlobals,
+	smallInteger,
+} from "../context";
 
-export const challengeDisclosureCommand = registerGlobals(new Command("challenge_disclosure"))
+export const challengeDisclosureCommand = registerGlobals(
+	new Command("challenge_disclosure"),
+)
 	.description("challengeDisclosure")
 	.requiredOption("--reserved <reserved>", "reserved")
-	.requiredOption("--disclosure-request <disclosureRequest>", "The `disclosure_request` account")
+	.requiredOption(
+		"--disclosure-request <disclosureRequest>",
+		"The `disclosure_request` account",
+	)
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
-const input = {
-		reserved: smallInteger("--reserved", options.reserved),
-		disclosureRequest: pubkey("--disclosure-request", options.disclosureRequest),
-		viewer: context.payer,
-		clock: pubkey("--clock", options.clock),
-	};
+		const input = {
+			reserved: smallInteger("--reserved", options.reserved),
+			disclosureRequest: pubkey(
+				"--disclosure-request",
+				options.disclosureRequest,
+			),
+			viewer: context.payer,
+			clock: pubkey("--clock", options.clock),
+		};
 		const instruction = getChallengeDisclosureInstruction(
 			...[input],
 			{ programAddress: context.programAddress },
