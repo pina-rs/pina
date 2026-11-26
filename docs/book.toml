@@ -26,3 +26,6 @@ additional-js = ["theme/pina.js"]
 [output.html.fold]
 enable = true
 level = 0
+
+[output.html.playground]
+runnable = false

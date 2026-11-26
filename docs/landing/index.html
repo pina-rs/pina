@@ -20,6 +20,8 @@
 	<link rel="icon" href="favicon.png" type="image/png">
 	<link rel="preload" href="landing/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 	<link rel="preload" href="landing/fonts/fraunces-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="preload" href="landing/fonts/fraunces-latin-opsz-italic.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="preload" href="landing/fonts/jetbrains-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 	<link rel="stylesheet" href="landing/landing.css?v={{version}}">
 	<script>
 		document.documentElement.classList.replace("no-js", "js");
@@ -96,7 +98,7 @@
 						<span class="install-prompt" aria-hidden="true">$</span>
 						<code data-copy-source>cargo add pina</code>
 						<button class="copy-btn" type="button" data-copy aria-label="Copy install command">
-							<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg>
+							<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-copy"/></svg>
 							<span class="copy-label">Copy</span>
 						</button>
 					</div>
@@ -304,19 +306,19 @@
 						<span class="step-n">1</span>
 						<h3>Install the CLI</h3>
 						<p>Prebuilt for macOS, Linux, Windows, and FreeBSD. Or <code>cargo install pina_cli</code>.</p>
-						<div class="cmd"><code data-copy-source>npm install --global @pina-rs/cli</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg><span class="copy-label">Copy</span></button></div>
+						<div class="cmd"><code data-copy-source>npm install --global @pina-rs/cli</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-label">Copy</span></button></div>
 					</li>
 					<li class="step" data-copy-root>
 						<span class="step-n">2</span>
 						<h3>Scaffold a program</h3>
 						<p>A <code>no_std</code> program, a typed starter instruction, and host and Surfpool tests.</p>
-						<div class="cmd"><code data-copy-source>pina init my_program</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg><span class="copy-label">Copy</span></button></div>
+						<div class="cmd"><code data-copy-source>pina init my_program</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-label">Copy</span></button></div>
 					</li>
 					<li class="step" data-copy-root>
 						<span class="step-n">3</span>
 						<h3>Build and test</h3>
 						<p>Compile to SBF with the Agave toolchain, then run the scaffold&rsquo;s tests.</p>
-						<div class="cmd"><code data-copy-source>cd my_program &amp;&amp; pina build &amp;&amp; pina test</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></svg><span class="copy-label">Copy</span></button></div>
+						<div class="cmd"><code data-copy-source>cd my_program &amp;&amp; pina build &amp;&amp; pina test</code><button class="copy-btn" type="button" data-copy aria-label="Copy command"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-copy"/></svg><span class="copy-label">Copy</span></button></div>
 					</li>
 				</ol>
 				<div class="next-links">
@@ -369,6 +371,10 @@
 		<symbol id="pina-mark" viewBox="0 0 320 320">
 			<g fill="currentColor" fill-rule="evenodd" transform="translate(-492.8 -69.9) scale(0.85 0.62)"><path d="M768 152 L793 205 Q795 210 792 217 L768 276 L744 217 Q741 210 744 204 Z"/><path d="M677 209 L721 223 Q730 226 734 235 L752 281 L708 267 Q698 264 694 254 Z"/><path d="M859 209 L815 223 Q806 226 802 235 L784 281 L828 267 Q838 264 842 254 Z"/><path d="M782 294 L724 294 Q706 292 693 306 L662 338 Q641 360 657 384 L676 404 Z"/><path d="M687 415 L793 304 Q816 281 837 307 L875 344 Q896 367 878 389 L862 405 L802 344 Q790 339 778 342 L875 439 Q897 463 878 494 L873 504 L768 397 L720 447 Z"/><path d="M669 418 L751 501 L716 537 L662 484 Q635 456 658 428 Z"/><path d="M760 581 L727 548 L810 464 L844 498 Z"/><path d="M661 505 L742 585 L719 585 Q690 584 670 563 Q645 545 655 521 Z"/><path d="M854 509 L869 524 Q880 546 864 565 Q850 585 822 586 Q803 588 787 579 Z"/></g>
 		</symbol>
+		<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2.5"/><path d="M15.5 8.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v7A2.5 2.5 0 0 0 6 15.5h2.5"/></symbol>
+		<symbol id="i-yes" viewBox="0 0 12 12"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></symbol>
+		<symbol id="i-part" viewBox="0 0 12 12"><path d="M3 6h6"/></symbol>
+		<symbol id="i-no" viewBox="0 0 12 12"><path d="M3.5 3.5l5 5M8.5 3.5l-5 5"/></symbol>
 	</svg>
 
 	<script src="landing/landing.js?v={{version}}" defer></script>

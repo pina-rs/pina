@@ -94,8 +94,9 @@
 			return;
 		}
 		bars.classList.remove("reveal-bars");
-		void bars.offsetWidth;
-		bars.classList.add("reveal-bars");
+		requestAnimationFrame(() => {
+			bars.classList.add("reveal-bars");
+		});
 	}
 
 	// Copy buttons.
@@ -132,45 +133,85 @@
 		return;
 	}
 
-	// The navigation sits on the dark hero, then takes the page colours once
-	// the hero has scrolled away beneath it.
-	const nav = document.querySelector("[data-nav]");
-	const hero = document.querySelector(".hero");
-	if (nav && hero) {
-		new IntersectionObserver(([entry]) => {
-			nav.classList.toggle("is-page", !entry.isIntersecting);
-		}, { rootMargin: `-${nav.offsetHeight}px 0px 0px 0px` }).observe(hero);
-	}
+	// Defer non-critical geometry reads and scroll-reveal setup past the first
+	// paint so the inline script never triggers synchronous layout before FCP.
+	requestAnimationFrame(() => {
+		const nav = document.querySelector("[data-nav]");
+		const hero = document.querySelector(".hero");
+		const navHeight = nav && hero ? nav.offsetHeight : 0;
+		const viewportHeight = window.innerHeight;
+		const targets = Array.from(
+			document.querySelectorAll(
+				".section-head, .card, .chart, .matrix-scroll, .commands li, .step, .next-link, .notice",
+			),
+		);
+		const inViewport = targets.map((target) =>
+			target.getBoundingClientRect().top < viewportHeight
+		);
 
-	// Scroll reveals. Anything already on screen is shown at once so nothing
-	// above the fold flickers.
-	const targets = document.querySelectorAll(
-		".section-head, .card, .chart, .matrix-scroll, .commands li, .step, .next-link, .notice",
-	);
-	const reveal = new IntersectionObserver((entries) => {
-		for (const entry of entries) {
-			if (entry.isIntersecting) {
-				entry.target.classList.add("is-in");
-				reveal.unobserve(entry.target);
-				if (entry.target.classList.contains("chart")) {
-					const visible = entry.target.querySelector(
-						".chart-panel:not([hidden])",
-					);
-					if (visible) {
-						replayBars(visible);
+		// The navigation sits on the dark hero, then takes the page colours once
+		// the hero has scrolled away beneath it.
+		if (nav && hero) {
+			new IntersectionObserver(([entry]) => {
+				nav.classList.toggle("is-page", !entry.isIntersecting);
+			}, { rootMargin: `-${navHeight}px 0px 0px 0px` }).observe(hero);
+		}
+
+		// Scroll reveals. Anything already on screen is shown at once so nothing
+		// above the fold flickers.
+		const reveal = new IntersectionObserver((entries) => {
+			for (const entry of entries) {
+				if (entry.isIntersecting) {
+					entry.target.classList.add("is-in");
+					reveal.unobserve(entry.target);
+					if (entry.target.classList.contains("chart")) {
+						const visible = entry.target.querySelector(
+							".chart-panel:not([hidden])",
+						);
+						if (visible) {
+							replayBars(visible);
+						}
 					}
 				}
 			}
-		}
-	}, { rootMargin: "0px 0px -8% 0px" });
+		}, { rootMargin: "0px 0px -8% 0px" });
 
-	for (const target of targets) {
-		target.classList.add("reveal");
-		if (target.getBoundingClientRect().top < window.innerHeight) {
-			target.classList.add("is-in");
-		} else {
-			reveal.observe(target);
+		for (let i = 0; i < targets.length; i += 1) {
+			const target = targets[i];
+			target.classList.add("reveal");
+			if (inViewport[i]) {
+				target.classList.add("is-in");
+			} else {
+				reveal.observe(target);
+			}
 		}
+		root.classList.add("reveal-ready");
+	});
+
+	// Prefetch internal docs pages on hover so clicking into the book is instant.
+	const conn = navigator.connection;
+	if (!conn || (!conn.saveData && !/2g/.test(conn.effectiveType || ""))) {
+		const prefetched = new Set([location.href.split("#")[0]]);
+		document.addEventListener("pointerover", (event) => {
+			const link = event.target?.closest?.("a[href]");
+			if (
+				!link ||
+				link.origin !== location.origin ||
+				link.target === "_blank" ||
+				link.hasAttribute("download")
+			) {
+				return;
+			}
+			const url = link.href.split("#")[0];
+			if (prefetched.has(url) || !url.endsWith(".html")) {
+				return;
+			}
+			prefetched.add(url);
+			const hint = document.createElement("link");
+			hint.rel = "prefetch";
+			hint.as = "document";
+			hint.href = url;
+			document.head.appendChild(hint);
+		}, { passive: true });
 	}
-	root.classList.add("reveal-ready");
 })();

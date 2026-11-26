@@ -215,7 +215,7 @@ html {
 	font-feature-settings: "cv11", "ss01";
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
-	text-rendering: optimizeLegibility;
+	font-kerning: normal;
 }
 
 body {
