@@ -1130,7 +1130,13 @@ struct FastLib {
 
 #[derive(Deserialize)]
 struct FastWorkspaceManifest {
+	package: Option<FastWorkspacePackage>,
 	workspace: Option<FastWorkspace>,
+}
+
+#[derive(Deserialize)]
+struct FastWorkspacePackage {
+	workspace: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -1269,6 +1275,14 @@ fn discover_workspace_root_from_manifest(
 	}
 	let raw = std::fs::read_to_string(manifest_path).ok()?;
 	let manifest = toml::from_str::<FastWorkspaceManifest>(&raw).ok()?;
+	if manifest
+		.package
+		.as_ref()
+		.and_then(|pkg| pkg.workspace.as_deref())
+		.is_some()
+	{
+		return None;
+	}
 	discover_workspace_root_from_flag(program_dir, manifest.workspace.is_some())
 }
 
@@ -1342,7 +1356,30 @@ fn config_file_sets_target_dir(path: &Path) -> bool {
 			.is_ok_and(|text| text.contains("target-dir") || text.contains("target_dir"))
 }
 
-fn has_cargo_config_target_dir(start_dir: &Path) -> bool {
+fn resolve_cargo_home_dir(
+	cargo_home: Option<OsString>,
+	user_home: Option<OsString>,
+) -> Option<PathBuf> {
+	if let Some(home) = cargo_home.filter(|value| !value.is_empty()) {
+		return Some(PathBuf::from(home));
+	}
+	user_home
+		.filter(|value| !value.is_empty())
+		.map(|home| PathBuf::from(home).join(".cargo"))
+}
+
+fn default_user_home() -> Option<OsString> {
+	#[cfg(windows)]
+	{
+		std::env::var_os("USERPROFILE").filter(|value| !value.is_empty())
+	}
+	#[cfg(not(windows))]
+	{
+		std::env::var_os("HOME").filter(|value| !value.is_empty())
+	}
+}
+
+fn has_cargo_config_target_dir_with_home(start_dir: &Path, cargo_home: Option<&Path>) -> bool {
 	let mut current = Some(start_dir);
 	while let Some(dir) = current {
 		if [".cargo/config.toml", ".cargo/config"]
@@ -1353,14 +1390,16 @@ fn has_cargo_config_target_dir(start_dir: &Path) -> bool {
 		}
 		current = dir.parent();
 	}
-	std::env::var_os("CARGO_HOME")
-		.filter(|v| !v.is_empty())
-		.map(PathBuf::from)
-		.is_some_and(|home| {
-			["config.toml", "config"]
-				.into_iter()
-				.any(|name| config_file_sets_target_dir(&home.join(name)))
-		})
+	cargo_home.is_some_and(|home| {
+		["config.toml", "config"]
+			.into_iter()
+			.any(|name| config_file_sets_target_dir(&home.join(name)))
+	})
+}
+
+fn has_cargo_config_target_dir(start_dir: &Path) -> bool {
+	let cargo_home = resolve_cargo_home_dir(std::env::var_os("CARGO_HOME"), default_user_home());
+	has_cargo_config_target_dir_with_home(start_dir, cargo_home.as_deref())
 }
 
 /// Normalize an output and require containment beneath its trusted root.
@@ -3361,5 +3400,70 @@ mode = "overwrite"
 			discover_workspace_root_from_manifest(&child_pkg, &child_pkg.join("Cargo.toml")),
 			Some(child_pkg)
 		);
+
+		// Explicit `package.workspace` declines the fast workspace shortcut.
+		let external_ws = root.join("external_ws_member");
+		fs::create_dir_all(external_ws.join("src")).unwrap();
+		fs::write(external_ws.join("src/lib.rs"), "").unwrap();
+		fs::write(
+			external_ws.join("Cargo.toml"),
+			"[package]\nname = \"ext\"\nversion = \"0.1.0\"\nworkspace = \"../workspace\"\n",
+		)
+		.unwrap();
+		assert_eq!(
+			discover_workspace_root_from_manifest(&external_ws, &external_ws.join("Cargo.toml")),
+			None
+		);
+
+		// Cargo home resolution checks explicit CARGO_HOME, then default `$HOME/.cargo`.
+		let custom_cargo_home = root.join("custom_cargo_home");
+		let fake_user_home = root.join("fake_user_home");
+		assert_eq!(
+			resolve_cargo_home_dir(
+				Some(custom_cargo_home.as_os_str().to_os_string()),
+				Some(fake_user_home.as_os_str().to_os_string()),
+			),
+			Some(custom_cargo_home.clone())
+		);
+		assert_eq!(
+			resolve_cargo_home_dir(
+				Some(OsString::new()),
+				Some(fake_user_home.as_os_str().to_os_string()),
+			),
+			Some(fake_user_home.join(".cargo"))
+		);
+		assert_eq!(
+			resolve_cargo_home_dir(None, Some(fake_user_home.as_os_str().to_os_string())),
+			Some(fake_user_home.join(".cargo"))
+		);
+		assert_eq!(resolve_cargo_home_dir(None, None), None);
+
+		// Default Cargo home config setting target-dir forces metadata fallback.
+		let default_cargo = fake_user_home.join(".cargo");
+		fs::create_dir_all(&default_cargo).unwrap();
+		assert!(!has_cargo_config_target_dir_with_home(
+			&standalone,
+			Some(&default_cargo)
+		));
+		assert!(!has_cargo_config_target_dir_with_home(&standalone, None));
+		fs::write(
+			default_cargo.join("config.toml"),
+			"[build]\ntarget-dir = \"/work/custom-target\"\n",
+		)
+		.unwrap();
+		assert!(has_cargo_config_target_dir_with_home(
+			&standalone,
+			Some(&default_cargo)
+		));
+		fs::remove_file(default_cargo.join("config.toml")).unwrap();
+		fs::write(
+			default_cargo.join("config"),
+			"[build]\ntarget_dir = \"/work/custom-target\"\n",
+		)
+		.unwrap();
+		assert!(has_cargo_config_target_dir_with_home(
+			&standalone,
+			Some(&default_cargo)
+		));
 	}
 }

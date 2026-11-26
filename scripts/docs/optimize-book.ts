@@ -19,7 +19,7 @@ import {
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, posix, relative, resolve } from "node:path";
+import { join, posix, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import vm from "node:vm";
 
@@ -42,14 +42,32 @@ function shortHash(content: string): string {
 	return createHash("sha256").update(content).digest("hex").slice(0, 8);
 }
 
+function isCssHexDigit(ch: string | undefined): boolean {
+	return ch !== undefined && /^[0-9a-fA-F]$/.test(ch);
+}
+
+function isCssWhitespace(ch: string | undefined): boolean {
+	return ch === " " || ch === "\t" || ch === "\n" || ch === "\r" || ch === "\f";
+}
+
+function isValidJsScript(code: string): boolean {
+	try {
+		new vm.Script(code);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Lossless minifiers (CSS, JS, HTML)
 // ---------------------------------------------------------------------------
 
 /**
  * Minifies CSS while preserving string literals, CSS backslash-newline string
- * continuations (used in mdBook's inline SVG data URIs), `calc()` spacing, and
- * descendant combinators before pseudo-classes (e.g. `.buttons :hover`).
+ * continuations (used in mdBook's inline SVG data URIs), hexadecimal escape
+ * terminators (e.g. `.\31  .item`), `calc()` spacing, and descendant
+ * combinators before pseudo-classes (e.g. `.buttons :hover`).
  */
 export function minifyCss(input: string): string {
 	const out: string[] = [];
@@ -140,10 +158,37 @@ export function minifyCss(input: string): string {
 			continue;
 		}
 
+		// CSS escapes outside strings: preserve the single whitespace consumed by
+		// a hex escape (`\31 `) separately from any following selector whitespace
+		// so `.\31  .item` retains its descendant combinator.
+		if (ch === "\\") {
+			emitSpaceIfNeeded(ch);
+			out.push(ch);
+			i += 1;
+			if (i < len && isCssHexDigit(input[i])) {
+				let hexCount = 0;
+				while (i < len && hexCount < 6 && isCssHexDigit(input[i])) {
+					out.push(input[i]);
+					i += 1;
+					hexCount += 1;
+				}
+				if (i < len && isCssWhitespace(input[i])) {
+					if (input[i] === "\r" && input[i + 1] === "\n") {
+						i += 2;
+					} else {
+						i += 1;
+					}
+					out.push(" ");
+				}
+			} else if (i < len) {
+				out.push(input[i]);
+				i += 1;
+			}
+			continue;
+		}
+
 		// Whitespace
-		if (
-			ch === " " || ch === "\t" || ch === "\n" || ch === "\r" || ch === "\f"
-		) {
+		if (isCssWhitespace(ch)) {
 			pendingSpace = true;
 			i += 1;
 			continue;
@@ -164,15 +209,27 @@ export function minifyCss(input: string): string {
 
 /**
  * Conservatively minifies JavaScript: strips comments outside string, template,
- * and regex literals, collapses indentation/blank lines, and preserves newlines
- * where ASI could otherwise change meaning.
+ * and regex literals, collapses indentation/blank lines, preserves newlines
+ * where ASI could otherwise change meaning, and falls back to the original
+ * source if the minified output ever fails syntax validation.
  */
 export function minifyJs(input: string): string {
-	const stripped: string[] = [];
+	const lines: string[] = [];
+	let cur: string[] = [];
 	const len = input.length;
 	let i = 0;
 	let lastNonWs = "";
 	let lastWord = "";
+	let afterControlParen = false;
+	const parenStack: boolean[] = [];
+
+	const flushLine = (): void => {
+		const trimmed = cur.join("").trim();
+		if (trimmed.length > 0) {
+			lines.push(trimmed);
+		}
+		cur = [];
+	};
 
 	const REGEX_PREV_WORDS = new Set([
 		"return",
@@ -191,8 +248,10 @@ export function minifyJs(input: string): string {
 		"of",
 	]);
 
+	const CONTROL_FLOW_WORDS = new Set(["if", "while", "for", "with"]);
+
 	const canStartRegex = (): boolean => {
-		if (!lastNonWs) {
+		if (afterControlParen || !lastNonWs) {
 			return true;
 		}
 		if ("([{:;,=!?&|+-*%^~<>".includes(lastNonWs)) {
@@ -218,33 +277,35 @@ export function minifyJs(input: string): string {
 
 		// Block comment
 		if (ch === "/" && input[i + 1] === "*") {
-			const hadNewline = (() => {
-				let j = i + 2;
-				let nl = false;
-				while (j < len && !(input[j] === "*" && input[j + 1] === "/")) {
-					if (input[j] === "\n") {
-						nl = true;
-					}
-					j += 1;
+			let j = i + 2;
+			let hadNewline = false;
+			while (j < len && !(input[j] === "*" && input[j + 1] === "/")) {
+				if (input[j] === "\n") {
+					hadNewline = true;
 				}
-				i = j + 2;
-				return nl;
-			})();
-			stripped.push(hadNewline ? "\n" : " ");
+				j += 1;
+			}
+			i = j + 2;
+			if (hadNewline) {
+				flushLine();
+				lastNonWs = "\n";
+			} else {
+				cur.push(" ");
+			}
 			continue;
 		}
 
 		// Single or double quoted string
 		if (ch === '"' || ch === "'") {
 			const quote = ch;
-			stripped.push(ch);
+			cur.push(ch);
 			i += 1;
 			while (i < len) {
 				const c = input[i];
-				stripped.push(c);
+				cur.push(c);
 				i += 1;
 				if (c === "\\" && i < len) {
-					stripped.push(input[i]);
+					cur.push(input[i]);
 					i += 1;
 					continue;
 				}
@@ -254,35 +315,47 @@ export function minifyJs(input: string): string {
 			}
 			lastNonWs = quote;
 			lastWord = "";
+			afterControlParen = false;
 			continue;
 		}
 
-		// Template literal
+		// Template literal (preserving embedded newlines and nested `${...}` expressions)
 		if (ch === "`") {
-			stripped.push(ch);
+			cur.push(ch);
 			i += 1;
 			let exprDepth = 0;
+			let exprQuote = "";
 			while (i < len) {
 				const c = input[i];
-				stripped.push(c);
+				cur.push(c);
 				i += 1;
 				if (c === "\\" && i < len) {
-					stripped.push(input[i]);
+					cur.push(input[i]);
 					i += 1;
-					continue;
-				}
-				if (c === "$" && input[i] === "{") {
-					stripped.push("{");
-					i += 1;
-					exprDepth += 1;
 					continue;
 				}
 				if (exprDepth > 0) {
+					if (exprQuote) {
+						if (c === exprQuote) {
+							exprQuote = "";
+						}
+						continue;
+					}
+					if (c === '"' || c === "'" || c === "`") {
+						exprQuote = c;
+						continue;
+					}
 					if (c === "{") {
 						exprDepth += 1;
 					} else if (c === "}") {
 						exprDepth -= 1;
 					}
+					continue;
+				}
+				if (c === "$" && input[i] === "{") {
+					cur.push("{");
+					i += 1;
+					exprDepth += 1;
 					continue;
 				}
 				if (c === "`") {
@@ -291,20 +364,21 @@ export function minifyJs(input: string): string {
 			}
 			lastNonWs = "`";
 			lastWord = "";
+			afterControlParen = false;
 			continue;
 		}
 
 		// Regex literal
 		if (ch === "/" && canStartRegex()) {
-			stripped.push(ch);
+			cur.push(ch);
 			i += 1;
 			let inClass = false;
 			while (i < len) {
 				const c = input[i];
-				stripped.push(c);
+				cur.push(c);
 				i += 1;
 				if (c === "\\" && i < len) {
-					stripped.push(input[i]);
+					cur.push(input[i]);
 					i += 1;
 					continue;
 				}
@@ -319,90 +393,66 @@ export function minifyJs(input: string): string {
 				}
 			}
 			while (i < len && /[a-z]/i.test(input[i])) {
-				stripped.push(input[i]);
+				cur.push(input[i]);
 				i += 1;
 			}
 			lastNonWs = "/";
 			lastWord = "";
+			afterControlParen = false;
 			continue;
 		}
 
-		// Identifier / keyword tracking for regex disambiguation
+		// Identifier / keyword tracking for regex and control-flow disambiguation
 		if (/[A-Za-z_$]/.test(ch)) {
 			let j = i + 1;
 			while (j < len && /[A-Za-z0-9_$]/.test(input[j])) {
 				j += 1;
 			}
 			const word = input.slice(i, j);
-			stripped.push(word);
+			cur.push(word);
 			lastWord = word;
 			lastNonWs = word[word.length - 1];
+			afterControlParen = false;
 			i = j;
 			continue;
 		}
 
-		stripped.push(ch);
+		if (ch === "\n") {
+			flushLine();
+			lastNonWs = "\n";
+			i += 1;
+			continue;
+		}
+
+		if (ch === "(") {
+			parenStack.push(CONTROL_FLOW_WORDS.has(lastWord));
+			afterControlParen = false;
+			cur.push(ch);
+			lastNonWs = ch;
+			lastWord = "";
+			i += 1;
+			continue;
+		}
+
+		if (ch === ")") {
+			afterControlParen = parenStack.pop() ?? false;
+			cur.push(ch);
+			lastNonWs = ch;
+			lastWord = "";
+			i += 1;
+			continue;
+		}
+
+		cur.push(ch);
 		if (ch !== " " && ch !== "\t" && ch !== "\r") {
 			lastNonWs = ch;
-			if (ch !== "\n") {
-				lastWord = "";
-			}
+			lastWord = "";
+			afterControlParen = false;
 		}
 		i += 1;
 	}
 
-	// Trim lines and remove empty lines while preserving newlines inside template literals
-	const text = stripped.join("");
-	const lines: string[] = [];
-	let cur = "";
-	let inTemplate = false;
-	let inQuote = "";
-	for (let k = 0; k < text.length; k += 1) {
-		const c = text[k];
-		if (inQuote) {
-			cur += c;
-			if (c === "\\" && k + 1 < text.length) {
-				cur += text[k + 1];
-				k += 1;
-			} else if (c === inQuote) {
-				inQuote = "";
-			}
-			continue;
-		}
-		if (inTemplate) {
-			cur += c;
-			if (c === "\\" && k + 1 < text.length) {
-				cur += text[k + 1];
-				k += 1;
-			} else if (c === "`") {
-				inTemplate = false;
-			}
-			continue;
-		}
-		if (c === '"' || c === "'") {
-			inQuote = c;
-			cur += c;
-			continue;
-		}
-		if (c === "`") {
-			inTemplate = true;
-			cur += c;
-			continue;
-		}
-		if (c === "\n") {
-			const trimmed = cur.trim();
-			if (trimmed.length > 0) {
-				lines.push(trimmed);
-			}
-			cur = "";
-			continue;
-		}
-		cur += c;
-	}
-	const tail = cur.trim();
-	if (tail.length > 0) {
-		lines.push(tail);
-	}
+	flushLine();
 
 	// Join lines cleanly when the previous line ends with a token that cannot trigger ASI
 	const joined: string[] = [];
@@ -420,21 +470,92 @@ export function minifyJs(input: string): string {
 		}
 	}
 
-	return joined.join("\n");
+	const result = joined.join("\n");
+	if (isValidJsScript(input) && !isValidJsScript(result)) {
+		return input;
+	}
+	return result;
 }
 
 const STRUCTURAL_TAG_RE =
 	/^\/?(?:html|head|body|meta|link|title|base|style|script|header|nav|main|section|article|aside|footer|div|ul|ol|li|dl|dt|dd|table|thead|tbody|tfoot|tr|th|td|caption|colgroup|col|h[1-6]|p|blockquote|figure|figcaption|details|summary|form|fieldset|legend|hr|template|noscript|iframe|svg|g|defs|symbol|path|circle|rect|line|polygon|polyline|mdbook-sidebar-scrollbox)\b/i;
 
 /**
- * Minifies HTML while preserving whitespace inside `<pre>`, `<code>`,
- * `<textarea>`, `<script>`, and `<style>` blocks, and minifying inline CSS/JS.
+ * Collapses whitespace in text nodes and between tag attributes without ever
+ * modifying whitespace inside quoted HTML attribute values.
  */
-export function minifyHtml(input: string): string {
+function collapseHtmlWhitespaceOutsideAttributes(html: string): string {
+	const out: string[] = [];
+	const len = html.length;
+	let i = 0;
+
+	while (i < len) {
+		if (html[i] === "<") {
+			let quote = "";
+			let tagPendingWs = false;
+			out.push("<");
+			i += 1;
+			while (i < len) {
+				const ch = html[i];
+				if (quote) {
+					out.push(ch);
+					i += 1;
+					if (ch === quote) {
+						quote = "";
+					}
+					continue;
+				}
+				if (ch === '"' || ch === "'") {
+					if (tagPendingWs) {
+						out.push(" ");
+						tagPendingWs = false;
+					}
+					quote = ch;
+					out.push(ch);
+					i += 1;
+					continue;
+				}
+				if (ch === ">") {
+					tagPendingWs = false;
+					out.push(ch);
+					i += 1;
+					break;
+				}
+				if (ch === " " || ch === "\t" || ch === "\r" || ch === "\n") {
+					tagPendingWs = true;
+					i += 1;
+					continue;
+				}
+				if (tagPendingWs) {
+					out.push(" ");
+					tagPendingWs = false;
+				}
+				out.push(ch);
+				i += 1;
+			}
+			continue;
+		}
+
+		const nextTag = html.indexOf("<", i);
+		const end = nextTag === -1 ? len : nextTag;
+		const text = html
+			.slice(i, end)
+			.replace(/[ \t]*[\r\n]+[ \t]*/g, " ")
+			.replace(/[ \t]{2,}/g, " ");
+		out.push(text);
+		i = end;
+	}
+
+	return out.join("");
+}
+
+function extractAndMinifyRawBlocks(input: string): {
+	withPlaceholders: string;
+	rawBlocks: string[];
+} {
 	const rawBlocks: string[] = [];
 	const placeholder = (index: number) => `\u0000RAW${index}\u0000`;
 
-	// Extract raw elements whose internal whitespace must not be collapsed.
 	const withPlaceholders = input.replace(
 		/<(pre|code|textarea|script|style)(\b[^>]*)>([\s\S]*?)<\/\1>/gi,
 		(full, tag: string, attrs: string, body: string) => {
@@ -444,7 +565,9 @@ export function minifyHtml(input: string): string {
 				replacement = `<style${attrs}>${minifyCss(body)}</style>`;
 			} else if (
 				lower === "script" &&
-				!/\btype\s*=\s*["']?application\/(?:ld\+)?json/i.test(attrs) &&
+				!/\btype\s*=\s*["']?(?:application\/(?:ld\+)?json|module)/i.test(
+					attrs,
+				) &&
 				!/\bsrc\s*=/i.test(attrs) &&
 				body.trim().length > 0
 			) {
@@ -456,13 +579,42 @@ export function minifyHtml(input: string): string {
 		},
 	);
 
+	return { withPlaceholders, rawBlocks };
+}
+
+function restoreRawBlocks(html: string, rawBlocks: readonly string[]): string {
+	return html.replace(/\u0000RAW(\d+)\u0000/g, (_m, idx: string) => {
+		return rawBlocks[Number(idx)] ?? "";
+	});
+}
+
+/**
+ * Minifies standalone non-mdBook HTML pages conservatively: minifies inline
+ * `<style>`/`<script>` blocks and strips HTML comments while preserving body
+ * whitespace so custom `white-space: pre` containers (such as `.cmd` and
+ * `.tree` in `flow-interactive.html`) stay intact.
+ */
+export function minifyStandaloneHtml(input: string): string {
+	const { withPlaceholders, rawBlocks } = extractAndMinifyRawBlocks(input);
+	const out = withPlaceholders.replace(/<!--(?!\[if)[\s\S]*?-->/g, "");
+	return restoreRawBlocks(out, rawBlocks).trim();
+}
+
+/**
+ * Minifies HTML while preserving whitespace inside `<pre>`, `<code>`,
+ * `<textarea>`, `<script>`, `<style>`, and quoted HTML attributes, and
+ * minifying inline CSS/JS.
+ */
+export function minifyHtml(input: string): string {
+	const { withPlaceholders, rawBlocks } = extractAndMinifyRawBlocks(input);
+
 	// Strip HTML comments (keep conditional/IE comments if any exist).
 	let out = withPlaceholders.replace(/<!--(?!\[if)[\s\S]*?-->/g, "");
 
 	// Collapse whitespace between tags when at least one side is structural.
 	out = out.replace(
 		/>[ \t\r\n]+<(\/?[a-zA-Z0-9-]+)/g,
-		(match, nextTag: string) => {
+		(_match, nextTag: string) => {
 			if (STRUCTURAL_TAG_RE.test(nextTag)) {
 				return `><${nextTag}`;
 			}
@@ -480,16 +632,10 @@ export function minifyHtml(input: string): string {
 		"<$1>",
 	);
 
-	// Collapse runs of whitespace in text nodes.
-	out = out.replace(/[ \t]*[\r\n]+[ \t]*/g, " ");
-	out = out.replace(/[ \t]{2,}/g, " ");
+	// Collapse runs of whitespace in text nodes and tag delimiters without touching quoted attributes.
+	out = collapseHtmlWhitespaceOutsideAttributes(out);
 
-	// Restore raw blocks.
-	out = out.replace(/\u0000RAW(\d+)\u0000/g, (_m, idx: string) => {
-		return rawBlocks[Number(idx)] ?? "";
-	});
-
-	return out.trim();
+	return restoreRawBlocks(out, rawBlocks).trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -540,10 +686,16 @@ function decodeHtmlEntities(text: string): string {
 					return "/";
 				default:
 					if (dec) {
-						return String.fromCodePoint(Number.parseInt(dec, 10));
+						const cp = Number.parseInt(dec, 10);
+						return Number.isFinite(cp) && cp >= 0 && cp <= 0x10ffff
+							? String.fromCodePoint(cp)
+							: match;
 					}
 					if (hex) {
-						return String.fromCodePoint(Number.parseInt(hex, 16));
+						const cp = Number.parseInt(hex, 16);
+						return Number.isFinite(cp) && cp >= 0 && cp <= 0x10ffff
+							? String.fromCodePoint(cp)
+							: match;
 					}
 					return match;
 			}
@@ -781,8 +933,6 @@ export function highlightAndEnhanceCodeBlocks(
 		},
 	);
 
-	// Also mark non-header inline `<code>` with `hljs` only if needed? No —
-	// `pina.css` and `general.css` style `:not(pre) > code` directly without `.hljs`.
 	return { html: transformed, hasBoring };
 }
 
@@ -838,9 +988,9 @@ export function buildCompactSearchData(
 }
 
 function renderOnDemandSearchScript(searchDataRelPath: string): string {
-	// Self-contained ~2.5 KB searcher + DOM text-node highlighter (`?highlight=`).
+	// Self-contained ~2.8 KB searcher + DOM text-node highlighter (`?highlight=`).
 	// Preserves all mdBook DOM IDs, URL params (`?search=`, `?highlight=`),
-	// teaser markup (`<em>`), and keyboard navigation.
+	// teaser markup (`<em>`), and keyboard navigation without using `innerHTML`.
 	return `(function(){
 "use strict";
 const root=typeof path_to_root==="string"?path_to_root:"";
@@ -852,14 +1002,13 @@ const listOuter=document.getElementById("mdbook-searchresults-outer");
 const header=document.getElementById("mdbook-searchresults-header");
 const toggle=document.getElementById("mdbook-search-toggle");
 const content=document.getElementById("mdbook-content");
-if(!wrap||!bar||!list||!listOuter||!header||!toggle){return;}
+if(!wrap||!outer||!bar||!list||!listOuter||!header||!toggle){return;}
 
 let data=null;
 let loading=null;
 let lastQuery="";
 let teaserId=0;
 
-const esc=s=>s.replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&#34;"}[c]));
 const hasFocus=()=>bar===document.activeElement;
 window.search=window.search||{};
 window.search.hasFocus=hasFocus;
@@ -877,12 +1026,14 @@ unmark();
 if(!content||!terms.length){return;}
 const clean=terms.map(t=>t.trim()).filter(Boolean).map(t=>t.replace(/[.*+?^$()|[\\]\\\\]/g,"\\\\$&"));
 if(!clean.length){return;}
-const re=new RegExp("("+clean.join("|")+")","gi");
+const pat="("+clean.join("|")+")";
+const testRe=new RegExp(pat,"i");
+const re=new RegExp(pat,"gi");
 const walker=document.createTreeWalker(content,NodeFilter.SHOW_TEXT,{
 acceptNode(n){
 const p=n.parentElement;
 if(!p||p.closest("script,style,svg,mark,button")){return NodeFilter.FILTER_REJECT;}
-return re.test(n.nodeValue||"")?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP;
+return testRe.test(n.nodeValue||"")?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP;
 }
 });
 const nodes=[];
@@ -901,7 +1052,7 @@ frag.appendChild(mk);
 last=m.index+m[0].length;
 }
 if(last<text.length){frag.appendChild(document.createTextNode(text.slice(last)));}
-node.parentNode.replaceChild(frag,node);
+if(node.parentNode){node.parentNode.replaceChild(frag,node);}
 }
 const marks=content.querySelectorAll("mark.pina-hl");
 const hide=()=>{
@@ -927,12 +1078,40 @@ if(mode==="push"||(mode==="push_if_new"&&!had)){history.pushState({},document.ti
 else{history.replaceState({},document.title,u);}
 }
 
+function syncCurrentQuery(){
+const cur=bar.value.trim();
+if(cur){
+bar.classList.add("active");
+renderResults(cur);
+}else{
+lastQuery="";
+bar.classList.remove("active");
+listOuter.classList.add("hidden");
+list.textContent="";
+}
+}
+
+function showLoadError(){
+header.textContent="Failed to load search index.";
+list.textContent="";
+const li=document.createElement("li");
+const btn=document.createElement("button");
+btn.type="button";
+btn.textContent="Retry search";
+btn.addEventListener("click",()=>{
+loadData().then(loaded=>{if(loaded){syncCurrentQuery();}});
+});
+li.appendChild(btn);
+list.appendChild(li);
+listOuter.classList.remove("hidden");
+}
+
 function loadData(){
 if(data){return Promise.resolve(data);}
 if(!loading){
 outer.classList.add("searching");
 loading=fetch(root+${JSON.stringify(searchDataRelPath)})
-.then(r=>r.json())
+.then(r=>{if(!r.ok){throw new Error("HTTP "+r.status);}return r.json();})
 .then(json=>{
 data=json.u.map((u,i)=>{
 const entry=json.d[i]||["",""];
@@ -942,16 +1121,24 @@ const sep=bc.lastIndexOf(" » ");
 const title=sep>=0?bc.slice(sep+3):bc;
 return {u,bc,body,tl:title.toLowerCase(),bl:bc.toLowerCase(),dl:body.toLowerCase()};
 });
+loading=null;
 outer.classList.remove("searching");
 return data;
 })
-.catch(err=>{outer.classList.remove("searching");console.error(err);return [];});
+.catch(err=>{
+loading=null;
+lastQuery="";
+outer.classList.remove("searching");
+console.error(err);
+showLoadError();
+return null;
+});
 }
 return loading;
 }
 
-function makeTeaser(body,terms){
-if(!body){return "";}
+function appendTeaser(container,body,terms){
+if(!body){return;}
 const lower=body.toLowerCase();
 let pos=-1;
 for(const t of terms){
@@ -963,10 +1150,18 @@ const end=Math.min(body.length,start+220);
 let slice=body.slice(start,end).trim();
 if(start>0){slice="…"+slice;}
 if(end<body.length){slice+="…";}
-const escaped=esc(slice);
-const pat=terms.map(t=>esc(t).replace(/[.*+?^$()|[\\]\\\\]/g,"\\\\$&")).filter(Boolean);
-if(!pat.length){return escaped;}
-return escaped.replace(new RegExp("("+pat.join("|")+")","gi"),"<em>$1</em>");
+const pat=terms.map(t=>t.replace(/[.*+?^$()|[\\]\\\\]/g,"\\\\$&")).filter(Boolean);
+if(!pat.length){container.textContent=slice;return;}
+const re=new RegExp("("+pat.join("|")+")","gi");
+let last=0,m;
+while((m=re.exec(slice))!==null){
+if(m.index>last){container.appendChild(document.createTextNode(slice.slice(last,m.index)));}
+const em=document.createElement("em");
+em.textContent=m[0];
+container.appendChild(em);
+last=m.index+m[0].length;
+}
+if(last<slice.length){container.appendChild(document.createTextNode(slice.slice(last)));}
 }
 
 function renderResults(query){
@@ -1003,11 +1198,23 @@ list.textContent="";
 const enc=encodeURIComponent(terms.join(" ")).replace(/'/g,"%27");
 const frag=document.createDocumentFragment();
 for(const [,doc] of top){
-teaserId+=1;
 const parts=doc.u.split("#");
-const href=root+parts[0]+"?highlight="+enc+(parts[1]?"#"+parts[1]:"");
+const page=parts[0]||"";
+if(/^(?:[a-z][a-z0-9+.-]*:|\\/\\/)/i.test(page)){continue;}
+teaserId+=1;
+const href=root+page+"?highlight="+enc+(parts[1]?"#"+parts[1]:"");
 const li=document.createElement("li");
-li.innerHTML='<a href="'+href+'" aria-details="mdbook-teaser_'+teaserId+'">'+esc(doc.bc)+'</a><span class="teaser" id="mdbook-teaser_'+teaserId+'" aria-label="Search Result Teaser">'+makeTeaser(doc.body,terms)+'</span>';
+const a=document.createElement("a");
+a.setAttribute("href",href);
+a.setAttribute("aria-details","mdbook-teaser_"+teaserId);
+a.textContent=doc.bc;
+const sp=document.createElement("span");
+sp.className="teaser";
+sp.id="mdbook-teaser_"+teaserId;
+sp.setAttribute("aria-label","Search Result Teaser");
+appendTeaser(sp,doc.body,terms);
+li.appendChild(a);
+li.appendChild(sp);
 frag.appendChild(li);
 }
 list.appendChild(frag);
@@ -1018,10 +1225,7 @@ function show(yes){
 if(yes){
 wrap.classList.remove("hidden");
 toggle.setAttribute("aria-expanded","true");
-loadData().then(()=>{
-const q=bar.value.trim();
-if(q){bar.classList.add("active");renderResults(q);}
-});
+loadData().then(loaded=>{if(loaded){syncCurrentQuery();}});
 }else{
 wrap.classList.add("hidden");
 toggle.setAttribute("aria-expanded","false");
@@ -1033,7 +1237,7 @@ function onInput(){
 const q=bar.value.trim();
 if(q){
 bar.classList.add("active");
-loadData().then(()=>renderResults(q));
+loadData().then(loaded=>{if(loaded){syncCurrentQuery();}});
 }else{
 lastQuery="";
 bar.classList.remove("active");
@@ -1136,6 +1340,7 @@ const meta=document.querySelector('meta[name="theme-color"]');
 if(!toggle||!popup){return;}
 const colors=${JSON.stringify(themeColors)};
 const ids=Array.from(popup.querySelectorAll("button.theme"),el=>el.id);
+const findThemeBtn=name=>{const el=document.getElementById("mdbook-theme-"+name);return el&&popup.contains(el)?el:null;};
 const saved=()=>{try{return localStorage.getItem("mdbook-theme");}catch{return null;}};
 const pick=()=>{
 const t=saved();
@@ -1154,10 +1359,10 @@ html.classList.add(t);
 prev=t;
 popup.querySelectorAll(".theme-selected").forEach(el=>el.classList.remove("theme-selected"));
 const sel=saved()??"default_theme";
-const btn=popup.querySelector("button#mdbook-theme-"+sel)||popup.querySelector("button#mdbook-theme-"+pick());
+const btn=findThemeBtn(sel)||findThemeBtn(pick());
 if(btn){btn.classList.add("theme-selected");}
 }
-const show=()=>{popup.style.display="block";toggle.setAttribute("aria-expanded","true");const b=popup.querySelector("button#mdbook-theme-"+pick());if(b){b.focus();}};
+const show=()=>{popup.style.display="block";toggle.setAttribute("aria-expanded","true");const b=findThemeBtn(pick());if(b){b.focus();}};
 const hide=()=>{popup.style.display="none";toggle.setAttribute("aria-expanded","false");toggle.focus();};
 const mq=matchMedia("(prefers-color-scheme: dark)");
 mq.onchange=()=>apply(pick(),false);
@@ -1276,7 +1481,13 @@ async function copyText(text){
 if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(text);return;}
 const ta=document.createElement("textarea");
 ta.value=text;ta.style.position="fixed";ta.style.opacity="0";
-document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();
+document.body.appendChild(ta);
+try{
+ta.select();
+if(!document.execCommand("copy")){throw new Error("copy failed");}
+}finally{
+ta.remove();
+}
 }
 document.addEventListener("click",e=>{
 const clip=e.target.closest&&e.target.closest("button.clip-button");
@@ -1303,7 +1514,10 @@ const label=showing?"Show hidden lines":"Hide lines";
 eye.title=label;
 eye.setAttribute("aria-label",label);
 const tpl=document.getElementById(showing?"fa-eye":"fa-eye-slash");
-if(tpl){eye.innerHTML=tpl.innerHTML;}
+if(tpl){
+if(tpl.content){eye.replaceChildren(tpl.content.cloneNode(true));}
+else{eye.innerHTML=tpl.innerHTML;}
+}
 }
 });
 document.addEventListener("mouseout",e=>{
@@ -1349,21 +1563,41 @@ ${
 			? `(function lazySearch(){
 const toggle=document.getElementById("mdbook-search-toggle");
 if(!toggle){return;}
-let loaded=false;
+let loading=false,ready=false,pendingOpen=false;
+function onClick(){
+if(ready){return;}
+boot(true);
+}
+function onKey(e){
+if(ready||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||otherFocus(e)){return;}
+if(e.key==="/"||e.key==="s"){e.preventDefault();boot(true);}
+}
 function boot(openNow){
-if(loaded){if(openNow&&window.search&&window.search.open){window.search.open();}return;}
-loaded=true;
+if(openNow){pendingOpen=true;}
+if(ready){
+if(pendingOpen&&window.search&&window.search.open){pendingOpen=false;window.search.open();}
+return;
+}
+if(loading){return;}
+loading=true;
 const s=document.createElement("script");
 s.src=root+${JSON.stringify(searchScriptRelPath)};
-if(openNow){s.onload=()=>{if(window.search&&window.search.open){window.search.open();}};}
+s.onload=()=>{
+loading=false;
+ready=true;
+toggle.removeEventListener("click",onClick);
+document.removeEventListener("keydown",onKey);
+if(pendingOpen&&window.search&&window.search.open){pendingOpen=false;window.search.open();}
+};
+s.onerror=()=>{
+loading=false;
+pendingOpen=false;
+s.remove();
+};
 document.head.appendChild(s);
 }
-const onClick=()=>{if(!loaded){boot(true);}};
-toggle.addEventListener("click",onClick,{once:true});
-document.addEventListener("keydown",e=>{
-if(loaded||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||otherFocus(e)){return;}
-if(e.key==="/"||e.key==="s"){e.preventDefault();boot(true);}
-});
+toggle.addEventListener("click",onClick);
+document.addEventListener("keydown",onKey);
 const p=new URLSearchParams(location.search);
 if(p.has("search")||p.has("highlight")){boot(false);}
 })();`
@@ -1397,7 +1631,8 @@ document.head.appendChild(link);
 
 /**
  * Rebases relative `url(...)` paths in `css` from `sourceRel` to `targetRel`
- * (both POSIX paths relative to the book root).
+ * (both POSIX paths relative to the book root). Parses quoted and unquoted
+ * URL values separately so parentheses inside quoted paths rebase cleanly.
  */
 export function rebaseCssUrls(
 	css: string,
@@ -1410,8 +1645,10 @@ export function rebaseCssUrls(
 		return css;
 	}
 	return css.replace(
-		/url\(\s*(['"]?)([^)'"]+)\1\s*\)/g,
-		(full, quote: string, rawUrl: string) => {
+		/url\(\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|([^)'"\s][^)]*))\s*\)/g,
+		(full, dq?: string, sq?: string, unquoted?: string) => {
+			const quote = dq !== undefined ? '"' : sq !== undefined ? "'" : "";
+			const rawUrl = dq ?? sq ?? unquoted ?? "";
 			const trimmed = rawUrl.trim();
 			if (
 				!trimmed ||
@@ -1424,9 +1661,15 @@ export function rebaseCssUrls(
 			) {
 				return full;
 			}
-			const resolved = posix.normalize(posix.join(srcDir, trimmed));
+			const suffixMatch = /[?#][\s\S]*$/.exec(trimmed);
+			const suffix = suffixMatch ? suffixMatch[0] : "";
+			const pathPart = suffix ? trimmed.slice(0, suffixMatch!.index) : trimmed;
+			if (!pathPart) {
+				return full;
+			}
+			const resolved = posix.normalize(posix.join(srcDir, pathPart));
 			const rebased = posix.relative(dstDir, resolved);
-			return `url(${quote}${rebased}${quote})`;
+			return `url(${quote}${rebased}${suffix}${quote})`;
 		},
 	);
 }
@@ -1485,6 +1728,25 @@ function removeEmptyDir(dirPath: string): void {
 	}
 }
 
+function resolveBookRelativeHref(href: string, prefix: string): string | null {
+	const cleaned = href.replace(/[?#][\s\S]*$/, "");
+	if (
+		!cleaned ||
+		cleaned.startsWith("http:") ||
+		cleaned.startsWith("https:") ||
+		cleaned.startsWith("//") ||
+		cleaned.startsWith("/") ||
+		cleaned.startsWith("data:")
+	) {
+		return null;
+	}
+	if (prefix && !cleaned.startsWith(prefix)) {
+		return null;
+	}
+	const withoutPrefix = prefix ? cleaned.slice(prefix.length) : cleaned;
+	return posix.normalize(withoutPrefix);
+}
+
 // ---------------------------------------------------------------------------
 // Main book optimization pipeline
 // ---------------------------------------------------------------------------
@@ -1498,44 +1760,91 @@ export interface OptimizeStats {
 }
 
 /**
- * Optimizes a built mdBook directory in place.
+ * Optimizes a built mdBook directory in place. Idempotent when run on an
+ * already-optimized directory.
  */
 export function optimizeBook(bookDir: string): OptimizeStats {
 	const root = resolve(bookDir);
 	const files = walkFiles(root);
 
-	const highlightJs = findSingle(files, /^highlight-[a-f0-9]+\.js$/);
-	const bookJs = findSingle(files, /^book-[a-f0-9]+\.js$/);
-	const tocJs = findSingle(files, /^toc-[a-f0-9]+\.js$/);
-	const clipboardJs = findSingle(files, /^clipboard-[a-f0-9]+\.min\.js$/);
-	const elasticlunrJs = findSingle(files, /^elasticlunr-[a-f0-9]+\.min\.js$/);
-	const markJs = findSingle(files, /^mark-[a-f0-9]+\.min\.js$/);
-	const searcherJs = findSingle(files, /^searcher-[a-f0-9]+\.js$/);
-	const searchIndexJs = findSingle(files, /^searchindex-[a-f0-9]+\.js$/);
+	const highlightJs = findSingle(files, /^highlight(?:-[a-f0-9]+)?\.js$/);
+	const bookJs = findSingle(files, /^book(?:-[a-f0-9]+)?\.js$/);
+	const tocJs = findSingle(files, /^toc(?:-[a-f0-9]+)?\.js$/);
+	const clipboardJs = findSingle(
+		files,
+		/^clipboard(?:-[a-f0-9]+)?\.min\.js$/,
+	);
+	const elasticlunrJs = findSingle(
+		files,
+		/^elasticlunr(?:-[a-f0-9]+)?\.min\.js$/,
+	);
+	const markJs = findSingle(files, /^mark(?:-[a-f0-9]+)?\.min\.js$/);
+	const searcherJs = findSingle(files, /^searcher(?:-[a-f0-9]+)?\.js$/);
+	const searchIndexJs = findSingle(files, /^searchindex(?:-[a-f0-9]+)?\.js$/);
 
-	const variablesCss = findSingle(files, /^css\/variables-[a-f0-9]+\.css$/);
-	const generalCss = findSingle(files, /^css\/general-[a-f0-9]+\.css$/);
-	const chromeCss = findSingle(files, /^css\/chrome-[a-f0-9]+\.css$/);
-	const printCss = findSingle(files, /^css\/print-[a-f0-9]+\.css$/);
-	const fontsCss = findSingle(files, /^fonts\/fonts-[a-f0-9]+\.css$/);
-	const hlLightCss = findSingle(files, /^highlight-[a-f0-9]+\.css$/);
-	const hlDarkCss = findSingle(files, /^tomorrow-night-[a-f0-9]+\.css$/);
-	const hlAyuCss = findSingle(files, /^ayu-highlight-[a-f0-9]+\.css$/);
+	const variablesCss = findSingle(
+		files,
+		/^css\/variables(?:-[a-f0-9]+)?\.css$/,
+	);
+	const generalCss = findSingle(files, /^css\/general(?:-[a-f0-9]+)?\.css$/);
+	const chromeCss = findSingle(files, /^css\/chrome(?:-[a-f0-9]+)?\.css$/);
+	const printCss = findSingle(files, /^css\/print(?:-[a-f0-9]+)?\.css$/);
+	const fontsCss = findSingle(files, /^fonts\/fonts(?:-[a-f0-9]+)?\.css$/);
+	const hlLightCss = findSingle(files, /^highlight(?:-[a-f0-9]+)?\.css$/);
+	const hlDarkCss = findSingle(
+		files,
+		/^tomorrow-night(?:-[a-f0-9]+)?\.css$/,
+	);
+	const hlAyuCss = findSingle(
+		files,
+		/^ayu-highlight(?:-[a-f0-9]+)?\.css$/,
+	);
 
-	const pinaCss = findSingle(files, /^theme\/pina-[a-f0-9]+\.css$/);
-	const pinaJs = findSingle(files, /^theme\/pina-[a-f0-9]+\.js$/);
+	const pinaCss = findSingle(files, /^theme\/pina(?:-[a-f0-9]+)?\.css$/);
+	const pinaJs = findSingle(files, /^theme\/pina(?:-[a-f0-9]+)?\.js$/);
 	const isPinaBranded = pinaCss !== null && pinaJs !== null;
+
+	// Detect already-optimized output so a second invocation is a safe no-op.
+	const existingBundleCss = findSingle(
+		files,
+		/^assets\/book-[a-f0-9]{8}\.css$/,
+	);
+	const existingBundleJs = findSingle(files, /^assets\/book-[a-f0-9]{8}\.js$/);
+	const hasUnoptimizedSources = Boolean(
+		variablesCss ||
+			generalCss ||
+			chromeCss ||
+			bookJs ||
+			tocJs ||
+			highlightJs ||
+			searchIndexJs,
+	);
+	if ((existingBundleCss || existingBundleJs) && !hasUnoptimizedSources) {
+		return {
+			htmlFilesOptimized: 0,
+			bundleCssFile: existingBundleCss ?? "",
+			bundleJsFile: existingBundleJs ?? "",
+			searchDataFile: findSingle(
+				files,
+				/^assets\/search-data-[a-f0-9]{8}\.json$/,
+			),
+			searchJsFile: findSingle(files, /^assets\/search-[a-f0-9]{8}\.js$/),
+		};
+	}
 
 	const assetsDir = join(root, "assets");
 	mkdirSync(assetsDir, { recursive: true });
 
-	// 1. Bundle & minify all active CSS into a single hashed stylesheet.
+	// 1. Bundle & minify discovered CSS into a single hashed stylesheet,
+	// tracking every file that the bundle actually supersedes.
 	const cssParts: string[] = [];
+	const supersededCssFiles = new Set<string>();
 	const bundleCssPlaceholder = "assets/book.css";
 	const addCss = (rel: string | null, wrapMedia?: string): void => {
 		if (!rel) {
 			return;
 		}
+		supersededCssFiles.add(rel);
 		const raw = readFileSync(join(root, rel), "utf8");
 		const rebased = rebaseCssUrls(raw, rel, bundleCssPlaceholder);
 		const min = minifyCss(rebased);
@@ -1554,8 +1863,19 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 	// colors uniformly across themes. For standard mdBook themes (e.g. PinaPod),
 	// scope each highlight theme stylesheet under its theme class so all syntax
 	// highlighting stays inside the single CSS file with zero `<link disabled>`.
-	if (!isPinaBranded) {
+	if (isPinaBranded) {
 		if (hlLightCss) {
+			supersededCssFiles.add(hlLightCss);
+		}
+		if (hlDarkCss) {
+			supersededCssFiles.add(hlDarkCss);
+		}
+		if (hlAyuCss) {
+			supersededCssFiles.add(hlAyuCss);
+		}
+	} else {
+		if (hlLightCss) {
+			supersededCssFiles.add(hlLightCss);
 			cssParts.push(
 				scopeCssSelectors(
 					readFileSync(join(root, hlLightCss), "utf8"),
@@ -1564,6 +1884,7 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 			);
 		}
 		if (hlDarkCss) {
+			supersededCssFiles.add(hlDarkCss);
 			cssParts.push(
 				scopeCssSelectors(
 					readFileSync(join(root, hlDarkCss), "utf8"),
@@ -1572,6 +1893,7 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 			);
 		}
 		if (hlAyuCss) {
+			supersededCssFiles.add(hlAyuCss);
 			cssParts.push(
 				scopeCssSelectors(readFileSync(join(root, hlAyuCss), "utf8"), ".ayu"),
 			);
@@ -1579,14 +1901,18 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 	}
 
 	// Include any custom theme stylesheets (e.g. `theme/pina-*.css`).
-	for (const cssFile of files.filter((f) => /^theme\/.*\.css$/.test(f))) {
+	const themeCssFiles = files.filter((f) => /^theme\/.*\.css$/.test(f));
+	for (const cssFile of themeCssFiles) {
 		addCss(cssFile);
 	}
 	addCss(printCss, "print");
 
 	const bundledCss = cssParts.join("\n");
-	const bundleCssRel = `assets/book-${shortHash(bundledCss)}.css`;
-	writeFileSync(join(root, bundleCssRel), bundledCss);
+	let bundleCssRel = "";
+	if (bundledCss.length > 0 && supersededCssFiles.size > 0) {
+		bundleCssRel = `assets/book-${shortHash(bundledCss)}.css`;
+		writeFileSync(join(root, bundleCssRel), bundledCss);
+	}
 
 	// 2. Replace mdBook's massive elasticlunr search index with compact JSON + tiny searcher.
 	let searchDataRel: string | null = null;
@@ -1656,11 +1982,12 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 		let html = readFileSync(absHtml, "utf8");
 
 		// Standalone non-mdBook pages (e.g. `migrations/flow-interactive.html`)
-		// only get HTML/CSS/JS minification.
+		// only get conservative inline CSS/JS/comment minification so custom
+		// `white-space: pre` blocks remain untouched.
 		const isMdBookPage = html.includes("mdbook-body-container") ||
 			relHtml === "toc.html";
 		if (!isMdBookPage) {
-			writeFileSync(absHtml, minifyHtml(html));
+			writeFileSync(absHtml, minifyStandaloneHtml(html));
 			htmlFilesOptimized += 1;
 			continue;
 		}
@@ -1671,18 +1998,29 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 			: `${"../".repeat(dirRel.split("/").length)}`;
 		const homeHref = prefix === "" ? "./" : prefix;
 
-		// Replace all mdBook + theme + highlight stylesheet `<link>` tags with the single bundle.
-		let insertedBundle = false;
-		html = html.replace(
-			/<link\b[^>]*\brel="stylesheet"[^>]*>\s*/gi,
-			() => {
-				if (insertedBundle) {
-					return "";
-				}
-				insertedBundle = true;
-				return `<link rel="stylesheet" href="${prefix}${bundleCssRel}">\n`;
-			},
-		);
+		// Replace only stylesheet `<link>` tags that the bundle actually supersedes,
+		// preserving custom `additional-css` outside `theme/` and external sheets.
+		if (bundleCssRel) {
+			let insertedBundle = false;
+			html = html.replace(
+				/<link\b[^>]*\brel=["']stylesheet["'][^>]*>\s*/gi,
+				(fullTag) => {
+					const hrefMatch = /\bhref=["']([^"']+)["']/i.exec(fullTag);
+					if (!hrefMatch) {
+						return fullTag;
+					}
+					const relTarget = resolveBookRelativeHref(hrefMatch[1], prefix);
+					if (!relTarget || !supersededCssFiles.has(relTarget)) {
+						return fullTag;
+					}
+					if (insertedBundle) {
+						return "";
+					}
+					insertedBundle = true;
+					return `<link rel="stylesheet" href="${prefix}${bundleCssRel}">\n`;
+				},
+			);
+		}
 
 		if (relHtml === "toc.html") {
 			writeFileSync(absHtml, minifyHtml(html));
@@ -1799,7 +2137,7 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 		htmlFilesOptimized += 1;
 	}
 
-	// 6. Delete superseded assets so the published artifact stays minimal.
+	// 6. Delete only assets actually superseded by the bundles.
 	const toDelete = [
 		highlightJs,
 		bookJs,
@@ -1809,16 +2147,8 @@ export function optimizeBook(bookDir: string): OptimizeStats {
 		markJs,
 		searcherJs,
 		searchIndexJs,
-		variablesCss,
-		generalCss,
-		chromeCss,
-		printCss,
-		fontsCss,
-		hlLightCss,
-		hlDarkCss,
-		hlAyuCss,
-		pinaCss,
 		pinaJs,
+		...(bundleCssRel ? Array.from(supersededCssFiles) : []),
 	];
 	for (const rel of toDelete) {
 		if (rel) {
@@ -1865,7 +2195,7 @@ function main(): number {
 
 if (
 	process.argv[1] !== undefined &&
-	import.meta.url === pathToFileURL(process.argv[1]).href
+	import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
 	process.exitCode = main();
 }

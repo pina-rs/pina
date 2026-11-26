@@ -716,10 +716,17 @@ export function buildLanding(bookDir: string, root = ROOT): void {
 			join(output, "favicon.svg"),
 		);
 	}
-	if (!shareBookFonts) {
-		const fonts = join(root, "docs/theme/fonts");
-		for (const file of readdirSync(fonts)) {
-			if (file.endsWith(".woff2") || file.endsWith(".txt")) {
+	const fonts = join(root, "docs/theme/fonts");
+	const fontFiles = readdirSync(fonts);
+	const missingFonts = fontFiles.filter(
+		(file) => file.endsWith(".woff2") && !bookFonts.has(file),
+	);
+	for (const file of missingFonts) {
+		copyInto(join(fonts, file), join(output, "fonts", file));
+	}
+	if (missingFonts.length > 0) {
+		for (const file of fontFiles) {
+			if (file.endsWith(".txt")) {
 				copyInto(join(fonts, file), join(output, "fonts", file));
 			}
 		}

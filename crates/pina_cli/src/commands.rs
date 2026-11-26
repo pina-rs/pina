@@ -1935,25 +1935,35 @@ fn doc_topic_basename(topic: &str) -> Option<&str> {
 
 fn render_docs(content: &str) {
 	use std::io::IsTerminal;
-	use std::io::Write;
 
 	let stdout = std::io::stdout();
 	let is_tty = stdout.is_terminal();
 	let mut out = std::io::BufWriter::with_capacity(64 * 1024, stdout.lock());
-	render_docs_to(&mut out, content, is_tty);
-	let _ = out.flush();
+	if let Err(err) = render_docs_to(&mut out, content, is_tty) {
+		eprintln!(
+			"{} Failed to write documentation: {err}",
+			"Error".red().bold()
+		);
+		std::process::exit(1);
+	}
 }
 
-fn render_docs_to(writer: &mut impl Write, content: &str, is_terminal: bool) {
+fn render_docs_to(
+	writer: &mut impl Write,
+	content: &str,
+	is_terminal: bool,
+) -> std::io::Result<()> {
 	if is_terminal {
 		let skin = termimad::MadSkin::default();
-		let _ = skin.write_text_on(writer, content);
+		skin.write_text_on(writer, content)
+			.map_err(std::io::Error::other)?;
 	} else {
-		let _ = writer.write_all(content.as_bytes());
+		writer.write_all(content.as_bytes())?;
 		if !content.ends_with('\n') {
-			let _ = writer.write_all(b"\n");
+			writer.write_all(b"\n")?;
 		}
 	}
+	writer.flush()
 }
 
 fn run_init(name: &str, path: Option<&Path>, force: bool, sbpf_linker: bool) {
@@ -3132,20 +3142,60 @@ fn run_import(command: &ImportCommand<'_>) {
 mod docs_render_tests {
 	use super::*;
 
+	struct FailingWriter {
+		fail_write: bool,
+		fail_flush: bool,
+	}
+
+	impl Write for FailingWriter {
+		fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+			if self.fail_write {
+				return Err(std::io::Error::other("write failed"));
+			}
+			Ok(buf.len())
+		}
+
+		fn flush(&mut self) -> std::io::Result<()> {
+			if self.fail_flush {
+				return Err(std::io::Error::other("flush failed"));
+			}
+			Ok(())
+		}
+	}
+
 	#[test]
 	fn render_docs_to_handles_terminal_and_non_terminal_outputs() {
 		let mut piped = Vec::new();
-		render_docs_to(&mut piped, "# Title\nBody", false);
+		render_docs_to(&mut piped, "# Title\nBody", false).expect("piped render");
 		assert_eq!(String::from_utf8_lossy(&piped), "# Title\nBody\n");
 
 		let mut piped_with_nl = Vec::new();
-		render_docs_to(&mut piped_with_nl, "# Title\n", false);
+		render_docs_to(&mut piped_with_nl, "# Title\n", false).expect("piped render with nl");
 		assert_eq!(String::from_utf8_lossy(&piped_with_nl), "# Title\n");
 
 		let mut tty = Vec::new();
-		render_docs_to(&mut tty, "# Title\nBody\n", true);
+		render_docs_to(&mut tty, "# Title\nBody\n", true).expect("tty render");
 		let tty_text = String::from_utf8_lossy(&tty);
 		assert!(tty_text.contains("Title"));
 		assert!(tty_text.contains("Body"));
+
+		let mut write_err = FailingWriter {
+			fail_write: true,
+			fail_flush: false,
+		};
+		assert!(render_docs_to(&mut write_err, "# Title", false).is_err());
+		assert!(render_docs_to(&mut write_err, "# Title", true).is_err());
+
+		let mut ok_writer = FailingWriter {
+			fail_write: false,
+			fail_flush: false,
+		};
+		render_docs_to(&mut ok_writer, "# Title\n", false).expect("ok writer render");
+
+		let mut flush_err = FailingWriter {
+			fail_write: false,
+			fail_flush: true,
+		};
+		assert!(render_docs_to(&mut flush_err, "# Title\n", false).is_err());
 	}
 }

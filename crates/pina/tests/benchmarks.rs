@@ -508,6 +508,47 @@ struct BenchUniqueAccounts<'a> {
 	fee: &'a mut AccountView,
 }
 
+#[allow(dead_code)]
+struct BenchFourUniqueAccounts<'a> {
+	authority: &'a AccountView,
+	vault: &'a mut AccountView,
+	fee: &'a mut AccountView,
+	recipient: &'a mut AccountView,
+}
+
+impl<'a> pina::ParseAccounts<'a> for BenchFourUniqueAccounts<'a> {
+	const ACCOUNT_BOUND: usize = 4;
+	const ACCOUNT_LIMIT: usize = 4;
+	const ACCOUNT_MINIMUM: usize = 4;
+	const ALIAS_LAYOUT: pina::__AliasLayout = pina::__AliasLayout {
+		static_layout: true,
+		mut_mask: [0b1110, 0, 0, 0],
+		optional_mask: [0; 4],
+		unique_mask: [0b0010, 0, 0, 0],
+		remaining_mut_start: usize::MAX,
+		remaining_mut_distinct: false,
+	};
+
+	fn parse_accounts(cursor: &mut pina::AccountsCursor<'a>) -> Result<Self, pina::ProgramError> {
+		Ok(Self {
+			authority: cursor.next()?,
+			vault: cursor.next_mut()?,
+			fee: cursor.next_mut()?,
+			recipient: cursor.next_mut()?,
+		})
+	}
+}
+
+impl<'a> TryFrom<(&Address, &'a mut [AccountView])> for BenchFourUniqueAccounts<'a> {
+	type Error = pina::ProgramError;
+
+	fn try_from(
+		(program_id, accounts): (&Address, &'a mut [AccountView]),
+	) -> Result<Self, Self::Error> {
+		pina::__parse_derived_accounts::<Self, true>(program_id, accounts)
+	}
+}
+
 fn make_bench_account(key_byte: u8, writable: bool) -> RuntimeAccount {
 	RuntimeAccount {
 		borrow_state: NOT_BORROWED,
@@ -559,6 +600,27 @@ fn benchmark_accounts_parse_unique_aliasing() {
 
 	bench("Accounts::try_from (1 ro + 1 unique mut + 1 mut)", || {
 		let parsed = BenchUniqueAccounts::try_from((&SYSTEM_ID, black_box(&mut views[..])));
+		let _ = black_box(parsed.is_ok());
+	});
+}
+
+#[test]
+#[allow(unsafe_code)]
+fn benchmark_accounts_parse_four_unique_aliasing() {
+	let mut a = make_bench_account(1, false);
+	let mut b = make_bench_account(2, true);
+	let mut c = make_bench_account(3, true);
+	let mut d = make_bench_account(4, true);
+	// SAFETY: Each local RuntimeAccount stays pinned on the stack and outlives `views`.
+	let mut views = [
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut a)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut b)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut c)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut d)) },
+	];
+
+	bench("Accounts::try_from (1 ro + 1 unique mut + 2 mut)", || {
+		let parsed = BenchFourUniqueAccounts::try_from((&SYSTEM_ID, black_box(&mut views[..])));
 		let _ = black_box(parsed.is_ok());
 	});
 }
