@@ -41,6 +41,13 @@ pub enum AliasInstruction {
 	ManualTryFrom = 21,
 	MutTriple = 22,
 	MutQuad = 23,
+	ReqAndOptionalMut = 24,
+	TwoReqAndOptMut = 25,
+	#[dispatch(accounts = MutPairAccounts)]
+	SharedMutPairA = 26,
+	#[dispatch(accounts = MutPairAccounts)]
+	SharedMutPairB = 27,
+	UniqueQuad = 28,
 }
 
 #[discriminator]
@@ -134,6 +141,30 @@ pub struct OptionalMutPairAccounts<'a> {
 	pub authority: &'a AccountView,
 	pub opt_a: Option<&'a mut AccountView>,
 	pub opt_b: Option<&'a mut AccountView>,
+}
+
+#[derive(Accounts)]
+pub struct ReqAndOptionalMutAccounts<'a> {
+	pub authority: &'a AccountView,
+	pub req_mut: &'a mut AccountView,
+	pub opt_a: Option<&'a mut AccountView>,
+	pub opt_b: Option<&'a mut AccountView>,
+}
+
+#[derive(Accounts)]
+pub struct TwoReqAndOptMutAccounts<'a> {
+	pub req_a: &'a mut AccountView,
+	pub req_b: &'a mut AccountView,
+	pub opt_c: Option<&'a mut AccountView>,
+}
+
+#[derive(Accounts)]
+pub struct UniqueQuadAccounts<'a> {
+	pub ro_slot: &'a AccountView,
+	#[pina(unique)]
+	pub unique_ro: &'a AccountView,
+	pub mut_a: &'a mut AccountView,
+	pub mut_b: &'a mut AccountView,
 }
 
 #[derive(Accounts)]
@@ -347,6 +378,35 @@ impl<'a> ProcessAccountInfos<'a> for OptionalMutPairAccounts<'a> {
 			out.push(&*b);
 		}
 		record(&out)
+	}
+}
+
+impl<'a> ProcessAccountInfos<'a> for ReqAndOptionalMutAccounts<'a> {
+	fn process(self, _data: &[u8]) -> ProgramResult {
+		let mut out = std::vec![self.authority, &*self.req_mut];
+		if let Some(a) = self.opt_a {
+			out.push(&*a);
+		}
+		if let Some(b) = self.opt_b {
+			out.push(&*b);
+		}
+		record(&out)
+	}
+}
+
+impl<'a> ProcessAccountInfos<'a> for TwoReqAndOptMutAccounts<'a> {
+	fn process(self, _data: &[u8]) -> ProgramResult {
+		let mut out = std::vec![&*self.req_a, &*self.req_b];
+		if let Some(c) = self.opt_c {
+			out.push(&*c);
+		}
+		record(&out)
+	}
+}
+
+impl<'a> ProcessAccountInfos<'a> for UniqueQuadAccounts<'a> {
+	fn process(self, _data: &[u8]) -> ProgramResult {
+		record(&[self.ro_slot, self.unique_ro, &*self.mut_a, &*self.mut_b])
 	}
 }
 
@@ -1739,4 +1799,637 @@ fn handwritten_try_from_conversion_runs_on_both_dispatch_first_and_slice_routers
 		)
 	};
 	assert_eq!(status, SUCCESS);
+}
+
+#[allow(dead_code)]
+#[derive(Accounts)]
+struct WideOptMutAccounts<'a> {
+	f00: &'a AccountView,
+	f01: &'a AccountView,
+	f02: &'a AccountView,
+	f03: &'a AccountView,
+	f04: &'a AccountView,
+	f05: &'a AccountView,
+	f06: &'a AccountView,
+	f07: &'a AccountView,
+	f08: &'a AccountView,
+	f09: &'a AccountView,
+	f10: &'a AccountView,
+	f11: &'a AccountView,
+	f12: &'a AccountView,
+	f13: &'a AccountView,
+	f14: &'a AccountView,
+	f15: &'a AccountView,
+	f16: &'a AccountView,
+	f17: &'a AccountView,
+	f18: &'a AccountView,
+	f19: &'a AccountView,
+	f20: &'a AccountView,
+	f21: &'a AccountView,
+	f22: &'a AccountView,
+	f23: &'a AccountView,
+	f24: &'a AccountView,
+	f25: &'a AccountView,
+	f26: &'a AccountView,
+	f27: &'a AccountView,
+	f28: &'a AccountView,
+	f29: &'a AccountView,
+	f30: &'a AccountView,
+	f31: &'a AccountView,
+	req_mut: &'a mut AccountView,
+	opt_a: Option<&'a mut AccountView>,
+	opt_b: Option<&'a mut AccountView>,
+}
+
+#[test]
+fn opt_mut_aliasing_64_enforces_all_adversarial_cases_and_precedence() {
+	let dup: ProgramError = PinaProgramError::DuplicateMutableAccount.into();
+
+	// Confirm every optional-mutable layout with no `#[pina(unique)]` or mutable
+	// remaining routes through `is_mut_only_64()` -> `validate_opt_mut_aliasing_64`.
+	const {
+		assert!(OptionalMutPairAccounts::ALIAS_LAYOUT.is_mut_only_64());
+		assert!(!OptionalMutPairAccounts::ALIAS_LAYOUT.is_simple_mut_64());
+		assert!(OptionalMutPairAccounts::ALIAS_LAYOUT.needs_alias_check());
+
+		assert!(ReqAndOptionalMutAccounts::ALIAS_LAYOUT.is_mut_only_64());
+		assert!(!ReqAndOptionalMutAccounts::ALIAS_LAYOUT.is_simple_mut_64());
+		assert!(ReqAndOptionalMutAccounts::ALIAS_LAYOUT.needs_alias_check());
+
+		assert!(TwoReqAndOptMutAccounts::ALIAS_LAYOUT.is_mut_only_64());
+		assert!(!TwoReqAndOptMutAccounts::ALIAS_LAYOUT.is_simple_mut_64());
+		assert!(TwoReqAndOptMutAccounts::ALIAS_LAYOUT.needs_alias_check());
+	}
+
+	// 1. Distinct required + two present optional mutable accounts succeed.
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), rw(3), rw(4)],
+		std::vec![1, 2, 3, 4],
+	);
+
+	// 2. Two omitted optionals (both readonly and writable sentinel so
+	// `DUP_WRITABLE_MASK != 0` enters `validate_opt_mut_aliasing_64` on dispatch).
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), program_sentinel(false), Slot::Duplicate(2)],
+		std::vec![1, 2],
+	);
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), program_sentinel(true), Slot::Duplicate(2)],
+		std::vec![1, 2],
+	);
+
+	// 3. Omitted optional (`program_id` sentinel) aliasing a required `&mut`
+	// slot holding `program_id`: optional parses as `None` and must NOT conflict.
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), program_sentinel(true), Slot::Duplicate(1), rw(3)],
+		std::vec![1, ID.as_ref()[0], 3],
+	);
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[
+			ro(1),
+			program_sentinel(true),
+			Slot::Duplicate(1),
+			Slot::Duplicate(1),
+		],
+		std::vec![1, ID.as_ref()[0]],
+	);
+
+	// 4. Required `&mut` slot holding `program_id` is NOT omitted: if readonly,
+	// it must be rejected with `InvalidAccountData`, and two required `&mut`
+	// slots holding `program_id` must be rejected with `DuplicateMutableAccount`
+	// even while an optional slot is omitted.
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[
+			ro(1),
+			program_sentinel(false),
+			Slot::Duplicate(1),
+			Slot::Duplicate(1),
+		],
+		&ProgramError::InvalidAccountData,
+	);
+	assert_both_reject(
+		AliasInstruction::TwoReqAndOptMut,
+		&[
+			program_sentinel(true),
+			Slot::Duplicate(0),
+			Slot::Duplicate(0),
+		],
+		&dup,
+	);
+
+	// 5. Present optional aliasing a required mutable slot MUST be rejected.
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), Slot::Duplicate(1), rw(3)],
+		&dup,
+	);
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), rw(3), Slot::Duplicate(1)],
+		&dup,
+	);
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), program_sentinel(false), Slot::Duplicate(1)],
+		&dup,
+	);
+
+	// 6. Present optional aliasing another present optional MUST be rejected.
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), rw(3), Slot::Duplicate(2)],
+		&dup,
+	);
+
+	// 7. Present optional that is not writable MUST be rejected with
+	// `InvalidAccountData` (including when duplicated or combined with an
+	// earlier writable duplicate — writability precedes duplicate).
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), ro(3), rw(4)],
+		&ProgramError::InvalidAccountData,
+	);
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), ro(3), Slot::Duplicate(2)],
+		&ProgramError::InvalidAccountData,
+	);
+	// Precedence case A (`i < j < k`): earlier writable duplicate + later
+	// non-writable present optional must still report `InvalidAccountData`.
+	assert_both_reject(
+		AliasInstruction::TwoReqAndOptMut,
+		&[rw(1), Slot::Duplicate(0), ro(2)],
+		&ProgramError::InvalidAccountData,
+	);
+	// Precedence case B (`i < k < j`): interleaved readonly present optional
+	// between two aliasing writable mutable slots must report `InvalidAccountData`.
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(9), rw(1), ro(2), Slot::Duplicate(1)],
+		&ProgramError::InvalidAccountData,
+	);
+	// Omitted readonly optional after an earlier writable duplicate does NOT
+	// trigger writability failure; the earlier duplicate reports
+	// `DuplicateMutableAccount`.
+	assert_both_reject(
+		AliasInstruction::TwoReqAndOptMut,
+		&[rw(1), Slot::Duplicate(0), program_sentinel(false)],
+		&dup,
+	);
+
+	// 8. Shortened account slices (omitting one or both trailing optionals,
+	// including with `DUP_WRITABLE_MASK != 0` so `validate_opt_mut_aliasing_64`
+	// runs with `accounts.len() < ACCOUNT_LIMIT`).
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2)],
+		std::vec![1, 2],
+	);
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), rw(3)],
+		std::vec![1, 2, 3],
+	);
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), program_sentinel(true)],
+		std::vec![1, 2],
+	);
+	assert_both_accept(
+		AliasInstruction::ReqAndOptionalMut,
+		&[rw(1), Slot::Duplicate(0)],
+		std::vec![1, 1],
+	);
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), rw(2), Slot::Duplicate(1)],
+		&dup,
+	);
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1), ro(2)],
+		&ProgramError::InvalidAccountData,
+	);
+	assert_both_reject(
+		AliasInstruction::ReqAndOptionalMut,
+		&[ro(1)],
+		&ProgramError::NotEnoughAccountKeys,
+	);
+}
+
+#[test]
+fn opt_mut_aliasing_64_handles_indices_32_to_63_and_slices_over_64() {
+	let dup: ProgramError = PinaProgramError::DuplicateMutableAccount.into();
+
+	const {
+		assert!(WideOptMutAccounts::ALIAS_LAYOUT.is_mut_only_64());
+		assert!(!WideOptMutAccounts::ALIAS_LAYOUT.is_simple_mut_64());
+		assert!(!WideOptMutAccounts::ALIAS_LAYOUT.is_compact_32());
+		assert!(WideOptMutAccounts::ALIAS_LAYOUT.needs_alias_check());
+	}
+
+	// Verify `is_mut_only_64()` false boundaries explicitly.
+	let mut boundary = __AliasLayout {
+		static_layout: true,
+		mut_mask: [0b11, 0, 0, 0],
+		optional_mask: [0b10, 0, 0, 0],
+		unique_mask: [0; 4],
+		remaining_mut_start: usize::MAX,
+		remaining_mut_distinct: true,
+	};
+	assert!(boundary.is_mut_only_64());
+	assert!(
+		!__AliasLayout {
+			mut_mask: [0b11, 1, 0, 0],
+			..boundary
+		}
+		.is_mut_only_64()
+	);
+	assert!(
+		!__AliasLayout {
+			unique_mask: [1, 0, 0, 0],
+			..boundary
+		}
+		.is_mut_only_64()
+	);
+	boundary.remaining_mut_start = 4;
+	assert!(!boundary.is_mut_only_64());
+
+	let run_wide_both = |slots: &[Slot]| -> (u64, Result<(), ProgramError>) {
+		let (mut direct_in, _) = serialize(slots, &[], &ID);
+		let mut direct_views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 40];
+		// SAFETY: `direct_in` holds at most 35 serialized accounts.
+		let (pid, count, _) = unsafe {
+			entrypoint::deserialize::<40>(direct_in.as_mut_ptr().cast(), &mut direct_views)
+		};
+		// SAFETY: `deserialize` initialized `count` entries.
+		let direct_slice = unsafe {
+			core::slice::from_raw_parts_mut(direct_views.as_mut_ptr().cast::<AccountView>(), count)
+		};
+		let direct_res = WideOptMutAccounts::try_from((pid, direct_slice)).map(|_| ());
+
+		let (mut route_in, offset) = serialize(slots, &[], &ID);
+		let ptr = route_in.as_mut_ptr().cast::<u8>();
+		// SAFETY: `route_in` is a valid serialized entrypoint buffer.
+		let route_status = unsafe {
+			__dispatch_entrypoint(
+				ptr,
+				ptr.add(offset),
+				|entry: EntrypointInput, pid: &Address, _data: &[u8]| {
+					let mut views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 35];
+					let route = entry.parse_route::<35, { ROUTE_BOUNDED }, true>(&mut views)?;
+					let _ = WideOptMutAccounts::try_from_route(pid, route)?;
+					Ok(())
+				},
+			)
+		};
+
+		(route_status, direct_res)
+	};
+
+	let base_slots = || -> Vec<Slot> {
+		let mut slots: Vec<Slot> = (0_u8..32).map(ro).collect();
+		slots.push(rw(40)); // slot 32: req_mut
+		slots.push(rw(41)); // slot 33: opt_a
+		slots.push(rw(42)); // slot 34: opt_b
+		slots
+	};
+
+	// Distinct accounts at slots 32..35 succeed.
+	assert_eq!(run_wide_both(&base_slots()), (SUCCESS, Ok(())));
+
+	// Both optionals omitted via writable `program_id` sentinel succeed.
+	let mut two_omitted = base_slots();
+	two_omitted[33] = program_sentinel(true);
+	two_omitted[34] = Slot::Duplicate(33);
+	assert_eq!(run_wide_both(&two_omitted), (SUCCESS, Ok(())));
+
+	// Omitted optional at slot 33 aliasing required `&mut` holding `program_id`
+	// at slot 32 succeeds.
+	let mut req_prog_omitted = base_slots();
+	req_prog_omitted[32] = program_sentinel(true);
+	req_prog_omitted[33] = Slot::Duplicate(32);
+	assert_eq!(run_wide_both(&req_prog_omitted), (SUCCESS, Ok(())));
+
+	// Present optional at slot 33 aliasing required `&mut` at slot 32 fails.
+	let mut opt_aliases_req = base_slots();
+	opt_aliases_req[33] = Slot::Duplicate(32);
+	assert_eq!(
+		run_wide_both(&opt_aliases_req),
+		(u64::from(dup.clone()), Err(dup.clone()))
+	);
+
+	// Present optional at slot 34 aliasing present optional at slot 33 fails.
+	let mut opt_aliases_opt = base_slots();
+	opt_aliases_opt[34] = Slot::Duplicate(33);
+	assert_eq!(
+		run_wide_both(&opt_aliases_opt),
+		(u64::from(dup.clone()), Err(dup.clone()))
+	);
+
+	// Present optional at slot 33 readonly while slot 32 == slot 34 reports
+	// `InvalidAccountData` (writability precedes duplicate even in 32..64).
+	let mut precedence_wide = base_slots();
+	precedence_wide[33] = ro(99);
+	precedence_wide[34] = Slot::Duplicate(32);
+	assert_eq!(
+		run_wide_both(&precedence_wide),
+		(
+			u64::from(ProgramError::InvalidAccountData),
+			Err(ProgramError::InvalidAccountData)
+		)
+	);
+
+	// Shortened slice (34 accounts, trailing slot 34 absent): distinct succeeds,
+	// duplicate between 32 and 33 fails.
+	let mut short_ok = base_slots();
+	short_ok.pop();
+	assert_eq!(run_wide_both(&short_ok), (SUCCESS, Ok(())));
+
+	let mut short_dup = short_ok;
+	short_dup[33] = Slot::Duplicate(32);
+	assert_eq!(
+		run_wide_both(&short_dup),
+		(u64::from(dup.clone()), Err(dup))
+	);
+
+	// Bit-63 boundary with `accounts.len() == 66 > 64`: verify bit 63 (`1 << 63`)
+	// handles omitted optional, duplicate, non-writable, and ignores >64 slots,
+	// matching `validate_account_aliasing` on every case.
+	let bit_32_63_layout = __AliasLayout {
+		static_layout: true,
+		mut_mask: [(1_u64 << 32) | (1_u64 << 63), 0, 0, 0],
+		optional_mask: [1_u64 << 63, 0, 0, 0],
+		unique_mask: [0; 4],
+		remaining_mut_start: usize::MAX,
+		remaining_mut_distinct: true,
+	};
+	let check_bit_63 = |slots: &[Slot], expected: u8| {
+		let (mut input, _) = serialize(slots, &[], &ID);
+		let mut views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 66];
+		// SAFETY: `input` holds 66 serialized accounts.
+		let (pid, count, _) =
+			unsafe { entrypoint::deserialize::<66>(input.as_mut_ptr().cast(), &mut views) };
+		// SAFETY: `deserialize` initialized `count` entries.
+		let slice =
+			unsafe { core::slice::from_raw_parts(views.as_mut_ptr().cast::<AccountView>(), count) };
+		let fast = validate_opt_mut_aliasing_64(
+			pid,
+			slice,
+			bit_32_63_layout.mut_mask[0],
+			bit_32_63_layout.optional_mask[0] & bit_32_63_layout.mut_mask[0],
+		);
+		let general = validate_account_aliasing(pid, slice, 66, &bit_32_63_layout);
+		assert_eq!(fast, expected);
+		assert_eq!(fast, general);
+	};
+
+	let mut over64_ok: Vec<Slot> = (0_u8..66).map(rw).collect();
+	// Duplicate at slots 64/65 (outside mut_mask[0]) must be ignored.
+	over64_ok[65] = Slot::Duplicate(64);
+	check_bit_63(&over64_ok, 0);
+
+	// Slot 63 omitted (`program_id` aliasing slot 32) -> OK (0).
+	let mut over64_omitted = over64_ok.clone();
+	over64_omitted[32] = program_sentinel(true);
+	over64_omitted[63] = Slot::Duplicate(32);
+	check_bit_63(&over64_omitted, 0);
+
+	// Slot 63 present aliasing slot 32 -> duplicate (2).
+	let mut over64_dup = over64_ok.clone();
+	over64_dup[63] = Slot::Duplicate(32);
+	check_bit_63(&over64_dup, 2);
+
+	// Slot 63 present readonly -> not writable (1).
+	let mut over64_ro = over64_ok;
+	over64_ro[63] = ro(120);
+	check_bit_63(&over64_ro, 1);
+}
+
+#[test]
+fn validate_opt_mut_aliasing_64_matches_general_validators_exhaustively() {
+	use pinocchio::account::NOT_BORROWED;
+	use pinocchio::account::RuntimeAccount;
+
+	fn make_runtime(address: Address, writable: bool) -> RuntimeAccount {
+		RuntimeAccount {
+			borrow_state: NOT_BORROWED,
+			is_signer: 0,
+			is_writable: u8::from(writable),
+			executable: 0,
+			padding: [0; 4],
+			address,
+			owner: ID,
+			lamports: 1,
+			data_len: 0,
+		}
+	}
+
+	let mut pool_raw = [
+		make_runtime(addr(1), true),  // 0: rw(1)
+		make_runtime(addr(2), true),  // 1: rw(2)
+		make_runtime(addr(3), false), // 2: ro(3)
+		make_runtime(addr(4), false), // 3: ro(4)
+		make_runtime(ID, true),       // 4: rw(ID)
+		make_runtime(ID, false),      // 5: ro(ID)
+	];
+	// SAFETY: `pool_raw` remains pinned for the duration of this test.
+	let pool: [AccountView; 6] = core::array::from_fn(|idx| unsafe {
+		AccountView::new_unchecked(core::ptr::from_mut(&mut pool_raw[idx]))
+	});
+
+	let assert_all_match = |slots: usize, mut_mask: u64, opt_mask: u64, slice: &[AccountView]| {
+		let opt_mut_mask = opt_mask & mut_mask;
+		let layout = __AliasLayout {
+			static_layout: true,
+			mut_mask: [mut_mask, 0, 0, 0],
+			optional_mask: [opt_mask, 0, 0, 0],
+			unique_mask: [0; 4],
+			remaining_mut_start: usize::MAX,
+			remaining_mut_distinct: true,
+		};
+		let mut_and_opt =
+			(mut_mask & u64::from(u32::MAX)) | ((opt_mask & u64::from(u32::MAX)) << 32);
+		let unique_and_rem = 0xFF_u64 << 32;
+
+		let opt_mut_64 = validate_opt_mut_aliasing_64(&ID, slice, mut_mask, opt_mut_mask);
+		let compact_32 = validate_account_aliasing_compact(&ID, slice, mut_and_opt, unique_and_rem);
+		let general = validate_account_aliasing(&ID, slice, slots, &layout);
+
+		assert_eq!(
+			opt_mut_64,
+			compact_32,
+			"mismatch vs compact_32 for slots={slots} mut={mut_mask:#b} opt={opt_mask:#b} len={}",
+			slice.len()
+		);
+		assert_eq!(
+			opt_mut_64,
+			general,
+			"mismatch vs general for slots={slots} mut={mut_mask:#b} opt={opt_mask:#b} len={}",
+			slice.len()
+		);
+	};
+
+	// Part A: exhaustive over all 4^3 = 64 3-slot layouts (including optional
+	// readonly slots) and all slices of length 0..=3 from 6 accounts (259 slices
+	// -> 16,576 combinations; smaller account pool under Miri).
+	let pool_a_len = if cfg!(miri) { 4 } else { 6 };
+	let pool_a_indices: &[usize] = if cfg!(miri) {
+		&[0, 2, 4, 5]
+	} else {
+		&[0, 1, 2, 3, 4, 5]
+	};
+	for layout_code in 0_u32..64 {
+		let mut mut_mask = 0_u64;
+		let mut opt_mask = 0_u64;
+		for bit in 0..3 {
+			let kind = (layout_code >> (bit * 2)) & 0b11;
+			// 0 = ro, 1 = opt_ro, 2 = req_mut, 3 = opt_mut
+			if kind == 1 || kind == 3 {
+				opt_mask |= 1_u64 << bit;
+			}
+			if kind == 2 || kind == 3 {
+				mut_mask |= 1_u64 << bit;
+			}
+		}
+
+		// Length 0
+		assert_all_match(3, mut_mask, opt_mask, &[]);
+		// Length 1
+		for &a in &pool_a_indices[..pool_a_len] {
+			assert_all_match(3, mut_mask, opt_mask, &[pool[a]]);
+			// Length 2
+			for &b in &pool_a_indices[..pool_a_len] {
+				assert_all_match(3, mut_mask, opt_mask, &[pool[a], pool[b]]);
+				// Length 3
+				for &c in &pool_a_indices[..pool_a_len] {
+					assert_all_match(3, mut_mask, opt_mask, &[pool[a], pool[b], pool[c]]);
+				}
+			}
+		}
+	}
+
+	// Part B: exhaustive over all 3^4 = 81 4-slot layouts (`ro`, `req_mut`,
+	// `opt_mut`) and all slices of length 0..=4 drawn from 5 accounts
+	// (`rw(1)`, `rw(2)`, `ro(3)`, `rw(ID)`, `ro(ID)`) -> 63,261 combinations.
+	#[cfg(not(miri))]
+	{
+		let pool_b = [pool[0], pool[1], pool[2], pool[4], pool[5]];
+		for mut code in 0_u32..81 {
+			let mut mut_mask = 0_u64;
+			let mut opt_mask = 0_u64;
+			for bit in 0..4 {
+				let kind = code % 3;
+				code /= 3;
+				// 0 = ro, 1 = req_mut, 2 = opt_mut
+				if kind == 1 || kind == 2 {
+					mut_mask |= 1_u64 << bit;
+				}
+				if kind == 2 {
+					opt_mask |= 1_u64 << bit;
+				}
+			}
+
+			assert_all_match(4, mut_mask, opt_mask, &[]);
+			for &a in &pool_b {
+				assert_all_match(4, mut_mask, opt_mask, &[a]);
+				for &b in &pool_b {
+					assert_all_match(4, mut_mask, opt_mask, &[a, b]);
+					for &c in &pool_b {
+						assert_all_match(4, mut_mask, opt_mask, &[a, b, c]);
+						for &d in &pool_b {
+							assert_all_match(4, mut_mask, opt_mask, &[a, b, c, d]);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+#[test]
+fn cold_route_and_shared_dispatch_accounts_match_direct_path() {
+	let dup: ProgramError = PinaProgramError::DuplicateMutableAccount.into();
+
+	// Shared accounts struct across multiple `#[dispatch(accounts = ...)]`
+	// variants (`SharedMutPairA`, `SharedMutPairB`) parses and enforces aliasing
+	// identically on both dispatch (`__parse_accounts_inlined`) and direct paths.
+	for ix in [
+		AliasInstruction::SharedMutPairA,
+		AliasInstruction::SharedMutPairB,
+	] {
+		assert_both_accept(ix, &[rw(1), rw(2)], std::vec![1, 2]);
+		assert_both_reject(ix, &[rw(1), Slot::Duplicate(0)], &dup);
+		assert_both_reject(
+			ix,
+			&[ro(1), Slot::Duplicate(0)],
+			&ProgramError::InvalidAccountData,
+		);
+		assert_both_reject(ix, &[rw(1)], &ProgramError::NotEnoughAccountKeys);
+	}
+
+	// `COLD_ROUTE = true` (`run_dispatch`) matches `COLD_ROUTE = false`
+	// (`run_direct`) on 3-mut and 4-mut simple layouts even when an earlier
+	// writable duplicate precedes a later readonly slot.
+	assert_both_reject(
+		AliasInstruction::MutTriple,
+		&[rw(1), Slot::Duplicate(0), ro(2)],
+		&dup,
+	);
+	assert_both_reject(
+		AliasInstruction::MutQuad,
+		&[ro(9), rw(1), Slot::Duplicate(1), rw(2), ro(3)],
+		&dup,
+	);
+
+	// `COLD_ROUTE = true` (`validate_account_aliasing_compact`) matches
+	// `COLD_ROUTE = false` (inline <=4 unique fast path) across distinct,
+	// allowed ro+mut overlap, aliased unique, aliased mut, writability-before-
+	// duplicate precedence, and short-slice inputs.
+	const {
+		assert!(!UniqueQuadAccounts::ALIAS_LAYOUT.is_mut_only_64());
+		assert!(UniqueQuadAccounts::ALIAS_LAYOUT.is_compact_32());
+		assert!(UniqueQuadAccounts::ALIAS_LAYOUT.optional_mask[0] == 0);
+		assert!(UniqueQuadAccounts::ACCOUNT_LIMIT == 4);
+	}
+	assert_both_accept(
+		AliasInstruction::UniqueQuad,
+		&[ro(1), ro(2), rw(3), rw(4)],
+		std::vec![1, 2, 3, 4],
+	);
+	// Allowed overlap between non-unique `ro_slot` (0) and `mut_a` (2) sets
+	// `DUP_ANY_MASK | DUP_WRITABLE_MASK`, exercising `COLD_ROUTE = true`.
+	assert_both_accept(
+		AliasInstruction::UniqueQuad,
+		&[rw(1), ro(2), Slot::Duplicate(0), rw(4)],
+		std::vec![1, 2, 1, 4],
+	);
+	assert_both_reject(
+		AliasInstruction::UniqueQuad,
+		&[ro(1), Slot::Duplicate(0), rw(3), rw(4)],
+		&dup,
+	);
+	// Earlier readonly unique duplicate + later non-writable mut reports
+	// `InvalidAccountData` first on both paths.
+	assert_both_reject(
+		AliasInstruction::UniqueQuad,
+		&[ro(1), Slot::Duplicate(0), ro(3), rw(4)],
+		&ProgramError::InvalidAccountData,
+	);
+	assert_both_reject(
+		AliasInstruction::UniqueQuad,
+		&[ro(1), ro(2), rw(3), Slot::Duplicate(2)],
+		&dup,
+	);
+	assert_both_reject(
+		AliasInstruction::UniqueQuad,
+		&[ro(1), ro(2), rw(3)],
+		&ProgramError::NotEnoughAccountKeys,
+	);
 }

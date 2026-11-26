@@ -184,7 +184,7 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			}
 			AccountFieldKind::Nested => {
 				let ty = &field.ty;
-				quote! { let #ident = <#ty as #crate_path::ParseAccounts>::parse_accounts(cursor)?; }
+				quote! { let #ident = <#ty as #crate_path::ParseAccounts>::__parse_accounts_inlined(cursor)?; }
 			}
 		};
 		parse_fields.push(parse_field);
@@ -519,6 +519,13 @@ pub(crate) fn expand(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 			fn parse_accounts(
 				cursor: &mut #crate_path::AccountsCursor<#lifetime>,
 			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
+				Self::__parse_accounts_inlined(cursor)
+			}
+
+			#[inline(always)]
+			fn __parse_accounts_inlined(
+				cursor: &mut #crate_path::AccountsCursor<#lifetime>,
+			) -> ::core::result::Result<Self, #crate_path::ProgramError> {
 				#child_unique_guard
 				#(#parse_fields)*
 				#remaining_binding
@@ -751,7 +758,7 @@ fn generate_validation_impl(
 
 	Ok(quote! {
 		impl #impl_generics #crate_path::PinaValidate for #struct_name #ty_generics #where_clause {
-			#[inline]
+			#[inline(always)]
 			fn validate(&self) -> #crate_path::ProgramResult {
 				#(#header_checks)*
 				#(#identity_checks)*

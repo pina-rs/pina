@@ -1059,6 +1059,7 @@ fn account_validation_accepts_matching_metadata() {
 	let account = &account_views[0];
 
 	assert!(account.assert_executable().is_ok());
+	assert!(account.assert_program(&address).is_ok());
 	assert!(account.assert_empty().is_ok());
 	assert!(account.assert_sysvar(&address).is_ok());
 	assert!(account.assert_owners(&[SYSVAR_OWNER]).is_ok());

@@ -52,6 +52,12 @@ impl<'a> pina::ParseAccounts<'a> for InitAccounts<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let payer = cursor.next()?;
         let config = cursor.next()?;
         let system_program = cursor.next()?;
@@ -96,7 +102,7 @@ for InitAccounts<'a> {
     }
 }
 impl<'a> pina::PinaValidate for InitAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }
@@ -172,6 +178,12 @@ impl<'a> pina::ParseAccounts<'a> for TransferAccounts<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let authority = cursor.next()?;
         let source = cursor.next()?;
         let destination = cursor.next()?;
@@ -221,7 +233,7 @@ for TransferAccounts<'a> {
     }
 }
 impl<'a> pina::PinaValidate for TransferAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }
@@ -294,6 +306,12 @@ impl<'a> pina::ParseAccounts<'a> for MutableTransferAccounts<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let authority = cursor.next_mut()?;
         let extra = cursor.remaining_mut_distinct()?;
         Ok(Self { authority, extra })
@@ -336,7 +354,7 @@ for MutableTransferAccounts<'a> {
     }
 }
 impl<'a> pina::PinaValidate for MutableTransferAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }
@@ -405,6 +423,12 @@ impl<'a> pina::ParseAccounts<'a> for DuplicateMutableRemainingAccounts<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let authority = cursor.next()?;
         let extra = cursor.remaining_mut()?;
         Ok(Self { authority, extra })
@@ -451,7 +475,7 @@ for DuplicateMutableRemainingAccounts<'a> {
     }
 }
 impl<'a> pina::PinaValidate for DuplicateMutableRemainingAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }
@@ -513,6 +537,12 @@ impl<'a> pina::ParseAccounts<'a> for SingleAccount<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let account = cursor.next()?;
         Ok(Self { account })
     }
@@ -551,7 +581,7 @@ for SingleAccount<'a> {
     }
 }
 impl<'a> pina::PinaValidate for SingleAccount<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }
@@ -651,6 +681,12 @@ impl<'a> pina::ParseAccounts<'a> for EscrowAccounts<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let maker = cursor.next()?;
         let escrow = cursor.next()?;
         let mint_a = cursor.next()?;
@@ -707,7 +743,7 @@ for EscrowAccounts<'a> {
     }
 }
 impl<'a> pina::PinaValidate for EscrowAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }
@@ -793,6 +829,12 @@ impl<'a> ::pina::ParseAccounts<'a> for DefaultCrateAccounts<'a> {
     fn parse_accounts(
         cursor: &mut ::pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, ::pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut ::pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, ::pina::ProgramError> {
         let authority = cursor.next()?;
         let data = cursor.next()?;
         Ok(Self { authority, data })
@@ -838,7 +880,7 @@ for DefaultCrateAccounts<'a> {
     }
 }
 impl<'a> ::pina::PinaValidate for DefaultCrateAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> ::pina::ProgramResult {
         Ok(())
     }
@@ -919,6 +961,12 @@ impl<'a> pina::ParseAccounts<'a> for MakeAccounts<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let maker = cursor.next_mut()?;
         let system_program = cursor.next()?;
         let escrow = cursor.next_mut_opt()?;
@@ -965,7 +1013,7 @@ for MakeAccounts<'a> {
     }
 }
 impl<'a> pina::PinaValidate for MakeAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }
