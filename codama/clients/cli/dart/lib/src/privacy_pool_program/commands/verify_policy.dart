@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class VerifyPolicyCommand extends Command<void> {
@@ -14,12 +13,14 @@ final class VerifyPolicyCommand extends Command<void> {
       ..addOption(
         'policy_hash',
         mandatory: true,
-        help: "Single BN254 scalar representing the Custom Ring policy statement.",
+        help:
+            "Single BN254 scalar representing the Custom Ring policy statement.",
       )
       ..addOption(
         'proof_a',
         mandatory: true,
-        help: "192-byte compressed Groth16 policy proof (`A: 32B, B: 128B, C: 32B`).",
+        help:
+            "192-byte compressed Groth16 policy proof (`A: 32B, B: 128B, C: 32B`).",
       )
       ..addOption('proof_b', mandatory: true, help: "proofB")
       ..addOption('proof_c', mandatory: true, help: "proofC")

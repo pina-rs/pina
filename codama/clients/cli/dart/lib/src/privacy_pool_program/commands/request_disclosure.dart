@@ -5,7 +5,6 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class RequestDisclosureCommand extends Command<void> {
@@ -18,7 +17,8 @@ final class RequestDisclosureCommand extends Command<void> {
       ..addOption(
         'view_pubkey',
         mandatory: true,
-        help: "Claimed consent key for `commitment`, authenticated via `path_elements`.",
+        help:
+            "Claimed consent key for `commitment`, authenticated via `path_elements`.",
       )
       ..addOption('leaf_index', mandatory: true, help: "leafIndex")
       ..addOption('path_elements', mandatory: true, help: "pathElements")

@@ -40,7 +40,8 @@ CommandRunner<void> buildRunner() {
     ..argParser.addOption(
       'compute-unit-limit',
       valueHelp: 'units',
-      help: 'Compute unit limit to request instead of the one recorded for the instruction.',
+      help:
+          'Compute unit limit to request instead of the one recorded for the instruction.',
     )
     ..addCommand(InitializeCommand())
     ..addCommand(SetVerificationKeyCommand())

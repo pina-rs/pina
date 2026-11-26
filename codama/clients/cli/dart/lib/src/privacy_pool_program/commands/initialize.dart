@@ -7,7 +7,6 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
-
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class InitializeCommand extends Command<void> {
@@ -22,7 +21,8 @@ final class InitializeCommand extends Command<void> {
       ..addOption(
         'custodians',
         mandatory: true,
-        help: "Initial three-member disclosure committee as concatenated 32-byte keys.",
+        help:
+            "Initial three-member disclosure committee as concatenated 32-byte keys.",
       )
       ..addOption(
         'pool_config',
@@ -99,8 +99,9 @@ final class InitializeCommand extends Command<void> {
           )).$1;
     final disclosureLog = (results['disclosure_log'] as String?) != null
         ? pubkey('--disclosure-log', results['disclosure_log']! as String)
-        : (await findDisclosureLogPda(programAddress: context.programAddress))
-              .$1;
+        : (await findDisclosureLogPda(
+            programAddress: context.programAddress,
+          )).$1;
     final programData = pubkey(
       '--program-data',
       results['program_data']! as String,
