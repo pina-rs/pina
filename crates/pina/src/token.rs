@@ -14,6 +14,13 @@ fn validate_extensions_allowed<B>(
 where
 	B: crate::token_2022::state::ExtensionBaseState,
 {
+	if allowed.is_empty() {
+		return state
+			.write_extension_types(&mut [])
+			.map(|_| ())
+			.map_err(|_| ProgramError::InvalidAccountData);
+	}
+
 	let mut extensions = [crate::token_2022::state::ExtensionType::Uninitialized;
 		crate::token_2022::state::MAX_EXTENSIONS];
 	let count = state.write_extension_types(&mut extensions)?;
@@ -63,6 +70,7 @@ impl<'a> TokenMintRef<'a> {
 	///
 	/// Returns `IncorrectProgramId` for unsupported programs, or the validation
 	/// error returned by the selected upstream token crate.
+	#[inline]
 	pub fn from_account_view(
 		account: &'a AccountView,
 		token_program: &Address,
@@ -82,6 +90,7 @@ impl<'a> TokenMintRef<'a> {
 	}
 
 	/// Return the program that validated this mint.
+	#[inline]
 	pub const fn program_id(&self) -> &Address {
 		match self {
 			Self::Legacy(_) => &ID,
@@ -101,6 +110,7 @@ impl<'a> TokenMintRef<'a> {
 	///
 	/// Returns [`ProgramError::InvalidAccountData`] when a Token-2022 extension is
 	/// not allow-listed, or propagates malformed extension-data errors.
+	#[inline]
 	pub fn assert_extensions_allowed(
 		self,
 		allowed: &[crate::token_2022::state::ExtensionType],
@@ -118,11 +128,13 @@ impl<'a> TokenMintRef<'a> {
 	///
 	/// Returns [`ProgramError::InvalidAccountData`] when any extension is present,
 	/// or propagates malformed extension-data errors.
+	#[inline]
 	pub fn assert_no_extensions(self) -> Result<Self, ProgramError> {
 		self.assert_extensions_allowed(&[])
 	}
 
 	/// Borrow the legacy mint when this view belongs to SPL Token.
+	#[inline]
 	pub fn legacy(&self) -> Option<&state::Mint> {
 		match self {
 			Self::Legacy(mint) => Some(mint),
@@ -131,6 +143,7 @@ impl<'a> TokenMintRef<'a> {
 	}
 
 	/// Borrow the complete Token-2022 state when extensions are available.
+	#[inline]
 	pub fn token_2022(
 		&self,
 	) -> Option<&crate::token_2022::state::StateWithExtensions<crate::token_2022::state::Mint>> {
@@ -141,6 +154,7 @@ impl<'a> TokenMintRef<'a> {
 	}
 
 	/// Return the optional mint authority.
+	#[inline]
 	pub fn mint_authority(&self) -> Option<&Address> {
 		match self {
 			Self::Legacy(mint) => mint.mint_authority(),
@@ -149,6 +163,7 @@ impl<'a> TokenMintRef<'a> {
 	}
 
 	/// Return the total token supply.
+	#[inline]
 	pub fn supply(&self) -> u64 {
 		match self {
 			Self::Legacy(mint) => mint.supply(),
@@ -157,6 +172,7 @@ impl<'a> TokenMintRef<'a> {
 	}
 
 	/// Return the number of base-ten decimal places.
+	#[inline]
 	pub fn decimals(&self) -> u8 {
 		match self {
 			Self::Legacy(mint) => mint.decimals(),
@@ -165,6 +181,7 @@ impl<'a> TokenMintRef<'a> {
 	}
 
 	/// Return whether the mint is initialized.
+	#[inline]
 	pub fn is_initialized(&self) -> bool {
 		match self {
 			Self::Legacy(mint) => mint.is_initialized(),
@@ -173,6 +190,7 @@ impl<'a> TokenMintRef<'a> {
 	}
 
 	/// Return the optional freeze authority.
+	#[inline]
 	pub fn freeze_authority(&self) -> Option<&Address> {
 		match self {
 			Self::Legacy(mint) => mint.freeze_authority(),
@@ -209,6 +227,7 @@ impl<'a> TokenAccountRef<'a> {
 	///
 	/// Returns `IncorrectProgramId` for unsupported programs, or the validation
 	/// error returned by the selected upstream token crate.
+	#[inline]
 	pub fn from_account_view(
 		account: &'a AccountView,
 		token_program: &Address,
@@ -228,6 +247,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return the program that validated this token account.
+	#[inline]
 	pub const fn program_id(&self) -> &Address {
 		match self {
 			Self::Legacy(_) => &ID,
@@ -248,6 +268,7 @@ impl<'a> TokenAccountRef<'a> {
 	///
 	/// Returns [`ProgramError::InvalidAccountData`] when a Token-2022 extension is
 	/// not allow-listed, or propagates malformed extension-data errors.
+	#[inline]
 	pub fn assert_extensions_allowed(
 		self,
 		allowed: &[crate::token_2022::state::ExtensionType],
@@ -265,11 +286,13 @@ impl<'a> TokenAccountRef<'a> {
 	///
 	/// Returns [`ProgramError::InvalidAccountData`] when any extension is present,
 	/// or propagates malformed extension-data errors.
+	#[inline]
 	pub fn assert_no_extensions(self) -> Result<Self, ProgramError> {
 		self.assert_extensions_allowed(&[])
 	}
 
 	/// Borrow the legacy token account when this view belongs to SPL Token.
+	#[inline]
 	pub fn legacy(&self) -> Option<&state::TokenAccount> {
 		match self {
 			Self::Legacy(account) => Some(account),
@@ -278,6 +301,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Borrow the complete Token-2022 state when extensions are available.
+	#[inline]
 	pub fn token_2022(
 		&self,
 	) -> Option<
@@ -290,6 +314,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return the mint associated with this account.
+	#[inline]
 	pub fn mint(&self) -> &Address {
 		match self {
 			Self::Legacy(account) => account.mint(),
@@ -298,6 +323,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return the wallet that owns this token account.
+	#[inline]
 	pub fn owner(&self) -> &Address {
 		match self {
 			Self::Legacy(account) => account.owner(),
@@ -306,6 +332,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return the token balance.
+	#[inline]
 	pub fn amount(&self) -> u64 {
 		match self {
 			Self::Legacy(account) => account.amount(),
@@ -314,6 +341,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return the optional transfer delegate.
+	#[inline]
 	pub fn delegate(&self) -> Option<&Address> {
 		match self {
 			Self::Legacy(account) => account.delegate(),
@@ -322,6 +350,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return whether this account wraps native SOL.
+	#[inline]
 	pub fn is_native(&self) -> bool {
 		match self {
 			Self::Legacy(account) => account.is_native(),
@@ -330,6 +359,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return the rent reserve for a native account.
+	#[inline]
 	pub fn native_amount(&self) -> Option<u64> {
 		match self {
 			Self::Legacy(account) => account.native_amount(),
@@ -338,6 +368,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return the amount currently delegated.
+	#[inline]
 	pub fn delegated_amount(&self) -> u64 {
 		match self {
 			Self::Legacy(account) => account.delegated_amount(),
@@ -346,6 +377,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return the optional close authority.
+	#[inline]
 	pub fn close_authority(&self) -> Option<&Address> {
 		match self {
 			Self::Legacy(account) => account.close_authority(),
@@ -354,6 +386,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return whether the account is initialized.
+	#[inline]
 	pub fn is_initialized(&self) -> bool {
 		match self {
 			Self::Legacy(account) => account.is_initialized(),
@@ -362,6 +395,7 @@ impl<'a> TokenAccountRef<'a> {
 	}
 
 	/// Return whether the account is frozen.
+	#[inline]
 	pub fn is_frozen(&self) -> bool {
 		match self {
 			Self::Legacy(account) => account.is_frozen(),

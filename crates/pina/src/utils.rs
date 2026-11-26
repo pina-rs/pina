@@ -209,17 +209,26 @@ pub fn log_caller() {}
 /// }
 /// ```
 #[cfg(feature = "token")]
+#[inline]
 pub fn try_get_associated_token_address(
 	wallet_address: &Address,
 	token_mint_address: &Address,
 	token_program_id: &Address,
 ) -> Option<(Address, u8)> {
-	crate::try_find_program_address(
-		&[
-			wallet_address.as_ref(),
-			token_program_id.as_ref(),
-			token_mint_address.as_ref(),
-		],
-		&pinocchio_associated_token_account::ID,
-	)
+	#[cfg(any(target_os = "solana", target_arch = "bpf"))]
+	{
+		crate::pda::sbf_derive_ata(wallet_address, token_mint_address, token_program_id)
+	}
+
+	#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+	{
+		crate::try_find_program_address(
+			&[
+				wallet_address.as_ref(),
+				token_program_id.as_ref(),
+				token_mint_address.as_ref(),
+			],
+			&pinocchio_associated_token_account::ID,
+		)
+	}
 }

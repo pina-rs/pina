@@ -2027,9 +2027,10 @@ impl<'a> ProcessAccountInfos<'a> for ConfigInitializeAccounts<'a> {
 		let args = ConfigInitializeIx::try_from_bytes(data)?;
 
 		self.authority.assert_signer()?.assert_writable()?;
-		let (program_data, _) = Address::find_program_address(&[ID.as_ref()], &UPGRADEABLE_LOADER);
+		const PROGRAM_DATA: Address =
+			find_program_address_const(&[ID.as_array().as_slice()], &UPGRADEABLE_LOADER).0;
 		self.program_data
-			.assert_address(&program_data)?
+			.assert_address(&PROGRAM_DATA)?
 			.assert_owner(&UPGRADEABLE_LOADER)?;
 		let metadata = self.program_data.try_borrow()?;
 
