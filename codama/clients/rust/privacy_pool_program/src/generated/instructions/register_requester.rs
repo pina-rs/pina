@@ -11,12 +11,12 @@
 pub const REGISTER_REQUESTER_DISCRIMINATOR: u8 = 3u8;
 /// Compute units `RegisterRequester` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const REGISTER_REQUESTER_MEASURED_COMPUTE_UNITS: u32 = 319;
+pub const REGISTER_REQUESTER_MEASURED_COMPUTE_UNITS: u32 = 243;
 /// Compute unit limit to request for a transaction carrying `RegisterRequester`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT: u32 = 700;
+pub const REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT: u32 = 600;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -105,6 +105,5 @@ impl RegisterRequesterInstructionData {
 pub struct RegisterRequesterInstructionWire {
 	pub discriminator: u8,
 	pub requester: solana_pubkey::Pubkey,
-	/// Highest tier the entity may file at.
 	pub max_tier: u8,
 }

@@ -22,10 +22,7 @@ export const registerRequesterCommand = registerGlobals(
 )
 	.description("registerRequester")
 	.requiredOption("--requester <requester>", "requester")
-	.requiredOption(
-		"--max-tier <maxTier>",
-		"Highest tier the entity may file at.",
-	)
+	.requiredOption("--max-tier <maxTier>", "maxTier")
 	.option(
 		"--pool-config <poolConfig>",
 		"The `pool_config` account [default: derived]",

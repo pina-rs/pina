@@ -11,25 +11,25 @@ import 'programs/programs.dart';
 
 /// Compute units `initialize` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int initializeMeasuredComputeUnits = 48260;
+const int initializeMeasuredComputeUnits = 14980;
 
 /// Compute unit limit to request for a transaction carrying `initialize`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int initializeComputeUnitLimit = 58300;
+const int initializeComputeUnitLimit = 18300;
 
 /// Compute units `setVerificationKey` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int setVerificationKeyMeasuredComputeUnits = 15258;
+const int setVerificationKeyMeasuredComputeUnits = 4596;
 
 /// Compute unit limit to request for a transaction carrying `setVerificationKey`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int setVerificationKeyComputeUnitLimit = 18700;
+const int setVerificationKeyComputeUnitLimit = 5900;
 
 /// Compute units `setCustodians` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int setCustodiansMeasuredComputeUnits = 243;
+const int setCustodiansMeasuredComputeUnits = 230;
 
 /// Compute unit limit to request for a transaction carrying `setCustodians`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -38,70 +38,70 @@ const int setCustodiansComputeUnitLimit = 600;
 
 /// Compute units `registerRequester` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int registerRequesterMeasuredComputeUnits = 319;
+const int registerRequesterMeasuredComputeUnits = 243;
 
 /// Compute unit limit to request for a transaction carrying `registerRequester`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int registerRequesterComputeUnitLimit = 700;
+const int registerRequesterComputeUnitLimit = 600;
 
 /// Compute units `deposit` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int depositMeasuredComputeUnits = 15996;
+const int depositMeasuredComputeUnits = 17804;
 
 /// Compute unit limit to request for a transaction carrying `deposit`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int depositComputeUnitLimit = 19500;
+const int depositComputeUnitLimit = 21700;
 
 /// Compute units `withdraw` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int withdrawMeasuredComputeUnits = 92269;
+const int withdrawMeasuredComputeUnits = 106428;
 
 /// Compute unit limit to request for a transaction carrying `withdraw`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int withdrawComputeUnitLimit = 111100;
+const int withdrawComputeUnitLimit = 128100;
 
 /// Compute units `transfer` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int transferMeasuredComputeUnits = 105283;
+const int transferMeasuredComputeUnits = 122195;
 
 /// Compute unit limit to request for a transaction carrying `transfer`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int transferComputeUnitLimit = 126700;
+const int transferComputeUnitLimit = 147000;
 
 /// Compute units `requestDisclosure` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int requestDisclosureMeasuredComputeUnits = 11015;
+const int requestDisclosureMeasuredComputeUnits = 17668;
 
 /// Compute unit limit to request for a transaction carrying `requestDisclosure`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int requestDisclosureComputeUnitLimit = 13600;
+const int requestDisclosureComputeUnitLimit = 21600;
 
 /// Compute units `grantDisclosure` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int grantDisclosureMeasuredComputeUnits = 1893;
+const int grantDisclosureMeasuredComputeUnits = 171;
 
 /// Compute unit limit to request for a transaction carrying `grantDisclosure`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int grantDisclosureComputeUnitLimit = 2600;
+const int grantDisclosureComputeUnitLimit = 600;
 
 /// Compute units `challengeDisclosure` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int challengeDisclosureMeasuredComputeUnits = 1943;
+const int challengeDisclosureMeasuredComputeUnits = 212;
 
 /// Compute unit limit to request for a transaction carrying `challengeDisclosure`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int challengeDisclosureComputeUnitLimit = 2700;
+const int challengeDisclosureComputeUnitLimit = 600;
 
 /// Compute units `resolveChallenge` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int resolveChallengeMeasuredComputeUnits = 198;
+const int resolveChallengeMeasuredComputeUnits = 188;
 
 /// Compute unit limit to request for a transaction carrying `resolveChallenge`: the
 /// measurement plus the project's margin and the cost of the compute budget
@@ -110,21 +110,66 @@ const int resolveChallengeComputeUnitLimit = 600;
 
 /// Compute units `approveDisclosure` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int approveDisclosureMeasuredComputeUnits = 438;
+const int approveDisclosureMeasuredComputeUnits = 591;
 
 /// Compute unit limit to request for a transaction carrying `approveDisclosure`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
-const int approveDisclosureComputeUnitLimit = 900;
+const int approveDisclosureComputeUnitLimit = 1100;
 
 /// Compute units `cancelDisclosure` consumed in its most expensive recorded Surfpool
 /// simulation.
-const int cancelDisclosureMeasuredComputeUnits = 121;
+const int cancelDisclosureMeasuredComputeUnits = 125;
 
 /// Compute unit limit to request for a transaction carrying `cancelDisclosure`: the
 /// measurement plus the project's margin and the cost of the compute budget
 /// instructions.
 const int cancelDisclosureComputeUnitLimit = 500;
+
+/// Compute units `registerAsset` consumed in its most expensive recorded Surfpool
+/// simulation.
+const int registerAssetMeasuredComputeUnits = 2438;
+
+/// Compute unit limit to request for a transaction carrying `registerAsset`: the
+/// measurement plus the project's margin and the cost of the compute budget
+/// instructions.
+const int registerAssetComputeUnitLimit = 3300;
+
+/// Compute units `depositToken` consumed in its most expensive recorded Surfpool
+/// simulation.
+const int depositTokenMeasuredComputeUnits = 18492;
+
+/// Compute unit limit to request for a transaction carrying `depositToken`: the
+/// measurement plus the project's margin and the cost of the compute budget
+/// instructions.
+const int depositTokenComputeUnitLimit = 22500;
+
+/// Compute units `withdrawToken` consumed in its most expensive recorded Surfpool
+/// simulation.
+const int withdrawTokenMeasuredComputeUnits = 93216;
+
+/// Compute unit limit to request for a transaction carrying `withdrawToken`: the
+/// measurement plus the project's margin and the cost of the compute budget
+/// instructions.
+const int withdrawTokenComputeUnitLimit = 112200;
+
+/// Compute units `setPolicy` consumed in its most expensive recorded Surfpool
+/// simulation.
+const int setPolicyMeasuredComputeUnits = 131;
+
+/// Compute unit limit to request for a transaction carrying `setPolicy`: the
+/// measurement plus the project's margin and the cost of the compute budget
+/// instructions.
+const int setPolicyComputeUnitLimit = 500;
+
+/// Compute units `verifyPolicy` consumed in its most expensive recorded Surfpool
+/// simulation.
+const int verifyPolicyMeasuredComputeUnits = 80148;
+
+/// Compute unit limit to request for a transaction carrying `verifyPolicy`: the
+/// measurement plus the project's margin and the cost of the compute budget
+/// instructions.
+const int verifyPolicyComputeUnitLimit = 96500;
 
 /// The most compute units a transaction may request.
 const int _maxComputeUnitLimit = 1400000;
@@ -144,6 +189,11 @@ const List<(List<int>, int)> _computeUnitLimits = [
   ([10], resolveChallengeComputeUnitLimit),
   ([11], approveDisclosureComputeUnitLimit),
   ([12], cancelDisclosureComputeUnitLimit),
+  ([13], registerAssetComputeUnitLimit),
+  ([14], depositTokenComputeUnitLimit),
+  ([15], withdrawTokenComputeUnitLimit),
+  ([16], setPolicyComputeUnitLimit),
+  ([17], verifyPolicyComputeUnitLimit),
 ];
 
 /// The compute unit limit to request for a transaction carrying

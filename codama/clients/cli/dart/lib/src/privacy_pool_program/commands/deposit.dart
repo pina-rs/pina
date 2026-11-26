@@ -12,28 +12,24 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class DepositCommand extends Command<void> {
   DepositCommand() {
     argParser
-      ..addOption('bump', mandatory: true, help: "bump")
+      ..addOption(
+        'amount',
+        mandatory: true,
+        help: "Variable SOL deposit amount in lamports.",
+      )
       ..addOption(
         'commitment',
         mandatory: true,
-        help: "Client-computed Poseidon commitment of the new note.",
+        help: "Client-computed Poseidon note commitment.",
       )
       ..addOption(
         'view_pubkey',
         mandatory: true,
         help: "Per-note consent/notification public key.",
       )
-      ..addOption(
-        'envelope_len',
-        mandatory: true,
-        help: "Active length of the encrypted note plaintext.",
-      )
+      ..addOption('envelope_len', mandatory: true, help: "envelopeLen")
       ..addOption('envelope', mandatory: true, help: "envelope")
-      ..addOption(
-        'shares',
-        mandatory: true,
-        help: "Encrypted per-custodian key shares.",
-      )
+      ..addOption('shares', mandatory: true, help: "shares")
       ..addOption(
         'pool_config',
         mandatory: false,
@@ -48,11 +44,6 @@ final class DepositCommand extends Command<void> {
         'merkle_tree',
         mandatory: false,
         help: "The merkle_tree account [default: derived]",
-      )
-      ..addOption(
-        'note_commitment',
-        mandatory: true,
-        help: "The note_commitment account",
       );
   }
 
@@ -76,11 +67,7 @@ final class DepositCommand extends Command<void> {
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
         : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
-    final noteCommitment = pubkey(
-      '--note-commitment',
-      results['note_commitment']! as String,
-    );
-    final bumpValue = integer('--bump', results['bump']! as String);
+    final amountValue = bigInteger('--amount', results['amount']! as String);
     final commitmentValue = base58Bytes(
       '--commitment',
       results['commitment']! as String,
@@ -104,9 +91,8 @@ final class DepositCommand extends Command<void> {
       poolConfig: poolConfig,
       poolVault: poolVault,
       merkleTree: merkleTree,
-      noteCommitment: noteCommitment,
       systemProgram: Address("11111111111111111111111111111111"),
-      bump: bumpValue,
+      amount: amountValue,
       commitment: commitmentValue,
       viewPubkey: viewPubkeyValue,
       envelopeLen: envelopeLenValue,

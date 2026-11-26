@@ -18,6 +18,9 @@ class RequestDisclosureInstructionData {
     required this.nonce,
     required this.tier,
     required this.commitment,
+    required this.viewPubkey,
+    required this.leafIndex,
+    required this.pathElements,
     required this.noticeLen,
     required this.notice,
     required this.legalBasisHash,
@@ -28,6 +31,9 @@ class RequestDisclosureInstructionData {
   final BigInt nonce;
   final int tier;
   final Uint8List commitment;
+  final Uint8List viewPubkey;
+  final BigInt leafIndex;
+  final Uint8List pathElements;
   final int noticeLen;
   final Uint8List notice;
   final Uint8List legalBasisHash;
@@ -43,6 +49,15 @@ getRequestDisclosureInstructionDataEncoder() {
     (
       'commitment',
       fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    (
+      'viewPubkey',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    ('leafIndex', getU64Encoder()),
+    (
+      'pathElements',
+      fixEncoderSize(getBytesEncoder(), 512, allowTruncation: false),
     ),
     ('noticeLen', getU8Encoder()),
     ('notice', fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false)),
@@ -60,6 +75,9 @@ getRequestDisclosureInstructionDataEncoder() {
       'nonce': value.nonce,
       'tier': value.tier,
       'commitment': value.commitment,
+      'viewPubkey': value.viewPubkey,
+      'leafIndex': value.leafIndex,
+      'pathElements': value.pathElements,
       'noticeLen': value.noticeLen,
       'notice': value.notice,
       'legalBasisHash': value.legalBasisHash,
@@ -75,6 +93,9 @@ getRequestDisclosureInstructionDataDecoder() {
     ('nonce', getU64Decoder()),
     ('tier', getU8Decoder()),
     ('commitment', fixDecoderSize(getBytesDecoder(), 32)),
+    ('viewPubkey', fixDecoderSize(getBytesDecoder(), 32)),
+    ('leafIndex', getU64Decoder()),
+    ('pathElements', fixDecoderSize(getBytesDecoder(), 512)),
     ('noticeLen', getU8Decoder()),
     ('notice', fixDecoderSize(getBytesDecoder(), 96)),
     ('legalBasisHash', fixDecoderSize(getBytesDecoder(), 32)),
@@ -104,6 +125,9 @@ getRequestDisclosureInstructionDataDecoder() {
         nonce: map['nonce']! as BigInt,
         tier: map['tier']! as int,
         commitment: map['commitment']! as Uint8List,
+        viewPubkey: map['viewPubkey']! as Uint8List,
+        leafIndex: map['leafIndex']! as BigInt,
+        pathElements: map['pathElements']! as Uint8List,
         noticeLen: map['noticeLen']! as int,
         notice: map['notice']! as Uint8List,
         legalBasisHash: map['legalBasisHash']! as Uint8List,
@@ -146,7 +170,7 @@ Instruction getRequestDisclosureInstruction({
   required Address requester,
   required Address poolConfig,
   required Address requesterRegistry,
-  required Address noteCommitment,
+  required Address merkleTree,
   required Address disclosureRequest,
   required Address systemProgram,
   required Address clock,
@@ -154,6 +178,9 @@ Instruction getRequestDisclosureInstruction({
   required BigInt nonce,
   required int tier,
   required Uint8List commitment,
+  required Uint8List viewPubkey,
+  required BigInt leafIndex,
+  required Uint8List pathElements,
   required int noticeLen,
   required Uint8List notice,
   required Uint8List legalBasisHash,
@@ -163,6 +190,9 @@ Instruction getRequestDisclosureInstruction({
     nonce: nonce,
     tier: tier,
     commitment: commitment,
+    viewPubkey: viewPubkey,
+    leafIndex: leafIndex,
+    pathElements: pathElements,
     noticeLen: noticeLen,
     notice: notice,
     legalBasisHash: legalBasisHash,
@@ -174,7 +204,7 @@ Instruction getRequestDisclosureInstruction({
       AccountMeta(address: requester, role: AccountRole.writableSigner),
       AccountMeta(address: poolConfig, role: AccountRole.readonly),
       AccountMeta(address: requesterRegistry, role: AccountRole.readonly),
-      AccountMeta(address: noteCommitment, role: AccountRole.readonly),
+      AccountMeta(address: merkleTree, role: AccountRole.readonly),
       AccountMeta(address: disclosureRequest, role: AccountRole.writable),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
       AccountMeta(address: clock, role: AccountRole.readonly),

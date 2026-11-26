@@ -8,13 +8,19 @@
 
 import {
 	type Address,
+	getAddressEncoder,
 	getProgramDerivedAddress,
 	getUtf8Encoder,
 	type HasAddress,
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
-export async function findNullifierSetPda(
+export type AssetVaultSeeds = {
+	mint: Address | HasAddress;
+};
+
+export async function findAssetVaultPda(
+	seeds: AssetVaultSeeds,
 	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
@@ -28,6 +34,9 @@ export async function findNullifierSetPda(
 		: programAddressInput.address;
 	return await getProgramDerivedAddress({
 		programAddress,
-		seeds: [getUtf8Encoder().encode("privacy-pool-nullifiers")],
+		seeds: [
+			getUtf8Encoder().encode("privacy-pool-asset"),
+			getAddressEncoder().encode(seeds.mint),
+		],
 	});
 }

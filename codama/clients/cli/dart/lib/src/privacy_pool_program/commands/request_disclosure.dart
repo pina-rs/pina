@@ -12,27 +12,19 @@ final class RequestDisclosureCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('nonce', mandatory: true, help: "nonce")
+      ..addOption('tier', mandatory: true, help: "tier")
+      ..addOption('commitment', mandatory: true, help: "commitment")
       ..addOption(
-        'tier',
+        'view_pubkey',
         mandatory: true,
-        help: "Tier being invoked; see the `TIER_*` constants.",
+        help:
+            "Claimed consent key for `commitment`, authenticated via `path_elements`.",
       )
-      ..addOption(
-        'commitment',
-        mandatory: true,
-        help: "Target note commitment.",
-      )
-      ..addOption(
-        'notice_len',
-        mandatory: true,
-        help: "Active length of the encrypted notice.",
-      )
+      ..addOption('leaf_index', mandatory: true, help: "leafIndex")
+      ..addOption('path_elements', mandatory: true, help: "pathElements")
+      ..addOption('notice_len', mandatory: true, help: "noticeLen")
       ..addOption('notice', mandatory: true, help: "notice")
-      ..addOption(
-        'legal_basis_hash',
-        mandatory: true,
-        help: "Hash of the legal basis; nonzero required above tier 0.",
-      )
+      ..addOption('legal_basis_hash', mandatory: true, help: "legalBasisHash")
       ..addOption(
         'pool_config',
         mandatory: false,
@@ -44,9 +36,9 @@ final class RequestDisclosureCommand extends Command<void> {
         help: "The requester_registry account [default: derived]",
       )
       ..addOption(
-        'note_commitment',
-        mandatory: true,
-        help: "The note_commitment account",
+        'merkle_tree',
+        mandatory: false,
+        help: "The merkle_tree account [default: derived]",
       )
       ..addOption(
         'disclosure_request',
@@ -83,10 +75,9 @@ final class RequestDisclosureCommand extends Command<void> {
         : (await findRequesterRegistryPda(
             programAddress: context.programAddress,
           )).$1;
-    final noteCommitment = pubkey(
-      '--note-commitment',
-      results['note_commitment']! as String,
-    );
+    final merkleTree = (results['merkle_tree'] as String?) != null
+        ? pubkey('--merkle-tree', results['merkle_tree']! as String)
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
     final disclosureRequest = pubkey(
       '--disclosure-request',
       results['disclosure_request']! as String,
@@ -103,6 +94,18 @@ final class RequestDisclosureCommand extends Command<void> {
       '--commitment',
       results['commitment']! as String,
     );
+    final viewPubkeyValue = base58Bytes(
+      '--view-pubkey',
+      results['view_pubkey']! as String,
+    );
+    final leafIndexValue = bigInteger(
+      '--leaf-index',
+      results['leaf_index']! as String,
+    );
+    final pathElementsValue = base58Bytes(
+      '--path-elements',
+      results['path_elements']! as String,
+    );
     final noticeLenValue = integer(
       '--notice-len',
       results['notice_len']! as String,
@@ -117,7 +120,7 @@ final class RequestDisclosureCommand extends Command<void> {
       requester: requester,
       poolConfig: poolConfig,
       requesterRegistry: requesterRegistry,
-      noteCommitment: noteCommitment,
+      merkleTree: merkleTree,
       disclosureRequest: disclosureRequest,
       systemProgram: systemProgram,
       clock: clock,
@@ -125,6 +128,9 @@ final class RequestDisclosureCommand extends Command<void> {
       nonce: nonceValue,
       tier: tierValue,
       commitment: commitmentValue,
+      viewPubkey: viewPubkeyValue,
+      leafIndex: leafIndexValue,
+      pathElements: pathElementsValue,
       noticeLen: noticeLenValue,
       notice: noticeValue,
       legalBasisHash: legalBasisHashValue,

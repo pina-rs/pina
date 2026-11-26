@@ -23,20 +23,17 @@ export const requestDisclosureCommand = registerGlobals(
 	.description("requestDisclosure")
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption("--nonce <nonce>", "nonce")
+	.requiredOption("--tier <tier>", "tier")
+	.requiredOption("--commitment <commitment>", "commitment")
 	.requiredOption(
-		"--tier <tier>",
-		"Tier being invoked; see the `TIER_*` constants.",
+		"--view-pubkey <viewPubkey>",
+		"Claimed consent key for `commitment`, authenticated via `path_elements`.",
 	)
-	.requiredOption("--commitment <commitment>", "Target note commitment.")
-	.requiredOption(
-		"--notice-len <noticeLen>",
-		"Active length of the encrypted notice.",
-	)
+	.requiredOption("--leaf-index <leafIndex>", "leafIndex")
+	.requiredOption("--path-elements <pathElements>", "pathElements")
+	.requiredOption("--notice-len <noticeLen>", "noticeLen")
 	.requiredOption("--notice <notice>", "notice")
-	.requiredOption(
-		"--legal-basis-hash <legalBasisHash>",
-		"Hash of the legal basis; nonzero required above tier 0.",
-	)
+	.requiredOption("--legal-basis-hash <legalBasisHash>", "legalBasisHash")
 	.option(
 		"--pool-config <poolConfig>",
 		"The `pool_config` account [default: derived]",
@@ -45,9 +42,9 @@ export const requestDisclosureCommand = registerGlobals(
 		"--requester-registry <requesterRegistry>",
 		"The `requester_registry` account [default: derived]",
 	)
-	.requiredOption(
-		"--note-commitment <noteCommitment>",
-		"The `note_commitment` account",
+	.option(
+		"--merkle-tree <merkleTree>",
+		"The `merkle_tree` account [default: derived]",
 	)
 	.requiredOption(
 		"--disclosure-request <disclosureRequest>",
@@ -65,6 +62,9 @@ export const requestDisclosureCommand = registerGlobals(
 			nonce: bigInteger("--nonce", options.nonce),
 			tier: smallInteger("--tier", options.tier),
 			commitment: base58("--commitment", options.commitment),
+			viewPubkey: base58("--view-pubkey", options.viewPubkey),
+			leafIndex: bigInteger("--leaf-index", options.leafIndex),
+			pathElements: base58("--path-elements", options.pathElements),
 			noticeLen: smallInteger("--notice-len", options.noticeLen),
 			notice: base58("--notice", options.notice),
 			legalBasisHash: base58("--legal-basis-hash", options.legalBasisHash),
@@ -75,7 +75,9 @@ export const requestDisclosureCommand = registerGlobals(
 			requesterRegistry: options.requesterRegistry === undefined
 				? undefined
 				: pubkey("--requester-registry", options.requesterRegistry),
-			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
+			merkleTree: options.merkleTree === undefined
+				? undefined
+				: pubkey("--merkle-tree", options.merkleTree),
 			disclosureRequest: pubkey(
 				"--disclosure-request",
 				options.disclosureRequest,

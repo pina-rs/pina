@@ -1,58 +1,78 @@
 {
 	"schemaVersion": 1,
 	"measurement": "surfpool-simulation-max",
-	"artifactSha256": "5f15331ffa33d4474c801ea4aeffd7ec6a6f552bd84a40658bcf364141f2f50b",
+	"artifactSha256": "b1af6c5968bd8733cc0735e60f9819c64546485a392f3fecace230676fb2ece0",
 	"instructions": {
 		"approveDisclosure": {
-			"computeUnits": 438,
+			"computeUnits": 591,
 			"samples": 2
 		},
 		"cancelDisclosure": {
-			"computeUnits": 121,
+			"computeUnits": 125,
 			"samples": 1
 		},
 		"challengeDisclosure": {
-			"computeUnits": 1943,
+			"computeUnits": 212,
 			"samples": 1
 		},
 		"deposit": {
-			"computeUnits": 15996,
-			"samples": 5
+			"computeUnits": 17804,
+			"samples": 2
+		},
+		"depositToken": {
+			"computeUnits": 18492,
+			"samples": 1
 		},
 		"grantDisclosure": {
-			"computeUnits": 1893,
+			"computeUnits": 171,
 			"samples": 1
 		},
 		"initialize": {
-			"computeUnits": 48260,
-			"samples": 5
+			"computeUnits": 14980,
+			"samples": 2
+		},
+		"registerAsset": {
+			"computeUnits": 2438,
+			"samples": 1
 		},
 		"registerRequester": {
-			"computeUnits": 319,
-			"samples": 1
-		},
-		"requestDisclosure": {
-			"computeUnits": 11015,
-			"samples": 3
-		},
-		"resolveChallenge": {
-			"computeUnits": 198,
-			"samples": 1
-		},
-		"setCustodians": {
 			"computeUnits": 243,
 			"samples": 1
 		},
+		"requestDisclosure": {
+			"computeUnits": 17668,
+			"samples": 3
+		},
+		"resolveChallenge": {
+			"computeUnits": 188,
+			"samples": 1
+		},
+		"setCustodians": {
+			"computeUnits": 230,
+			"samples": 1
+		},
+		"setPolicy": {
+			"computeUnits": 131,
+			"samples": 1
+		},
 		"setVerificationKey": {
-			"computeUnits": 15258,
-			"samples": 10
+			"computeUnits": 4596,
+			"samples": 4
 		},
 		"transfer": {
-			"computeUnits": 105283,
+			"computeUnits": 122195,
+			"samples": 1
+		},
+		"verifyPolicy": {
+			"computeUnits": 80148,
 			"samples": 1
 		},
 		"withdraw": {
-			"computeUnits": 92269,
+			"computeUnits": 106428,
+			"samples": 1
+		},
+		"withdrawToken": {
+			"computeUnits": 93216,
 			"samples": 1
 		}
 	}

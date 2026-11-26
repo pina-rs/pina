@@ -43,7 +43,11 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import { findPoolConfigPda, findRequesterRegistryPda } from "../pdas";
+import {
+	findMerkleTreePda,
+	findPoolConfigPda,
+	findRequesterRegistryPda,
+} from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
@@ -61,7 +65,7 @@ export type RequestDisclosureInstruction<
 	TAccountRequester extends string | AccountMeta<string> = string,
 	TAccountPoolConfig extends string | AccountMeta<string> = string,
 	TAccountRequesterRegistry extends string | AccountMeta<string> = string,
-	TAccountNoteCommitment extends string | AccountMeta<string> = string,
+	TAccountMerkleTree extends string | AccountMeta<string> = string,
 	TAccountDisclosureRequest extends string | AccountMeta<string> = string,
 	TAccountSystemProgram extends string | AccountMeta<string> = string,
 	TAccountClock extends string | AccountMeta<string> = string,
@@ -80,9 +84,8 @@ export type RequestDisclosureInstruction<
 			TAccountRequesterRegistry extends string
 				? ReadonlyAccount<TAccountRequesterRegistry>
 				: TAccountRequesterRegistry,
-			TAccountNoteCommitment extends string
-				? ReadonlyAccount<TAccountNoteCommitment>
-				: TAccountNoteCommitment,
+			TAccountMerkleTree extends string ? ReadonlyAccount<TAccountMerkleTree>
+				: TAccountMerkleTree,
 			TAccountDisclosureRequest extends string
 				? WritableAccount<TAccountDisclosureRequest>
 				: TAccountDisclosureRequest,
@@ -99,28 +102,28 @@ export type RequestDisclosureInstructionData = {
 	discriminator: number;
 	bump: number;
 	nonce: bigint;
-	/** Tier being invoked; see the `TIER_*` constants. */
 	tier: number;
-	/** Target note commitment. */
 	commitment: ReadonlyUint8Array;
-	/** Active length of the encrypted notice. */
+	/** Claimed consent key for `commitment`, authenticated via `path_elements`. */
+	viewPubkey: ReadonlyUint8Array;
+	leafIndex: bigint;
+	pathElements: ReadonlyUint8Array;
 	noticeLen: number;
 	notice: ReadonlyUint8Array;
-	/** Hash of the legal basis; nonzero required above tier 0. */
 	legalBasisHash: ReadonlyUint8Array;
 };
 
 export type RequestDisclosureInstructionDataArgs = {
 	bump: number;
 	nonce: number | bigint;
-	/** Tier being invoked; see the `TIER_*` constants. */
 	tier: number;
-	/** Target note commitment. */
 	commitment: ReadonlyUint8Array;
-	/** Active length of the encrypted notice. */
+	/** Claimed consent key for `commitment`, authenticated via `path_elements`. */
+	viewPubkey: ReadonlyUint8Array;
+	leafIndex: number | bigint;
+	pathElements: ReadonlyUint8Array;
 	noticeLen: number;
 	notice: ReadonlyUint8Array;
-	/** Hash of the legal basis; nonzero required above tier 0. */
 	legalBasisHash: ReadonlyUint8Array;
 };
 
@@ -134,6 +137,9 @@ export function getRequestDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 			["nonce", getU64Encoder()],
 			["tier", getU8Encoder()],
 			["commitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["viewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["leafIndex", getU64Encoder()],
+			["pathElements", fixPinaPodEncoderSize(getBytesEncoder(), 512)],
 			["noticeLen", getU8Encoder()],
 			["notice", fixPinaPodEncoderSize(getBytesEncoder(), 96)],
 			["legalBasisHash", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
@@ -157,6 +163,9 @@ export function getRequestDisclosureInstructionDataDecoder(): FixedSizeDecoder<
 		["nonce", getU64Decoder()],
 		["tier", getU8Decoder()],
 		["commitment", fixDecoderSize(getBytesDecoder(), 32)],
+		["viewPubkey", fixDecoderSize(getBytesDecoder(), 32)],
+		["leafIndex", getU64Decoder()],
+		["pathElements", fixDecoderSize(getBytesDecoder(), 512)],
 		["noticeLen", getU8Decoder()],
 		["notice", fixDecoderSize(getBytesDecoder(), 96)],
 		["legalBasisHash", fixDecoderSize(getBytesDecoder(), 32)],
@@ -178,8 +187,7 @@ export type RequestDisclosureAsyncInput<
 	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
 	TAccountRequesterRegistry extends InstructionAccountInput =
 		InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput =
-		InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
 	TAccountDisclosureRequest extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
@@ -189,7 +197,7 @@ export type RequestDisclosureAsyncInput<
 	requester: TAccountRequester;
 	poolConfig?: TAccountPoolConfig;
 	requesterRegistry?: TAccountRequesterRegistry;
-	noteCommitment: TAccountNoteCommitment;
+	merkleTree?: TAccountMerkleTree;
 	disclosureRequest: TAccountDisclosureRequest;
 	systemProgram: TAccountSystemProgram;
 	clock: TAccountClock;
@@ -197,6 +205,9 @@ export type RequestDisclosureAsyncInput<
 	nonce: RequestDisclosureInstructionDataArgs["nonce"];
 	tier: RequestDisclosureInstructionDataArgs["tier"];
 	commitment: RequestDisclosureInstructionDataArgs["commitment"];
+	viewPubkey: RequestDisclosureInstructionDataArgs["viewPubkey"];
+	leafIndex: RequestDisclosureInstructionDataArgs["leafIndex"];
+	pathElements: RequestDisclosureInstructionDataArgs["pathElements"];
 	noticeLen: RequestDisclosureInstructionDataArgs["noticeLen"];
 	notice: RequestDisclosureInstructionDataArgs["notice"];
 	legalBasisHash: RequestDisclosureInstructionDataArgs["legalBasisHash"];
@@ -206,7 +217,7 @@ export async function getRequestDisclosureInstructionAsync<
 	TAccountRequester extends InstructionSignerInput,
 	TAccountPoolConfig extends InstructionAccountInput,
 	TAccountRequesterRegistry extends InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput,
 	TAccountDisclosureRequest extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TAccountClock extends InstructionAccountInput,
@@ -216,7 +227,7 @@ export async function getRequestDisclosureInstructionAsync<
 		TAccountRequester,
 		TAccountPoolConfig,
 		TAccountRequesterRegistry,
-		TAccountNoteCommitment,
+		TAccountMerkleTree,
 		TAccountDisclosureRequest,
 		TAccountSystemProgram,
 		TAccountClock
@@ -240,8 +251,8 @@ export async function getRequestDisclosureInstructionAsync<
 			InstructionAccountInputAddress<TAccountRequesterRegistry>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountDisclosureRequest,
@@ -284,8 +295,8 @@ export async function getRequestDisclosureInstructionAsync<
 			isSigner: false,
 			isWritable: false,
 		},
-		noteCommitment: {
-			value: input.noteCommitment ?? null,
+		merkleTree: {
+			value: input.merkleTree ?? null,
 			isSigner: false,
 			isWritable: false,
 		},
@@ -318,13 +329,16 @@ export async function getRequestDisclosureInstructionAsync<
 			programAddress,
 		});
 	}
+	if (!accounts.merkleTree.value) {
+		accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
+	}
 
 	return Object.freeze({
 		accounts: [
 			getAccountMeta("requester", accounts.requester),
 			getAccountMeta("poolConfig", accounts.poolConfig),
 			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
-			getAccountMeta("noteCommitment", accounts.noteCommitment),
+			getAccountMeta("merkleTree", accounts.merkleTree),
 			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("clock", accounts.clock),
@@ -348,8 +362,8 @@ export async function getRequestDisclosureInstructionAsync<
 			InstructionAccountInputAddress<TAccountRequesterRegistry>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountDisclosureRequest,
@@ -371,8 +385,7 @@ export type RequestDisclosureInput<
 	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
 	TAccountRequesterRegistry extends InstructionAccountInput =
 		InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput =
-		InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
 	TAccountDisclosureRequest extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
@@ -382,7 +395,7 @@ export type RequestDisclosureInput<
 	requester: TAccountRequester;
 	poolConfig: TAccountPoolConfig;
 	requesterRegistry: TAccountRequesterRegistry;
-	noteCommitment: TAccountNoteCommitment;
+	merkleTree: TAccountMerkleTree;
 	disclosureRequest: TAccountDisclosureRequest;
 	systemProgram: TAccountSystemProgram;
 	clock: TAccountClock;
@@ -390,6 +403,9 @@ export type RequestDisclosureInput<
 	nonce: RequestDisclosureInstructionDataArgs["nonce"];
 	tier: RequestDisclosureInstructionDataArgs["tier"];
 	commitment: RequestDisclosureInstructionDataArgs["commitment"];
+	viewPubkey: RequestDisclosureInstructionDataArgs["viewPubkey"];
+	leafIndex: RequestDisclosureInstructionDataArgs["leafIndex"];
+	pathElements: RequestDisclosureInstructionDataArgs["pathElements"];
 	noticeLen: RequestDisclosureInstructionDataArgs["noticeLen"];
 	notice: RequestDisclosureInstructionDataArgs["notice"];
 	legalBasisHash: RequestDisclosureInstructionDataArgs["legalBasisHash"];
@@ -399,7 +415,7 @@ export function getRequestDisclosureInstruction<
 	TAccountRequester extends InstructionSignerInput,
 	TAccountPoolConfig extends InstructionAccountInput,
 	TAccountRequesterRegistry extends InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountMerkleTree extends InstructionAccountInput,
 	TAccountDisclosureRequest extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TAccountClock extends InstructionAccountInput,
@@ -409,7 +425,7 @@ export function getRequestDisclosureInstruction<
 		TAccountRequester,
 		TAccountPoolConfig,
 		TAccountRequesterRegistry,
-		TAccountNoteCommitment,
+		TAccountMerkleTree,
 		TAccountDisclosureRequest,
 		TAccountSystemProgram,
 		TAccountClock
@@ -432,8 +448,8 @@ export function getRequestDisclosureInstruction<
 		InstructionAccountInputAddress<TAccountRequesterRegistry>
 	>,
 	ResolvedInstructionAccountMeta<
-		TAccountNoteCommitment,
-		InstructionAccountInputAddress<TAccountNoteCommitment>
+		TAccountMerkleTree,
+		InstructionAccountInputAddress<TAccountMerkleTree>
 	>,
 	ResolvedInstructionAccountMeta<
 		TAccountDisclosureRequest,
@@ -475,8 +491,8 @@ export function getRequestDisclosureInstruction<
 			isSigner: false,
 			isWritable: false,
 		},
-		noteCommitment: {
-			value: input.noteCommitment ?? null,
+		merkleTree: {
+			value: input.merkleTree ?? null,
 			isSigner: false,
 			isWritable: false,
 		},
@@ -505,7 +521,7 @@ export function getRequestDisclosureInstruction<
 			getAccountMeta("requester", accounts.requester),
 			getAccountMeta("poolConfig", accounts.poolConfig),
 			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
-			getAccountMeta("noteCommitment", accounts.noteCommitment),
+			getAccountMeta("merkleTree", accounts.merkleTree),
 			getAccountMeta("disclosureRequest", accounts.disclosureRequest),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 			getAccountMeta("clock", accounts.clock),
@@ -529,8 +545,8 @@ export function getRequestDisclosureInstruction<
 			InstructionAccountInputAddress<TAccountRequesterRegistry>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
+			TAccountMerkleTree,
+			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountDisclosureRequest,
@@ -556,7 +572,7 @@ export type ParsedRequestDisclosureInstruction<
 		requester: TAccountMetas[0];
 		poolConfig: TAccountMetas[1];
 		requesterRegistry: TAccountMetas[2];
-		noteCommitment: TAccountMetas[3];
+		merkleTree: TAccountMetas[3];
 		disclosureRequest: TAccountMetas[4];
 		systemProgram: TAccountMetas[5];
 		clock: TAccountMetas[6];
@@ -594,7 +610,7 @@ export function parseRequestDisclosureInstruction<
 			requester: getNextAccount(),
 			poolConfig: getNextAccount(),
 			requesterRegistry: getNextAccount(),
-			noteCommitment: getNextAccount(),
+			merkleTree: getNextAccount(),
 			disclosureRequest: getNextAccount(),
 			systemProgram: getNextAccount(),
 			clock: getNextAccount(),

@@ -12,16 +12,13 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DisclosureLog {
-	/// Append-only public record of executed disclosures. The entry is written
-	/// by the same instruction that marks the request executed, so execution
-	/// without a log record cannot happen.
+	/// Append-only public record of executed disclosures. Stores a salted
+	/// `scope_hash` rather than raw note commitments so observers cannot link log
+	/// entries back to shielded notes.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// Entries written so far.
 	pub count: u64,
-	/// Flat `LOG_ENTRY_BYTES` entries: requester, commitment, tier, nonce,
-	/// timestamp, padding.
 	pub entries: [u8; 3072],
 }
 

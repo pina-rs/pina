@@ -15,12 +15,12 @@ import {
 	type ProgramDerivedAddress,
 } from "@solana/kit";
 
-export type NoteCommitmentSeeds = {
-	commitment: Address | HasAddress;
+export type NullifierRecordSeeds = {
+	nullifier: Address | HasAddress;
 };
 
-export async function findNoteCommitmentPda(
-	seeds: NoteCommitmentSeeds,
+export async function findNullifierRecordPda(
+	seeds: NullifierRecordSeeds,
 	config: { programAddress?: Address | HasAddress | undefined } = {},
 ): Promise<ProgramDerivedAddress> {
 	const {
@@ -35,8 +35,8 @@ export async function findNoteCommitmentPda(
 	return await getProgramDerivedAddress({
 		programAddress,
 		seeds: [
-			getUtf8Encoder().encode("privacy-pool-note"),
-			getAddressEncoder().encode(seeds.commitment),
+			getUtf8Encoder().encode("privacy-pool-nullifier"),
+			getAddressEncoder().encode(seeds.nullifier),
 		],
 	});
 }

@@ -13,14 +13,15 @@ use pina::Address;
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// Global pool configuration and governance root.
+/// Global pool configuration, governance root, and Custom Ring policy flags.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PoolConfig {
 	pub bump: u8,
 	pub authority: Address,
 	pub custodian_threshold: u16,
 	pub challenge_window_secs: u32,
-	pub deposit_lamports: u64,
+	pub policy_flags: u8,
+	pub policy_cosigner: Address,
 	pub total_deposits: u64,
 }
 
@@ -29,7 +30,7 @@ pub const POOL_CONFIG_DISCRIMINATOR: [u8; 2] = [1, 0];
 
 impl PoolConfig {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 57;
+	pub const LEN: usize = 82;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
@@ -59,9 +60,11 @@ impl PoolConfig {
 		let challenge_window_secs: u32 =
 			u32::from_le_bytes(data.get(cursor..cursor + 4)?.try_into().ok()?);
 		cursor += 4;
-		let deposit_lamports: u64 =
-			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
-		cursor += 8;
+		let policy_flags: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
+		cursor += 1;
+		let policy_cosigner =
+			Address::new_from_array(data.get(cursor..cursor + 32)?.try_into().ok()?);
+		cursor += 32;
 		let total_deposits: u64 =
 			u64::from_le_bytes(data.get(cursor..cursor + 8)?.try_into().ok()?);
 
@@ -70,7 +73,8 @@ impl PoolConfig {
 			authority,
 			custodian_threshold,
 			challenge_window_secs,
-			deposit_lamports,
+			policy_flags,
+			policy_cosigner,
 			total_deposits,
 		})
 	}

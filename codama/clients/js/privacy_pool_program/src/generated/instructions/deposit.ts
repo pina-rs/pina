@@ -20,6 +20,8 @@ import {
 	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
@@ -64,7 +66,6 @@ export type DepositInstruction<
 	TAccountPoolConfig extends string | AccountMeta<string> = string,
 	TAccountPoolVault extends string | AccountMeta<string> = string,
 	TAccountMerkleTree extends string | AccountMeta<string> = string,
-	TAccountNoteCommitment extends string | AccountMeta<string> = string,
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -83,9 +84,6 @@ export type DepositInstruction<
 				: TAccountPoolVault,
 			TAccountMerkleTree extends string ? WritableAccount<TAccountMerkleTree>
 				: TAccountMerkleTree,
-			TAccountNoteCommitment extends string
-				? WritableAccount<TAccountNoteCommitment>
-				: TAccountNoteCommitment,
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
@@ -95,28 +93,26 @@ export type DepositInstruction<
 
 export type DepositInstructionData = {
 	discriminator: number;
-	bump: number;
-	/** Client-computed Poseidon commitment of the new note. */
+	/** Variable SOL deposit amount in lamports. */
+	amount: bigint;
+	/** Client-computed Poseidon note commitment. */
 	commitment: ReadonlyUint8Array;
 	/** Per-note consent/notification public key. */
 	viewPubkey: ReadonlyUint8Array;
-	/** Active length of the encrypted note plaintext. */
 	envelopeLen: number;
 	envelope: ReadonlyUint8Array;
-	/** Encrypted per-custodian key shares. */
 	shares: ReadonlyUint8Array;
 };
 
 export type DepositInstructionDataArgs = {
-	bump: number;
-	/** Client-computed Poseidon commitment of the new note. */
+	/** Variable SOL deposit amount in lamports. */
+	amount: number | bigint;
+	/** Client-computed Poseidon note commitment. */
 	commitment: ReadonlyUint8Array;
 	/** Per-note consent/notification public key. */
 	viewPubkey: ReadonlyUint8Array;
-	/** Active length of the encrypted note plaintext. */
 	envelopeLen: number;
 	envelope: ReadonlyUint8Array;
-	/** Encrypted per-custodian key shares. */
 	shares: ReadonlyUint8Array;
 };
 
@@ -126,11 +122,11 @@ export function getDepositInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["bump", getU8Encoder()],
+			["amount", getU64Encoder()],
 			["commitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 			["viewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 			["envelopeLen", getU8Encoder()],
-			["envelope", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
+			["envelope", fixPinaPodEncoderSize(getBytesEncoder(), 96)],
 			["shares", fixPinaPodEncoderSize(getBytesEncoder(), 144)],
 		]),
 		(value) => ({ ...value, discriminator: 4 }),
@@ -145,11 +141,11 @@ export function getDepositInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(DEPOSIT_DISCRIMINATOR, getU8Decoder()),
 		],
-		["bump", getU8Decoder()],
+		["amount", getU64Decoder()],
 		["commitment", fixDecoderSize(getBytesDecoder(), 32)],
 		["viewPubkey", fixDecoderSize(getBytesDecoder(), 32)],
 		["envelopeLen", getU8Decoder()],
-		["envelope", fixDecoderSize(getBytesDecoder(), 128)],
+		["envelope", fixDecoderSize(getBytesDecoder(), 96)],
 		["shares", fixDecoderSize(getBytesDecoder(), 144)],
 	]);
 }
@@ -169,8 +165,6 @@ export type DepositAsyncInput<
 	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
 	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput =
-		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
 > = {
@@ -178,9 +172,8 @@ export type DepositAsyncInput<
 	poolConfig?: TAccountPoolConfig;
 	poolVault?: TAccountPoolVault;
 	merkleTree?: TAccountMerkleTree;
-	noteCommitment: TAccountNoteCommitment;
 	systemProgram?: TAccountSystemProgram;
-	bump: DepositInstructionDataArgs["bump"];
+	amount: DepositInstructionDataArgs["amount"];
 	commitment: DepositInstructionDataArgs["commitment"];
 	viewPubkey: DepositInstructionDataArgs["viewPubkey"];
 	envelopeLen: DepositInstructionDataArgs["envelopeLen"];
@@ -193,7 +186,6 @@ export async function getDepositInstructionAsync<
 	TAccountPoolConfig extends InstructionAccountInput,
 	TAccountPoolVault extends InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -202,7 +194,6 @@ export async function getDepositInstructionAsync<
 		TAccountPoolConfig,
 		TAccountPoolVault,
 		TAccountMerkleTree,
-		TAccountNoteCommitment,
 		TAccountSystemProgram
 	>,
 	config?: {
@@ -226,10 +217,6 @@ export async function getDepositInstructionAsync<
 		ResolvedInstructionAccountMeta<
 			TAccountMerkleTree,
 			InstructionAccountInputAddress<TAccountMerkleTree>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
@@ -266,11 +253,6 @@ export async function getDepositInstructionAsync<
 		},
 		merkleTree: {
 			value: input.merkleTree ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
-		noteCommitment: {
-			value: input.noteCommitment ?? null,
 			isSigner: false,
 			isWritable: true,
 		},
@@ -311,7 +293,6 @@ export async function getDepositInstructionAsync<
 			getAccountMeta("poolConfig", accounts.poolConfig),
 			getAccountMeta("poolVault", accounts.poolVault),
 			getAccountMeta("merkleTree", accounts.merkleTree),
-			getAccountMeta("noteCommitment", accounts.noteCommitment),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
 		data: getDepositInstructionDataEncoder().encode(
@@ -337,10 +318,6 @@ export async function getDepositInstructionAsync<
 			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
-		>,
-		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
 			InstructionAccountInputAddress<TAccountSystemProgram>
 		>
@@ -352,8 +329,6 @@ export type DepositInput<
 	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
 	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput =
-		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
 > = {
@@ -361,9 +336,8 @@ export type DepositInput<
 	poolConfig: TAccountPoolConfig;
 	poolVault: TAccountPoolVault;
 	merkleTree: TAccountMerkleTree;
-	noteCommitment: TAccountNoteCommitment;
 	systemProgram?: TAccountSystemProgram;
-	bump: DepositInstructionDataArgs["bump"];
+	amount: DepositInstructionDataArgs["amount"];
 	commitment: DepositInstructionDataArgs["commitment"];
 	viewPubkey: DepositInstructionDataArgs["viewPubkey"];
 	envelopeLen: DepositInstructionDataArgs["envelopeLen"];
@@ -376,7 +350,6 @@ export function getDepositInstruction<
 	TAccountPoolConfig extends InstructionAccountInput,
 	TAccountPoolVault extends InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
@@ -385,7 +358,6 @@ export function getDepositInstruction<
 		TAccountPoolConfig,
 		TAccountPoolVault,
 		TAccountMerkleTree,
-		TAccountNoteCommitment,
 		TAccountSystemProgram
 	>,
 	config?: {
@@ -408,10 +380,6 @@ export function getDepositInstruction<
 	ResolvedInstructionAccountMeta<
 		TAccountMerkleTree,
 		InstructionAccountInputAddress<TAccountMerkleTree>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountNoteCommitment,
-		InstructionAccountInputAddress<TAccountNoteCommitment>
 	>,
 	ResolvedInstructionAccountMeta<
 		TAccountSystemProgram,
@@ -450,11 +418,6 @@ export function getDepositInstruction<
 			isSigner: false,
 			isWritable: true,
 		},
-		noteCommitment: {
-			value: input.noteCommitment ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
 		systemProgram: {
 			value: input.systemProgram ?? null,
 			isSigner: false,
@@ -483,7 +446,6 @@ export function getDepositInstruction<
 			getAccountMeta("poolConfig", accounts.poolConfig),
 			getAccountMeta("poolVault", accounts.poolVault),
 			getAccountMeta("merkleTree", accounts.merkleTree),
-			getAccountMeta("noteCommitment", accounts.noteCommitment),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
 		data: getDepositInstructionDataEncoder().encode(
@@ -509,10 +471,6 @@ export function getDepositInstruction<
 			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
-		>,
-		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
 			InstructionAccountInputAddress<TAccountSystemProgram>
 		>
@@ -529,8 +487,7 @@ export type ParsedDepositInstruction<
 		poolConfig: TAccountMetas[1];
 		poolVault: TAccountMetas[2];
 		merkleTree: TAccountMetas[3];
-		noteCommitment: TAccountMetas[4];
-		systemProgram: TAccountMetas[5];
+		systemProgram: TAccountMetas[4];
 	};
 	data: DepositInstructionData;
 };
@@ -544,12 +501,12 @@ export function parseDepositInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedDepositInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 6) {
+	if (instruction.accounts.length < 5) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 6,
+				expectedAccountMetas: 5,
 			},
 		);
 	}
@@ -566,7 +523,6 @@ export function parseDepositInstruction<
 			poolConfig: getNextAccount(),
 			poolVault: getNextAccount(),
 			merkleTree: getNextAccount(),
-			noteCommitment: getNextAccount(),
 			systemProgram: getNextAccount(),
 		},
 		data: getDepositInstructionDataDecoder().decode(instruction.data),

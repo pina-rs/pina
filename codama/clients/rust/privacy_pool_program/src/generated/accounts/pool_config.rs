@@ -12,18 +12,22 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct PoolConfig {
-	/// Global pool configuration and governance root.
+	/// Global pool configuration, governance root, and Custom Ring policy flags.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// The key that may rotate custodians, requesters, and verifying keys.
+	/// Governance key that rotates custodians, requesters, verifying keys, and
+	/// Custom Ring policy settings.
 	pub authority: solana_pubkey::Pubkey,
 	/// Custodian approvals required to execute a disclosure.
 	pub custodian_threshold: u16,
 	/// Tier-1 challenge window length in seconds.
 	pub challenge_window_secs: u32,
-	/// SOL escrowed per deposit.
-	pub deposit_lamports: u64,
+	/// Custom Ring policy bitmask (`POLICY_PAUSED`, `POLICY_REQUIRE_COSIGNER`).
+	pub policy_flags: u8,
+	/// Required co-signer or Custom Ring program PDA when
+	/// `POLICY_REQUIRE_COSIGNER` is active.
+	pub policy_cosigner: solana_pubkey::Pubkey,
 	/// Lifetime deposit count, for analysis only.
 	pub total_deposits: u64,
 }

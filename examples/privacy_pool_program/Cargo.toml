@@ -43,7 +43,7 @@ prover = [
 bpf-entrypoint = []
 
 [dependencies]
-pina = { workspace = true, features = ["alloc", "account-resize", "compact", "derive", "logs"] }
+pina = { workspace = true, features = ["alloc", "account-resize", "compact", "derive", "logs", "token"] }
 solana-sha256-hasher = { workspace = true, features = ["sha2"] }
 
 [dependencies.ark-bn254]
@@ -97,9 +97,10 @@ optional = true
 ark-bn254 = { workspace = true, default-features = true }
 ark-ec = { workspace = true, default-features = true }
 ark-ff = { workspace = true, default-features = true }
+ark-serialize = { workspace = true, default-features = true }
 light-poseidon = { workspace = true, default-features = true }
 mollusk-svm = { workspace = true, default-features = true }
-pina = { workspace = true, features = ["alloc", "account-resize", "compact", "derive", "logs"] }
+pina = { workspace = true, features = ["alloc", "account-resize", "compact", "derive", "logs", "token"] }
 solana-account = { workspace = true, default-features = true }
 solana-instruction = { workspace = true, default-features = true }
 solana-pubkey = { workspace = true, default-features = true }

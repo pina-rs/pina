@@ -77,13 +77,11 @@ export type RegisterRequesterInstruction<
 export type RegisterRequesterInstructionData = {
 	discriminator: number;
 	requester: Address;
-	/** Highest tier the entity may file at. */
 	maxTier: number;
 };
 
 export type RegisterRequesterInstructionDataArgs = {
 	requester: Address | HasAddress;
-	/** Highest tier the entity may file at. */
 	maxTier: number;
 };
 

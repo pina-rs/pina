@@ -11,12 +11,12 @@
 pub const SET_VERIFICATION_KEY_DISCRIMINATOR: u8 = 1u8;
 /// Compute units `SetVerificationKey` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const SET_VERIFICATION_KEY_MEASURED_COMPUTE_UNITS: u32 = 15258;
+pub const SET_VERIFICATION_KEY_MEASURED_COMPUTE_UNITS: u32 = 4596;
 /// Compute unit limit to request for a transaction carrying `SetVerificationKey`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT: u32 = 18700;
+pub const SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT: u32 = 5900;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -31,7 +31,6 @@ impl SetVerificationKey {
 	pub fn new(
 		authority: solana_pubkey::Pubkey,
 		verifying_key_account: solana_pubkey::Pubkey,
-		system_program: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
 			authority,
@@ -41,7 +40,7 @@ impl SetVerificationKey {
 			)
 			.0,
 			verifying_key_account,
-			system_program,
+			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
 
@@ -108,15 +107,12 @@ impl SetVerificationKeyInstructionData {
 pub struct SetVerificationKeyInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,
-	/// Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].
+	/// Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`].
 	pub slot: u8,
-	pub ic_len: u8,
 	pub alpha_g1: [u8; 64],
 	pub beta_g2: [u8; 128],
 	pub gamma_g2: [u8; 128],
 	pub delta_g2: [u8; 128],
 	pub ic0: [u8; 64],
 	pub ic1: [u8; 64],
-	pub ic2: [u8; 64],
-	pub ic3: [u8; 64],
 }

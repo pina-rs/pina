@@ -53,7 +53,6 @@ pub struct ApproveDisclosure<'account> {
 #[derive(Clone, Copy, Debug)]
 pub struct ApproveDisclosureIx {
 	/// Instruction argument `reserved`.
-	/// Reserved; must be zero.
 	pub reserved: u8,
 }
 

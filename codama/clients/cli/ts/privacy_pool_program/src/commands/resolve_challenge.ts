@@ -21,10 +21,7 @@ export const resolveChallengeCommand = registerGlobals(
 	new Command("resolve_challenge"),
 )
 	.description("resolveChallenge")
-	.requiredOption(
-		"--approve <approve>",
-		"Nonzero resolves in the requester's favor (execution may proceed);",
-	)
+	.requiredOption("--approve <approve>", "approve")
 	.option(
 		"--pool-config <poolConfig>",
 		"The `pool_config` account [default: derived]",

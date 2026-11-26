@@ -16,29 +16,23 @@ class SetVerificationKeyInstructionData {
   const SetVerificationKeyInstructionData({
     required this.bump,
     required this.slot,
-    required this.icLen,
     required this.alphaG1,
     required this.betaG2,
     required this.gammaG2,
     required this.deltaG2,
     required this.ic0,
     required this.ic1,
-    required this.ic2,
-    required this.ic3,
   }) : discriminator = 1;
 
   final int discriminator;
   final int bump;
   final int slot;
-  final int icLen;
   final Uint8List alphaG1;
   final Uint8List betaG2;
   final Uint8List gammaG2;
   final Uint8List deltaG2;
   final Uint8List ic0;
   final Uint8List ic1;
-  final Uint8List ic2;
-  final Uint8List ic3;
 }
 
 Encoder<SetVerificationKeyInstructionData>
@@ -47,15 +41,12 @@ getSetVerificationKeyInstructionDataEncoder() {
     ('discriminator', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('slot', getU8Encoder()),
-    ('icLen', getU8Encoder()),
     ('alphaG1', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
     ('betaG2', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
     ('gammaG2', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
     ('deltaG2', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
     ('ic0', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
     ('ic1', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
-    ('ic2', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
-    ('ic3', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
   ]);
 
   return transformEncoder(
@@ -64,15 +55,12 @@ getSetVerificationKeyInstructionDataEncoder() {
       'discriminator': 1,
       'bump': value.bump,
       'slot': value.slot,
-      'icLen': value.icLen,
       'alphaG1': value.alphaG1,
       'betaG2': value.betaG2,
       'gammaG2': value.gammaG2,
       'deltaG2': value.deltaG2,
       'ic0': value.ic0,
       'ic1': value.ic1,
-      'ic2': value.ic2,
-      'ic3': value.ic3,
     },
   );
 }
@@ -83,15 +71,12 @@ getSetVerificationKeyInstructionDataDecoder() {
     ('discriminator', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('slot', getU8Decoder()),
-    ('icLen', getU8Decoder()),
     ('alphaG1', fixDecoderSize(getBytesDecoder(), 64)),
     ('betaG2', fixDecoderSize(getBytesDecoder(), 128)),
     ('gammaG2', fixDecoderSize(getBytesDecoder(), 128)),
     ('deltaG2', fixDecoderSize(getBytesDecoder(), 128)),
     ('ic0', fixDecoderSize(getBytesDecoder(), 64)),
     ('ic1', fixDecoderSize(getBytesDecoder(), 64)),
-    ('ic2', fixDecoderSize(getBytesDecoder(), 64)),
-    ('ic3', fixDecoderSize(getBytesDecoder(), 64)),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -116,15 +101,12 @@ getSetVerificationKeyInstructionDataDecoder() {
       SetVerificationKeyInstructionData(
         bump: map['bump']! as int,
         slot: map['slot']! as int,
-        icLen: map['icLen']! as int,
         alphaG1: map['alphaG1']! as Uint8List,
         betaG2: map['betaG2']! as Uint8List,
         gammaG2: map['gammaG2']! as Uint8List,
         deltaG2: map['deltaG2']! as Uint8List,
         ic0: map['ic0']! as Uint8List,
         ic1: map['ic1']! as Uint8List,
-        ic2: map['ic2']! as Uint8List,
-        ic3: map['ic3']! as Uint8List,
       ),
       newOffset,
     );
@@ -167,28 +149,22 @@ Instruction getSetVerificationKeyInstruction({
   required Address systemProgram,
   required int bump,
   required int slot,
-  required int icLen,
   required Uint8List alphaG1,
   required Uint8List betaG2,
   required Uint8List gammaG2,
   required Uint8List deltaG2,
   required Uint8List ic0,
   required Uint8List ic1,
-  required Uint8List ic2,
-  required Uint8List ic3,
 }) {
   final instructionData = SetVerificationKeyInstructionData(
     bump: bump,
     slot: slot,
-    icLen: icLen,
     alphaG1: alphaG1,
     betaG2: betaG2,
     gammaG2: gammaG2,
     deltaG2: deltaG2,
     ic0: ic0,
     ic1: ic1,
-    ic2: ic2,
-    ic3: ic3,
   );
 
   return Instruction(

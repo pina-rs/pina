@@ -33,9 +33,9 @@ pub struct RequestDisclosure<'account> {
 	/// Required privileges: read-only.
 	pub requester_registry: &'account AccountView,
 
-	/// CPI account `noteCommitment`.
+	/// CPI account `merkleTree`.
 	/// Required privileges: read-only.
-	pub note_commitment: &'account AccountView,
+	pub merkle_tree: &'account AccountView,
 
 	/// CPI account `disclosureRequest`.
 	/// Required privileges: writable.
@@ -63,41 +63,50 @@ pub struct RequestDisclosureIx {
 	pub nonce: u64,
 
 	/// Instruction argument `tier`.
-	/// Tier being invoked; see the `TIER_*` constants.
 	pub tier: u8,
 
 	/// Instruction argument `commitment`.
-	/// Target note commitment.
 	pub commitment: [u8; 32],
 
+	/// Instruction argument `viewPubkey`.
+	/// Claimed consent key for `commitment`, authenticated via `path_elements`.
+	pub view_pubkey: [u8; 32],
+
+	/// Instruction argument `leafIndex`.
+	pub leaf_index: u64,
+
+	/// Instruction argument `pathElements`.
+	pub path_elements: [u8; 512],
+
 	/// Instruction argument `noticeLen`.
-	/// Active length of the encrypted notice.
 	pub notice_len: u8,
 
 	/// Instruction argument `notice`.
 	pub notice: [u8; 96],
 
 	/// Instruction argument `legalBasisHash`.
-	/// Hash of the legal basis; nonzero required above tier 0.
 	pub legal_basis_hash: [u8; 32],
 }
 
 impl RequestDisclosureIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 172;
+	pub const LEN: usize = 724;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 172], ProgramError> {
-		let mut data = [0u8; 172];
+	pub fn to_bytes(&self) -> Result<[u8; 724], ProgramError> {
+		let mut data = [0u8; 724];
 		data[..1].copy_from_slice(&REQUEST_DISCLOSURE_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
 		data[2..10].copy_from_slice(&self.nonce.to_le_bytes());
 		data[10..11].copy_from_slice(&self.tier.to_le_bytes());
 		data[11..43].copy_from_slice(&self.commitment);
-		data[43..44].copy_from_slice(&self.notice_len.to_le_bytes());
-		data[44..140].copy_from_slice(&self.notice);
-		data[140..172].copy_from_slice(&self.legal_basis_hash);
+		data[43..75].copy_from_slice(&self.view_pubkey);
+		data[75..83].copy_from_slice(&self.leaf_index.to_le_bytes());
+		data[83..595].copy_from_slice(&self.path_elements);
+		data[595..596].copy_from_slice(&self.notice_len.to_le_bytes());
+		data[596..692].copy_from_slice(&self.notice);
+		data[692..724].copy_from_slice(&self.legal_basis_hash);
 
 		Ok(data)
 	}
@@ -121,7 +130,7 @@ impl<'account> RequestDisclosure<'account> {
 			CpiHandle::writable_signer(self.requester)?,
 			CpiHandle::readonly(self.pool_config),
 			CpiHandle::readonly(self.requester_registry),
-			CpiHandle::readonly(self.note_commitment),
+			CpiHandle::readonly(self.merkle_tree),
 			CpiHandle::writable(self.disclosure_request)?,
 			CpiHandle::readonly(self.system_program),
 			CpiHandle::readonly(self.clock),

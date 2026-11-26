@@ -73,20 +73,10 @@ export type ResolveChallengeInstruction<
 
 export type ResolveChallengeInstructionData = {
 	discriminator: number;
-	/**
-	 * Nonzero resolves in the requester's favor (execution may proceed);
-	 * zero rejects the request outright.
-	 */
 	approve: number;
 };
 
-export type ResolveChallengeInstructionDataArgs = {
-	/**
-	 * Nonzero resolves in the requester's favor (execution may proceed);
-	 * zero rejects the request outright.
-	 */
-	approve: number;
-};
+export type ResolveChallengeInstructionDataArgs = { approve: number };
 
 export function getResolveChallengeInstructionDataEncoder(): FixedSizeEncoder<
 	ResolveChallengeInstructionDataArgs

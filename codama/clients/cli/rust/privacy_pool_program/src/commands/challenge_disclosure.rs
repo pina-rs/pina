@@ -18,15 +18,11 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct ChallengeDisclosureArgs {
-	/// Reserved; must be zero.
 	#[arg(long)]
 	reserved: u8,
 	/// The `disclosure_request` account
 	#[arg(long)]
 	disclosure_request: String,
-	/// The `note_commitment` account
-	#[arg(long)]
-	note_commitment: String,
 	/// The `clock` account
 	#[arg(long)]
 	clock: String,
@@ -34,7 +30,6 @@ pub struct ChallengeDisclosureArgs {
 
 pub(crate) fn run(context: &CliContext, args: ChallengeDisclosureArgs) -> Result<(), CliError> {
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
-	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let viewer = context.payer_pubkey();
 	let clock = CliContext::pubkey("--clock", &args.clock)?;
 	let data = ChallengeDisclosureInstructionData::new(|data| {
@@ -48,7 +43,6 @@ pub(crate) fn run(context: &CliContext, args: ChallengeDisclosureArgs) -> Result
 
 	let accounts = ChallengeDisclosure {
 		disclosure_request,
-		note_commitment,
 		viewer,
 		clock,
 	};

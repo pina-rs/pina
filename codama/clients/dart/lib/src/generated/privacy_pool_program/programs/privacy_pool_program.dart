@@ -21,10 +21,10 @@ enum PrivacyPoolProgramAccount {
   poolConfig,
   poolVault,
   merkleTree,
-  nullifierSet,
+  nullifierRecord,
   custodianRegistry,
   requesterRegistry,
-  noteCommitment,
+  assetVault,
   disclosureRequest,
   disclosureLog,
   verifyingKeyAccount,
@@ -45,6 +45,11 @@ enum PrivacyPoolProgramInstruction {
   resolveChallenge,
   approveDisclosure,
   cancelDisclosure,
+  registerAsset,
+  depositToken,
+  withdrawToken,
+  setPolicy,
+  verifyPolicy,
 }
 
 /// Identifies the type of a PrivacyPoolProgram instruction.
@@ -89,6 +94,21 @@ PrivacyPoolProgramInstruction identifyPrivacyPoolProgramInstruction(
   }
   if (containsBytes(data, getU8Encoder().encode(12), 0)) {
     return PrivacyPoolProgramInstruction.cancelDisclosure;
+  }
+  if (containsBytes(data, getU8Encoder().encode(13), 0)) {
+    return PrivacyPoolProgramInstruction.registerAsset;
+  }
+  if (containsBytes(data, getU8Encoder().encode(14), 0)) {
+    return PrivacyPoolProgramInstruction.depositToken;
+  }
+  if (containsBytes(data, getU8Encoder().encode(15), 0)) {
+    return PrivacyPoolProgramInstruction.withdrawToken;
+  }
+  if (containsBytes(data, getU8Encoder().encode(16), 0)) {
+    return PrivacyPoolProgramInstruction.setPolicy;
+  }
+  if (containsBytes(data, getU8Encoder().encode(17), 0)) {
+    return PrivacyPoolProgramInstruction.verifyPolicy;
   }
 
   throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
@@ -213,6 +233,46 @@ final class ParsedCancelDisclosure extends ParsedPrivacyPoolProgramInstruction {
   final CancelDisclosureInstructionData data;
 }
 
+/// A parsed RegisterAsset instruction.
+final class ParsedRegisterAsset extends ParsedPrivacyPoolProgramInstruction {
+  const ParsedRegisterAsset({required this.data})
+    : super(PrivacyPoolProgramInstruction.registerAsset);
+
+  final RegisterAssetInstructionData data;
+}
+
+/// A parsed DepositToken instruction.
+final class ParsedDepositToken extends ParsedPrivacyPoolProgramInstruction {
+  const ParsedDepositToken({required this.data})
+    : super(PrivacyPoolProgramInstruction.depositToken);
+
+  final DepositTokenInstructionData data;
+}
+
+/// A parsed WithdrawToken instruction.
+final class ParsedWithdrawToken extends ParsedPrivacyPoolProgramInstruction {
+  const ParsedWithdrawToken({required this.data})
+    : super(PrivacyPoolProgramInstruction.withdrawToken);
+
+  final WithdrawTokenInstructionData data;
+}
+
+/// A parsed SetPolicy instruction.
+final class ParsedSetPolicy extends ParsedPrivacyPoolProgramInstruction {
+  const ParsedSetPolicy({required this.data})
+    : super(PrivacyPoolProgramInstruction.setPolicy);
+
+  final SetPolicyInstructionData data;
+}
+
+/// A parsed VerifyPolicy instruction.
+final class ParsedVerifyPolicy extends ParsedPrivacyPoolProgramInstruction {
+  const ParsedVerifyPolicy({required this.data})
+    : super(PrivacyPoolProgramInstruction.verifyPolicy);
+
+  final VerifyPolicyInstructionData data;
+}
+
 /// Parses a PrivacyPoolProgram instruction.
 ParsedPrivacyPoolProgramInstruction parsePrivacyPoolProgramInstruction(
   Instruction instruction,
@@ -260,6 +320,21 @@ ParsedPrivacyPoolProgramInstruction parsePrivacyPoolProgramInstruction(
     ),
     PrivacyPoolProgramInstruction.cancelDisclosure => ParsedCancelDisclosure(
       data: parseCancelDisclosureInstruction(instruction),
+    ),
+    PrivacyPoolProgramInstruction.registerAsset => ParsedRegisterAsset(
+      data: parseRegisterAssetInstruction(instruction),
+    ),
+    PrivacyPoolProgramInstruction.depositToken => ParsedDepositToken(
+      data: parseDepositTokenInstruction(instruction),
+    ),
+    PrivacyPoolProgramInstruction.withdrawToken => ParsedWithdrawToken(
+      data: parseWithdrawTokenInstruction(instruction),
+    ),
+    PrivacyPoolProgramInstruction.setPolicy => ParsedSetPolicy(
+      data: parseSetPolicyInstruction(instruction),
+    ),
+    PrivacyPoolProgramInstruction.verifyPolicy => ParsedVerifyPolicy(
+      data: parseVerifyPolicyInstruction(instruction),
     ),
   };
 }

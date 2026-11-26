@@ -14,7 +14,7 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 @immutable
 class DepositInstructionData {
   const DepositInstructionData({
-    required this.bump,
+    required this.amount,
     required this.commitment,
     required this.viewPubkey,
     required this.envelopeLen,
@@ -23,7 +23,7 @@ class DepositInstructionData {
   }) : discriminator = 4;
 
   final int discriminator;
-  final int bump;
+  final BigInt amount;
   final Uint8List commitment;
   final Uint8List viewPubkey;
   final int envelopeLen;
@@ -34,7 +34,7 @@ class DepositInstructionData {
 Encoder<DepositInstructionData> getDepositInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('bump', getU8Encoder()),
+    ('amount', getU64Encoder()),
     (
       'commitment',
       fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
@@ -44,10 +44,7 @@ Encoder<DepositInstructionData> getDepositInstructionDataEncoder() {
       fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
     ),
     ('envelopeLen', getU8Encoder()),
-    (
-      'envelope',
-      fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false),
-    ),
+    ('envelope', fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false)),
     ('shares', fixEncoderSize(getBytesEncoder(), 144, allowTruncation: false)),
   ]);
 
@@ -55,7 +52,7 @@ Encoder<DepositInstructionData> getDepositInstructionDataEncoder() {
     structEncoder,
     (DepositInstructionData value) => <String, Object?>{
       'discriminator': 4,
-      'bump': value.bump,
+      'amount': value.amount,
       'commitment': value.commitment,
       'viewPubkey': value.viewPubkey,
       'envelopeLen': value.envelopeLen,
@@ -68,11 +65,11 @@ Encoder<DepositInstructionData> getDepositInstructionDataEncoder() {
 Decoder<DepositInstructionData> getDepositInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
-    ('bump', getU8Decoder()),
+    ('amount', getU64Decoder()),
     ('commitment', fixDecoderSize(getBytesDecoder(), 32)),
     ('viewPubkey', fixDecoderSize(getBytesDecoder(), 32)),
     ('envelopeLen', getU8Decoder()),
-    ('envelope', fixDecoderSize(getBytesDecoder(), 128)),
+    ('envelope', fixDecoderSize(getBytesDecoder(), 96)),
     ('shares', fixDecoderSize(getBytesDecoder(), 144)),
   ]);
 
@@ -93,7 +90,7 @@ Decoder<DepositInstructionData> getDepositInstructionDataDecoder() {
 
     return (
       DepositInstructionData(
-        bump: map['bump']! as int,
+        amount: map['amount']! as BigInt,
         commitment: map['commitment']! as Uint8List,
         viewPubkey: map['viewPubkey']! as Uint8List,
         envelopeLen: map['envelopeLen']! as int,
@@ -139,9 +136,8 @@ Instruction getDepositInstruction({
   required Address poolConfig,
   required Address poolVault,
   required Address merkleTree,
-  required Address noteCommitment,
   required Address systemProgram,
-  required int bump,
+  required BigInt amount,
   required Uint8List commitment,
   required Uint8List viewPubkey,
   required int envelopeLen,
@@ -149,7 +145,7 @@ Instruction getDepositInstruction({
   required Uint8List shares,
 }) {
   final instructionData = DepositInstructionData(
-    bump: bump,
+    amount: amount,
     commitment: commitment,
     viewPubkey: viewPubkey,
     envelopeLen: envelopeLen,
@@ -164,7 +160,6 @@ Instruction getDepositInstruction({
       AccountMeta(address: poolConfig, role: AccountRole.writable),
       AccountMeta(address: poolVault, role: AccountRole.writable),
       AccountMeta(address: merkleTree, role: AccountRole.writable),
-      AccountMeta(address: noteCommitment, role: AccountRole.writable),
       AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getDepositInstructionDataEncoder().encode(instructionData),

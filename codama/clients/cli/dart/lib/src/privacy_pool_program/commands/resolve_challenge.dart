@@ -10,12 +10,7 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class ResolveChallengeCommand extends Command<void> {
   ResolveChallengeCommand() {
     argParser
-      ..addOption(
-        'approve',
-        mandatory: true,
-        help:
-            "Nonzero resolves in the requester's favor (execution may proceed);",
-      )
+      ..addOption('approve', mandatory: true, help: "approve")
       ..addOption(
         'pool_config',
         mandatory: false,

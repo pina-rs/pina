@@ -21,14 +21,10 @@ export const challengeDisclosureCommand = registerGlobals(
 	new Command("challenge_disclosure"),
 )
 	.description("challengeDisclosure")
-	.requiredOption("--reserved <reserved>", "Reserved; must be zero.")
+	.requiredOption("--reserved <reserved>", "reserved")
 	.requiredOption(
 		"--disclosure-request <disclosureRequest>",
 		"The `disclosure_request` account",
-	)
-	.requiredOption(
-		"--note-commitment <noteCommitment>",
-		"The `note_commitment` account",
 	)
 	.requiredOption("--clock <clock>", "The `clock` account")
 	.action(async (options) => {
@@ -39,7 +35,6 @@ export const challengeDisclosureCommand = registerGlobals(
 				"--disclosure-request",
 				options.disclosureRequest,
 			),
-			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
 			viewer: context.payer,
 			clock: pubkey("--clock", options.clock),
 		};

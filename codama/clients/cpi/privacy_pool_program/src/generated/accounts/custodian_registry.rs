@@ -11,8 +11,7 @@
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// The disclosure committee. A threshold of these keys must approve before
-/// a disclosure may execute, and each approval is a signed transaction.
+/// The disclosure committee.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CustodianRegistry {
 	pub bump: u8,

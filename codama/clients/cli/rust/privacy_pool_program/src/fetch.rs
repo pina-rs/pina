@@ -20,42 +20,36 @@ use crate::context::CliError;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-	/// Global pool configuration and governance root.
+	/// Global pool configuration, governance root, and Custom Ring policy flags.
 	PoolConfig(PoolConfigArgs),
-	/// The pool's SOL custody. Data-less by design: every lamport in it is
-	/// backed by an unspent note commitment in the tree.
+	/// The pool's native SOL custody PDA.
 	PoolVault(PoolVaultArgs),
-	/// Full-node incremental Merkle tree over Poseidon-2 hashes.
+	/// Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.
 	///
-	/// Level `ℓ` (0 = leaves) occupies `nodes` at offset
-	/// `(1 << (depth+1)) − (1 << (depth+1−ℓ))`, so the root sits in the final
-	/// slot. Empty subtrees hold the precomputed zero-hash chain, letting
-	/// witnesses cover unwritten leaves.
+	/// Holds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root
+	/// ring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.
 	MerkleTree(MerkleTreeArgs),
-	/// Append-only set of spent nullifiers.
-	NullifierSet(NullifierSetArgs),
-	/// The disclosure committee. A threshold of these keys must approve before
-	/// a disclosure may execute, and each approval is a signed transaction.
+	/// Per-nullifier spent marker PDA. Existence proves the nullifier was spent in
+	/// $O(1)$ without a global nullifier write-lock hotspot or fixed capacity cap.
+	NullifierRecord(NullifierRecordArgs),
+	/// The disclosure committee.
 	CustodianRegistry(CustodianRegistryArgs),
 	/// Entities allowed to file tier-1 and tier-2 disclosure requests.
 	RequesterRegistry(RequesterRegistryArgs),
-	/// Per-note audit record. The envelope and shares are encrypted by the
-	/// depositor's client and opaque to the program; the view key is the
-	/// per-note consent key that may grant tier-0 requests and file challenges.
-	///
-	/// Spent notes are *not* marked here: linking a nullifier to its commitment
-	/// would break the privacy the pool exists to provide. The nullifier set is
-	/// the only spent record.
-	NoteCommitment(NoteCommitmentArgs),
-	/// One disclosure request and its state machine.
+	/// Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL
+	/// Interface PDA).
+	AssetVault(AssetVaultArgs),
+	/// One disclosure request and its state machine. Stores `view_pubkey` after
+	/// `RequestDisclosure` authenticates it against the Merkle tree so
+	/// `GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.
 	DisclosureRequest(DisclosureRequestArgs),
-	/// Append-only public record of executed disclosures. The entry is written
-	/// by the same instruction that marks the request executed, so execution
-	/// without a log record cannot happen.
+	/// Append-only public record of executed disclosures. Stores a salted
+	/// `scope_hash` rather than raw note commitments so observers cannot link log
+	/// entries back to shielded notes.
 	DisclosureLog(DisclosureLogArgs),
-	/// One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
-	/// (root, nullifier, recipient hash), slot 1 transfer proofs
-	/// (root, nullifier, output binding).
+	/// Single-input Groth16 verifying key. Every circuit compresses its statement
+	/// into one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are
+	/// stored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).
 	VerifyingKeyAccount(VerifyingKeyAccountArgs),
 }
 
@@ -81,10 +75,13 @@ pub struct MerkleTreeArgs {
 }
 
 #[derive(Debug, Args)]
-pub struct NullifierSetArgs {
+pub struct NullifierRecordArgs {
 	/// Account address; overrides PDA derivation.
 	#[arg(long)]
 	address: Option<String>,
+	/// PDA seed `nullifier`.
+	#[arg(long)]
+	nullifier: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -102,13 +99,13 @@ pub struct RequesterRegistryArgs {
 }
 
 #[derive(Debug, Args)]
-pub struct NoteCommitmentArgs {
+pub struct AssetVaultArgs {
 	/// Account address; overrides PDA derivation.
 	#[arg(long)]
 	address: Option<String>,
-	/// PDA seed `commitment`.
+	/// PDA seed `mint`.
 	#[arg(long)]
-	commitment: Option<String>,
+	mint: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -146,10 +143,10 @@ pub(crate) fn run(context: &CliContext, command: Command) -> Result<(), CliError
 		Command::PoolConfig(args) => fetch_pool_config(context, args),
 		Command::PoolVault(args) => fetch_pool_vault(context, args),
 		Command::MerkleTree(args) => fetch_merkle_tree(context, args),
-		Command::NullifierSet(args) => fetch_nullifier_set(context, args),
+		Command::NullifierRecord(args) => fetch_nullifier_record(context, args),
 		Command::CustodianRegistry(args) => fetch_custodian_registry(context, args),
 		Command::RequesterRegistry(args) => fetch_requester_registry(context, args),
-		Command::NoteCommitment(args) => fetch_note_commitment(context, args),
+		Command::AssetVault(args) => fetch_asset_vault(context, args),
 		Command::DisclosureRequest(args) => fetch_disclosure_request(context, args),
 		Command::DisclosureLog(args) => fetch_disclosure_log(context, args),
 		Command::VerifyingKeyAccount(args) => fetch_verifying_key_account(context, args),
@@ -222,17 +219,26 @@ fn fetch_merkle_tree(context: &CliContext, args: MerkleTreeArgs) -> Result<(), C
 	Ok(())
 }
 
-fn fetch_nullifier_set(context: &CliContext, args: NullifierSetArgs) -> Result<(), CliError> {
+fn fetch_nullifier_record(context: &CliContext, args: NullifierRecordArgs) -> Result<(), CliError> {
 	let address = match &args.address {
 		Some(value) => CliContext::pubkey("--address", value)?,
 		None => {
-			let seeds: &[&[u8]] = &["privacy-pool-nullifiers".as_bytes()];
+			let nullifier = match &args.nullifier {
+				Some(value) => CliContext::pubkey("--nullifier", value)?,
+				None => {
+					return Err(CliError::MissingSeed {
+						account: "nullifier-record".to_string(),
+						seed: "--nullifier".to_string(),
+					});
+				}
+			};
+			let seeds: &[&[u8]] = &["privacy-pool-nullifier".as_bytes(), nullifier.as_ref()];
 			Pubkey::find_program_address(seeds, &context.program_address).0
 		}
 	};
 	let data = context.fetch_account(&address)?;
-	let value = match privacy_pool_program_client::accounts::NullifierSet::from_bytes(&data) {
-		Ok(account) => nullifier_set_json(account),
+	let value = match privacy_pool_program_client::accounts::NullifierRecord::from_bytes(&data) {
+		Ok(account) => nullifier_record_json(account),
 		Err(error) => {
 			return Err(CliError::AccountDecode {
 				address: address.to_string(),
@@ -240,7 +246,7 @@ fn fetch_nullifier_set(context: &CliContext, args: NullifierSetArgs) -> Result<(
 			});
 		}
 	};
-	print_value(context.json, "nullifier-set", &address, &value);
+	print_value(context.json, "nullifier-record", &address, &value);
 	Ok(())
 }
 
@@ -294,26 +300,26 @@ fn fetch_requester_registry(
 	Ok(())
 }
 
-fn fetch_note_commitment(context: &CliContext, args: NoteCommitmentArgs) -> Result<(), CliError> {
+fn fetch_asset_vault(context: &CliContext, args: AssetVaultArgs) -> Result<(), CliError> {
 	let address = match &args.address {
 		Some(value) => CliContext::pubkey("--address", value)?,
 		None => {
-			let commitment = match &args.commitment {
-				Some(value) => CliContext::pubkey("--commitment", value)?,
+			let mint = match &args.mint {
+				Some(value) => CliContext::pubkey("--mint", value)?,
 				None => {
 					return Err(CliError::MissingSeed {
-						account: "note-commitment".to_string(),
-						seed: "--commitment".to_string(),
+						account: "asset-vault".to_string(),
+						seed: "--mint".to_string(),
 					});
 				}
 			};
-			let seeds: &[&[u8]] = &["privacy-pool-note".as_bytes(), commitment.as_ref()];
+			let seeds: &[&[u8]] = &["privacy-pool-asset".as_bytes(), mint.as_ref()];
 			Pubkey::find_program_address(seeds, &context.program_address).0
 		}
 	};
 	let data = context.fetch_account(&address)?;
-	let value = match privacy_pool_program_client::accounts::NoteCommitment::from_bytes(&data) {
-		Ok(account) => note_commitment_json(account),
+	let value = match privacy_pool_program_client::accounts::AssetVault::from_bytes(&data) {
+		Ok(account) => asset_vault_json(account),
 		Err(error) => {
 			return Err(CliError::AccountDecode {
 				address: address.to_string(),
@@ -321,7 +327,7 @@ fn fetch_note_commitment(context: &CliContext, args: NoteCommitmentArgs) -> Resu
 			});
 		}
 	};
-	print_value(context.json, "note-commitment", &address, &value);
+	print_value(context.json, "asset-vault", &address, &value);
 	Ok(())
 }
 
@@ -431,7 +437,8 @@ fn pool_config_json(account: &privacy_pool_program_client::accounts::PoolConfigZ
 		"authority": account.authority.to_string(),
 		"custodian_threshold": account.custodian_threshold.get(),
 		"challenge_window_secs": account.challenge_window_secs.get(),
-		"deposit_lamports": account.deposit_lamports.get(),
+		"policy_flags": account.policy_flags,
+		"policy_cosigner": account.policy_cosigner.to_string(),
 		"total_deposits": account.total_deposits.get(),
 	})
 }
@@ -446,17 +453,17 @@ fn merkle_tree_json(account: &privacy_pool_program_client::accounts::MerkleTreeZ
 	json!({
 		"bump": account.bump,
 		"next_leaf_index": account.next_leaf_index.get(),
-		"nodes": account.nodes.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+		"filled_subtrees": account.filled_subtrees.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 		"roots_len": account.roots_len.get(),
 		"roots": account.roots.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 	})
 }
 
-fn nullifier_set_json(account: &privacy_pool_program_client::accounts::NullifierSetZc) -> Value {
+fn nullifier_record_json(
+	account: &privacy_pool_program_client::accounts::NullifierRecordZc,
+) -> Value {
 	json!({
 		"bump": account.bump,
-		"count": account.count.get(),
-		"nullifiers": account.nullifiers.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 	})
 }
 
@@ -480,16 +487,12 @@ fn requester_registry_json(
 	})
 }
 
-fn note_commitment_json(
-	account: &privacy_pool_program_client::accounts::NoteCommitmentZc,
-) -> Value {
+fn asset_vault_json(account: &privacy_pool_program_client::accounts::AssetVaultZc) -> Value {
 	json!({
 		"bump": account.bump,
-		"commitment": account.commitment.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
-		"view_pubkey": account.view_pubkey.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
-		"envelope_len": account.envelope_len,
-		"envelope": account.envelope.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
-		"shares": account.shares.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+		"mint": account.mint.to_string(),
+		"token_program": account.token_program.to_string(),
+		"vault_token_account": account.vault_token_account.to_string(),
 	})
 }
 
@@ -502,6 +505,7 @@ fn disclosure_request_json(
 		"nonce": account.nonce.get(),
 		"tier": account.tier,
 		"commitment": account.commitment.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+		"view_pubkey": account.view_pubkey.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 		"notice_len": account.notice_len,
 		"notice": account.notice.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 		"legal_basis_hash": account.legal_basis_hash.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
@@ -531,11 +535,8 @@ fn verifying_key_account_json(
 		"beta_g2": account.beta_g2.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 		"gamma_g2": account.gamma_g2.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 		"delta_g2": account.delta_g2.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
-		"ic_len": account.ic_len,
 		"ic0": account.ic0.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 		"ic1": account.ic1.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
-		"ic2": account.ic2.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
-		"ic3": account.ic3.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
 	})
 }
 

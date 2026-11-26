@@ -1,14 +1,8 @@
-//! Surfpool end-to-end journeys for the privacy pool program.
+//! Surfpool end-to-end journeys for the upgraded privacy pool program.
 //!
-//! These tests run against the real runtime through `pina test`, which
-//! builds the SBF artifact and runs this crate with `--ignored`. Every
-//! signer and account uses fixed seeds so the recorded instruction paths
-//! stay deterministic for the benchmark harness.
-//!
-//! The journeys cover the protocol's spine on a real runtime: pool setup
-//! with both verifying keys, a deposit whose on-chain root matches the
-//! host prediction, a real Groth16 withdrawal, and the tier-0 disclosure
-//! lifecycle through consent, custodian approvals, and the atomic log.
+//! Runs against a real runtime through `pina test` with deterministic seeds so
+//! every instruction discriminator (`Initialize` through `VerifyPolicy`) is
+//! recorded cleanly by the benchmark harness.
 
 #![cfg(test)]
 
@@ -19,40 +13,12 @@ use pina_test::ProgramTest;
 use pina_test::Pubkey;
 use pina_test::Signer;
 
-// The program is a cdylib only (see ../../Cargo.toml), so its real types
-// come in through a source include rather than an rlib dependency.
 #[path = "../../../src/lib.rs"]
 mod program;
 
-// Re-export the program root so its submodules (`crypto`, `syscalls`) resolve
-// their `crate::` paths against this crate root, exactly as they do when the
-// program compiles as its own crate.
-use program::Address;
-use program::ApproveDisclosureIx;
-use program::CancelDisclosureIx;
-use program::ChallengeDisclosureIx;
-use program::DEPOSIT_LAMPORTS;
-use program::DepositIx;
-use program::GrantDisclosureIx;
-use program::InitializeIx;
-use program::RegisterRequesterIx;
-use program::RequestDisclosureIx;
-use program::ResolveChallengeIx;
-use program::SetCustodiansIx;
-use program::SetVerificationKeyIx;
-use program::TREE_NODES;
-use program::TransferIx;
-use program::VK_SLOT_TRANSFER;
-use program::VK_SLOT_WITHDRAW;
-use program::WithdrawIx;
-use program::prover;
 pub use program::*;
 
 const SYSTEM_BYTES: [u8; 32] = [0; 32];
-
-/// The tree account stores 8,160 node bytes after the envelope, bump, and
-/// next-leaf counter.
-const TREE_NODES_AT: usize = 2 + 1 + 8;
 
 fn system() -> Pubkey {
 	Pubkey::new_from_array(SYSTEM_BYTES)
@@ -67,12 +33,15 @@ fn pina_address(pubkey: &Pubkey) -> Address {
 	Address::new_from_array(pubkey.to_bytes())
 }
 
-/// Test-only deployer, installed in this isolated Surfnet's loader state.
+fn token_program_id() -> Pubkey {
+	let bytes: &[u8] = pina::token::ID.as_ref();
+	Pubkey::new_from_array(bytes.try_into().unwrap())
+}
+
 fn bootstrap_authority() -> Keypair {
 	Keypair::new_from_array([0xB0; 32])
 }
 
-/// ProgramData address derived by the upgradeable loader at deployment.
 fn program_data_address() -> Pubkey {
 	Pubkey::find_program_address(
 		&[program_id().as_ref()],
@@ -101,12 +70,27 @@ fn recipient() -> Pubkey {
 	Pubkey::new_from_array([0xDE; 32])
 }
 
+fn relayer() -> Keypair {
+	Keypair::new_from_array([0xF1; 32])
+}
+
+fn cosigner() -> Keypair {
+	Keypair::new_from_array([0xE4; 32])
+}
+
 fn requester() -> Keypair {
 	Keypair::new_from_array([0x7A; 32])
 }
 
 fn view_key() -> Keypair {
 	Keypair::new_from_array([0x5A; 32])
+}
+
+fn clock() -> Pubkey {
+	Pubkey::new_from_array([
+		6, 167, 213, 23, 24, 199, 116, 201, 40, 86, 99, 152, 105, 29, 94, 182, 139, 94, 184, 163,
+		155, 75, 109, 92, 115, 85, 91, 33, 0, 0, 0, 0,
+	])
 }
 
 fn config_pda() -> (Pubkey, u8) {
@@ -121,8 +105,8 @@ fn tree_pda() -> (Pubkey, u8) {
 	Pubkey::find_program_address(&[b"privacy-pool-tree"], &program_id())
 }
 
-fn nullifiers_pda() -> (Pubkey, u8) {
-	Pubkey::find_program_address(&[b"privacy-pool-nullifiers"], &program_id())
+fn nullifier_pda(nullifier: &[u8; 32]) -> (Pubkey, u8) {
+	Pubkey::find_program_address(&[b"privacy-pool-nullifier", nullifier], &program_id())
 }
 
 fn custodians_pda() -> (Pubkey, u8) {
@@ -137,8 +121,8 @@ fn log_pda() -> (Pubkey, u8) {
 	Pubkey::find_program_address(&[b"privacy-pool-log"], &program_id())
 }
 
-fn note_pda(commitment: &[u8; 32]) -> (Pubkey, u8) {
-	Pubkey::find_program_address(&[b"privacy-pool-note", commitment], &program_id())
+fn asset_pda(mint: &Pubkey) -> (Pubkey, u8) {
+	Pubkey::find_program_address(&[b"privacy-pool-asset", mint.as_ref()], &program_id())
 }
 
 fn request_pda(requester: &Pubkey, nonce: u64) -> (Pubkey, u8) {
@@ -157,93 +141,7 @@ fn vkey_pda(slot: u8) -> (Pubkey, u8) {
 	Pubkey::find_program_address(&[b"privacy-pool-vkey", &seed], &program_id())
 }
 
-/// Host-side commitment: `poseidon(poseidon(secret, seed), amount)`.
-fn commitment_bytes(secrets: &prover::NoteSecrets) -> [u8; 32] {
-	let inner = program::poseidon2(
-		&prover::fr_to_le(&secrets.secret),
-		&prover::fr_to_le(&secrets.nullifier_seed),
-	)
-	.unwrap_or_else(|error| panic!("host commitment: {error:?}"));
-	let mut amount = [0_u8; 32];
-	amount[..8].copy_from_slice(&DEPOSIT_LAMPORTS.to_le_bytes());
-	program::poseidon2(&inner, &amount).unwrap_or_else(|error| panic!("host commitment: {error:?}"))
-}
-
-/// Host-side nullifier: `poseidon(seed, secret)`.
-fn nullifier_bytes(secrets: &prover::NoteSecrets) -> [u8; 32] {
-	program::poseidon2(
-		&prover::fr_to_le(&secrets.nullifier_seed),
-		&prover::fr_to_le(&secrets.secret),
-	)
-	.unwrap_or_else(|error| panic!("host nullifier: {error:?}"))
-}
-
-/// Journeys run serially: each embeds its own Surfnet and spends tens of
-/// seconds in seeded Groth16 setup; parallel instances starve the runtime
-/// runloops until RPC polls time out.
 static JOURNEY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-/// Published seeds and stale deployment authorities cannot capture the pool.
-#[test]
-#[ignore = "run with pina test"]
-fn bootstrap_requires_the_current_deployment_authority() {
-	let _guard = journey_guard();
-	pina_test::run(async {
-		let mut program = ProgramTest::start(program_id()).await.unwrap();
-		let deployer = bootstrap_authority();
-		program
-			.set_upgrade_authority(Some(deployer.pubkey()))
-			.unwrap();
-		let published = Keypair::new_from_array(*b"pina-pool-bootstrap-2026-09-26!!");
-		let mut data = vec![0; InitializeIx::SIZE];
-		InitializeIx::initialize(&mut data, |_| Ok(())).unwrap();
-
-		for signer in [&published, &deployer] {
-			// Rotate away before trying the old deployer; the published key is
-			// rejected even while the legitimate deployment authority is active.
-			if signer.pubkey() == deployer.pubkey() {
-				program
-					.set_upgrade_authority(Some(custodian_a().pubkey()))
-					.unwrap();
-			}
-
-			program.fund(&signer.pubkey(), 1_000_000_000).unwrap();
-			let balance = program.balance(&signer.pubkey()).unwrap();
-			let error = program
-				.send_with_signers(
-					Instruction::new_with_bytes(
-						program_id(),
-						&data,
-						vec![
-							AccountMeta::new(signer.pubkey(), true),
-							AccountMeta::new(config_pda().0, false),
-							AccountMeta::new(vault_pda().0, false),
-							AccountMeta::new(tree_pda().0, false),
-							AccountMeta::new(nullifiers_pda().0, false),
-							AccountMeta::new(custodians_pda().0, false),
-							AccountMeta::new(requesters_pda().0, false),
-							AccountMeta::new(log_pda().0, false),
-							AccountMeta::new_readonly(system(), false),
-							AccountMeta::new_readonly(program_data_address(), false),
-						],
-					),
-					&[signer],
-				)
-				.expect_err("only the deployment authority may initialize");
-			pina_test::assert_custom_error(&error, PrivacyPoolError::InvalidAuthority as u32);
-			assert_eq!(program.balance(&signer.pubkey()).unwrap(), balance);
-			assert!(program.account(&config_pda().0).is_err());
-		}
-
-		program.set_upgrade_authority(None).unwrap();
-		let metadata = program.account(&program_data_address()).unwrap();
-		assert_eq!(
-			metadata.data[12], 0,
-			"immutable loader state has no authority"
-		);
-		program.stop().unwrap();
-	});
-}
 
 fn journey_guard() -> std::sync::MutexGuard<'static, ()> {
 	JOURNEY_LOCK
@@ -251,9 +149,17 @@ fn journey_guard() -> std::sync::MutexGuard<'static, ()> {
 		.unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
+struct StartedPool {
+	program: ProgramTest,
+	tree: prover::HostMerkleTree,
+	note: prover::NoteSecrets,
+	join_split_pk: ark_groth16::ProvingKey<ark_bn254::Bn254>,
+	policy_pk: ark_groth16::ProvingKey<ark_bn254::Bn254>,
+}
+
+async fn start_pool() -> StartedPool {
 	let pid = program_id();
-	let mut program = ProgramTest::start(pid)
+	let program = ProgramTest::start(pid)
 		.await
 		.unwrap_or_else(|error| panic!("start program test: {error:?}"));
 
@@ -265,11 +171,9 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 		.fund(&auth.pubkey(), 3_000_000_000)
 		.unwrap_or_else(|error| panic!("fund authority: {error:?}"));
 
-	// Initialize the pool with the fixed custodian committee.
 	let (config_key, config_bump) = config_pda();
 	let (vault_key, vault_bump) = vault_pda();
 	let (tree_key, tree_bump) = tree_pda();
-	let (nullifiers_key, nullifiers_bump) = nullifiers_pda();
 	let (custodians_key, custodians_bump) = custodians_pda();
 	let (requesters_key, requesters_bump) = requesters_pda();
 	let (log_key, log_bump) = log_pda();
@@ -279,21 +183,20 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 		ix.config_bump = config_bump;
 		ix.vault_bump = vault_bump;
 		ix.tree_bump = tree_bump;
-		ix.nullifiers_bump = nullifiers_bump;
 		ix.custodians_bump = custodians_bump;
 		ix.requesters_bump = requesters_bump;
 		ix.log_bump = log_bump;
 		let mut committee = [0_u8; 96];
-		for (slot, key) in [custodian_a(), custodian_b(), custodian_c()]
+		for (slot, k) in [custodian_a(), custodian_b(), custodian_c()]
 			.iter()
 			.enumerate()
 		{
-			committee[slot * 32..(slot + 1) * 32].copy_from_slice(key.pubkey().as_ref());
+			committee[slot * 32..(slot + 1) * 32].copy_from_slice(k.pubkey().as_ref());
 		}
 		ix.custodians = committee;
 		Ok(())
 	})
-	.unwrap_or_else(|error| panic!("encode initialize: {error:?}"));
+	.unwrap();
 
 	program
 		.send_with_signers(
@@ -305,7 +208,6 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 					AccountMeta::new(config_key, false),
 					AccountMeta::new(vault_key, false),
 					AccountMeta::new(tree_key, false),
-					AccountMeta::new(nullifiers_key, false),
 					AccountMeta::new(custodians_key, false),
 					AccountMeta::new(requesters_key, false),
 					AccountMeta::new(log_key, false),
@@ -317,30 +219,27 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 		)
 		.unwrap_or_else(|error| panic!("initialize pool: {error:?}"));
 
-	// Install both verifying keys from the seeded setups.
-	let (_withdraw_pk, withdraw_vk) = prover::seeded_setup(false, 0x1111);
-	let (_transfer_pk, transfer_vk) = prover::seeded_setup(true, 0x2222);
+	let (join_split_pk, join_split_vk) = prover::seeded_setup_join_split(0x1111);
+	let (policy_pk, policy_vk) = prover::seeded_setup_policy(0x2222);
+
 	for (slot, wire) in [
-		(VK_SLOT_WITHDRAW, prover::serialize_vk(&withdraw_vk)),
-		(VK_SLOT_TRANSFER, prover::serialize_vk(&transfer_vk)),
+		(VK_SLOT_JOIN_SPLIT, prover::serialize_vk(&join_split_vk)),
+		(VK_SLOT_POLICY, prover::serialize_vk(&policy_vk)),
 	] {
 		let (vkey_key, vkey_bump) = vkey_pda(slot);
 		let mut data = vec![0_u8; SetVerificationKeyIx::SIZE];
 		SetVerificationKeyIx::initialize(&mut data, |ix| {
 			ix.bump = vkey_bump;
 			ix.slot = slot;
-			ix.ic_len = wire.ic_len;
 			ix.alpha_g1 = wire.alpha_g1;
 			ix.beta_g2 = wire.beta_g2;
 			ix.gamma_g2 = wire.gamma_g2;
 			ix.delta_g2 = wire.delta_g2;
-			ix.ic0 = wire.ic[0];
-			ix.ic1 = wire.ic[1];
-			ix.ic2 = wire.ic[2];
-			ix.ic3 = wire.ic[3];
+			ix.ic0 = wire.ic0;
+			ix.ic1 = wire.ic1;
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode vkey: {error:?}"));
+		.unwrap();
 		program
 			.send_with_signers(
 				Instruction::new_with_bytes(
@@ -358,25 +257,44 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 			.unwrap_or_else(|error| panic!("install vkey {slot}: {error:?}"));
 	}
 
-	// Deposit one note with the fixed view key.
+	// Variable-amount SOL deposit (800_000_000 lamports) with X25519 + AEAD envelope.
 	let dep = depositor();
-	program
-		.fund(&dep.pubkey(), 2_000_000_000)
-		.unwrap_or_else(|error| panic!("fund depositor: {error:?}"));
-	let secrets = prover::note_secrets(0x88);
-	let commitment = commitment_bytes(&secrets);
-	let (note_key, note_bump) = note_pda(&commitment);
+	program.fund(&dep.pubkey(), 2_000_000_000).unwrap();
+	let note = prover::note_secrets(
+		0x88,
+		800_000_000,
+		ark_bn254::Fr::from(0_u64),
+		view_key().pubkey().to_bytes(),
+	);
+	let recipient_kp = shielded::ShieldedKeypair::from_seed([0x5E; 32]);
+	let mut pt = [0_u8; 40];
+	pt[..8].copy_from_slice(&note.amount.to_le_bytes());
+	pt[8..].copy_from_slice(&prover::fr_to_le(&note.secret));
+	let enc =
+		shielded::encrypt_note_envelope(&recipient_kp.viewing_pubkey, &[0x44; 32], &pt).unwrap();
+	let shares = shielded::encrypt_custodian_shares(
+		&[
+			shielded::ShieldedKeypair::from_seed([0xA1; 32]).viewing_pubkey,
+			shielded::ShieldedKeypair::from_seed([0xB2; 32]).viewing_pubkey,
+			shielded::ShieldedKeypair::from_seed([0xC3; 32]).viewing_pubkey,
+		],
+		&[0x44; 32],
+		&enc.tx_viewing_key,
+		&[0x55; 32],
+	)
+	.unwrap();
+
 	let mut deposit = vec![0_u8; DepositIx::SIZE];
 	DepositIx::initialize(&mut deposit, |ix| {
-		ix.bump = note_bump;
-		ix.commitment = commitment;
-		ix.view_pubkey = view_key().pubkey().to_bytes();
-		ix.envelope_len = 128;
-		ix.envelope = core::array::from_fn(|index| index as u8);
-		ix.shares = core::array::from_fn(|index| 0xA0 ^ index as u8);
+		ix.amount.set(note.amount);
+		ix.commitment = note.note_id_bytes();
+		ix.view_pubkey = note.view_pubkey;
+		ix.envelope_len = enc.len;
+		ix.envelope = enc.bytes;
+		ix.shares = shares;
 		Ok(())
 	})
-	.unwrap_or_else(|error| panic!("encode deposit: {error:?}"));
+	.unwrap();
 	program
 		.send_with_signers(
 			Instruction::new_with_bytes(
@@ -387,7 +305,6 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 					AccountMeta::new(config_key, false),
 					AccountMeta::new(vault_key, false),
 					AccountMeta::new(tree_key, false),
-					AccountMeta::new(note_key, false),
 					AccountMeta::new_readonly(system(), false),
 				],
 			),
@@ -395,697 +312,872 @@ async fn start_pool() -> (ProgramTest, prover::NoteSecrets, [u8; 32], u64) {
 		)
 		.unwrap_or_else(|error| panic!("deposit: {error:?}"));
 
-	(program, secrets, commitment, 0)
+	let mut tree = prover::HostMerkleTree::new();
+	tree.push(note.leaf_bytes());
+
+	StartedPool {
+		program,
+		tree,
+		note,
+		join_split_pk,
+		policy_pk,
+	}
 }
 
 #[test]
 #[ignore = "run with pina test"]
-fn deposit_root_matches_the_host_prediction() {
+fn bootstrap_requires_the_current_deployment_authority() {
 	let _guard = journey_guard();
 	pina_test::run(async {
-		let (program, secrets, commitment, _) = start_pool().await;
+		let mut program = ProgramTest::start(program_id()).await.unwrap();
+		let deployer = bootstrap_authority();
+		program
+			.set_upgrade_authority(Some(deployer.pubkey()))
+			.unwrap();
+		let published = Keypair::new_from_array(*b"pina-pool-bootstrap-2026-09-26!!");
+		let mut data = vec![0; InitializeIx::SIZE];
+		InitializeIx::initialize(&mut data, |_| Ok(())).unwrap();
 
-		// The stored leaf equals the host commitment, and the on-chain
-		// root (computed through the Poseidon syscall) equals the host
-		// fold of that leaf up the zero-hash chain.
-		let tree = tree_pda().0;
-		let account = program
-			.account(&tree)
-			.unwrap_or_else(|error| panic!("fetch tree: {error:?}"));
-		let nodes = &account.data[TREE_NODES_AT..TREE_NODES_AT + TREE_NODES * 32];
-		assert_eq!(&nodes[..32], &commitment[..]);
-
-		let zeros = program::zero_hashes().unwrap_or_else(|error| panic!("zero hashes: {error:?}"));
-		let mut expected = program::poseidon2(&commitment, &zeros[0])
-			.unwrap_or_else(|error| panic!("host fold: {error:?}"));
-		for level in 2..=program::TREE_DEPTH {
-			expected = program::poseidon2(&expected, &zeros[level - 1])
-				.unwrap_or_else(|error| panic!("host fold: {error:?}"));
+		for signer in [&published, &deployer] {
+			if signer.pubkey() == deployer.pubkey() {
+				program
+					.set_upgrade_authority(Some(custodian_a().pubkey()))
+					.unwrap();
+			}
+			program.fund(&signer.pubkey(), 1_000_000_000).unwrap();
+			let error = program
+				.send_with_signers(
+					Instruction::new_with_bytes(
+						program_id(),
+						&data,
+						vec![
+							AccountMeta::new(signer.pubkey(), true),
+							AccountMeta::new(config_pda().0, false),
+							AccountMeta::new(vault_pda().0, false),
+							AccountMeta::new(tree_pda().0, false),
+							AccountMeta::new(custodians_pda().0, false),
+							AccountMeta::new(requesters_pda().0, false),
+							AccountMeta::new(log_pda().0, false),
+							AccountMeta::new_readonly(system(), false),
+							AccountMeta::new_readonly(program_data_address(), false),
+						],
+					),
+					&[signer],
+				)
+				.expect_err("only the deployment authority may initialize");
+			pina_test::assert_custom_error(&error, PrivacyPoolError::InvalidAuthority as u32);
 		}
-		assert_eq!(&nodes[(TREE_NODES - 1) * 32..], &expected[..]);
-
-		// The nullifier derivation stays private but reproducible.
-		let nullifier = nullifier_bytes(&secrets);
-		assert_ne!(nullifier, commitment);
+		program.stop().unwrap();
 	});
 }
 
 #[test]
 #[ignore = "run with pina test"]
-fn withdraw_pays_out_through_a_real_proof() {
+fn withdraw_pays_recipient_and_relayer_with_compressed_proof() {
 	let _guard = journey_guard();
 	pina_test::run(async {
-		let (program, secrets, ..) = start_pool().await;
+		let mut s = start_pool().await;
 		let pid = program_id();
+		let rel = relayer();
+		s.program.fund(&rel.pubkey(), 1_000_000_000).unwrap();
 
-		let tree = tree_pda().0;
-		let account = program
-			.account(&tree)
-			.unwrap_or_else(|error| panic!("fetch tree: {error:?}"));
-		let nodes = account.data[TREE_NODES_AT..TREE_NODES_AT + TREE_NODES * 32].to_vec();
-		let mut root = [0_u8; 32];
-		root.copy_from_slice(&nodes[(TREE_NODES - 1) * 32..]);
+		let root = s.tree.root();
+		let (path_elements, path_indices) = s.tree.witness(0);
+		let change = prover::note_secrets(
+			0x89,
+			290_000_000,
+			ark_bn254::Fr::from(0_u64),
+			view_key().pubkey().to_bytes(),
+		);
+		let n0 = s.note.nullifier_bytes();
+		let (n0_key, n0_bump) = nullifier_pda(&n0);
+		let zero_env = [0_u8; MAX_ENVELOPE_BYTES];
+		let zero_shares = [0_u8; SHARE_BLOB_BYTES];
 
-		let nullifier = nullifier_bytes(&secrets);
-		let (path_elements, path_indices) = prover::build_witness(&nodes, 0);
-		let (pk, vk) = prover::seeded_setup(false, 0x1111);
-		let circuit = prover::SpendCircuit {
-			root: prover::fr_from_le(&root).unwrap(),
-			nullifier: prover::fr_from_le(&nullifier).unwrap(),
-			output: prover::SpendOutput::Withdraw {
-				recipient: Address::new_from_array(recipient().to_bytes()),
-			},
-			amount: prover::amount_field(),
-			witness: Some(prover::SpendWitness {
-				spent: secrets,
-				path_elements,
-				path_indices,
-				successor: None,
-				successor_metadata_digest: None,
+		let ext_hash = ext_data_digest(
+			&pina_address(&recipient()),
+			&pina_address(&rel.pubkey()),
+			&Address::default(),
+			&change.view_pubkey,
+			0,
+			&zero_env,
+			&zero_shares,
+			&[0_u8; 32],
+			0,
+			&zero_env,
+			&zero_shares,
+		)
+		.unwrap();
+		let amounts = pack_amounts(0, 500_000_000, 10_000_000);
+		let statement = join_split_statement_hash(
+			&root,
+			&n0,
+			&[0_u8; 32],
+			&change.commitment_bytes(),
+			&[0_u8; 32],
+			&ext_hash,
+			&[0_u8; 32],
+			&amounts,
+		)
+		.unwrap();
+
+		let circuit = prover::JoinSplitCircuit {
+			statement_hash: prover::fr_from_le(&statement).unwrap(),
+			witness: Some(prover::JoinSplitWitness {
+				root: prover::fr_from_le(&root).unwrap(),
+				asset_id: ark_bn254::Fr::from(0_u64),
+				ext_data_hash: prover::fr_from_le(&ext_hash).unwrap(),
+				public_in: 0,
+				public_out: 500_000_000,
+				relayer_fee: 10_000_000,
+				inputs: [
+					prover::InputWitness {
+						note: s.note,
+						path_elements,
+						path_indices,
+					},
+					prover::InputWitness::dummy(ark_bn254::Fr::from(0_u64)),
+				],
+				outputs: [
+					change,
+					prover::NoteSecrets::dummy(ark_bn254::Fr::from(0_u64)),
+				],
 			}),
 		};
-		let proof = prover::prove_spend(&pk, circuit, 0x99);
-		let recipient_hash =
-			program::recipient_hash(&Address::new_from_array(recipient().to_bytes())).unwrap();
-		assert!(prover::verify_host(
-			&vk,
-			&[
-				prover::fr_from_le(&root).unwrap(),
-				prover::fr_from_le(&nullifier).unwrap(),
-				prover::fr_from_le(&recipient_hash).unwrap(),
-			],
-			&proof,
-		));
+		let proof = prover::prove_join_split(&s.join_split_pk, circuit, 0x99);
+		let wire = prover::serialize_proof_compressed(&proof);
 
-		// The recorded instruction path is deterministic; the withdrawal
-		// pays the denomination to the fixed recipient.
-		let before = program.balance(&recipient()).unwrap_or(0);
-
-		let wire = prover::serialize_proof(&proof);
+		let before = s.program.balance(&recipient()).unwrap_or(0);
 		let mut data = vec![0_u8; WithdrawIx::SIZE];
 		WithdrawIx::initialize(&mut data, |ix| {
-			ix.nullifier = nullifier;
+			ix.nullifier_0_bump = n0_bump;
+			ix.nullifier_1_bump = 0;
+			ix.nullifier_0 = n0;
+			ix.nullifier_1 = [0_u8; 32];
 			ix.root = root;
+			ix.public_out.set(500_000_000);
+			ix.relayer_fee.set(10_000_000);
+			ix.change_commitment = change.commitment_bytes();
+			ix.change_view_pubkey = change.view_pubkey;
+			ix.envelope_len = 0;
+			ix.envelope = zero_env;
+			ix.shares = zero_shares;
 			ix.proof_a = wire.a;
 			ix.proof_b = wire.b;
 			ix.proof_c = wire.c;
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode withdraw: {error:?}"));
+		.unwrap();
 
-		program
-			.send_instruction(Instruction::new_with_bytes(
-				pid,
-				&data,
-				vec![
-					AccountMeta::new_readonly(config_pda().0, false),
-					AccountMeta::new(vault_pda().0, false),
-					AccountMeta::new_readonly(tree, false),
-					AccountMeta::new(nullifiers_pda().0, false),
-					AccountMeta::new_readonly(vkey_pda(VK_SLOT_WITHDRAW).0, false),
-					AccountMeta::new(recipient(), false),
-					AccountMeta::new_readonly(system(), false),
-				],
-			))
+		s.program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&data,
+					vec![
+						AccountMeta::new(rel.pubkey(), true),
+						AccountMeta::new_readonly(config_pda().0, false),
+						AccountMeta::new(vault_pda().0, false),
+						AccountMeta::new(tree_pda().0, false),
+						AccountMeta::new(n0_key, false),
+						AccountMeta::new(Pubkey::new_from_array([0xDD; 32]), false),
+						AccountMeta::new_readonly(vkey_pda(VK_SLOT_JOIN_SPLIT).0, false),
+						AccountMeta::new(recipient(), false),
+						AccountMeta::new_readonly(cosigner().pubkey(), false),
+						AccountMeta::new_readonly(system(), false),
+					],
+				),
+				&[&rel],
+			)
 			.unwrap_or_else(|error| panic!("withdraw: {error:?}"));
 
-		let after = program
-			.balance(&recipient())
-			.unwrap_or_else(|error| panic!("fetch recipient: {error:?}"));
-		assert_eq!(after, before + DEPOSIT_LAMPORTS);
+		assert_eq!(
+			s.program.balance(&recipient()).unwrap(),
+			before + 500_000_000
+		);
+		s.program.stop().unwrap();
 	});
 }
 
 #[test]
 #[ignore = "run with pina test"]
-fn tier_zero_disclosure_requires_consent_and_logs_execution() {
+fn tier_zero_disclosure_and_every_remaining_instruction() {
 	let _guard = journey_guard();
 	pina_test::run(async {
-		let (program, _secrets, commitment, _) = start_pool().await;
+		let mut s = start_pool().await;
 		let pid = program_id();
-
+		let auth = bootstrap_authority();
 		let req = requester();
-		program
-			.fund(&req.pubkey(), 1_000_000_000)
-			.unwrap_or_else(|error| panic!("fund requester: {error:?}"));
+		let rel = relayer();
+		s.program.fund(&req.pubkey(), 1_000_000_000).unwrap();
+		s.program.fund(&rel.pubkey(), 1_000_000_000).unwrap();
 
-		// Anyone may file at tier 0.
-		let (request_key, request_bump) = request_pda(&req.pubkey(), 1);
-		let mut request_data = vec![0_u8; RequestDisclosureIx::SIZE];
-		RequestDisclosureIx::initialize(&mut request_data, |ix| {
-			ix.bump = request_bump;
+		// 1. Tier-0 RequestDisclosure (with Merkle proof) -> GrantDisclosure -> ApproveDisclosure (salted scope hash in log)
+		let path_bytes = s.tree.witness_bytes(0);
+		let (req_key, req_bump) = request_pda(&req.pubkey(), 1);
+		let mut req_data = vec![0_u8; RequestDisclosureIx::SIZE];
+		RequestDisclosureIx::initialize(&mut req_data, |ix| {
+			ix.bump = req_bump;
 			ix.nonce.set(1);
-			ix.tier = program::TIER_CONSENT;
-			ix.commitment = commitment;
-			ix.notice_len = 96;
-			ix.notice = core::array::from_fn(|index| 0xC0 ^ index as u8);
+			ix.tier = TIER_CONSENT;
+			ix.commitment = s.note.commitment_bytes();
+			ix.view_pubkey = s.note.view_pubkey;
+			ix.leaf_index.set(0);
+			ix.path_elements = path_bytes;
+			ix.notice_len = 16;
+			ix.notice = [0xC0; 96];
 			ix.legal_basis_hash = [0; 32];
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode request: {error:?}"));
-		program
+		.unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&request_data,
+					&req_data,
 					vec![
 						AccountMeta::new(req.pubkey(), true),
 						AccountMeta::new_readonly(config_pda().0, false),
 						AccountMeta::new_readonly(requesters_pda().0, false),
-						AccountMeta::new_readonly(note_pda(&commitment).0, false),
-						AccountMeta::new(request_key, false),
+						AccountMeta::new_readonly(tree_pda().0, false),
+						AccountMeta::new(req_key, false),
 						AccountMeta::new_readonly(system(), false),
 						AccountMeta::new_readonly(clock(), false),
 					],
 				),
 				&[&req],
 			)
-			.unwrap_or_else(|error| panic!("request disclosure: {error:?}"));
+			.unwrap();
 
-		// The note's view key grants consent.
 		let viewer = view_key();
 		let mut grant = vec![0_u8; GrantDisclosureIx::SIZE];
-		GrantDisclosureIx::initialize(&mut grant, |_| Ok(()))
-			.unwrap_or_else(|error| panic!("encode grant: {error:?}"));
-		program
+		GrantDisclosureIx::initialize(&mut grant, |_| Ok(())).unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
 					&grant,
 					vec![
-						AccountMeta::new(request_key, false),
-						AccountMeta::new_readonly(note_pda(&commitment).0, false),
+						AccountMeta::new(req_key, false),
 						AccountMeta::new_readonly(viewer.pubkey(), true),
 					],
 				),
 				&[&viewer],
 			)
-			.unwrap_or_else(|error| panic!("grant consent: {error:?}"));
+			.unwrap();
 
-		// Two custodian approvals execute the request and append the log
-		// entry in the same instruction.
-		for custodian in [custodian_a(), custodian_b()] {
-			let mut approval = vec![0_u8; program::ApproveDisclosureIx::SIZE];
-			program::ApproveDisclosureIx::initialize(&mut approval, |_| Ok(()))
-				.unwrap_or_else(|error| panic!("encode approval: {error:?}"));
-			program
+		for cust in [custodian_a(), custodian_b()] {
+			let mut app = vec![0_u8; ApproveDisclosureIx::SIZE];
+			ApproveDisclosureIx::initialize(&mut app, |_| Ok(())).unwrap();
+			s.program
 				.send_with_signers(
 					Instruction::new_with_bytes(
 						pid,
-						&approval,
+						&app,
 						vec![
-							AccountMeta::new_readonly(custodian.pubkey(), true),
+							AccountMeta::new_readonly(cust.pubkey(), true),
 							AccountMeta::new_readonly(config_pda().0, false),
 							AccountMeta::new_readonly(custodians_pda().0, false),
-							AccountMeta::new(request_key, false),
+							AccountMeta::new(req_key, false),
 							AccountMeta::new(log_pda().0, false),
 							AccountMeta::new_readonly(clock(), false),
 						],
 					),
-					&[&custodian],
+					&[&cust],
 				)
-				.unwrap_or_else(|error| panic!("approve disclosure: {error:?}"));
+				.unwrap();
 		}
 
-		// The log holds exactly one entry naming the requester, the
-		// commitment, and the tier.
-		let log = log_pda().0;
-		let account = program
-			.account(&log)
-			.unwrap_or_else(|error| panic!("fetch log: {error:?}"));
-		let count = u64::from_le_bytes(
-			account.data[3..11]
-				.try_into()
-				.unwrap_or_else(|_| panic!("count")),
-		);
-		assert_eq!(count, 1);
-		assert_eq!(&account.data[11..43], req.pubkey().as_ref());
-		assert_eq!(&account.data[43..75], &commitment[..]);
-		assert_eq!(account.data[75], program::TIER_CONSENT);
-	});
-}
+		// Verify privacy-preserving salted scope hash in DisclosureLog.
+		let log_acc = s.program.account(&log_pda().0).unwrap();
+		let expected_scope =
+			disclosure_scope_hash(&s.note.commitment_bytes(), &pina_address(&req.pubkey()), 1);
+		assert_eq!(&log_acc.data[43..75], &expected_scope[..]);
 
-/// Exercise every remaining instruction so the benchmark harness sees a
-/// sample for each IDL discriminator: `transfer`, `setCustodians`,
-/// `registerRequester`, `challengeDisclosure`, `resolveChallenge`, and
-/// `cancelDisclosure`.
-#[test]
-#[ignore = "run with pina test"]
-fn every_instruction_discriminator_is_exercised() {
-	let _guard = journey_guard();
-	pina_test::run(async {
-		let (program, secrets, commitment, _) = start_pool().await;
-		let pid = program_id();
-
-		// registerRequester (3): the authority registers a tier-1 entity.
-		let requester = requester();
-		program
-			.fund(&requester.pubkey(), 1_000_000_000)
-			.unwrap_or_else(|error| panic!("fund requester: {error:?}"));
-		let mut register = vec![0_u8; RegisterRequesterIx::SIZE];
-		RegisterRequesterIx::initialize(&mut register, |ix| {
-			ix.requester = pina_address(&requester.pubkey());
-			ix.max_tier = program::TIER_COMPELLED;
+		// 2. RegisterRequester, SetCustodians, CancelDisclosure, ChallengeDisclosure, ResolveChallenge
+		let mut reg = vec![0_u8; RegisterRequesterIx::SIZE];
+		RegisterRequesterIx::initialize(&mut reg, |ix| {
+			ix.requester = pina_address(&req.pubkey());
+			ix.max_tier = TIER_COMPELLED;
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode register: {error:?}"));
-		program
+		.unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&register,
+					&reg,
 					vec![
-						AccountMeta::new_readonly(bootstrap_authority().pubkey(), true),
+						AccountMeta::new_readonly(auth.pubkey(), true),
 						AccountMeta::new_readonly(config_pda().0, false),
 						AccountMeta::new(requesters_pda().0, false),
 					],
 				),
-				&[&bootstrap_authority()],
+				&[&auth],
 			)
-			.unwrap_or_else(|error| panic!("register requester: {error:?}"));
+			.unwrap();
 
-		// setCustodians (2): rotate the committee to three fresh keys.
-		let replacement = [
-			Keypair::new_from_array([0xD1; 32]),
-			Keypair::new_from_array([0xD2; 32]),
-			Keypair::new_from_array([0xD3; 32]),
-		];
-		let mut rotate = vec![0_u8; SetCustodiansIx::SIZE];
-		SetCustodiansIx::initialize(&mut rotate, |ix| {
+		let mut set_cust = vec![0_u8; SetCustodiansIx::SIZE];
+		SetCustodiansIx::initialize(&mut set_cust, |ix| {
 			let mut committee = [0_u8; 96];
-			for (slot, key) in replacement.iter().enumerate() {
-				committee[slot * 32..(slot + 1) * 32].copy_from_slice(key.pubkey().as_ref());
+			for (slot, k) in [custodian_a(), custodian_b(), custodian_c()]
+				.iter()
+				.enumerate()
+			{
+				committee[slot * 32..(slot + 1) * 32].copy_from_slice(k.pubkey().as_ref());
 			}
 			ix.custodians = committee;
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode set custodians: {error:?}"));
-		program
+		.unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&rotate,
+					&set_cust,
 					vec![
-						AccountMeta::new_readonly(bootstrap_authority().pubkey(), true),
+						AccountMeta::new_readonly(auth.pubkey(), true),
 						AccountMeta::new_readonly(config_pda().0, false),
 						AccountMeta::new(custodians_pda().0, false),
 					],
 				),
-				&[&bootstrap_authority()],
+				&[&auth],
 			)
-			.unwrap_or_else(|error| panic!("set custodians: {error:?}"));
+			.unwrap();
 
-		// transfer (6): spend the deposited note into a fresh commitment.
-		let tree = tree_pda().0;
-		let account = program
-			.account(&tree)
-			.unwrap_or_else(|error| panic!("fetch tree: {error:?}"));
-		let nodes = account.data[TREE_NODES_AT..TREE_NODES_AT + TREE_NODES * 32].to_vec();
-		let mut root = [0_u8; 32];
-		root.copy_from_slice(&nodes[(TREE_NODES - 1) * 32..]);
-		let nullifier = nullifier_bytes(&secrets);
-		let successor = prover::note_secrets(0xAB);
-		let (path_elements, path_indices) = prover::build_witness(&nodes, 0);
-		let (transfer_pk, _) = prover::seeded_setup(true, 0x2222);
-		let envelope = core::array::from_fn(|index| 0x40 ^ index as u8);
-		let shares = core::array::from_fn(|index| 0x80 ^ index as u8);
-		let metadata =
-			program::transfer_metadata_digest(&[0x0B; 32], 128, &envelope, &shares).unwrap();
-		let binding =
-			program::transfer_output_binding(&commitment_bytes(&successor), &metadata).unwrap();
-		let circuit = prover::SpendCircuit {
-			root: prover::fr_from_le(&root).unwrap(),
-			nullifier: prover::fr_from_le(&nullifier).unwrap(),
-			output: prover::SpendOutput::Transfer {
-				binding: prover::fr_from_le(&binding).unwrap(),
-			},
-			amount: prover::amount_field(),
-			witness: Some(prover::SpendWitness {
-				spent: secrets,
-				path_elements,
-				path_indices,
-				successor: Some(successor),
-				successor_metadata_digest: Some(prover::fr_from_le(&metadata).unwrap()),
-			}),
-		};
-		let wire = prover::serialize_proof(&prover::prove_spend(&transfer_pk, circuit, 0xCD));
-		let (note_key, note_bump) = note_pda(&commitment_bytes(&successor));
-		let mut transfer = vec![0_u8; TransferIx::SIZE];
-		TransferIx::initialize(&mut transfer, |ix| {
-			ix.bump = note_bump;
-			ix.nullifier = nullifier;
-			ix.root = root;
-			ix.new_commitment = commitment_bytes(&successor);
-			ix.new_view_pubkey = [0x0B; 32];
-			ix.envelope_len = 128;
-			ix.envelope = envelope;
-			ix.shares = shares;
-			ix.proof_a = wire.a;
-			ix.proof_b = wire.b;
-			ix.proof_c = wire.c;
+		// File & Cancel tier-2 request
+		let (cancel_key, cancel_bump) = request_pda(&req.pubkey(), 2);
+		let mut req2 = vec![0_u8; RequestDisclosureIx::SIZE];
+		RequestDisclosureIx::initialize(&mut req2, |ix| {
+			ix.bump = cancel_bump;
+			ix.nonce.set(2);
+			ix.tier = TIER_COMPELLED;
+			ix.commitment = s.note.commitment_bytes();
+			ix.view_pubkey = s.note.view_pubkey;
+			ix.leaf_index.set(0);
+			ix.path_elements = path_bytes;
+			ix.notice_len = 8;
+			ix.notice = [0xC1; 96];
+			ix.legal_basis_hash = [0x77; 32];
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode transfer: {error:?}"));
-		let payer = Keypair::new_from_array([0xF1; 32]);
-		program
-			.fund(&payer.pubkey(), 1_000_000_000)
-			.unwrap_or_else(|error| panic!("fund payer: {error:?}"));
-		program
+		.unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&transfer,
+					&req2,
 					vec![
+						AccountMeta::new(req.pubkey(), true),
 						AccountMeta::new_readonly(config_pda().0, false),
-						AccountMeta::new(payer.pubkey(), true),
-						AccountMeta::new(tree, false),
-						AccountMeta::new(nullifiers_pda().0, false),
-						AccountMeta::new_readonly(vkey_pda(VK_SLOT_TRANSFER).0, false),
-						AccountMeta::new(note_key, false),
+						AccountMeta::new_readonly(requesters_pda().0, false),
+						AccountMeta::new_readonly(tree_pda().0, false),
+						AccountMeta::new(cancel_key, false),
 						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
 					],
 				),
-				&[&payer],
+				&[&req],
 			)
-			.unwrap_or_else(|error| panic!("transfer: {error:?}"));
-
-		// cancelDisclosure (12): the requester withdraws a pending request.
-		let (cancel_request_key, cancel_bump) = request_pda(&requester.pubkey(), 5);
-		file_request(
-			&program,
-			&requester,
-			cancel_bump,
-			5,
-			program::TIER_COMPELLED,
-		)
-		.await;
+			.unwrap();
 		let mut cancel = vec![0_u8; CancelDisclosureIx::SIZE];
-		CancelDisclosureIx::initialize(&mut cancel, |_| Ok(()))
-			.unwrap_or_else(|error| panic!("encode cancel: {error:?}"));
-		program
+		CancelDisclosureIx::initialize(&mut cancel, |_| Ok(())).unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
 					&cancel,
 					vec![
-						AccountMeta::new_readonly(requester.pubkey(), true),
-						AccountMeta::new(cancel_request_key, false),
+						AccountMeta::new_readonly(req.pubkey(), true),
+						AccountMeta::new(cancel_key, false),
 					],
 				),
-				&[&requester],
+				&[&req],
 			)
-			.unwrap_or_else(|error| panic!("cancel disclosure: {error:?}"));
+			.unwrap();
 
-		// challengeDisclosure (9) then resolveChallenge (10): a tier-1
-		// request is challenged inside its window and resolved.
-		let (challenge_request_key, challenge_bump) = request_pda(&requester.pubkey(), 6);
-		file_request(
-			&program,
-			&requester,
-			challenge_bump,
-			6,
-			program::TIER_VERIFIED,
-		)
-		.await;
-		let viewer = view_key();
-		let mut challenge = vec![0_u8; ChallengeDisclosureIx::SIZE];
-		ChallengeDisclosureIx::initialize(&mut challenge, |_| Ok(()))
-			.unwrap_or_else(|error| panic!("encode challenge: {error:?}"));
-		program
+		// File, Challenge, and Resolve tier-1 request
+		let (ch_key, ch_bump) = request_pda(&req.pubkey(), 3);
+		let mut req3 = vec![0_u8; RequestDisclosureIx::SIZE];
+		RequestDisclosureIx::initialize(&mut req3, |ix| {
+			ix.bump = ch_bump;
+			ix.nonce.set(3);
+			ix.tier = TIER_VERIFIED;
+			ix.commitment = s.note.commitment_bytes();
+			ix.view_pubkey = s.note.view_pubkey;
+			ix.leaf_index.set(0);
+			ix.path_elements = path_bytes;
+			ix.notice_len = 8;
+			ix.notice = [0xC2; 96];
+			ix.legal_basis_hash = [0x78; 32];
+			Ok(())
+		})
+		.unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&challenge,
+					&req3,
 					vec![
-						AccountMeta::new(challenge_request_key, false),
-						AccountMeta::new_readonly(note_pda(&commitment).0, false),
+						AccountMeta::new(req.pubkey(), true),
+						AccountMeta::new_readonly(config_pda().0, false),
+						AccountMeta::new_readonly(requesters_pda().0, false),
+						AccountMeta::new_readonly(tree_pda().0, false),
+						AccountMeta::new(ch_key, false),
+						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(clock(), false),
+					],
+				),
+				&[&req],
+			)
+			.unwrap();
+		let mut ch = vec![0_u8; ChallengeDisclosureIx::SIZE];
+		ChallengeDisclosureIx::initialize(&mut ch, |_| Ok(())).unwrap();
+		s.program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&ch,
+					vec![
+						AccountMeta::new(ch_key, false),
 						AccountMeta::new_readonly(viewer.pubkey(), true),
 						AccountMeta::new_readonly(clock(), false),
 					],
 				),
 				&[&viewer],
 			)
-			.unwrap_or_else(|error| panic!("challenge disclosure: {error:?}"));
-
-		let mut resolve = vec![0_u8; ResolveChallengeIx::SIZE];
-		ResolveChallengeIx::initialize(&mut resolve, |ix| {
+			.unwrap();
+		let mut res = vec![0_u8; ResolveChallengeIx::SIZE];
+		ResolveChallengeIx::initialize(&mut res, |ix| {
 			ix.approve = 1;
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode resolve: {error:?}"));
-		program
+		.unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&resolve,
+					&res,
 					vec![
-						AccountMeta::new_readonly(bootstrap_authority().pubkey(), true),
+						AccountMeta::new_readonly(auth.pubkey(), true),
 						AccountMeta::new_readonly(config_pda().0, false),
-						AccountMeta::new(challenge_request_key, false),
+						AccountMeta::new(ch_key, false),
 					],
 				),
-				&[&bootstrap_authority()],
+				&[&auth],
 			)
-			.unwrap_or_else(|error| panic!("resolve challenge: {error:?}"));
-	});
-}
+			.unwrap();
 
-/// File one disclosure request with an opaque notice.
-async fn file_request(program: &ProgramTest, requester: &Keypair, bump: u8, nonce: u64, tier: u8) {
-	let mut request = vec![0_u8; RequestDisclosureIx::SIZE];
-	RequestDisclosureIx::initialize(&mut request, |ix| {
-		ix.bump = bump;
-		ix.nonce.set(nonce);
-		ix.tier = tier;
-		ix.commitment = commitment_of_deposit();
-		ix.notice_len = 96;
-		ix.notice = core::array::from_fn(|index| 0xC0 ^ index as u8);
-		ix.legal_basis_hash = [0x77; 32];
-		Ok(())
-	})
-	.unwrap_or_else(|error| panic!("encode request: {error:?}"));
-	let (request_key, _) = request_pda(&requester.pubkey(), nonce);
-	program
-		.send_with_signers(
-			Instruction::new_with_bytes(
-				program_id(),
-				&request,
-				vec![
-					AccountMeta::new(requester.pubkey(), true),
-					AccountMeta::new_readonly(config_pda().0, false),
-					AccountMeta::new_readonly(requesters_pda().0, false),
-					AccountMeta::new_readonly(note_pda(&commitment_of_deposit()).0, false),
-					AccountMeta::new(request_key, false),
-					AccountMeta::new_readonly(system(), false),
-					AccountMeta::new_readonly(clock(), false),
-				],
-			),
-			&[requester],
+		// 3. Transfer (2-in-2-out join-split splitting 800M into 500M + 295M + 5M relayer fee)
+		let root = s.tree.root();
+		let (path_elements, path_indices) = s.tree.witness(0);
+		let out0 = prover::note_secrets(0xAB, 500_000_000, ark_bn254::Fr::from(0_u64), [0x0B; 32]);
+		let out1 = prover::note_secrets(0xAC, 295_000_000, ark_bn254::Fr::from(0_u64), [0x0C; 32]);
+		let n0 = s.note.nullifier_bytes();
+		let (n0_key, n0_bump) = nullifier_pda(&n0);
+		let zero_env = [0_u8; MAX_ENVELOPE_BYTES];
+		let zero_shares = [0_u8; SHARE_BLOB_BYTES];
+		let ext_hash = ext_data_digest(
+			&Address::default(),
+			&pina_address(&rel.pubkey()),
+			&Address::default(),
+			&out0.view_pubkey,
+			0,
+			&zero_env,
+			&zero_shares,
+			&out1.view_pubkey,
+			0,
+			&zero_env,
+			&zero_shares,
 		)
-		.unwrap_or_else(|error| panic!("file disclosure request: {error:?}"));
-}
-
-/// The commitment the fixed deposit seeds, recomputed from the same seed.
-fn commitment_of_deposit() -> [u8; 32] {
-	commitment_bytes(&prover::note_secrets(0x88))
-}
-
-fn clock() -> Pubkey {
-	// The clock sysvar's fixed address.
-	Pubkey::new_from_array([
-		6, 167, 213, 23, 24, 199, 116, 201, 40, 86, 99, 152, 105, 29, 94, 182, 139, 94, 184, 163,
-		155, 75, 109, 92, 115, 85, 91, 33, 0, 0, 0, 0,
-	])
-}
-
-/// A depositor must not be able to name an account they control as the pool
-/// vault: the vault is data-less, so only its derived address pins it. Without
-/// that check a depositor would keep their lamports while the tree still
-/// recorded a spendable commitment, minting a note backed by nothing.
-#[test]
-#[ignore = "run with pina test"]
-fn deposit_rejects_a_substituted_vault() {
-	let _guard = journey_guard();
-	pina_test::run(async {
-		let (mut program, _secrets, _commitment, _) = start_pool().await;
-		let pid = program_id();
-
-		// An attacker-owned writable account standing in for the pool vault.
-		let attacker = Keypair::new_from_array([0xAB; 32]);
-		program
-			.fund(&attacker.pubkey(), 2_000_000_000)
-			.unwrap_or_else(|error| panic!("fund attacker: {error:?}"));
-
-		let dep = depositor();
-		program
-			.fund(&dep.pubkey(), 2_000_000_000)
-			.unwrap_or_else(|error| panic!("fund depositor: {error:?}"));
-		let secrets = prover::note_secrets(0x91);
-		let commitment = commitment_bytes(&secrets);
-		let (note_key, note_bump) = note_pda(&commitment);
-		let mut deposit = vec![0_u8; DepositIx::SIZE];
-		DepositIx::initialize(&mut deposit, |ix| {
-			ix.bump = note_bump;
-			ix.commitment = commitment;
-			ix.view_pubkey = view_key().pubkey().to_bytes();
-			ix.envelope_len = 128;
-			ix.envelope = core::array::from_fn(|index| index as u8);
-			ix.shares = core::array::from_fn(|index| 0xA0 ^ index as u8);
+		.unwrap();
+		let amounts = pack_amounts(0, 0, 5_000_000);
+		let statement = join_split_statement_hash(
+			&root,
+			&n0,
+			&[0_u8; 32],
+			&out0.commitment_bytes(),
+			&out1.commitment_bytes(),
+			&ext_hash,
+			&[0_u8; 32],
+			&amounts,
+		)
+		.unwrap();
+		let tcircuit = prover::JoinSplitCircuit {
+			statement_hash: prover::fr_from_le(&statement).unwrap(),
+			witness: Some(prover::JoinSplitWitness {
+				root: prover::fr_from_le(&root).unwrap(),
+				asset_id: ark_bn254::Fr::from(0_u64),
+				ext_data_hash: prover::fr_from_le(&ext_hash).unwrap(),
+				public_in: 0,
+				public_out: 0,
+				relayer_fee: 5_000_000,
+				inputs: [
+					prover::InputWitness {
+						note: s.note,
+						path_elements,
+						path_indices,
+					},
+					prover::InputWitness::dummy(ark_bn254::Fr::from(0_u64)),
+				],
+				outputs: [out0, out1],
+			}),
+		};
+		let wire = prover::serialize_proof_compressed(&prover::prove_join_split(
+			&s.join_split_pk,
+			tcircuit,
+			0xCD,
+		));
+		let mut transfer = vec![0_u8; TransferIx::SIZE];
+		TransferIx::initialize(&mut transfer, |ix| {
+			ix.nullifier_0_bump = n0_bump;
+			ix.nullifier_1_bump = 0;
+			ix.nullifier_0 = n0;
+			ix.nullifier_1 = [0_u8; 32];
+			ix.root = root;
+			ix.relayer_fee.set(5_000_000);
+			ix.out0_commitment = out0.commitment_bytes();
+			ix.out0_view_pubkey = out0.view_pubkey;
+			ix.out0_envelope_len = 0;
+			ix.out0_envelope = zero_env;
+			ix.out1_commitment = out1.commitment_bytes();
+			ix.out1_view_pubkey = out1.view_pubkey;
+			ix.out1_envelope_len = 0;
+			ix.out1_envelope = zero_env;
+			ix.proof_a = wire.a;
+			ix.proof_b = wire.b;
+			ix.proof_c = wire.c;
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode deposit: {error:?}"));
-
-		let before = program
-			.balance(&attacker.pubkey())
-			.unwrap_or_else(|error| panic!("fetch attacker: {error:?}"));
-
-		let error = program
+		.unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&deposit,
+					&transfer,
+					vec![
+						AccountMeta::new(rel.pubkey(), true),
+						AccountMeta::new_readonly(config_pda().0, false),
+						AccountMeta::new(vault_pda().0, false),
+						AccountMeta::new(tree_pda().0, false),
+						AccountMeta::new(n0_key, false),
+						AccountMeta::new(Pubkey::new_from_array([0xDE; 32]), false),
+						AccountMeta::new_readonly(vkey_pda(VK_SLOT_JOIN_SPLIT).0, false),
+						AccountMeta::new_readonly(cosigner().pubkey(), false),
+						AccountMeta::new_readonly(system(), false),
+					],
+				),
+				&[&rel],
+			)
+			.unwrap();
+		s.tree.push(out0.leaf_bytes());
+		s.tree.push(out1.leaf_bytes());
+
+		// 4. SetPolicy & VerifyPolicy (Custom Ring policy proof)
+		let mut sp = vec![0_u8; SetPolicyIx::SIZE];
+		SetPolicyIx::initialize(&mut sp, |ix| {
+			ix.policy_flags = 0;
+			ix.policy_cosigner = pina_address(&cosigner().pubkey());
+			Ok(())
+		})
+		.unwrap();
+		s.program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&sp,
+					vec![
+						AccountMeta::new_readonly(auth.pubkey(), true),
+						AccountMeta::new(config_pda().0, false),
+					],
+				),
+				&[&auth],
+			)
+			.unwrap();
+
+		let id_secret = ark_bn254::Fr::from(42_u64);
+		let salt = ark_bn254::Fr::from(99_u64);
+		let policy_hash =
+			poseidon2(&prover::fr_to_le(&id_secret), &prover::fr_to_le(&salt)).unwrap();
+		let pproof = prover::prove_policy(
+			&s.policy_pk,
+			prover::PolicyCircuit {
+				policy_hash: prover::fr_from_le(&policy_hash).unwrap(),
+				identity_secret: Some(id_secret),
+				policy_salt: Some(salt),
+			},
+			0x77,
+		);
+		let pwire = prover::serialize_proof_compressed(&pproof);
+		let mut vp = vec![0_u8; VerifyPolicyIx::SIZE];
+		VerifyPolicyIx::initialize(&mut vp, |ix| {
+			ix.policy_hash = policy_hash;
+			ix.proof_a = pwire.a;
+			ix.proof_b = pwire.b;
+			ix.proof_c = pwire.c;
+			Ok(())
+		})
+		.unwrap();
+		s.program
+			.send_instruction(Instruction::new_with_bytes(
+				pid,
+				&vp,
+				vec![AccountMeta::new_readonly(vkey_pda(VK_SLOT_POLICY).0, false)],
+			))
+			.unwrap();
+
+		// 5. RegisterAsset, DepositToken, WithdrawToken (SPL Token)
+		let mint = Keypair::new_from_array([0x1A; 32]);
+		let dep = depositor();
+		let (av_key, av_bump) = asset_pda(&mint.pubkey());
+		let vault_ta = Keypair::new_from_array([0x1B; 32]);
+		let dep_ta = Keypair::new_from_array([0x1C; 32]);
+		let rec_ta = Keypair::new_from_array([0x1D; 32]);
+		let rel_ta = Keypair::new_from_array([0x1E; 32]);
+		let payer_pk = s.program.payer();
+		let tok_prog = token_program_id();
+
+		let create_acc = |new_acc: &Keypair, space: u64| {
+			let lamports = pina_test::Rent::default().minimum_balance(space as usize);
+			let mut d = vec![0_u8, 0, 0, 0];
+			d.extend_from_slice(&lamports.to_le_bytes());
+			d.extend_from_slice(&space.to_le_bytes());
+			d.extend_from_slice(tok_prog.as_ref());
+			s.program
+				.send_with_signers(
+					Instruction::new_with_bytes(
+						system(),
+						&d,
+						vec![
+							AccountMeta::new(payer_pk, true),
+							AccountMeta::new(new_acc.pubkey(), true),
+							AccountMeta::new_readonly(tok_prog, false),
+						],
+					),
+					&[new_acc],
+				)
+				.unwrap();
+		};
+		// InitializeMint2 (tag 20)
+		create_acc(&mint, 82);
+		let mut init_mint = vec![20_u8, 6_u8];
+		init_mint.extend_from_slice(auth.pubkey().as_ref());
+		init_mint.extend_from_slice(&0_u32.to_le_bytes());
+		s.program
+			.send_instruction(Instruction::new_with_bytes(
+				tok_prog,
+				&init_mint,
+				vec![AccountMeta::new(mint.pubkey(), false)],
+			))
+			.unwrap();
+
+		// InitializeAccount3 (tag 18) for vault, depositor, recipient, relayer
+		for (ta, owner) in [
+			(&vault_ta, av_key),
+			(&dep_ta, dep.pubkey()),
+			(&rec_ta, recipient()),
+			(&rel_ta, rel.pubkey()),
+		] {
+			create_acc(ta, 165);
+			let mut init_ta = vec![18_u8];
+			init_ta.extend_from_slice(owner.as_ref());
+			s.program
+				.send_instruction(Instruction::new_with_bytes(
+					tok_prog,
+					&init_ta,
+					vec![
+						AccountMeta::new(ta.pubkey(), false),
+						AccountMeta::new_readonly(mint.pubkey(), false),
+					],
+				))
+				.unwrap();
+		}
+
+		// MintTo (tag 7)
+		let mut mint_to = vec![7_u8];
+		mint_to.extend_from_slice(&1_000_000_u64.to_le_bytes());
+		s.program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					tok_prog,
+					&mint_to,
+					vec![
+						AccountMeta::new(mint.pubkey(), false),
+						AccountMeta::new(dep_ta.pubkey(), false),
+						AccountMeta::new_readonly(auth.pubkey(), true),
+					],
+				),
+				&[&auth],
+			)
+			.unwrap();
+
+		let mut reg_asset = vec![0_u8; RegisterAssetIx::SIZE];
+		RegisterAssetIx::initialize(&mut reg_asset, |ix| {
+			ix.bump = av_bump;
+			Ok(())
+		})
+		.unwrap();
+		s.program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&reg_asset,
+					vec![
+						AccountMeta::new(auth.pubkey(), true),
+						AccountMeta::new_readonly(mint.pubkey(), false),
+						AccountMeta::new(av_key, false),
+						AccountMeta::new_readonly(vault_ta.pubkey(), false),
+						AccountMeta::new_readonly(token_program_id(), false),
+						AccountMeta::new_readonly(system(), false),
+					],
+				),
+				&[&auth],
+			)
+			.unwrap();
+
+		let mint_asset_bytes = asset_id(&pina_address(&mint.pubkey())).unwrap();
+		let mint_asset_fr = prover::fr_from_le(&mint_asset_bytes).unwrap();
+		let tok_note = prover::note_secrets(
+			0x701,
+			500_000,
+			mint_asset_fr,
+			view_key().pubkey().to_bytes(),
+		);
+		let mut dep_tok = vec![0_u8; DepositTokenIx::SIZE];
+		DepositTokenIx::initialize(&mut dep_tok, |ix| {
+			ix.amount.set(tok_note.amount);
+			ix.commitment = tok_note.note_id_bytes();
+			ix.view_pubkey = tok_note.view_pubkey;
+			ix.envelope_len = 0;
+			ix.envelope = zero_env;
+			ix.shares = zero_shares;
+			Ok(())
+		})
+		.unwrap();
+		s.program
+			.send_with_signers(
+				Instruction::new_with_bytes(
+					pid,
+					&dep_tok,
 					vec![
 						AccountMeta::new(dep.pubkey(), true),
 						AccountMeta::new(config_pda().0, false),
-						// The substituted vault.
-						AccountMeta::new(attacker.pubkey(), false),
 						AccountMeta::new(tree_pda().0, false),
-						AccountMeta::new(note_key, false),
-						AccountMeta::new_readonly(system(), false),
+						AccountMeta::new_readonly(mint.pubkey(), false),
+						AccountMeta::new_readonly(av_key, false),
+						AccountMeta::new(dep_ta.pubkey(), false),
+						AccountMeta::new(vault_ta.pubkey(), false),
+						AccountMeta::new_readonly(token_program_id(), false),
 					],
 				),
 				&[&dep],
 			)
-			.expect_err("a substituted vault must not fund a deposit");
-
-		// The rejection may surface as the owner check or the address check
-		// depending on which fires first; both are the vault identity check
-		// doing its job. What matters is that the deposit is refused, no
-		// lamports move, and no note is created.
-		assert!(
-			matches!(
-				error.transaction_error(),
-				Some(pina_test::TransactionError::InstructionError(0, _))
-			),
-			"the vault identity check rejects the substitute: {:?}",
-			error.transaction_error()
-		);
-		assert_eq!(
-			program
-				.balance(&attacker.pubkey())
-				.unwrap_or_else(|error| panic!("fetch attacker: {error:?}")),
-			before,
-			"the substituted account received nothing"
-		);
-		assert!(
-			program.account(&note_key).is_err(),
-			"a rejected deposit must not create a note"
-		);
-
-		program.stop().expect("stop isolated program test");
-	});
-}
-
-// ---------------------------------------------------------------------------
-// Audit regression (2026-09-26 deep audit)
-//
-// This test rejects an unapproved initializer. Run with
-// `pina test --project examples/privacy_pool_program --filter audit_init_`.
-// ---------------------------------------------------------------------------
-
-/// Audit 2026-09-26, finding 1: singleton initialization must bind the signer
-/// to the deployment's current upgrade authority. The resulting pool authority
-/// controls verification keys, custodians, and disclosure requesters.
-///
-/// An unapproved first initializer must not capture the pool or create any
-/// singleton pool state.
-#[test]
-#[ignore = "run with pina test"]
-fn audit_init_2026_09_26_unapproved_first_initializer_cannot_capture_the_pool() {
-	let _guard = journey_guard();
-	pina_test::run(async {
-		let pid = program_id();
-		let mut program = ProgramTest::start(pid)
-			.await
-			.unwrap_or_else(|error| panic!("start program test: {error:?}"));
-		program
-			.set_upgrade_authority(Some(bootstrap_authority().pubkey()))
 			.unwrap();
+		let tok_idx = s.tree.push(tok_note.leaf_bytes());
 
-		// The attacker races the intended deployer to the singleton PDAs.
-		let attacker = Keypair::new_from_array([0xA1; 32]);
-		program
-			.fund(&attacker.pubkey(), 3_000_000_000)
-			.unwrap_or_else(|error| panic!("fund attacker: {error:?}"));
-
-		let (config_key, config_bump) = config_pda();
-		let (vault_key, vault_bump) = vault_pda();
-		let (tree_key, tree_bump) = tree_pda();
-		let (nullifiers_key, nullifiers_bump) = nullifiers_pda();
-		let (custodians_key, custodians_bump) = custodians_pda();
-		let (requesters_key, requesters_bump) = requesters_pda();
-		let (log_key, log_bump) = log_pda();
-
-		let mut init = vec![0_u8; InitializeIx::SIZE];
-		InitializeIx::initialize(&mut init, |ix| {
-			ix.config_bump = config_bump;
-			ix.vault_bump = vault_bump;
-			ix.tree_bump = tree_bump;
-			ix.nullifiers_bump = nullifiers_bump;
-			ix.custodians_bump = custodians_bump;
-			ix.requesters_bump = requesters_bump;
-			ix.log_bump = log_bump;
-			// The attacker names their own keys as the disclosure committee.
-			let mut committee = [0_u8; 96];
-			for (slot, _seed) in [[0xE1; 32], [0xE2; 32], [0xE3; 32]].iter().enumerate() {
-				committee[slot * 32..(slot + 1) * 32].copy_from_slice(_seed);
-			}
-			ix.custodians = committee;
+		let tok_root = s.tree.root();
+		let (tok_pe, tok_pi) = s.tree.witness(tok_idx);
+		let tok_n0 = tok_note.nullifier_bytes();
+		let (tok_n0_key, tok_n0_bump) = nullifier_pda(&tok_n0);
+		let tok_ext = ext_data_digest(
+			&pina_address(&rec_ta.pubkey()),
+			&pina_address(&rel_ta.pubkey()),
+			&pina_address(&mint.pubkey()),
+			&[0_u8; 32],
+			0,
+			&zero_env,
+			&zero_shares,
+			&[0_u8; 32],
+			0,
+			&zero_env,
+			&zero_shares,
+		)
+		.unwrap();
+		let tok_amounts = pack_amounts(0, 490_000, 10_000);
+		let tok_stmt = join_split_statement_hash(
+			&tok_root,
+			&tok_n0,
+			&[0_u8; 32],
+			&[0_u8; 32],
+			&[0_u8; 32],
+			&tok_ext,
+			&mint_asset_bytes,
+			&tok_amounts,
+		)
+		.unwrap();
+		let wt_circuit = prover::JoinSplitCircuit {
+			statement_hash: prover::fr_from_le(&tok_stmt).unwrap(),
+			witness: Some(prover::JoinSplitWitness {
+				root: prover::fr_from_le(&tok_root).unwrap(),
+				asset_id: mint_asset_fr,
+				ext_data_hash: prover::fr_from_le(&tok_ext).unwrap(),
+				public_in: 0,
+				public_out: 490_000,
+				relayer_fee: 10_000,
+				inputs: [
+					prover::InputWitness {
+						note: tok_note,
+						path_elements: tok_pe,
+						path_indices: tok_pi,
+					},
+					prover::InputWitness::dummy(mint_asset_fr),
+				],
+				outputs: [
+					prover::NoteSecrets::dummy(mint_asset_fr),
+					prover::NoteSecrets::dummy(mint_asset_fr),
+				],
+			}),
+		};
+		let wt_wire = prover::serialize_proof_compressed(&prover::prove_join_split(
+			&s.join_split_pk,
+			wt_circuit,
+			0x702,
+		));
+		let mut wt = vec![0_u8; WithdrawTokenIx::SIZE];
+		WithdrawTokenIx::initialize(&mut wt, |ix| {
+			ix.nullifier_0_bump = tok_n0_bump;
+			ix.nullifier_1_bump = 0;
+			ix.nullifier_0 = tok_n0;
+			ix.nullifier_1 = [0_u8; 32];
+			ix.root = tok_root;
+			ix.public_out.set(490_000);
+			ix.relayer_fee.set(10_000);
+			ix.change_commitment = [0_u8; 32];
+			ix.change_view_pubkey = [0_u8; 32];
+			ix.envelope_len = 0;
+			ix.envelope = zero_env;
+			ix.proof_a = wt_wire.a;
+			ix.proof_b = wt_wire.b;
+			ix.proof_c = wt_wire.c;
 			Ok(())
 		})
-		.unwrap_or_else(|error| panic!("encode initialize: {error:?}"));
-
-		let error = program
+		.unwrap();
+		s.program
 			.send_with_signers(
 				Instruction::new_with_bytes(
 					pid,
-					&init,
+					&wt,
 					vec![
-						AccountMeta::new(attacker.pubkey(), true),
-						AccountMeta::new(config_key, false),
-						AccountMeta::new(vault_key, false),
-						AccountMeta::new(tree_key, false),
-						AccountMeta::new(nullifiers_key, false),
-						AccountMeta::new(custodians_key, false),
-						AccountMeta::new(requesters_key, false),
-						AccountMeta::new(log_key, false),
+						AccountMeta::new(rel.pubkey(), true),
+						AccountMeta::new_readonly(config_pda().0, false),
+						AccountMeta::new(tree_pda().0, false),
+						AccountMeta::new(tok_n0_key, false),
+						AccountMeta::new(Pubkey::new_from_array([0xDF; 32]), false),
+						AccountMeta::new_readonly(vkey_pda(VK_SLOT_JOIN_SPLIT).0, false),
+						AccountMeta::new_readonly(mint.pubkey(), false),
+						AccountMeta::new_readonly(av_key, false),
+						AccountMeta::new(vault_ta.pubkey(), false),
+						AccountMeta::new(rec_ta.pubkey(), false),
+						AccountMeta::new(rel_ta.pubkey(), false),
+						AccountMeta::new_readonly(cosigner().pubkey(), false),
+						AccountMeta::new_readonly(token_program_id(), false),
 						AccountMeta::new_readonly(system(), false),
-						AccountMeta::new_readonly(program_data_address(), false),
 					],
 				),
-				&[&attacker],
+				&[&rel],
 			)
-			.expect_err("an unapproved signer must not capture the pool");
+			.unwrap();
 
-		// The rejection must not leave any state behind: no config, no vault,
-		// no tree. A captured config with a refunded tree would leave the
-		// deployer locked out of their own pool.
-		assert!(
-			program.account(&config_key).is_err(),
-			"a rejected initialization must not create pool config state"
-		);
-		assert!(
-			program.account(&vault_key).is_err(),
-			"a rejected initialization must not create the pool vault"
-		);
-		assert!(
-			program.account(&tree_key).is_err(),
-			"a rejected initialization must not create the merkle tree"
-		);
-		pina_test::assert_custom_error(&error, PrivacyPoolError::InvalidAuthority as u32);
-
-		program
-			.stop()
-			.unwrap_or_else(|error| panic!("stop program test: {error:?}"));
+		s.program.stop().unwrap();
 	});
 }

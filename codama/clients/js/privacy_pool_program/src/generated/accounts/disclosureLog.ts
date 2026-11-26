@@ -60,31 +60,21 @@ export function getDisclosureLogDiscriminator2Bytes(): ReadonlyUint8Array {
 }
 
 /**
- * Append-only public record of executed disclosures. The entry is written
- * by the same instruction that marks the request executed, so execution
- * without a log record cannot happen.
+ * Append-only public record of executed disclosures. Stores a salted
+ * `scope_hash` rather than raw note commitments so observers cannot link log
+ * entries back to shielded notes.
  */
 export type DisclosureLog = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
-	/** Entries written so far. */
 	count: bigint;
-	/**
-	 * Flat `LOG_ENTRY_BYTES` entries: requester, commitment, tier, nonce,
-	 * timestamp, padding.
-	 */
 	entries: ReadonlyUint8Array;
 };
 
 export type DisclosureLogArgs = {
 	bump: number;
-	/** Entries written so far. */
 	count: number | bigint;
-	/**
-	 * Flat `LOG_ENTRY_BYTES` entries: requester, commitment, tier, nonce,
-	 * timestamp, padding.
-	 */
 	entries: ReadonlyUint8Array;
 };
 

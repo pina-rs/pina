@@ -520,11 +520,11 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 	match code {
 		0 => Some("InvalidAuthority"),
 		1 => Some("ZeroCommitment"),
-		2 => Some("NoteAlreadyExists"),
+		2 => Some("ZeroAmount"),
 		3 => Some("TreeFull"),
 		4 => Some("UnknownRoot"),
 		5 => Some("NullifierAlreadySpent"),
-		6 => Some("NullifierSetFull"),
+		6 => Some("PoolPaused"),
 		7 => Some("ProofVerificationFailed"),
 		8 => Some("VerifyingKeyMissing"),
 		9 => Some("InvalidVerifyingKeySlot"),
@@ -534,7 +534,7 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		13 => Some("InvalidTier"),
 		14 => Some("RequesterNotEntitled"),
 		15 => Some("RequesterRegistryFull"),
-		16 => Some("NoteNotFound"),
+		16 => Some("InvalidMerkleProof"),
 		17 => Some("InvalidRequestStatus"),
 		18 => Some("ConsentRequired"),
 		19 => Some("ChallengeWindowOpen"),
@@ -542,6 +542,8 @@ pub fn program_error_name(code: u32) -> Option<&'static str> {
 		21 => Some("LogFull"),
 		22 => Some("BufferOverflow"),
 		23 => Some("ArithmeticOverflow"),
+		24 => Some("PolicyCosignerRequired"),
+		25 => Some("InvalidAssetVault"),
 		_ => None,
 	}
 }

@@ -21,7 +21,7 @@ export const approveDisclosureCommand = registerGlobals(
 	new Command("approve_disclosure"),
 )
 	.description("approveDisclosure")
-	.requiredOption("--reserved <reserved>", "Reserved; must be zero.")
+	.requiredOption("--reserved <reserved>", "reserved")
 	.option(
 		"--pool-config <poolConfig>",
 		"The `pool_config` account [default: derived]",

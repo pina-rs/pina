@@ -11,31 +11,40 @@
 pub const WITHDRAW_DISCRIMINATOR: u8 = 5u8;
 /// Compute units `Withdraw` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const WITHDRAW_MEASURED_COMPUTE_UNITS: u32 = 92269;
+pub const WITHDRAW_MEASURED_COMPUTE_UNITS: u32 = 106428;
 /// Compute unit limit to request for a transaction carrying `Withdraw`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const WITHDRAW_COMPUTE_UNIT_LIMIT: u32 = 111100;
+pub const WITHDRAW_COMPUTE_UNIT_LIMIT: u32 = 128100;
 
 /// Accounts.
 #[derive(Clone, Debug)]
 pub struct Withdraw {
+	/// Relayer / transaction fee payer; receives `relayer_fee` directly.
+	pub payer: solana_pubkey::Pubkey,
 	pub pool_config: solana_pubkey::Pubkey,
 	pub pool_vault: solana_pubkey::Pubkey,
 	pub merkle_tree: solana_pubkey::Pubkey,
-	pub nullifier_set: solana_pubkey::Pubkey,
+	pub nullifier_record0: solana_pubkey::Pubkey,
+	pub nullifier_record1: solana_pubkey::Pubkey,
 	pub verifying_key_account: solana_pubkey::Pubkey,
 	pub recipient: solana_pubkey::Pubkey,
+	pub policy_cosigner: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 }
 
 impl Withdraw {
 	pub fn new(
+		payer: solana_pubkey::Pubkey,
+		nullifier_record0: solana_pubkey::Pubkey,
+		nullifier_record1: solana_pubkey::Pubkey,
 		verifying_key_account: solana_pubkey::Pubkey,
 		recipient: solana_pubkey::Pubkey,
+		policy_cosigner: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
+			payer,
 			pool_config: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-config".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
@@ -51,13 +60,11 @@ impl Withdraw {
 				&crate::PRIVACY_POOL_PROGRAM_ID,
 			)
 			.0,
-			nullifier_set: solana_pubkey::Pubkey::find_program_address(
-				&["privacy-pool-nullifiers".as_bytes()],
-				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			nullifier_record0,
+			nullifier_record1,
 			verifying_key_account,
 			recipient,
+			policy_cosigner,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -72,18 +79,23 @@ impl Withdraw {
 		data: WithdrawInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(10 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.payer, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.pool_config,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.pool_vault, false));
-		accounts.push(solana_instruction::AccountMeta::new_readonly(
+		accounts.push(solana_instruction::AccountMeta::new(
 			self.merkle_tree,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(
-			self.nullifier_set,
+			self.nullifier_record0,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.nullifier_record1,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
@@ -91,6 +103,10 @@ impl Withdraw {
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(self.recipient, false));
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.policy_cosigner,
+			false,
+		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.system_program,
 			false,
@@ -130,11 +146,23 @@ impl WithdrawInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct WithdrawInstructionWire {
 	pub discriminator: u8,
-	/// Nullifier derived by the circuit from the spent note's secrets.
-	pub nullifier: [u8; 32],
-	/// Tree root the proof's membership witness was built against.
+	pub nullifier0_bump: u8,
+	pub nullifier1_bump: u8,
+	pub nullifier0: [u8; 32],
+	pub nullifier1: [u8; 32],
 	pub root: [u8; 32],
-	pub proof_a: [u8; 64],
+	/// SOL withdrawn to `recipient` in lamports.
+	pub public_out: u64,
+	/// Optional fee paid from shielded balance to `relayer`.
+	pub relayer_fee: u64,
+	/// Optional change output commitment (`[0; 32]` if no change).
+	pub change_commitment: [u8; 32],
+	pub change_view_pubkey: [u8; 32],
+	pub envelope_len: u8,
+	pub envelope: [u8; 96],
+	pub shares: [u8; 144],
+	/// 192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).
+	pub proof_a: [u8; 32],
 	pub proof_b: [u8; 128],
-	pub proof_c: [u8; 64],
+	pub proof_c: [u8; 32],
 }

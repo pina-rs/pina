@@ -21,7 +21,7 @@ export const cancelDisclosureCommand = registerGlobals(
 	new Command("cancel_disclosure"),
 )
 	.description("cancelDisclosure")
-	.requiredOption("--reserved <reserved>", "Reserved; must be zero.")
+	.requiredOption("--reserved <reserved>", "reserved")
 	.requiredOption(
 		"--disclosure-request <disclosureRequest>",
 		"The `disclosure_request` account",

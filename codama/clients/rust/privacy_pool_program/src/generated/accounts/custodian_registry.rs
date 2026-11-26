@@ -12,14 +12,11 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct CustodianRegistry {
-	/// The disclosure committee. A threshold of these keys must approve before
-	/// a disclosure may execute, and each approval is a signed transaction.
+	/// The disclosure committee.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// Committee members as concatenated 32-byte addresses; raw bytes keep
-	/// the generated CLI clients renderable. A zero address marks the slot
-	/// unset.
+	/// Committee members as concatenated 32-byte addresses.
 	pub custodians: [u8; 96],
 }
 

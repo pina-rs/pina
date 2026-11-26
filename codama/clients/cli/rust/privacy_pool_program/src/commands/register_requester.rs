@@ -21,7 +21,6 @@ use crate::context::CliError;
 pub struct RegisterRequesterArgs {
 	#[arg(long)]
 	requester: String,
-	/// Highest tier the entity may file at.
 	#[arg(long)]
 	max_tier: u8,
 	/// The `pool_config` account [default: derived]

@@ -20,6 +20,8 @@ import {
 	getBytesEncoder,
 	getStructDecoder,
 	getStructEncoder,
+	getU64Decoder,
+	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
 	type Instruction,
@@ -41,7 +43,11 @@ import {
 	type ResolvedInstructionAccount,
 	type ResolvedInstructionAccountMeta,
 } from "@solana/program-client-core";
-import { findMerkleTreePda, findNullifierSetPda } from "../pdas";
+import {
+	findMerkleTreePda,
+	findPoolConfigPda,
+	findPoolVaultPda,
+} from "../pdas";
 import {
 	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
@@ -56,12 +62,14 @@ export function getTransferDiscriminatorBytes(): ReadonlyUint8Array {
 
 export type TransferInstruction<
 	TProgram extends string = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
-	TAccountPoolConfig extends string | AccountMeta<string> = string,
 	TAccountPayer extends string | AccountMeta<string> = string,
+	TAccountPoolConfig extends string | AccountMeta<string> = string,
+	TAccountPoolVault extends string | AccountMeta<string> = string,
 	TAccountMerkleTree extends string | AccountMeta<string> = string,
-	TAccountNullifierSet extends string | AccountMeta<string> = string,
+	TAccountNullifierRecord0 extends string | AccountMeta<string> = string,
+	TAccountNullifierRecord1 extends string | AccountMeta<string> = string,
 	TAccountVerifyingKeyAccount extends string | AccountMeta<string> = string,
-	TAccountNoteCommitment extends string | AccountMeta<string> = string,
+	TAccountPolicyCosigner extends string | AccountMeta<string> = string,
 	TAccountSystemProgram extends string | AccountMeta<string> =
 		"11111111111111111111111111111111",
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -70,23 +78,28 @@ export type TransferInstruction<
 	& InstructionWithData<ReadonlyUint8Array>
 	& InstructionWithAccounts<
 		[
-			TAccountPoolConfig extends string ? ReadonlyAccount<TAccountPoolConfig>
-				: TAccountPoolConfig,
 			TAccountPayer extends string ?
 					& WritableSignerAccount<TAccountPayer>
 					& AccountSignerMeta<TAccountPayer>
 				: TAccountPayer,
+			TAccountPoolConfig extends string ? ReadonlyAccount<TAccountPoolConfig>
+				: TAccountPoolConfig,
+			TAccountPoolVault extends string ? WritableAccount<TAccountPoolVault>
+				: TAccountPoolVault,
 			TAccountMerkleTree extends string ? WritableAccount<TAccountMerkleTree>
 				: TAccountMerkleTree,
-			TAccountNullifierSet extends string
-				? WritableAccount<TAccountNullifierSet>
-				: TAccountNullifierSet,
+			TAccountNullifierRecord0 extends string
+				? WritableAccount<TAccountNullifierRecord0>
+				: TAccountNullifierRecord0,
+			TAccountNullifierRecord1 extends string
+				? WritableAccount<TAccountNullifierRecord1>
+				: TAccountNullifierRecord1,
 			TAccountVerifyingKeyAccount extends string
 				? ReadonlyAccount<TAccountVerifyingKeyAccount>
 				: TAccountVerifyingKeyAccount,
-			TAccountNoteCommitment extends string
-				? WritableAccount<TAccountNoteCommitment>
-				: TAccountNoteCommitment,
+			TAccountPolicyCosigner extends string
+				? ReadonlyAccount<TAccountPolicyCosigner>
+				: TAccountPolicyCosigner,
 			TAccountSystemProgram extends string
 				? ReadonlyAccount<TAccountSystemProgram>
 				: TAccountSystemProgram,
@@ -96,32 +109,44 @@ export type TransferInstruction<
 
 export type TransferInstructionData = {
 	discriminator: number;
-	bump: number;
-	nullifier: ReadonlyUint8Array;
+	nullifier0Bump: number;
+	nullifier1Bump: number;
+	nullifier0: ReadonlyUint8Array;
+	nullifier1: ReadonlyUint8Array;
 	root: ReadonlyUint8Array;
-	/** Commitment of the successor note. */
-	newCommitment: ReadonlyUint8Array;
-	/** Successor note's consent key. */
-	newViewPubkey: ReadonlyUint8Array;
-	envelopeLen: number;
-	envelope: ReadonlyUint8Array;
-	shares: ReadonlyUint8Array;
+	/** Optional SOL relayer fee deducted from shielded inputs. */
+	relayerFee: bigint;
+	out0Commitment: ReadonlyUint8Array;
+	out0ViewPubkey: ReadonlyUint8Array;
+	out0EnvelopeLen: number;
+	out0Envelope: ReadonlyUint8Array;
+	out1Commitment: ReadonlyUint8Array;
+	out1ViewPubkey: ReadonlyUint8Array;
+	out1EnvelopeLen: number;
+	out1Envelope: ReadonlyUint8Array;
+	/** 192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`). */
 	proofA: ReadonlyUint8Array;
 	proofB: ReadonlyUint8Array;
 	proofC: ReadonlyUint8Array;
 };
 
 export type TransferInstructionDataArgs = {
-	bump: number;
-	nullifier: ReadonlyUint8Array;
+	nullifier0Bump: number;
+	nullifier1Bump: number;
+	nullifier0: ReadonlyUint8Array;
+	nullifier1: ReadonlyUint8Array;
 	root: ReadonlyUint8Array;
-	/** Commitment of the successor note. */
-	newCommitment: ReadonlyUint8Array;
-	/** Successor note's consent key. */
-	newViewPubkey: ReadonlyUint8Array;
-	envelopeLen: number;
-	envelope: ReadonlyUint8Array;
-	shares: ReadonlyUint8Array;
+	/** Optional SOL relayer fee deducted from shielded inputs. */
+	relayerFee: number | bigint;
+	out0Commitment: ReadonlyUint8Array;
+	out0ViewPubkey: ReadonlyUint8Array;
+	out0EnvelopeLen: number;
+	out0Envelope: ReadonlyUint8Array;
+	out1Commitment: ReadonlyUint8Array;
+	out1ViewPubkey: ReadonlyUint8Array;
+	out1EnvelopeLen: number;
+	out1Envelope: ReadonlyUint8Array;
+	/** 192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`). */
 	proofA: ReadonlyUint8Array;
 	proofB: ReadonlyUint8Array;
 	proofC: ReadonlyUint8Array;
@@ -133,17 +158,23 @@ export function getTransferInstructionDataEncoder(): FixedSizeEncoder<
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
-			["bump", getU8Encoder()],
-			["nullifier", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["nullifier0Bump", getU8Encoder()],
+			["nullifier1Bump", getU8Encoder()],
+			["nullifier0", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["nullifier1", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 			["root", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
-			["newCommitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
-			["newViewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
-			["envelopeLen", getU8Encoder()],
-			["envelope", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["shares", fixPinaPodEncoderSize(getBytesEncoder(), 144)],
-			["proofA", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
+			["relayerFee", getU64Encoder()],
+			["out0Commitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["out0ViewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["out0EnvelopeLen", getU8Encoder()],
+			["out0Envelope", fixPinaPodEncoderSize(getBytesEncoder(), 96)],
+			["out1Commitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["out1ViewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["out1EnvelopeLen", getU8Encoder()],
+			["out1Envelope", fixPinaPodEncoderSize(getBytesEncoder(), 96)],
+			["proofA", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 			["proofB", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["proofC", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
+			["proofC", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 		]),
 		(value) => ({ ...value, discriminator: 6 }),
 	);
@@ -157,17 +188,23 @@ export function getTransferInstructionDataDecoder(): FixedSizeDecoder<
 			"discriminator",
 			getPinaPodDiscriminatorDecoder(TRANSFER_DISCRIMINATOR, getU8Decoder()),
 		],
-		["bump", getU8Decoder()],
-		["nullifier", fixDecoderSize(getBytesDecoder(), 32)],
+		["nullifier0Bump", getU8Decoder()],
+		["nullifier1Bump", getU8Decoder()],
+		["nullifier0", fixDecoderSize(getBytesDecoder(), 32)],
+		["nullifier1", fixDecoderSize(getBytesDecoder(), 32)],
 		["root", fixDecoderSize(getBytesDecoder(), 32)],
-		["newCommitment", fixDecoderSize(getBytesDecoder(), 32)],
-		["newViewPubkey", fixDecoderSize(getBytesDecoder(), 32)],
-		["envelopeLen", getU8Decoder()],
-		["envelope", fixDecoderSize(getBytesDecoder(), 128)],
-		["shares", fixDecoderSize(getBytesDecoder(), 144)],
-		["proofA", fixDecoderSize(getBytesDecoder(), 64)],
+		["relayerFee", getU64Decoder()],
+		["out0Commitment", fixDecoderSize(getBytesDecoder(), 32)],
+		["out0ViewPubkey", fixDecoderSize(getBytesDecoder(), 32)],
+		["out0EnvelopeLen", getU8Decoder()],
+		["out0Envelope", fixDecoderSize(getBytesDecoder(), 96)],
+		["out1Commitment", fixDecoderSize(getBytesDecoder(), 32)],
+		["out1ViewPubkey", fixDecoderSize(getBytesDecoder(), 32)],
+		["out1EnvelopeLen", getU8Decoder()],
+		["out1Envelope", fixDecoderSize(getBytesDecoder(), 96)],
+		["proofA", fixDecoderSize(getBytesDecoder(), 32)],
 		["proofB", fixDecoderSize(getBytesDecoder(), 128)],
-		["proofC", fixDecoderSize(getBytesDecoder(), 64)],
+		["proofC", fixDecoderSize(getBytesDecoder(), 32)],
 	]);
 }
 
@@ -182,61 +219,71 @@ export function getTransferInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type TransferAsyncInput<
-	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
 	TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
-	TAccountNullifierSet extends InstructionAccountInput =
+	TAccountNullifierRecord0 extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountNullifierRecord1 extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountVerifyingKeyAccount extends InstructionAccountInput =
 		InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput =
+	TAccountPolicyCosigner extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
 > = {
-	poolConfig: TAccountPoolConfig;
-	/**
-	 * Funds the successor note's rent. Transfers are anonymous with respect
-	 * to the spent note, not to fees: this example has no relayer, so the
-	 * submitting wallet signs and pays. Production routes this through a
-	 * relayer so even this linkage disappears.
-	 */
+	/** Relayer / transaction fee payer; receives `relayer_fee` directly. */
 	payer: TAccountPayer;
+	poolConfig?: TAccountPoolConfig;
+	poolVault?: TAccountPoolVault;
 	merkleTree?: TAccountMerkleTree;
-	nullifierSet?: TAccountNullifierSet;
+	nullifierRecord0: TAccountNullifierRecord0;
+	nullifierRecord1: TAccountNullifierRecord1;
 	verifyingKeyAccount: TAccountVerifyingKeyAccount;
-	noteCommitment: TAccountNoteCommitment;
+	policyCosigner: TAccountPolicyCosigner;
 	systemProgram?: TAccountSystemProgram;
-	bump: TransferInstructionDataArgs["bump"];
-	nullifier: TransferInstructionDataArgs["nullifier"];
+	nullifier0Bump: TransferInstructionDataArgs["nullifier0Bump"];
+	nullifier1Bump: TransferInstructionDataArgs["nullifier1Bump"];
+	nullifier0: TransferInstructionDataArgs["nullifier0"];
+	nullifier1: TransferInstructionDataArgs["nullifier1"];
 	root: TransferInstructionDataArgs["root"];
-	newCommitment: TransferInstructionDataArgs["newCommitment"];
-	newViewPubkey: TransferInstructionDataArgs["newViewPubkey"];
-	envelopeLen: TransferInstructionDataArgs["envelopeLen"];
-	envelope: TransferInstructionDataArgs["envelope"];
-	shares: TransferInstructionDataArgs["shares"];
+	relayerFee: TransferInstructionDataArgs["relayerFee"];
+	out0Commitment: TransferInstructionDataArgs["out0Commitment"];
+	out0ViewPubkey: TransferInstructionDataArgs["out0ViewPubkey"];
+	out0EnvelopeLen: TransferInstructionDataArgs["out0EnvelopeLen"];
+	out0Envelope: TransferInstructionDataArgs["out0Envelope"];
+	out1Commitment: TransferInstructionDataArgs["out1Commitment"];
+	out1ViewPubkey: TransferInstructionDataArgs["out1ViewPubkey"];
+	out1EnvelopeLen: TransferInstructionDataArgs["out1EnvelopeLen"];
+	out1Envelope: TransferInstructionDataArgs["out1Envelope"];
 	proofA: TransferInstructionDataArgs["proofA"];
 	proofB: TransferInstructionDataArgs["proofB"];
 	proofC: TransferInstructionDataArgs["proofC"];
 };
 
 export async function getTransferInstructionAsync<
-	TAccountPoolConfig extends InstructionAccountInput,
 	TAccountPayer extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput,
-	TAccountNullifierSet extends InstructionAccountInput,
+	TAccountNullifierRecord0 extends InstructionAccountInput,
+	TAccountNullifierRecord1 extends InstructionAccountInput,
 	TAccountVerifyingKeyAccount extends InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountPolicyCosigner extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: TransferAsyncInput<
-		TAccountPoolConfig,
 		TAccountPayer,
+		TAccountPoolConfig,
+		TAccountPoolVault,
 		TAccountMerkleTree,
-		TAccountNullifierSet,
+		TAccountNullifierRecord0,
+		TAccountNullifierRecord1,
 		TAccountVerifyingKeyAccount,
-		TAccountNoteCommitment,
+		TAccountPolicyCosigner,
 		TAccountSystemProgram
 	>,
 	config?: {
@@ -246,28 +293,36 @@ export async function getTransferInstructionAsync<
 	TransferInstruction<
 		TProgramAddress,
 		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
 			TAccountPoolConfig,
 			InstructionAccountInputAddress<TAccountPoolConfig>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountPayer,
-			InstructionAccountInputAddress<TAccountPayer>
+			TAccountPoolVault,
+			InstructionAccountInputAddress<TAccountPoolVault>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountMerkleTree,
 			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNullifierSet,
-			InstructionAccountInputAddress<TAccountNullifierSet>
+			TAccountNullifierRecord0,
+			InstructionAccountInputAddress<TAccountNullifierRecord0>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierRecord1,
+			InstructionAccountInputAddress<TAccountNullifierRecord1>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountVerifyingKeyAccount,
 			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
+			TAccountPolicyCosigner,
+			InstructionAccountInputAddress<TAccountPolicyCosigner>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
@@ -287,19 +342,29 @@ export async function getTransferInstructionAsync<
 
 	// Original accounts.
 	const originalAccounts = {
+		payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
 		poolConfig: {
 			value: input.poolConfig ?? null,
 			isSigner: false,
 			isWritable: false,
 		},
-		payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+		poolVault: {
+			value: input.poolVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 		merkleTree: {
 			value: input.merkleTree ?? null,
 			isSigner: false,
 			isWritable: true,
 		},
-		nullifierSet: {
-			value: input.nullifierSet ?? null,
+		nullifierRecord0: {
+			value: input.nullifierRecord0 ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		nullifierRecord1: {
+			value: input.nullifierRecord1 ?? null,
 			isSigner: false,
 			isWritable: true,
 		},
@@ -308,10 +373,10 @@ export async function getTransferInstructionAsync<
 			isSigner: false,
 			isWritable: false,
 		},
-		noteCommitment: {
-			value: input.noteCommitment ?? null,
+		policyCosigner: {
+			value: input.policyCosigner ?? null,
 			isSigner: false,
-			isWritable: true,
+			isWritable: false,
 		},
 		systemProgram: {
 			value: input.systemProgram ?? null,
@@ -328,11 +393,14 @@ export async function getTransferInstructionAsync<
 	const args = { ...input };
 
 	// Resolve default values.
+	if (!accounts.poolConfig.value) {
+		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
+	}
+	if (!accounts.poolVault.value) {
+		accounts.poolVault.value = await findPoolVaultPda({ programAddress });
+	}
 	if (!accounts.merkleTree.value) {
 		accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
-	}
-	if (!accounts.nullifierSet.value) {
-		accounts.nullifierSet.value = await findNullifierSetPda({ programAddress });
 	}
 	if (!accounts.systemProgram.value) {
 		accounts.systemProgram.value =
@@ -343,12 +411,14 @@ export async function getTransferInstructionAsync<
 
 	return Object.freeze({
 		accounts: [
-			getAccountMeta("poolConfig", accounts.poolConfig),
 			getAccountMeta("payer", accounts.payer),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("poolVault", accounts.poolVault),
 			getAccountMeta("merkleTree", accounts.merkleTree),
-			getAccountMeta("nullifierSet", accounts.nullifierSet),
+			getAccountMeta("nullifierRecord0", accounts.nullifierRecord0),
+			getAccountMeta("nullifierRecord1", accounts.nullifierRecord1),
 			getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount),
-			getAccountMeta("noteCommitment", accounts.noteCommitment),
+			getAccountMeta("policyCosigner", accounts.policyCosigner),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
 		data: getTransferInstructionDataEncoder().encode(
@@ -358,28 +428,36 @@ export async function getTransferInstructionAsync<
 	} as TransferInstruction<
 		TProgramAddress,
 		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
 			TAccountPoolConfig,
 			InstructionAccountInputAddress<TAccountPoolConfig>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountPayer,
-			InstructionAccountInputAddress<TAccountPayer>
+			TAccountPoolVault,
+			InstructionAccountInputAddress<TAccountPoolVault>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountMerkleTree,
 			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNullifierSet,
-			InstructionAccountInputAddress<TAccountNullifierSet>
+			TAccountNullifierRecord0,
+			InstructionAccountInputAddress<TAccountNullifierRecord0>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierRecord1,
+			InstructionAccountInputAddress<TAccountNullifierRecord1>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountVerifyingKeyAccount,
 			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
+			TAccountPolicyCosigner,
+			InstructionAccountInputAddress<TAccountPolicyCosigner>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
@@ -389,61 +467,71 @@ export async function getTransferInstructionAsync<
 }
 
 export type TransferInput<
-	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
 	TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
-	TAccountNullifierSet extends InstructionAccountInput =
+	TAccountNullifierRecord0 extends InstructionAccountInput =
+		InstructionAccountInput,
+	TAccountNullifierRecord1 extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountVerifyingKeyAccount extends InstructionAccountInput =
 		InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput =
+	TAccountPolicyCosigner extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput =
 		InstructionAccountInput,
 > = {
-	poolConfig: TAccountPoolConfig;
-	/**
-	 * Funds the successor note's rent. Transfers are anonymous with respect
-	 * to the spent note, not to fees: this example has no relayer, so the
-	 * submitting wallet signs and pays. Production routes this through a
-	 * relayer so even this linkage disappears.
-	 */
+	/** Relayer / transaction fee payer; receives `relayer_fee` directly. */
 	payer: TAccountPayer;
+	poolConfig: TAccountPoolConfig;
+	poolVault: TAccountPoolVault;
 	merkleTree: TAccountMerkleTree;
-	nullifierSet: TAccountNullifierSet;
+	nullifierRecord0: TAccountNullifierRecord0;
+	nullifierRecord1: TAccountNullifierRecord1;
 	verifyingKeyAccount: TAccountVerifyingKeyAccount;
-	noteCommitment: TAccountNoteCommitment;
+	policyCosigner: TAccountPolicyCosigner;
 	systemProgram?: TAccountSystemProgram;
-	bump: TransferInstructionDataArgs["bump"];
-	nullifier: TransferInstructionDataArgs["nullifier"];
+	nullifier0Bump: TransferInstructionDataArgs["nullifier0Bump"];
+	nullifier1Bump: TransferInstructionDataArgs["nullifier1Bump"];
+	nullifier0: TransferInstructionDataArgs["nullifier0"];
+	nullifier1: TransferInstructionDataArgs["nullifier1"];
 	root: TransferInstructionDataArgs["root"];
-	newCommitment: TransferInstructionDataArgs["newCommitment"];
-	newViewPubkey: TransferInstructionDataArgs["newViewPubkey"];
-	envelopeLen: TransferInstructionDataArgs["envelopeLen"];
-	envelope: TransferInstructionDataArgs["envelope"];
-	shares: TransferInstructionDataArgs["shares"];
+	relayerFee: TransferInstructionDataArgs["relayerFee"];
+	out0Commitment: TransferInstructionDataArgs["out0Commitment"];
+	out0ViewPubkey: TransferInstructionDataArgs["out0ViewPubkey"];
+	out0EnvelopeLen: TransferInstructionDataArgs["out0EnvelopeLen"];
+	out0Envelope: TransferInstructionDataArgs["out0Envelope"];
+	out1Commitment: TransferInstructionDataArgs["out1Commitment"];
+	out1ViewPubkey: TransferInstructionDataArgs["out1ViewPubkey"];
+	out1EnvelopeLen: TransferInstructionDataArgs["out1EnvelopeLen"];
+	out1Envelope: TransferInstructionDataArgs["out1Envelope"];
 	proofA: TransferInstructionDataArgs["proofA"];
 	proofB: TransferInstructionDataArgs["proofB"];
 	proofC: TransferInstructionDataArgs["proofC"];
 };
 
 export function getTransferInstruction<
-	TAccountPoolConfig extends InstructionAccountInput,
 	TAccountPayer extends InstructionSignerInput,
+	TAccountPoolConfig extends InstructionAccountInput,
+	TAccountPoolVault extends InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput,
-	TAccountNullifierSet extends InstructionAccountInput,
+	TAccountNullifierRecord0 extends InstructionAccountInput,
+	TAccountNullifierRecord1 extends InstructionAccountInput,
 	TAccountVerifyingKeyAccount extends InstructionAccountInput,
-	TAccountNoteCommitment extends InstructionAccountInput,
+	TAccountPolicyCosigner extends InstructionAccountInput,
 	TAccountSystemProgram extends InstructionAccountInput,
 	TProgramAddress extends Address = typeof PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS,
 >(
 	input: TransferInput<
-		TAccountPoolConfig,
 		TAccountPayer,
+		TAccountPoolConfig,
+		TAccountPoolVault,
 		TAccountMerkleTree,
-		TAccountNullifierSet,
+		TAccountNullifierRecord0,
+		TAccountNullifierRecord1,
 		TAccountVerifyingKeyAccount,
-		TAccountNoteCommitment,
+		TAccountPolicyCosigner,
 		TAccountSystemProgram
 	>,
 	config?: {
@@ -452,28 +540,36 @@ export function getTransferInstruction<
 ): TransferInstruction<
 	TProgramAddress,
 	ResolvedInstructionAccountMeta<
+		TAccountPayer,
+		InstructionAccountInputAddress<TAccountPayer>
+	>,
+	ResolvedInstructionAccountMeta<
 		TAccountPoolConfig,
 		InstructionAccountInputAddress<TAccountPoolConfig>
 	>,
 	ResolvedInstructionAccountMeta<
-		TAccountPayer,
-		InstructionAccountInputAddress<TAccountPayer>
+		TAccountPoolVault,
+		InstructionAccountInputAddress<TAccountPoolVault>
 	>,
 	ResolvedInstructionAccountMeta<
 		TAccountMerkleTree,
 		InstructionAccountInputAddress<TAccountMerkleTree>
 	>,
 	ResolvedInstructionAccountMeta<
-		TAccountNullifierSet,
-		InstructionAccountInputAddress<TAccountNullifierSet>
+		TAccountNullifierRecord0,
+		InstructionAccountInputAddress<TAccountNullifierRecord0>
+	>,
+	ResolvedInstructionAccountMeta<
+		TAccountNullifierRecord1,
+		InstructionAccountInputAddress<TAccountNullifierRecord1>
 	>,
 	ResolvedInstructionAccountMeta<
 		TAccountVerifyingKeyAccount,
 		InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
 	>,
 	ResolvedInstructionAccountMeta<
-		TAccountNoteCommitment,
-		InstructionAccountInputAddress<TAccountNoteCommitment>
+		TAccountPolicyCosigner,
+		InstructionAccountInputAddress<TAccountPolicyCosigner>
 	>,
 	ResolvedInstructionAccountMeta<
 		TAccountSystemProgram,
@@ -492,19 +588,29 @@ export function getTransferInstruction<
 
 	// Original accounts.
 	const originalAccounts = {
+		payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
 		poolConfig: {
 			value: input.poolConfig ?? null,
 			isSigner: false,
 			isWritable: false,
 		},
-		payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+		poolVault: {
+			value: input.poolVault ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
 		merkleTree: {
 			value: input.merkleTree ?? null,
 			isSigner: false,
 			isWritable: true,
 		},
-		nullifierSet: {
-			value: input.nullifierSet ?? null,
+		nullifierRecord0: {
+			value: input.nullifierRecord0 ?? null,
+			isSigner: false,
+			isWritable: true,
+		},
+		nullifierRecord1: {
+			value: input.nullifierRecord1 ?? null,
 			isSigner: false,
 			isWritable: true,
 		},
@@ -513,10 +619,10 @@ export function getTransferInstruction<
 			isSigner: false,
 			isWritable: false,
 		},
-		noteCommitment: {
-			value: input.noteCommitment ?? null,
+		policyCosigner: {
+			value: input.policyCosigner ?? null,
 			isSigner: false,
-			isWritable: true,
+			isWritable: false,
 		},
 		systemProgram: {
 			value: input.systemProgram ?? null,
@@ -542,12 +648,14 @@ export function getTransferInstruction<
 
 	return Object.freeze({
 		accounts: [
-			getAccountMeta("poolConfig", accounts.poolConfig),
 			getAccountMeta("payer", accounts.payer),
+			getAccountMeta("poolConfig", accounts.poolConfig),
+			getAccountMeta("poolVault", accounts.poolVault),
 			getAccountMeta("merkleTree", accounts.merkleTree),
-			getAccountMeta("nullifierSet", accounts.nullifierSet),
+			getAccountMeta("nullifierRecord0", accounts.nullifierRecord0),
+			getAccountMeta("nullifierRecord1", accounts.nullifierRecord1),
 			getAccountMeta("verifyingKeyAccount", accounts.verifyingKeyAccount),
-			getAccountMeta("noteCommitment", accounts.noteCommitment),
+			getAccountMeta("policyCosigner", accounts.policyCosigner),
 			getAccountMeta("systemProgram", accounts.systemProgram),
 		],
 		data: getTransferInstructionDataEncoder().encode(
@@ -557,28 +665,36 @@ export function getTransferInstruction<
 	} as TransferInstruction<
 		TProgramAddress,
 		ResolvedInstructionAccountMeta<
+			TAccountPayer,
+			InstructionAccountInputAddress<TAccountPayer>
+		>,
+		ResolvedInstructionAccountMeta<
 			TAccountPoolConfig,
 			InstructionAccountInputAddress<TAccountPoolConfig>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountPayer,
-			InstructionAccountInputAddress<TAccountPayer>
+			TAccountPoolVault,
+			InstructionAccountInputAddress<TAccountPoolVault>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountMerkleTree,
 			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNullifierSet,
-			InstructionAccountInputAddress<TAccountNullifierSet>
+			TAccountNullifierRecord0,
+			InstructionAccountInputAddress<TAccountNullifierRecord0>
+		>,
+		ResolvedInstructionAccountMeta<
+			TAccountNullifierRecord1,
+			InstructionAccountInputAddress<TAccountNullifierRecord1>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountVerifyingKeyAccount,
 			InstructionAccountInputAddress<TAccountVerifyingKeyAccount>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNoteCommitment,
-			InstructionAccountInputAddress<TAccountNoteCommitment>
+			TAccountPolicyCosigner,
+			InstructionAccountInputAddress<TAccountPolicyCosigner>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountSystemProgram,
@@ -593,19 +709,16 @@ export type ParsedTransferInstruction<
 > = {
 	programAddress: Address<TProgram>;
 	accounts: {
-		poolConfig: TAccountMetas[0];
-		/**
-		 * Funds the successor note's rent. Transfers are anonymous with respect
-		 * to the spent note, not to fees: this example has no relayer, so the
-		 * submitting wallet signs and pays. Production routes this through a
-		 * relayer so even this linkage disappears.
-		 */
-		payer: TAccountMetas[1];
-		merkleTree: TAccountMetas[2];
-		nullifierSet: TAccountMetas[3];
-		verifyingKeyAccount: TAccountMetas[4];
-		noteCommitment: TAccountMetas[5];
-		systemProgram: TAccountMetas[6];
+		/** Relayer / transaction fee payer; receives `relayer_fee` directly. */
+		payer: TAccountMetas[0];
+		poolConfig: TAccountMetas[1];
+		poolVault: TAccountMetas[2];
+		merkleTree: TAccountMetas[3];
+		nullifierRecord0: TAccountMetas[4];
+		nullifierRecord1: TAccountMetas[5];
+		verifyingKeyAccount: TAccountMetas[6];
+		policyCosigner: TAccountMetas[7];
+		systemProgram: TAccountMetas[8];
 	};
 	data: TransferInstructionData;
 };
@@ -619,12 +732,12 @@ export function parseTransferInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedTransferInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 7) {
+	if (instruction.accounts.length < 9) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 7,
+				expectedAccountMetas: 9,
 			},
 		);
 	}
@@ -637,12 +750,14 @@ export function parseTransferInstruction<
 	return {
 		programAddress: instruction.programAddress,
 		accounts: {
-			poolConfig: getNextAccount(),
 			payer: getNextAccount(),
+			poolConfig: getNextAccount(),
+			poolVault: getNextAccount(),
 			merkleTree: getNextAccount(),
-			nullifierSet: getNextAccount(),
+			nullifierRecord0: getNextAccount(),
+			nullifierRecord1: getNextAccount(),
 			verifyingKeyAccount: getNextAccount(),
-			noteCommitment: getNextAccount(),
+			policyCosigner: getNextAccount(),
 			systemProgram: getNextAccount(),
 		},
 		data: getTransferInstructionDataDecoder().decode(instruction.data),

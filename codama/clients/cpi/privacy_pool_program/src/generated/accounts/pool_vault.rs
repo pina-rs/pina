@@ -11,8 +11,7 @@
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// The pool's SOL custody. Data-less by design: every lamport in it is
-/// backed by an unspent note commitment in the tree.
+/// The pool's native SOL custody PDA.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PoolVault {
 	pub bump: u8,

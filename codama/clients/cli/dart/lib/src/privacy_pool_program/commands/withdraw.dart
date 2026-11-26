@@ -12,17 +12,39 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class WithdrawCommand extends Command<void> {
   WithdrawCommand() {
     argParser
+      ..addOption('nullifier0_bump', mandatory: true, help: "nullifier0Bump")
+      ..addOption('nullifier1_bump', mandatory: true, help: "nullifier1Bump")
+      ..addOption('nullifier0', mandatory: true, help: "nullifier0")
+      ..addOption('nullifier1', mandatory: true, help: "nullifier1")
+      ..addOption('root', mandatory: true, help: "root")
       ..addOption(
-        'nullifier',
+        'public_out',
         mandatory: true,
-        help: "Nullifier derived by the circuit from the spent note's secrets.",
+        help: "SOL withdrawn to `recipient` in lamports.",
       )
       ..addOption(
-        'root',
+        'relayer_fee',
         mandatory: true,
-        help: "Tree root the proof's membership witness was built against.",
+        help: "Optional fee paid from shielded balance to `relayer`.",
       )
-      ..addOption('proof_a', mandatory: true, help: "proofA")
+      ..addOption(
+        'change_commitment',
+        mandatory: true,
+        help: "Optional change output commitment (`[0; 32]` if no change).",
+      )
+      ..addOption(
+        'change_view_pubkey',
+        mandatory: true,
+        help: "changeViewPubkey",
+      )
+      ..addOption('envelope_len', mandatory: true, help: "envelopeLen")
+      ..addOption('envelope', mandatory: true, help: "envelope")
+      ..addOption('shares', mandatory: true, help: "shares")
+      ..addOption(
+        'proof_a',
+        mandatory: true,
+        help: "192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).",
+      )
       ..addOption('proof_b', mandatory: true, help: "proofB")
       ..addOption('proof_c', mandatory: true, help: "proofC")
       ..addOption(
@@ -41,16 +63,26 @@ final class WithdrawCommand extends Command<void> {
         help: "The merkle_tree account [default: derived]",
       )
       ..addOption(
-        'nullifier_set',
-        mandatory: false,
-        help: "The nullifier_set account [default: derived]",
+        'nullifier_record0',
+        mandatory: true,
+        help: "The nullifier_record0 account",
+      )
+      ..addOption(
+        'nullifier_record1',
+        mandatory: true,
+        help: "The nullifier_record1 account",
       )
       ..addOption(
         'verifying_key_account',
         mandatory: true,
         help: "The verifying_key_account account",
       )
-      ..addOption('recipient', mandatory: true, help: "The recipient account");
+      ..addOption('recipient', mandatory: true, help: "The recipient account")
+      ..addOption(
+        'policy_cosigner',
+        mandatory: true,
+        help: "The policy_cosigner account",
+      );
   }
 
   @override
@@ -63,6 +95,7 @@ final class WithdrawCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
+    final payer = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
         : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
@@ -72,35 +105,92 @@ final class WithdrawCommand extends Command<void> {
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
         : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
-    final nullifierSet = (results['nullifier_set'] as String?) != null
-        ? pubkey('--nullifier-set', results['nullifier_set']! as String)
-        : (await findNullifierSetPda(
-            programAddress: context.programAddress,
-          )).$1;
+    final nullifierRecord0 = pubkey(
+      '--nullifier-record0',
+      results['nullifier_record0']! as String,
+    );
+    final nullifierRecord1 = pubkey(
+      '--nullifier-record1',
+      results['nullifier_record1']! as String,
+    );
     final verifyingKeyAccount = pubkey(
       '--verifying-key-account',
       results['verifying_key_account']! as String,
     );
     final recipient = pubkey('--recipient', results['recipient']! as String);
-    final nullifierValue = base58Bytes(
-      '--nullifier',
-      results['nullifier']! as String,
+    final policyCosigner = pubkey(
+      '--policy-cosigner',
+      results['policy_cosigner']! as String,
+    );
+    final nullifier0BumpValue = integer(
+      '--nullifier0-bump',
+      results['nullifier0_bump']! as String,
+    );
+    final nullifier1BumpValue = integer(
+      '--nullifier1-bump',
+      results['nullifier1_bump']! as String,
+    );
+    final nullifier0Value = base58Bytes(
+      '--nullifier0',
+      results['nullifier0']! as String,
+    );
+    final nullifier1Value = base58Bytes(
+      '--nullifier1',
+      results['nullifier1']! as String,
     );
     final rootValue = base58Bytes('--root', results['root']! as String);
+    final publicOutValue = bigInteger(
+      '--public-out',
+      results['public_out']! as String,
+    );
+    final relayerFeeValue = bigInteger(
+      '--relayer-fee',
+      results['relayer_fee']! as String,
+    );
+    final changeCommitmentValue = base58Bytes(
+      '--change-commitment',
+      results['change_commitment']! as String,
+    );
+    final changeViewPubkeyValue = base58Bytes(
+      '--change-view-pubkey',
+      results['change_view_pubkey']! as String,
+    );
+    final envelopeLenValue = integer(
+      '--envelope-len',
+      results['envelope_len']! as String,
+    );
+    final envelopeValue = base58Bytes(
+      '--envelope',
+      results['envelope']! as String,
+    );
+    final sharesValue = base58Bytes('--shares', results['shares']! as String);
     final proofAValue = base58Bytes('--proof-a', results['proof_a']! as String);
     final proofBValue = base58Bytes('--proof-b', results['proof_b']! as String);
     final proofCValue = base58Bytes('--proof-c', results['proof_c']! as String);
     final instruction = getWithdrawInstruction(
       programAddress: context.programAddress,
+      payer: payer,
       poolConfig: poolConfig,
       poolVault: poolVault,
       merkleTree: merkleTree,
-      nullifierSet: nullifierSet,
+      nullifierRecord0: nullifierRecord0,
+      nullifierRecord1: nullifierRecord1,
       verifyingKeyAccount: verifyingKeyAccount,
       recipient: recipient,
+      policyCosigner: policyCosigner,
       systemProgram: Address("11111111111111111111111111111111"),
-      nullifier: nullifierValue,
+      nullifier0Bump: nullifier0BumpValue,
+      nullifier1Bump: nullifier1BumpValue,
+      nullifier0: nullifier0Value,
+      nullifier1: nullifier1Value,
       root: rootValue,
+      publicOut: publicOutValue,
+      relayerFee: relayerFeeValue,
+      changeCommitment: changeCommitmentValue,
+      changeViewPubkey: changeViewPubkeyValue,
+      envelopeLen: envelopeLenValue,
+      envelope: envelopeValue,
+      shares: sharesValue,
       proofA: proofAValue,
       proofB: proofBValue,
       proofC: proofCValue,

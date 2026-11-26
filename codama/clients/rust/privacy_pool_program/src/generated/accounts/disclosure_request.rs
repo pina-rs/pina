@@ -12,32 +12,24 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct DisclosureRequest {
-	/// One disclosure request and its state machine.
+	/// One disclosure request and its state machine. Stores `view_pubkey` after
+	/// `RequestDisclosure` authenticates it against the Merkle tree so
+	/// `GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// Filing entity.
 	pub requester: solana_pubkey::Pubkey,
-	/// Client-chosen disambiguator for repeat filings.
 	pub nonce: u64,
-	/// Tier this request was filed at; see the `TIER_*` constants.
 	pub tier: u8,
-	/// Target note commitment.
 	pub commitment: [u8; 32],
-	/// Active bytes of the encrypted notice to the subject, client-opaque.
+	pub view_pubkey: [u8; 32],
 	pub notice_len: u8,
 	pub notice: [u8; 96],
-	/// Hash of the legal basis document; required nonzero above tier 0.
 	pub legal_basis_hash: [u8; 32],
-	/// Filing unix timestamp.
 	pub created_at: u64,
-	/// Challenge deadline unix timestamp (tier 1).
 	pub challenge_deadline: u64,
-	/// Current status; see the `STATUS_*` constants.
 	pub status: u8,
-	/// Set when the note's view key has granted consent.
 	pub granted: u8,
-	/// Custodian approval bitmask.
 	pub approvals: u8,
 }
 

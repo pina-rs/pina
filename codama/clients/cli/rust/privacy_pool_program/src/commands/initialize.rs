@@ -26,15 +26,12 @@ pub struct InitializeArgs {
 	#[arg(long)]
 	tree_bump: u8,
 	#[arg(long)]
-	nullifiers_bump: u8,
-	#[arg(long)]
 	custodians_bump: u8,
 	#[arg(long)]
 	requesters_bump: u8,
 	#[arg(long)]
 	log_bump: u8,
-	/// Initial three-member disclosure committee as concatenated 32-byte
-	/// addresses.
+	/// Initial three-member disclosure committee as concatenated 32-byte keys.
 	#[arg(long)]
 	custodians: String,
 	/// The `pool_config` account [default: derived]
@@ -46,9 +43,6 @@ pub struct InitializeArgs {
 	/// The `merkle_tree` account [default: derived]
 	#[arg(long)]
 	merkle_tree: Option<String>,
-	/// The `nullifier_set` account [default: derived]
-	#[arg(long)]
-	nullifier_set: Option<String>,
 	/// The `custodian_registry` account [default: derived]
 	#[arg(long)]
 	custodian_registry: Option<String>,
@@ -58,7 +52,7 @@ pub struct InitializeArgs {
 	/// The `disclosure_log` account [default: derived]
 	#[arg(long)]
 	disclosure_log: Option<String>,
-	/// Canonical `ProgramData` for this program, owned by the upgradeable loader
+	/// The `program_data` account
 	#[arg(long)]
 	program_data: String,
 }
@@ -96,16 +90,6 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 			.0
 		}
 	};
-	let nullifier_set = match &args.nullifier_set {
-		Some(value) => CliContext::pubkey("--nullifier_set", value)?,
-		None => {
-			Pubkey::find_program_address(
-				&["privacy-pool-nullifiers".as_bytes()],
-				&context.program_address,
-			)
-			.0
-		}
-	};
 	let custodian_registry = match &args.custodian_registry {
 		Some(value) => CliContext::pubkey("--custodian_registry", value)?,
 		None => {
@@ -138,7 +122,6 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		data.config_bump = args.config_bump;
 		data.vault_bump = args.vault_bump;
 		data.tree_bump = args.tree_bump;
-		data.nullifiers_bump = args.nullifiers_bump;
 		data.custodians_bump = args.custodians_bump;
 		data.requesters_bump = args.requesters_bump;
 		data.log_bump = args.log_bump;
@@ -155,7 +138,6 @@ pub(crate) fn run(context: &CliContext, args: InitializeArgs) -> Result<(), CliE
 		pool_config,
 		pool_vault,
 		merkle_tree,
-		nullifier_set,
 		custodian_registry,
 		requester_registry,
 		disclosure_log,

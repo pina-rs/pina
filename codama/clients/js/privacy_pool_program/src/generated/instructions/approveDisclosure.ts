@@ -88,14 +88,10 @@ export type ApproveDisclosureInstruction<
 
 export type ApproveDisclosureInstructionData = {
 	discriminator: number;
-	/** Reserved; must be zero. */
 	reserved: number;
 };
 
-export type ApproveDisclosureInstructionDataArgs = {
-	/** Reserved; must be zero. */
-	reserved: number;
-};
+export type ApproveDisclosureInstructionDataArgs = { reserved: number };
 
 export function getApproveDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 	ApproveDisclosureInstructionDataArgs

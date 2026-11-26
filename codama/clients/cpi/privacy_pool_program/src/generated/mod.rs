@@ -16,4 +16,4 @@ pub use instructions::*;
 pub use programs::*;
 
 /// Number of instructions rendered for the `privacyPoolProgram` program.
-pub const INSTRUCTION_COUNT: usize = 13;
+pub const INSTRUCTION_COUNT: usize = 18;

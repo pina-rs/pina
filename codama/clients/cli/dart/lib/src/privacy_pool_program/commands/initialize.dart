@@ -15,7 +15,6 @@ final class InitializeCommand extends Command<void> {
       ..addOption('config_bump', mandatory: true, help: "configBump")
       ..addOption('vault_bump', mandatory: true, help: "vaultBump")
       ..addOption('tree_bump', mandatory: true, help: "treeBump")
-      ..addOption('nullifiers_bump', mandatory: true, help: "nullifiersBump")
       ..addOption('custodians_bump', mandatory: true, help: "custodiansBump")
       ..addOption('requesters_bump', mandatory: true, help: "requestersBump")
       ..addOption('log_bump', mandatory: true, help: "logBump")
@@ -23,7 +22,7 @@ final class InitializeCommand extends Command<void> {
         'custodians',
         mandatory: true,
         help:
-            "Initial three-member disclosure committee as concatenated 32-byte",
+            "Initial three-member disclosure committee as concatenated 32-byte keys.",
       )
       ..addOption(
         'pool_config',
@@ -39,11 +38,6 @@ final class InitializeCommand extends Command<void> {
         'merkle_tree',
         mandatory: false,
         help: "The merkle_tree account [default: derived]",
-      )
-      ..addOption(
-        'nullifier_set',
-        mandatory: false,
-        help: "The nullifier_set account [default: derived]",
       )
       ..addOption(
         'custodian_registry',
@@ -63,8 +57,7 @@ final class InitializeCommand extends Command<void> {
       ..addOption(
         'program_data',
         mandatory: true,
-        help:
-            "Canonical `ProgramData` for this program, owned by the upgradeable loader",
+        help: "The program_data account",
       );
   }
 
@@ -88,11 +81,6 @@ final class InitializeCommand extends Command<void> {
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
         : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
-    final nullifierSet = (results['nullifier_set'] as String?) != null
-        ? pubkey('--nullifier-set', results['nullifier_set']! as String)
-        : (await findNullifierSetPda(
-            programAddress: context.programAddress,
-          )).$1;
     final custodianRegistry = (results['custodian_registry'] as String?) != null
         ? pubkey(
             '--custodian-registry',
@@ -130,10 +118,6 @@ final class InitializeCommand extends Command<void> {
       '--tree-bump',
       results['tree_bump']! as String,
     );
-    final nullifiersBumpValue = integer(
-      '--nullifiers-bump',
-      results['nullifiers_bump']! as String,
-    );
     final custodiansBumpValue = integer(
       '--custodians-bump',
       results['custodians_bump']! as String,
@@ -153,7 +137,6 @@ final class InitializeCommand extends Command<void> {
       poolConfig: poolConfig,
       poolVault: poolVault,
       merkleTree: merkleTree,
-      nullifierSet: nullifierSet,
       custodianRegistry: custodianRegistry,
       requesterRegistry: requesterRegistry,
       disclosureLog: disclosureLog,
@@ -162,7 +145,6 @@ final class InitializeCommand extends Command<void> {
       configBump: configBumpValue,
       vaultBump: vaultBumpValue,
       treeBump: treeBumpValue,
-      nullifiersBump: nullifiersBumpValue,
       custodiansBump: custodiansBumpValue,
       requestersBump: requestersBumpValue,
       logBump: logBumpValue,

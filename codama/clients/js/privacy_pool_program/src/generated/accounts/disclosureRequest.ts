@@ -61,60 +61,44 @@ export function getDisclosureRequestDiscriminator2Bytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(DISCLOSURE_REQUEST_DISCRIMINATOR2);
 }
 
-/** One disclosure request and its state machine. */
+/**
+ * One disclosure request and its state machine. Stores `view_pubkey` after
+ * `RequestDisclosure` authenticates it against the Merkle tree so
+ * `GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.
+ */
 export type DisclosureRequest = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
-	/** Filing entity. */
 	requester: Address;
-	/** Client-chosen disambiguator for repeat filings. */
 	nonce: bigint;
-	/** Tier this request was filed at; see the `TIER_*` constants. */
 	tier: number;
-	/** Target note commitment. */
 	commitment: ReadonlyUint8Array;
-	/** Active bytes of the encrypted notice to the subject, client-opaque. */
+	viewPubkey: ReadonlyUint8Array;
 	noticeLen: number;
 	notice: ReadonlyUint8Array;
-	/** Hash of the legal basis document; required nonzero above tier 0. */
 	legalBasisHash: ReadonlyUint8Array;
-	/** Filing unix timestamp. */
 	createdAt: bigint;
-	/** Challenge deadline unix timestamp (tier 1). */
 	challengeDeadline: bigint;
-	/** Current status; see the `STATUS_*` constants. */
 	status: number;
-	/** Set when the note's view key has granted consent. */
 	granted: number;
-	/** Custodian approval bitmask. */
 	approvals: number;
 };
 
 export type DisclosureRequestArgs = {
 	bump: number;
-	/** Filing entity. */
 	requester: Address | HasAddress;
-	/** Client-chosen disambiguator for repeat filings. */
 	nonce: number | bigint;
-	/** Tier this request was filed at; see the `TIER_*` constants. */
 	tier: number;
-	/** Target note commitment. */
 	commitment: ReadonlyUint8Array;
-	/** Active bytes of the encrypted notice to the subject, client-opaque. */
+	viewPubkey: ReadonlyUint8Array;
 	noticeLen: number;
 	notice: ReadonlyUint8Array;
-	/** Hash of the legal basis document; required nonzero above tier 0. */
 	legalBasisHash: ReadonlyUint8Array;
-	/** Filing unix timestamp. */
 	createdAt: number | bigint;
-	/** Challenge deadline unix timestamp (tier 1). */
 	challengeDeadline: number | bigint;
-	/** Current status; see the `STATUS_*` constants. */
 	status: number;
-	/** Set when the note's view key has granted consent. */
 	granted: number;
-	/** Custodian approval bitmask. */
 	approvals: number;
 };
 
@@ -131,6 +115,7 @@ export function getDisclosureRequestEncoder(): FixedSizeEncoder<
 			["nonce", getU64Encoder()],
 			["tier", getU8Encoder()],
 			["commitment", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
+			["viewPubkey", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
 			["noticeLen", getU8Encoder()],
 			["notice", fixPinaPodEncoderSize(getBytesEncoder(), 96)],
 			["legalBasisHash", fixPinaPodEncoderSize(getBytesEncoder(), 32)],
@@ -162,6 +147,7 @@ export function getDisclosureRequestDecoder(): FixedSizeDecoder<
 		["nonce", getU64Decoder()],
 		["tier", getU8Decoder()],
 		["commitment", fixDecoderSize(getBytesDecoder(), 32)],
+		["viewPubkey", fixDecoderSize(getBytesDecoder(), 32)],
 		["noticeLen", getU8Decoder()],
 		["notice", fixDecoderSize(getBytesDecoder(), 96)],
 		["legalBasisHash", fixDecoderSize(getBytesDecoder(), 32)],

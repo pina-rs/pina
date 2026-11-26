@@ -17,7 +17,6 @@ class InitializeInstructionData {
     required this.configBump,
     required this.vaultBump,
     required this.treeBump,
-    required this.nullifiersBump,
     required this.custodiansBump,
     required this.requestersBump,
     required this.logBump,
@@ -28,7 +27,6 @@ class InitializeInstructionData {
   final int configBump;
   final int vaultBump;
   final int treeBump;
-  final int nullifiersBump;
   final int custodiansBump;
   final int requestersBump;
   final int logBump;
@@ -41,7 +39,6 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
     ('configBump', getU8Encoder()),
     ('vaultBump', getU8Encoder()),
     ('treeBump', getU8Encoder()),
-    ('nullifiersBump', getU8Encoder()),
     ('custodiansBump', getU8Encoder()),
     ('requestersBump', getU8Encoder()),
     ('logBump', getU8Encoder()),
@@ -58,7 +55,6 @@ Encoder<InitializeInstructionData> getInitializeInstructionDataEncoder() {
       'configBump': value.configBump,
       'vaultBump': value.vaultBump,
       'treeBump': value.treeBump,
-      'nullifiersBump': value.nullifiersBump,
       'custodiansBump': value.custodiansBump,
       'requestersBump': value.requestersBump,
       'logBump': value.logBump,
@@ -73,7 +69,6 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
     ('configBump', getU8Decoder()),
     ('vaultBump', getU8Decoder()),
     ('treeBump', getU8Decoder()),
-    ('nullifiersBump', getU8Decoder()),
     ('custodiansBump', getU8Decoder()),
     ('requestersBump', getU8Decoder()),
     ('logBump', getU8Decoder()),
@@ -100,7 +95,6 @@ Decoder<InitializeInstructionData> getInitializeInstructionDataDecoder() {
         configBump: map['configBump']! as int,
         vaultBump: map['vaultBump']! as int,
         treeBump: map['treeBump']! as int,
-        nullifiersBump: map['nullifiersBump']! as int,
         custodiansBump: map['custodiansBump']! as int,
         requestersBump: map['requestersBump']! as int,
         logBump: map['logBump']! as int,
@@ -145,7 +139,6 @@ Instruction getInitializeInstruction({
   required Address poolConfig,
   required Address poolVault,
   required Address merkleTree,
-  required Address nullifierSet,
   required Address custodianRegistry,
   required Address requesterRegistry,
   required Address disclosureLog,
@@ -154,7 +147,6 @@ Instruction getInitializeInstruction({
   required int configBump,
   required int vaultBump,
   required int treeBump,
-  required int nullifiersBump,
   required int custodiansBump,
   required int requestersBump,
   required int logBump,
@@ -164,7 +156,6 @@ Instruction getInitializeInstruction({
     configBump: configBump,
     vaultBump: vaultBump,
     treeBump: treeBump,
-    nullifiersBump: nullifiersBump,
     custodiansBump: custodiansBump,
     requestersBump: requestersBump,
     logBump: logBump,
@@ -178,7 +169,6 @@ Instruction getInitializeInstruction({
       AccountMeta(address: poolConfig, role: AccountRole.writable),
       AccountMeta(address: poolVault, role: AccountRole.writable),
       AccountMeta(address: merkleTree, role: AccountRole.writable),
-      AccountMeta(address: nullifierSet, role: AccountRole.writable),
       AccountMeta(address: custodianRegistry, role: AccountRole.writable),
       AccountMeta(address: requesterRegistry, role: AccountRole.writable),
       AccountMeta(address: disclosureLog, role: AccountRole.writable),

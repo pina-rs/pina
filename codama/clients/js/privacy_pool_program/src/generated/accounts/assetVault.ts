@@ -19,19 +19,15 @@ import {
 	type FetchAccountsConfig,
 	fetchEncodedAccount,
 	fetchEncodedAccounts,
-	fixDecoderSize,
 	type FixedSizeCodec,
 	type FixedSizeDecoder,
 	type FixedSizeEncoder,
-	fixEncoderSize,
 	type GetAccountInfoApi,
-	getBytesDecoder,
-	getBytesEncoder,
+	getAddressDecoder,
+	getAddressEncoder,
 	type GetMultipleAccountsApi,
 	getStructDecoder,
 	getStructEncoder,
-	getU64Decoder,
-	getU64Encoder,
 	getU8Decoder,
 	getU8Encoder,
 	type HasAddress,
@@ -40,179 +36,180 @@ import {
 	type ReadonlyUint8Array,
 	transformEncoder,
 } from "@solana/kit";
-import { findNullifierSetPda } from "../pdas";
+import { type AssetVaultSeeds, findAssetVaultPda } from "../pdas";
 import {
-	fixPinaPodEncoderSize,
 	getPinaPodDiscriminatorDecoder,
 	getPinaPodMigrationVersionDecoder,
 } from "../pinaPodCodecs";
 
-export const NULLIFIER_SET_DISCRIMINATOR = 4;
+export const ASSET_VAULT_DISCRIMINATOR = 8;
 
-export function getNullifierSetDiscriminatorBytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(NULLIFIER_SET_DISCRIMINATOR);
+export function getAssetVaultDiscriminatorBytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ASSET_VAULT_DISCRIMINATOR);
 }
 
-export const NULLIFIER_SET_DISCRIMINATOR2 = 0;
+export const ASSET_VAULT_DISCRIMINATOR2 = 0;
 
-export function getNullifierSetDiscriminator2Bytes(): ReadonlyUint8Array {
-	return getU8Encoder().encode(NULLIFIER_SET_DISCRIMINATOR2);
+export function getAssetVaultDiscriminator2Bytes(): ReadonlyUint8Array {
+	return getU8Encoder().encode(ASSET_VAULT_DISCRIMINATOR2);
 }
 
-/** Append-only set of spent nullifiers. */
-export type NullifierSet = {
+/**
+ * Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL
+ * Interface PDA).
+ */
+export type AssetVault = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
-	/** Number of recorded nullifiers. */
-	count: bigint;
-	/** Flat 32-byte nullifier store. */
-	nullifiers: ReadonlyUint8Array;
+	mint: Address;
+	tokenProgram: Address;
+	vaultTokenAccount: Address;
 };
 
-export type NullifierSetArgs = {
+export type AssetVaultArgs = {
 	bump: number;
-	/** Number of recorded nullifiers. */
-	count: number | bigint;
-	/** Flat 32-byte nullifier store. */
-	nullifiers: ReadonlyUint8Array;
+	mint: Address | HasAddress;
+	tokenProgram: Address | HasAddress;
+	vaultTokenAccount: Address | HasAddress;
 };
 
-/** Gets the encoder for {@link NullifierSetArgs} account data. */
-export function getNullifierSetEncoder(): FixedSizeEncoder<NullifierSetArgs> {
+/** Gets the encoder for {@link AssetVaultArgs} account data. */
+export function getAssetVaultEncoder(): FixedSizeEncoder<AssetVaultArgs> {
 	return transformEncoder(
 		getStructEncoder([
 			["discriminator", getU8Encoder()],
 			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
-			["count", getU64Encoder()],
-			["nullifiers", fixPinaPodEncoderSize(getBytesEncoder(), 4096)],
+			["mint", getAddressEncoder()],
+			["tokenProgram", getAddressEncoder()],
+			["vaultTokenAccount", getAddressEncoder()],
 		]),
-		(value) => ({ ...value, discriminator: 4, migrationVersion: 0 }),
+		(value) => ({ ...value, discriminator: 8, migrationVersion: 0 }),
 	);
 }
 
-/** Gets the decoder for {@link NullifierSet} account data. */
-export function getNullifierSetDecoder(): FixedSizeDecoder<NullifierSet> {
+/** Gets the decoder for {@link AssetVault} account data. */
+export function getAssetVaultDecoder(): FixedSizeDecoder<AssetVault> {
 	return getStructDecoder([
 		[
 			"discriminator",
-			getPinaPodDiscriminatorDecoder(
-				NULLIFIER_SET_DISCRIMINATOR,
-				getU8Decoder(),
-			),
+			getPinaPodDiscriminatorDecoder(ASSET_VAULT_DISCRIMINATOR, getU8Decoder()),
 		],
 		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
-		["count", getU64Decoder()],
-		["nullifiers", fixDecoderSize(getBytesDecoder(), 4096)],
+		["mint", getAddressDecoder()],
+		["tokenProgram", getAddressDecoder()],
+		["vaultTokenAccount", getAddressDecoder()],
 	]);
 }
 
-/** Gets the codec for {@link NullifierSet} account data. */
-export function getNullifierSetCodec(): FixedSizeCodec<
-	NullifierSetArgs,
-	NullifierSet
+/** Gets the codec for {@link AssetVault} account data. */
+export function getAssetVaultCodec(): FixedSizeCodec<
+	AssetVaultArgs,
+	AssetVault
 > {
-	return combineCodec(getNullifierSetEncoder(), getNullifierSetDecoder());
+	return combineCodec(getAssetVaultEncoder(), getAssetVaultDecoder());
 }
 
-export function decodeNullifierSet<TAddress extends string = string>(
+export function decodeAssetVault<TAddress extends string = string>(
 	encodedAccount: EncodedAccount<TAddress>,
-): Account<NullifierSet, TAddress>;
-export function decodeNullifierSet<TAddress extends string = string>(
+): Account<AssetVault, TAddress>;
+export function decodeAssetVault<TAddress extends string = string>(
 	encodedAccount: MaybeEncodedAccount<TAddress>,
-): MaybeAccount<NullifierSet, TAddress>;
-export function decodeNullifierSet<TAddress extends string = string>(
+): MaybeAccount<AssetVault, TAddress>;
+export function decodeAssetVault<TAddress extends string = string>(
 	encodedAccount: EncodedAccount<TAddress> | MaybeEncodedAccount<TAddress>,
-): Account<NullifierSet, TAddress> | MaybeAccount<NullifierSet, TAddress> {
+): Account<AssetVault, TAddress> | MaybeAccount<AssetVault, TAddress> {
 	return decodeAccount(
 		encodedAccount as MaybeEncodedAccount<TAddress>,
-		getNullifierSetDecoder(),
+		getAssetVaultDecoder(),
 	);
 }
 
-export async function fetchNullifierSet<TAddress extends string = string>(
+export async function fetchAssetVault<TAddress extends string = string>(
 	rpc:
 		| Parameters<typeof fetchEncodedAccount>[0]
 		| ClientWithRpc<GetAccountInfoApi>,
 	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
-): Promise<Account<NullifierSet, TAddress>> {
-	const maybeAccount = await fetchMaybeNullifierSet(rpc, address, config);
+): Promise<Account<AssetVault, TAddress>> {
+	const maybeAccount = await fetchMaybeAssetVault(rpc, address, config);
 	assertAccountExists(maybeAccount);
 	return maybeAccount;
 }
 
-export async function fetchMaybeNullifierSet<TAddress extends string = string>(
+export async function fetchMaybeAssetVault<TAddress extends string = string>(
 	rpc:
 		| Parameters<typeof fetchEncodedAccount>[0]
 		| ClientWithRpc<GetAccountInfoApi>,
 	address: Address<TAddress> | HasAddress<TAddress>,
 	config?: FetchAccountConfig,
-): Promise<MaybeAccount<NullifierSet, TAddress>> {
+): Promise<MaybeAccount<AssetVault, TAddress>> {
 	const maybeAccount = await fetchEncodedAccount(
 		"rpc" in rpc ? rpc.rpc : rpc,
 		typeof address === "string" ? address : address.address,
 		config,
 	);
-	return decodeNullifierSet(maybeAccount);
+	return decodeAssetVault(maybeAccount);
 }
 
-export async function fetchAllNullifierSet(
+export async function fetchAllAssetVault(
 	rpc:
 		| Parameters<typeof fetchEncodedAccounts>[0]
 		| ClientWithRpc<GetMultipleAccountsApi>,
 	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
-): Promise<Account<NullifierSet>[]> {
-	const maybeAccounts = await fetchAllMaybeNullifierSet(rpc, addresses, config);
+): Promise<Account<AssetVault>[]> {
+	const maybeAccounts = await fetchAllMaybeAssetVault(rpc, addresses, config);
 	assertAccountsExist(maybeAccounts);
 	return maybeAccounts;
 }
 
-export async function fetchAllMaybeNullifierSet(
+export async function fetchAllMaybeAssetVault(
 	rpc:
 		| Parameters<typeof fetchEncodedAccounts>[0]
 		| ClientWithRpc<GetMultipleAccountsApi>,
 	addresses: Array<Address | HasAddress>,
 	config?: FetchAccountsConfig,
-): Promise<MaybeAccount<NullifierSet>[]> {
+): Promise<MaybeAccount<AssetVault>[]> {
 	const maybeAccounts = await fetchEncodedAccounts(
 		"rpc" in rpc ? rpc.rpc : rpc,
 		addresses.map((a) => (typeof a === "string" ? a : a.address)),
 		config,
 	);
-	return maybeAccounts.map((maybeAccount) => decodeNullifierSet(maybeAccount));
+	return maybeAccounts.map((maybeAccount) => decodeAssetVault(maybeAccount));
 }
 
-export async function fetchNullifierSetFromSeeds(
+export async function fetchAssetVaultFromSeeds(
 	rpc:
 		| Parameters<typeof fetchEncodedAccount>[0]
 		| ClientWithRpc<GetAccountInfoApi>,
+	seeds: AssetVaultSeeds,
 	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
-): Promise<Account<NullifierSet>> {
-	const maybeAccount = await fetchMaybeNullifierSetFromSeeds(rpc, config);
+): Promise<Account<AssetVault>> {
+	const maybeAccount = await fetchMaybeAssetVaultFromSeeds(rpc, seeds, config);
 	assertAccountExists(maybeAccount);
 	return maybeAccount;
 }
 
-export async function fetchMaybeNullifierSetFromSeeds(
+export async function fetchMaybeAssetVaultFromSeeds(
 	rpc:
 		| Parameters<typeof fetchEncodedAccount>[0]
 		| ClientWithRpc<GetAccountInfoApi>,
+	seeds: AssetVaultSeeds,
 	config: FetchAccountConfig & { programAddress?: Address | HasAddress } = {},
-): Promise<MaybeAccount<NullifierSet>> {
+): Promise<MaybeAccount<AssetVault>> {
 	const { programAddress, ...fetchConfig } = config;
-	const [address] = await findNullifierSetPda({ programAddress });
-	return await fetchMaybeNullifierSet(rpc, address, fetchConfig);
+	const [address] = await findAssetVaultPda(seeds, { programAddress });
+	return await fetchMaybeAssetVault(rpc, address, fetchConfig);
 }
 
 /** The account schema version this client was generated from. */
-export const NULLIFIER_SET_MIGRATION_VERSION = 0;
+export const ASSET_VAULT_MIGRATION_VERSION = 0;
 
 /**
- * Cheap envelope check for a fetched `NullifierSet` account: `true` only when the
+ * Cheap envelope check for a fetched `AssetVault` account: `true` only when the
  * bytes name this account's discriminator and a migration version older than
  * this client's schema. Those are exactly the accounts
  * {@link getMigrateInstruction} can bring current; every other mismatch is
@@ -220,17 +217,17 @@ export const NULLIFIER_SET_MIGRATION_VERSION = 0;
  *
  * ```ts
  * const account = await fetchEncodedAccount(rpc, address);
- * if (account.exists && nullifierSetNeedsMigration(account.data)) {
+ * if (account.exists && assetVaultNeedsMigration(account.data)) {
  * 	// Migrate first, then retry the instruction that failed.
- * 	await send(getMigrateInstruction({ nullifierSet: address, payer }));
+ * 	await send(getMigrateInstruction({ assetVault: address, payer }));
  * }
  * ```
  */
-export function nullifierSetNeedsMigration(data: ReadonlyUint8Array): boolean {
+export function assetVaultNeedsMigration(data: ReadonlyUint8Array): boolean {
 	if (data.length < 2) {
 		return false;
 	}
-	if (data[0] !== 4) {
+	if (data[0] !== 8) {
 		return false;
 	}
 	return data[1]! < 0;

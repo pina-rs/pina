@@ -21,11 +21,9 @@ use crate::context::CliError;
 pub struct SetVerificationKeyArgs {
 	#[arg(long)]
 	bump: u8,
-	/// Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].
+	/// Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`].
 	#[arg(long)]
 	slot: u8,
-	#[arg(long)]
-	ic_len: u8,
 	#[arg(long)]
 	alpha_g1: String,
 	#[arg(long)]
@@ -38,19 +36,12 @@ pub struct SetVerificationKeyArgs {
 	ic0: String,
 	#[arg(long)]
 	ic1: String,
-	#[arg(long)]
-	ic2: String,
-	#[arg(long)]
-	ic3: String,
 	/// The `pool_config` account [default: derived]
 	#[arg(long)]
 	pool_config: Option<String>,
 	/// The `verifying_key_account` account
 	#[arg(long)]
 	verifying_key_account: String,
-	/// The `system_program` account
-	#[arg(long)]
-	system_program: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: SetVerificationKeyArgs) -> Result<(), CliError> {
@@ -60,8 +51,6 @@ pub(crate) fn run(context: &CliContext, args: SetVerificationKeyArgs) -> Result<
 	let delta_g2 = CliContext::bytes::<128>("--delta_g2", &args.delta_g2)?;
 	let ic0 = CliContext::bytes::<64>("--ic0", &args.ic0)?;
 	let ic1 = CliContext::bytes::<64>("--ic1", &args.ic1)?;
-	let ic2 = CliContext::bytes::<64>("--ic2", &args.ic2)?;
-	let ic3 = CliContext::bytes::<64>("--ic3", &args.ic3)?;
 	let authority = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
 		Some(value) => CliContext::pubkey("--pool_config", value)?,
@@ -75,19 +64,15 @@ pub(crate) fn run(context: &CliContext, args: SetVerificationKeyArgs) -> Result<
 	};
 	let verifying_key_account =
 		CliContext::pubkey("--verifying_key_account", &args.verifying_key_account)?;
-	let system_program = CliContext::pubkey("--system_program", &args.system_program)?;
 	let data = SetVerificationKeyInstructionData::new(|data| {
 		data.bump = args.bump;
 		data.slot = args.slot;
-		data.ic_len = args.ic_len;
 		data.alpha_g1 = alpha_g1;
 		data.beta_g2 = beta_g2;
 		data.gamma_g2 = gamma_g2;
 		data.delta_g2 = delta_g2;
 		data.ic0 = ic0;
 		data.ic1 = ic1;
-		data.ic2 = ic2;
-		data.ic3 = ic3;
 	})
 	.map_err(|_| {
 		CliError::InvalidData {
@@ -99,7 +84,7 @@ pub(crate) fn run(context: &CliContext, args: SetVerificationKeyArgs) -> Result<
 		authority,
 		pool_config,
 		verifying_key_account,
-		system_program,
+		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 
 	context.send(

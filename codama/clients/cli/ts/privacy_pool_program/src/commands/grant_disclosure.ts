@@ -21,14 +21,10 @@ export const grantDisclosureCommand = registerGlobals(
 	new Command("grant_disclosure"),
 )
 	.description("grantDisclosure")
-	.requiredOption("--reserved <reserved>", "Reserved; must be zero.")
+	.requiredOption("--reserved <reserved>", "reserved")
 	.requiredOption(
 		"--disclosure-request <disclosureRequest>",
 		"The `disclosure_request` account",
-	)
-	.requiredOption(
-		"--note-commitment <noteCommitment>",
-		"The `note_commitment` account",
 	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
@@ -38,7 +34,6 @@ export const grantDisclosureCommand = registerGlobals(
 				"--disclosure-request",
 				options.disclosureRequest,
 			),
-			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
 			viewer: context.payer,
 		};
 		const instruction = getGrantDisclosureInstruction(

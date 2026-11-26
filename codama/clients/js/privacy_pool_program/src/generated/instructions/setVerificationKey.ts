@@ -59,7 +59,8 @@ export type SetVerificationKeyInstruction<
 	TAccountAuthority extends string | AccountMeta<string> = string,
 	TAccountPoolConfig extends string | AccountMeta<string> = string,
 	TAccountVerifyingKeyAccount extends string | AccountMeta<string> = string,
-	TAccountSystemProgram extends string | AccountMeta<string> = string,
+	TAccountSystemProgram extends string | AccountMeta<string> =
+		"11111111111111111111111111111111",
 	TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > =
 	& Instruction<TProgram>
@@ -85,32 +86,26 @@ export type SetVerificationKeyInstruction<
 export type SetVerificationKeyInstructionData = {
 	discriminator: number;
 	bump: number;
-	/** Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`]. */
+	/** Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`]. */
 	slot: number;
-	icLen: number;
 	alphaG1: ReadonlyUint8Array;
 	betaG2: ReadonlyUint8Array;
 	gammaG2: ReadonlyUint8Array;
 	deltaG2: ReadonlyUint8Array;
 	ic0: ReadonlyUint8Array;
 	ic1: ReadonlyUint8Array;
-	ic2: ReadonlyUint8Array;
-	ic3: ReadonlyUint8Array;
 };
 
 export type SetVerificationKeyInstructionDataArgs = {
 	bump: number;
-	/** Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`]. */
+	/** Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`]. */
 	slot: number;
-	icLen: number;
 	alphaG1: ReadonlyUint8Array;
 	betaG2: ReadonlyUint8Array;
 	gammaG2: ReadonlyUint8Array;
 	deltaG2: ReadonlyUint8Array;
 	ic0: ReadonlyUint8Array;
 	ic1: ReadonlyUint8Array;
-	ic2: ReadonlyUint8Array;
-	ic3: ReadonlyUint8Array;
 };
 
 export function getSetVerificationKeyInstructionDataEncoder(): FixedSizeEncoder<
@@ -121,15 +116,12 @@ export function getSetVerificationKeyInstructionDataEncoder(): FixedSizeEncoder<
 			["discriminator", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["slot", getU8Encoder()],
-			["icLen", getU8Encoder()],
 			["alphaG1", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 			["betaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
 			["gammaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
 			["deltaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
 			["ic0", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 			["ic1", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic2", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic3", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 		]),
 		(value) => ({ ...value, discriminator: 1 }),
 	);
@@ -148,15 +140,12 @@ export function getSetVerificationKeyInstructionDataDecoder(): FixedSizeDecoder<
 		],
 		["bump", getU8Decoder()],
 		["slot", getU8Decoder()],
-		["icLen", getU8Decoder()],
 		["alphaG1", fixDecoderSize(getBytesDecoder(), 64)],
 		["betaG2", fixDecoderSize(getBytesDecoder(), 128)],
 		["gammaG2", fixDecoderSize(getBytesDecoder(), 128)],
 		["deltaG2", fixDecoderSize(getBytesDecoder(), 128)],
 		["ic0", fixDecoderSize(getBytesDecoder(), 64)],
 		["ic1", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic2", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic3", fixDecoderSize(getBytesDecoder(), 64)],
 	]);
 }
 
@@ -181,18 +170,15 @@ export type SetVerificationKeyAsyncInput<
 	authority: TAccountAuthority;
 	poolConfig?: TAccountPoolConfig;
 	verifyingKeyAccount: TAccountVerifyingKeyAccount;
-	systemProgram: TAccountSystemProgram;
+	systemProgram?: TAccountSystemProgram;
 	bump: SetVerificationKeyInstructionDataArgs["bump"];
 	slot: SetVerificationKeyInstructionDataArgs["slot"];
-	icLen: SetVerificationKeyInstructionDataArgs["icLen"];
 	alphaG1: SetVerificationKeyInstructionDataArgs["alphaG1"];
 	betaG2: SetVerificationKeyInstructionDataArgs["betaG2"];
 	gammaG2: SetVerificationKeyInstructionDataArgs["gammaG2"];
 	deltaG2: SetVerificationKeyInstructionDataArgs["deltaG2"];
 	ic0: SetVerificationKeyInstructionDataArgs["ic0"];
 	ic1: SetVerificationKeyInstructionDataArgs["ic1"];
-	ic2: SetVerificationKeyInstructionDataArgs["ic2"];
-	ic3: SetVerificationKeyInstructionDataArgs["ic3"];
 };
 
 export async function getSetVerificationKeyInstructionAsync<
@@ -277,6 +263,12 @@ export async function getSetVerificationKeyInstructionAsync<
 	if (!accounts.poolConfig.value) {
 		accounts.poolConfig.value = await findPoolConfigPda({ programAddress });
 	}
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
 
 	return Object.freeze({
 		accounts: [
@@ -321,18 +313,15 @@ export type SetVerificationKeyInput<
 	authority: TAccountAuthority;
 	poolConfig: TAccountPoolConfig;
 	verifyingKeyAccount: TAccountVerifyingKeyAccount;
-	systemProgram: TAccountSystemProgram;
+	systemProgram?: TAccountSystemProgram;
 	bump: SetVerificationKeyInstructionDataArgs["bump"];
 	slot: SetVerificationKeyInstructionDataArgs["slot"];
-	icLen: SetVerificationKeyInstructionDataArgs["icLen"];
 	alphaG1: SetVerificationKeyInstructionDataArgs["alphaG1"];
 	betaG2: SetVerificationKeyInstructionDataArgs["betaG2"];
 	gammaG2: SetVerificationKeyInstructionDataArgs["gammaG2"];
 	deltaG2: SetVerificationKeyInstructionDataArgs["deltaG2"];
 	ic0: SetVerificationKeyInstructionDataArgs["ic0"];
 	ic1: SetVerificationKeyInstructionDataArgs["ic1"];
-	ic2: SetVerificationKeyInstructionDataArgs["ic2"];
-	ic3: SetVerificationKeyInstructionDataArgs["ic3"];
 };
 
 export function getSetVerificationKeyInstruction<
@@ -410,6 +399,14 @@ export function getSetVerificationKeyInstruction<
 
 	// Original args.
 	const args = { ...input };
+
+	// Resolve default values.
+	if (!accounts.systemProgram.value) {
+		accounts.systemProgram.value =
+			"11111111111111111111111111111111" as Address<
+				"11111111111111111111111111111111"
+			>;
+	}
 
 	return Object.freeze({
 		accounts: [

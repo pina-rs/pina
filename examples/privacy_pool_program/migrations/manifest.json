@@ -32,8 +32,12 @@
 								"rustType": "u32"
 							},
 							{
-								"name": "deposit_lamports",
-								"rustType": "u64"
+								"name": "policy_flags",
+								"rustType": "u8"
+							},
+							{
+								"name": "policy_cosigner",
+								"rustType": "Address"
 							},
 							{
 								"name": "total_deposits",
@@ -76,8 +80,8 @@
 								"rustType": "u64"
 							},
 							{
-								"name": "nodes",
-								"rustType": "[u8; 8160]"
+								"name": "filled_subtrees",
+								"rustType": "[u8; 512]"
 							},
 							{
 								"name": "roots_len",
@@ -85,7 +89,7 @@
 							},
 							{
 								"name": "roots",
-								"rustType": "[u8; 256]"
+								"rustType": "[u8; 1024]"
 							}
 						]
 					}
@@ -93,7 +97,7 @@
 			]
 		},
 		"account:1:04": {
-			"rustName": "NullifierSet",
+			"rustName": "NullifierRecord",
 			"versions": [
 				{
 					"schema": {
@@ -102,14 +106,6 @@
 							{
 								"name": "bump",
 								"rustType": "u8"
-							},
-							{
-								"name": "count",
-								"rustType": "u64"
-							},
-							{
-								"name": "nullifiers",
-								"rustType": "[u8; 4096]"
 							}
 						]
 					}
@@ -189,7 +185,7 @@
 			]
 		},
 		"account:1:08": {
-			"rustName": "NoteCommitment",
+			"rustName": "AssetVault",
 			"versions": [
 				{
 					"schema": {
@@ -200,24 +196,16 @@
 								"rustType": "u8"
 							},
 							{
-								"name": "commitment",
-								"rustType": "[u8; 32]"
+								"name": "mint",
+								"rustType": "Address"
 							},
 							{
-								"name": "view_pubkey",
-								"rustType": "[u8; 32]"
+								"name": "token_program",
+								"rustType": "Address"
 							},
 							{
-								"name": "envelope_len",
-								"rustType": "u8"
-							},
-							{
-								"name": "envelope",
-								"rustType": "[u8; 128]"
-							},
-							{
-								"name": "shares",
-								"rustType": "[u8; 144]"
+								"name": "vault_token_account",
+								"rustType": "Address"
 							}
 						]
 					}
@@ -249,6 +237,10 @@
 							},
 							{
 								"name": "commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "view_pubkey",
 								"rustType": "[u8; 32]"
 							},
 							{
@@ -320,24 +312,48 @@
 								"rustType": "[u8; 128]"
 							},
 							{
-								"name": "ic_len",
-								"rustType": "u8"
-							},
-							{
 								"name": "ic0",
 								"rustType": "[u8; 64]"
 							},
 							{
 								"name": "ic1",
 								"rustType": "[u8; 64]"
+							}
+						]
+					}
+				}
+			]
+		},
+		"event:1:01": {
+			"rustName": "NoteEncryptedEvent",
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "leaf_index",
+								"rustType": "u64"
 							},
 							{
-								"name": "ic2",
-								"rustType": "[u8; 64]"
+								"name": "commitment",
+								"rustType": "[u8; 32]"
 							},
 							{
-								"name": "ic3",
-								"rustType": "[u8; 64]"
+								"name": "view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "envelope_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "envelope",
+								"rustType": "[u8; 96]"
+							},
+							{
+								"name": "shares",
+								"rustType": "[u8; 144]"
 							}
 						]
 					}
@@ -362,10 +378,6 @@
 							},
 							{
 								"name": "tree_bump",
-								"rustType": "u8"
-							},
-							{
-								"name": "nullifiers_bump",
 								"rustType": "u8"
 							},
 							{
@@ -407,11 +419,6 @@
 								"name": "merkle_tree",
 								"writable": true,
 								"pda": "merkle_tree"
-							},
-							{
-								"name": "nullifier_set",
-								"writable": true,
-								"pda": "nullifier_set"
 							},
 							{
 								"name": "custodian_registry",
@@ -457,10 +464,6 @@
 								"rustType": "u8"
 							},
 							{
-								"name": "ic_len",
-								"rustType": "u8"
-							},
-							{
 								"name": "alpha_g1",
 								"rustType": "[u8; 64]"
 							},
@@ -483,14 +486,6 @@
 							{
 								"name": "ic1",
 								"rustType": "[u8; 64]"
-							},
-							{
-								"name": "ic2",
-								"rustType": "[u8; 64]"
-							},
-							{
-								"name": "ic3",
-								"rustType": "[u8; 64]"
 							}
 						]
 					},
@@ -502,7 +497,8 @@
 								"signer": true
 							},
 							{
-								"name": "pool_config"
+								"name": "pool_config",
+								"pda": "pool_config"
 							},
 							{
 								"name": "verifying_key_account",
@@ -510,7 +506,8 @@
 								"pda": "verifying_key_account"
 							},
 							{
-								"name": "system_program"
+								"name": "system_program",
+								"defaultValue": "publicKey:11111111111111111111111111111111"
 							}
 						]
 					}
@@ -538,11 +535,13 @@
 								"signer": true
 							},
 							{
-								"name": "pool_config"
+								"name": "pool_config",
+								"pda": "pool_config"
 							},
 							{
 								"name": "custodian_registry",
-								"writable": true
+								"writable": true,
+								"pda": "custodian_registry"
 							}
 						]
 					}
@@ -574,11 +573,13 @@
 								"signer": true
 							},
 							{
-								"name": "pool_config"
+								"name": "pool_config",
+								"pda": "pool_config"
 							},
 							{
 								"name": "requester_registry",
-								"writable": true
+								"writable": true,
+								"pda": "requester_registry"
 							}
 						]
 					}
@@ -594,8 +595,8 @@
 						"layout": "fixed",
 						"fields": [
 							{
-								"name": "bump",
-								"rustType": "u8"
+								"name": "amount",
+								"rustType": "u64"
 							},
 							{
 								"name": "commitment",
@@ -611,7 +612,7 @@
 							},
 							{
 								"name": "envelope",
-								"rustType": "[u8; 128]"
+								"rustType": "[u8; 96]"
 							},
 							{
 								"name": "shares",
@@ -628,7 +629,8 @@
 							},
 							{
 								"name": "pool_config",
-								"writable": true
+								"writable": true,
+								"pda": "pool_config"
 							},
 							{
 								"name": "pool_vault",
@@ -637,12 +639,8 @@
 							},
 							{
 								"name": "merkle_tree",
-								"writable": true
-							},
-							{
-								"name": "note_commitment",
 								"writable": true,
-								"pda": "note_commitment"
+								"pda": "merkle_tree"
 							},
 							{
 								"name": "system_program",
@@ -662,7 +660,19 @@
 						"layout": "fixed",
 						"fields": [
 							{
-								"name": "nullifier",
+								"name": "nullifier_0_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "nullifier_1_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "nullifier_0",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "nullifier_1",
 								"rustType": "[u8; 32]"
 							},
 							{
@@ -670,8 +680,36 @@
 								"rustType": "[u8; 32]"
 							},
 							{
+								"name": "public_out",
+								"rustType": "u64"
+							},
+							{
+								"name": "relayer_fee",
+								"rustType": "u64"
+							},
+							{
+								"name": "change_commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "change_view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "envelope_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "envelope",
+								"rustType": "[u8; 96]"
+							},
+							{
+								"name": "shares",
+								"rustType": "[u8; 144]"
+							},
+							{
 								"name": "proof_a",
-								"rustType": "[u8; 64]"
+								"rustType": "[u8; 32]"
 							},
 							{
 								"name": "proof_b",
@@ -679,14 +717,20 @@
 							},
 							{
 								"name": "proof_c",
-								"rustType": "[u8; 64]"
+								"rustType": "[u8; 32]"
 							}
 						]
 					},
 					"process": {
 						"accounts": [
 							{
-								"name": "pool_config"
+								"name": "payer",
+								"writable": true,
+								"signer": true
+							},
+							{
+								"name": "pool_config",
+								"pda": "pool_config"
 							},
 							{
 								"name": "pool_vault",
@@ -694,18 +738,30 @@
 								"pda": "pool_vault"
 							},
 							{
-								"name": "merkle_tree"
+								"name": "merkle_tree",
+								"writable": true,
+								"pda": "merkle_tree"
 							},
 							{
-								"name": "nullifier_set",
-								"writable": true
+								"name": "nullifier_record_0",
+								"writable": true,
+								"pda": "nullifier_record"
 							},
 							{
-								"name": "verifying_key_account"
+								"name": "nullifier_record_1",
+								"writable": true,
+								"pda": "nullifier_record"
+							},
+							{
+								"name": "verifying_key_account",
+								"pda": "verifying_key_account"
 							},
 							{
 								"name": "recipient",
 								"writable": true
+							},
+							{
+								"name": "policy_cosigner"
 							},
 							{
 								"name": "system_program",
@@ -725,11 +781,19 @@
 						"layout": "fixed",
 						"fields": [
 							{
-								"name": "bump",
+								"name": "nullifier_0_bump",
 								"rustType": "u8"
 							},
 							{
-								"name": "nullifier",
+								"name": "nullifier_1_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "nullifier_0",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "nullifier_1",
 								"rustType": "[u8; 32]"
 							},
 							{
@@ -737,28 +801,44 @@
 								"rustType": "[u8; 32]"
 							},
 							{
-								"name": "new_commitment",
+								"name": "relayer_fee",
+								"rustType": "u64"
+							},
+							{
+								"name": "out0_commitment",
 								"rustType": "[u8; 32]"
 							},
 							{
-								"name": "new_view_pubkey",
+								"name": "out0_view_pubkey",
 								"rustType": "[u8; 32]"
 							},
 							{
-								"name": "envelope_len",
+								"name": "out0_envelope_len",
 								"rustType": "u8"
 							},
 							{
-								"name": "envelope",
-								"rustType": "[u8; 128]"
+								"name": "out0_envelope",
+								"rustType": "[u8; 96]"
 							},
 							{
-								"name": "shares",
-								"rustType": "[u8; 144]"
+								"name": "out1_commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "out1_view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "out1_envelope_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "out1_envelope",
+								"rustType": "[u8; 96]"
 							},
 							{
 								"name": "proof_a",
-								"rustType": "[u8; 64]"
+								"rustType": "[u8; 32]"
 							},
 							{
 								"name": "proof_b",
@@ -766,35 +846,47 @@
 							},
 							{
 								"name": "proof_c",
-								"rustType": "[u8; 64]"
+								"rustType": "[u8; 32]"
 							}
 						]
 					},
 					"process": {
 						"accounts": [
 							{
-								"name": "pool_config"
-							},
-							{
 								"name": "payer",
 								"writable": true,
 								"signer": true
 							},
 							{
-								"name": "merkle_tree",
-								"writable": true
+								"name": "pool_config",
+								"pda": "pool_config"
 							},
 							{
-								"name": "nullifier_set",
-								"writable": true
-							},
-							{
-								"name": "verifying_key_account"
-							},
-							{
-								"name": "note_commitment",
+								"name": "pool_vault",
 								"writable": true,
-								"pda": "note_commitment"
+								"pda": "pool_vault"
+							},
+							{
+								"name": "merkle_tree",
+								"writable": true,
+								"pda": "merkle_tree"
+							},
+							{
+								"name": "nullifier_record_0",
+								"writable": true,
+								"pda": "nullifier_record"
+							},
+							{
+								"name": "nullifier_record_1",
+								"writable": true,
+								"pda": "nullifier_record"
+							},
+							{
+								"name": "verifying_key_account",
+								"pda": "verifying_key_account"
+							},
+							{
+								"name": "policy_cosigner"
 							},
 							{
 								"name": "system_program",
@@ -830,6 +922,18 @@
 								"rustType": "[u8; 32]"
 							},
 							{
+								"name": "view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "leaf_index",
+								"rustType": "u64"
+							},
+							{
+								"name": "path_elements",
+								"rustType": "[u8; 512]"
+							},
+							{
 								"name": "notice_len",
 								"rustType": "u8"
 							},
@@ -851,14 +955,16 @@
 								"signer": true
 							},
 							{
-								"name": "pool_config"
+								"name": "pool_config",
+								"pda": "pool_config"
 							},
 							{
-								"name": "requester_registry"
+								"name": "requester_registry",
+								"pda": "requester_registry"
 							},
 							{
-								"name": "note_commitment",
-								"pda": "note_commitment"
+								"name": "merkle_tree",
+								"pda": "merkle_tree"
 							},
 							{
 								"name": "disclosure_request",
@@ -898,10 +1004,6 @@
 								"pda": "disclosure_request"
 							},
 							{
-								"name": "note_commitment",
-								"pda": "note_commitment"
-							},
-							{
 								"name": "viewer",
 								"signer": true
 							}
@@ -930,10 +1032,6 @@
 								"name": "disclosure_request",
 								"writable": true,
 								"pda": "disclosure_request"
-							},
-							{
-								"name": "note_commitment",
-								"pda": "note_commitment"
 							},
 							{
 								"name": "viewer",
@@ -968,11 +1066,13 @@
 								"signer": true
 							},
 							{
-								"name": "pool_config"
+								"name": "pool_config",
+								"pda": "pool_config"
 							},
 							{
 								"name": "disclosure_request",
-								"writable": true
+								"writable": true,
+								"pda": "disclosure_request"
 							}
 						]
 					}
@@ -1000,18 +1100,22 @@
 								"signer": true
 							},
 							{
-								"name": "pool_config"
+								"name": "pool_config",
+								"pda": "pool_config"
 							},
 							{
-								"name": "custodian_registry"
+								"name": "custodian_registry",
+								"pda": "custodian_registry"
 							},
 							{
 								"name": "disclosure_request",
-								"writable": true
+								"writable": true,
+								"pda": "disclosure_request"
 							},
 							{
 								"name": "disclosure_log",
-								"writable": true
+								"writable": true,
+								"pda": "disclosure_log"
 							},
 							{
 								"name": "clock"
@@ -1043,7 +1147,327 @@
 							},
 							{
 								"name": "disclosure_request",
+								"writable": true,
+								"pda": "disclosure_request"
+							}
+						]
+					}
+				}
+			]
+		},
+		"instruction:1:0d": {
+			"rustName": "RegisterAssetIx",
+			"envelope": false,
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "bump",
+								"rustType": "u8"
+							}
+						]
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "payer",
+								"writable": true,
+								"signer": true
+							},
+							{
+								"name": "mint"
+							},
+							{
+								"name": "asset_vault",
+								"writable": true,
+								"pda": "asset_vault"
+							},
+							{
+								"name": "vault_token_account"
+							},
+							{
+								"name": "token_program"
+							},
+							{
+								"name": "system_program",
+								"defaultValue": "publicKey:11111111111111111111111111111111"
+							}
+						]
+					}
+				}
+			]
+		},
+		"instruction:1:0e": {
+			"rustName": "DepositTokenIx",
+			"envelope": false,
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "amount",
+								"rustType": "u64"
+							},
+							{
+								"name": "commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "envelope_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "envelope",
+								"rustType": "[u8; 96]"
+							},
+							{
+								"name": "shares",
+								"rustType": "[u8; 144]"
+							}
+						]
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "depositor",
+								"writable": true,
+								"signer": true
+							},
+							{
+								"name": "pool_config",
+								"writable": true,
+								"pda": "pool_config"
+							},
+							{
+								"name": "merkle_tree",
+								"writable": true,
+								"pda": "merkle_tree"
+							},
+							{
+								"name": "mint"
+							},
+							{
+								"name": "asset_vault",
+								"pda": "asset_vault"
+							},
+							{
+								"name": "depositor_token_account",
 								"writable": true
+							},
+							{
+								"name": "vault_token_account",
+								"writable": true
+							},
+							{
+								"name": "token_program"
+							}
+						]
+					}
+				}
+			]
+		},
+		"instruction:1:0f": {
+			"rustName": "WithdrawTokenIx",
+			"envelope": false,
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "nullifier_0_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "nullifier_1_bump",
+								"rustType": "u8"
+							},
+							{
+								"name": "nullifier_0",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "nullifier_1",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "root",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "public_out",
+								"rustType": "u64"
+							},
+							{
+								"name": "relayer_fee",
+								"rustType": "u64"
+							},
+							{
+								"name": "change_commitment",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "change_view_pubkey",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "envelope_len",
+								"rustType": "u8"
+							},
+							{
+								"name": "envelope",
+								"rustType": "[u8; 96]"
+							},
+							{
+								"name": "proof_a",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "proof_b",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "proof_c",
+								"rustType": "[u8; 32]"
+							}
+						]
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "payer",
+								"writable": true,
+								"signer": true
+							},
+							{
+								"name": "pool_config",
+								"pda": "pool_config"
+							},
+							{
+								"name": "merkle_tree",
+								"writable": true,
+								"pda": "merkle_tree"
+							},
+							{
+								"name": "nullifier_record_0",
+								"writable": true,
+								"pda": "nullifier_record"
+							},
+							{
+								"name": "nullifier_record_1",
+								"writable": true,
+								"pda": "nullifier_record"
+							},
+							{
+								"name": "verifying_key_account",
+								"pda": "verifying_key_account"
+							},
+							{
+								"name": "mint"
+							},
+							{
+								"name": "asset_vault",
+								"pda": "asset_vault"
+							},
+							{
+								"name": "vault_token_account",
+								"writable": true
+							},
+							{
+								"name": "recipient_token_account",
+								"writable": true
+							},
+							{
+								"name": "relayer_token_account",
+								"writable": true
+							},
+							{
+								"name": "policy_cosigner"
+							},
+							{
+								"name": "token_program"
+							},
+							{
+								"name": "system_program",
+								"defaultValue": "publicKey:11111111111111111111111111111111"
+							}
+						]
+					}
+				}
+			]
+		},
+		"instruction:1:10": {
+			"rustName": "SetPolicyIx",
+			"envelope": false,
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "policy_flags",
+								"rustType": "u8"
+							},
+							{
+								"name": "policy_cosigner",
+								"rustType": "Address"
+							}
+						]
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "authority",
+								"signer": true
+							},
+							{
+								"name": "pool_config",
+								"writable": true,
+								"pda": "pool_config"
+							}
+						]
+					}
+				}
+			]
+		},
+		"instruction:1:11": {
+			"rustName": "VerifyPolicyIx",
+			"envelope": false,
+			"versions": [
+				{
+					"schema": {
+						"layout": "fixed",
+						"fields": [
+							{
+								"name": "policy_hash",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "proof_a",
+								"rustType": "[u8; 32]"
+							},
+							{
+								"name": "proof_b",
+								"rustType": "[u8; 128]"
+							},
+							{
+								"name": "proof_c",
+								"rustType": "[u8; 32]"
+							}
+						]
+					},
+					"process": {
+						"accounts": [
+							{
+								"name": "verifying_key_account",
+								"pda": "verifying_key_account"
 							}
 						]
 					}

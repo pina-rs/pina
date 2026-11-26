@@ -37,10 +37,6 @@ pub struct Deposit<'account> {
 	/// Required privileges: writable.
 	pub merkle_tree: &'account AccountView,
 
-	/// CPI account `noteCommitment`.
-	/// Required privileges: writable.
-	pub note_commitment: &'account AccountView,
-
 	/// CPI account `systemProgram`.
 	/// Required privileges: read-only.
 	pub system_program: &'account AccountView,
@@ -52,11 +48,12 @@ pub struct Deposit<'account> {
 /// Instruction arguments for the `deposit` CPI call.
 #[derive(Clone, Copy, Debug)]
 pub struct DepositIx {
-	/// Instruction argument `bump`.
-	pub bump: u8,
+	/// Instruction argument `amount`.
+	/// Variable SOL deposit amount in lamports.
+	pub amount: u64,
 
 	/// Instruction argument `commitment`.
-	/// Client-computed Poseidon commitment of the new note.
+	/// Client-computed Poseidon note commitment.
 	pub commitment: [u8; 32],
 
 	/// Instruction argument `viewPubkey`.
@@ -64,32 +61,30 @@ pub struct DepositIx {
 	pub view_pubkey: [u8; 32],
 
 	/// Instruction argument `envelopeLen`.
-	/// Active length of the encrypted note plaintext.
 	pub envelope_len: u8,
 
 	/// Instruction argument `envelope`.
-	pub envelope: [u8; 128],
+	pub envelope: [u8; 96],
 
 	/// Instruction argument `shares`.
-	/// Encrypted per-custodian key shares.
 	pub shares: [u8; 144],
 }
 
 impl DepositIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 339;
+	pub const LEN: usize = 314;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 339], ProgramError> {
-		let mut data = [0u8; 339];
+	pub fn to_bytes(&self) -> Result<[u8; 314], ProgramError> {
+		let mut data = [0u8; 314];
 		data[..1].copy_from_slice(&DEPOSIT_DISCRIMINATOR);
-		data[1..2].copy_from_slice(&self.bump.to_le_bytes());
-		data[2..34].copy_from_slice(&self.commitment);
-		data[34..66].copy_from_slice(&self.view_pubkey);
-		data[66..67].copy_from_slice(&self.envelope_len.to_le_bytes());
-		data[67..195].copy_from_slice(&self.envelope);
-		data[195..339].copy_from_slice(&self.shares);
+		data[1..9].copy_from_slice(&self.amount.to_le_bytes());
+		data[9..41].copy_from_slice(&self.commitment);
+		data[41..73].copy_from_slice(&self.view_pubkey);
+		data[73..74].copy_from_slice(&self.envelope_len.to_le_bytes());
+		data[74..170].copy_from_slice(&self.envelope);
+		data[170..314].copy_from_slice(&self.shares);
 
 		Ok(data)
 	}
@@ -109,12 +104,11 @@ impl<'account> Deposit<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 6] = [
+		let accounts: [CpiHandle<'_>; 5] = [
 			CpiHandle::writable_signer(self.depositor)?,
 			CpiHandle::writable(self.pool_config)?,
 			CpiHandle::writable(self.pool_vault)?,
 			CpiHandle::writable(self.merkle_tree)?,
-			CpiHandle::writable(self.note_commitment)?,
 			CpiHandle::readonly(self.system_program),
 		];
 		let data = self.ix.to_bytes()?;

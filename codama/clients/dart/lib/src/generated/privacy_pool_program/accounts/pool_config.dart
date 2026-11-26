@@ -18,7 +18,8 @@ class PoolConfig {
     required this.authority,
     required this.custodianThreshold,
     required this.challengeWindowSecs,
-    required this.depositLamports,
+    required this.policyFlags,
+    required this.policyCosigner,
     required this.totalDeposits,
   }) : discriminator = 1,
        migrationVersion = 0;
@@ -29,7 +30,8 @@ class PoolConfig {
   final Address authority;
   final int custodianThreshold;
   final int challengeWindowSecs;
-  final BigInt depositLamports;
+  final int policyFlags;
+  final Address policyCosigner;
   final BigInt totalDeposits;
 
   @override
@@ -43,7 +45,8 @@ class PoolConfig {
           authority == other.authority &&
           custodianThreshold == other.custodianThreshold &&
           challengeWindowSecs == other.challengeWindowSecs &&
-          depositLamports == other.depositLamports &&
+          policyFlags == other.policyFlags &&
+          policyCosigner == other.policyCosigner &&
           totalDeposits == other.totalDeposits;
 
   @override
@@ -54,13 +57,14 @@ class PoolConfig {
     authority,
     custodianThreshold,
     challengeWindowSecs,
-    depositLamports,
+    policyFlags,
+    policyCosigner,
     totalDeposits,
   );
 
   @override
   String toString() =>
-      'PoolConfig(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, authority: $authority, custodianThreshold: $custodianThreshold, challengeWindowSecs: $challengeWindowSecs, depositLamports: $depositLamports, totalDeposits: $totalDeposits)';
+      'PoolConfig(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, authority: $authority, custodianThreshold: $custodianThreshold, challengeWindowSecs: $challengeWindowSecs, policyFlags: $policyFlags, policyCosigner: $policyCosigner, totalDeposits: $totalDeposits)';
 }
 
 Encoder<PoolConfig> getPoolConfigEncoder() {
@@ -71,7 +75,8 @@ Encoder<PoolConfig> getPoolConfigEncoder() {
     ('authority', getAddressEncoder()),
     ('custodianThreshold', getU16Encoder()),
     ('challengeWindowSecs', getU32Encoder()),
-    ('depositLamports', getU64Encoder()),
+    ('policyFlags', getU8Encoder()),
+    ('policyCosigner', getAddressEncoder()),
     ('totalDeposits', getU64Encoder()),
   ]);
 
@@ -84,7 +89,8 @@ Encoder<PoolConfig> getPoolConfigEncoder() {
       'authority': value.authority,
       'custodianThreshold': value.custodianThreshold,
       'challengeWindowSecs': value.challengeWindowSecs,
-      'depositLamports': value.depositLamports,
+      'policyFlags': value.policyFlags,
+      'policyCosigner': value.policyCosigner,
       'totalDeposits': value.totalDeposits,
     },
   );
@@ -98,7 +104,8 @@ Decoder<PoolConfig> getPoolConfigDecoder() {
     ('authority', getAddressDecoder()),
     ('custodianThreshold', getU16Decoder()),
     ('challengeWindowSecs', getU32Decoder()),
-    ('depositLamports', getU64Decoder()),
+    ('policyFlags', getU8Decoder()),
+    ('policyCosigner', getAddressDecoder()),
     ('totalDeposits', getU64Decoder()),
   ]);
 
@@ -128,7 +135,8 @@ Decoder<PoolConfig> getPoolConfigDecoder() {
         authority: map['authority']! as Address,
         custodianThreshold: map['custodianThreshold']! as int,
         challengeWindowSecs: map['challengeWindowSecs']! as int,
-        depositLamports: map['depositLamports']! as BigInt,
+        policyFlags: map['policyFlags']! as int,
+        policyCosigner: map['policyCosigner']! as Address,
         totalDeposits: map['totalDeposits']! as BigInt,
       ),
       newOffset,

@@ -4,22 +4,22 @@
 
 import { Command } from "commander";
 import {
+	fetchAssetVault,
 	fetchCustodianRegistry,
 	fetchDisclosureLog,
 	fetchDisclosureRequest,
 	fetchMerkleTree,
-	fetchNoteCommitment,
-	fetchNullifierSet,
+	fetchNullifierRecord,
 	fetchPoolConfig,
 	fetchPoolVault,
 	fetchRequesterRegistry,
 	fetchVerifyingKeyAccount,
+	findAssetVaultPda,
 	findCustodianRegistryPda,
 	findDisclosureLogPda,
 	findDisclosureRequestPda,
 	findMerkleTreePda,
-	findNoteCommitmentPda,
-	findNullifierSetPda,
+	findNullifierRecordPda,
 	findPoolConfigPda,
 	findPoolVaultPda,
 	findRequesterRegistryPda,
@@ -37,7 +37,9 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 	.description("Fetch and decode program accounts.")
 	.addCommand(
 		registerGlobals(new Command("pool-config"))
-			.description("Global pool configuration and governance root.")
+			.description(
+				"Global pool configuration, governance root, and Custom Ring policy flags.",
+			)
 			.option(
 				"--address <address>",
 				"Account address; overrides PDA derivation.",
@@ -60,9 +62,7 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 	)
 	.addCommand(
 		registerGlobals(new Command("pool-vault"))
-			.description(
-				"The pool's SOL custody. Data-less by design: every lamport in it is\nbacked by an unspent note commitment in the tree.",
-			)
+			.description("The pool's native SOL custody PDA.")
 			.option(
 				"--address <address>",
 				"Account address; overrides PDA derivation.",
@@ -86,7 +86,7 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 	.addCommand(
 		registerGlobals(new Command("merkle-tree"))
 			.description(
-				"Full-node incremental Merkle tree over Poseidon-2 hashes.\n\nLevel `ℓ` (0 = leaves) occupies `nodes` at offset\n`(1 << (depth+1)) − (1 << (depth+1−ℓ))`, so the root sits in the final\nslot. Empty subtrees hold the precomputed zero-hash chain, letting\nwitnesses cover unwritten leaves.",
+				"Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.\n\nHolds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root\nring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.",
 			)
 			.option(
 				"--address <address>",
@@ -109,33 +109,34 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			}),
 	)
 	.addCommand(
-		registerGlobals(new Command("nullifier-set"))
-			.description("Append-only set of spent nullifiers.")
+		registerGlobals(new Command("nullifier-record"))
+			.description(
+				"Per-nullifier spent marker PDA. Existence proves the nullifier was spent in\n$O(1)$ without a global nullifier write-lock hotspot or fixed capacity cap.",
+			)
 			.option(
 				"--address <address>",
 				"Account address; overrides PDA derivation.",
 			)
+			.requiredOption("--nullifier <nullifier>", "PDA seed `nullifier`.")
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const address = options.address === undefined
-					? (await findNullifierSetPda({
+				const nullifier = pubkey("--nullifier", options.nullifier as string);
+				const address = options.address ??
+					(await findNullifierRecordPda({ nullifier }, {
 						programAddress: context.programAddress,
-					}))[0]
-					: pubkey("--address", options.address as string);
-				const account = await fetchNullifierSet(context.rpc, address);
+					}))[0];
+				const account = await fetchNullifierRecord(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
 						`account ${address} belongs to ${account.programAddress}, not the configured program`,
 					);
 				}
-				printAccount(context.json, "nullifier-set", address, account.data);
+				printAccount(context.json, "nullifier-record", address, account.data);
 			}),
 	)
 	.addCommand(
 		registerGlobals(new Command("custodian-registry"))
-			.description(
-				"The disclosure committee. A threshold of these keys must approve before\na disclosure may execute, and each approval is a signed transaction.",
-			)
+			.description("The disclosure committee.")
 			.option(
 				"--address <address>",
 				"Account address; overrides PDA derivation.",
@@ -182,34 +183,36 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 			}),
 	)
 	.addCommand(
-		registerGlobals(new Command("note-commitment"))
+		registerGlobals(new Command("asset-vault"))
 			.description(
-				"Per-note audit record. The envelope and shares are encrypted by the\ndepositor's client and opaque to the program; the view key is the\nper-note consent key that may grant tier-0 requests and file challenges.\n\nSpent notes are *not* marked here: linking a nullifier to its commitment\nwould break the privacy the pool exists to provide. The nullifier set is\nthe only spent record.",
+				"Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL\nInterface PDA).",
 			)
 			.option(
 				"--address <address>",
 				"Account address; overrides PDA derivation.",
 			)
-			.requiredOption("--commitment <commitment>", "PDA seed `commitment`.")
+			.requiredOption("--mint <mint>", "PDA seed `mint`.")
 			.action(async (options) => {
 				const context = await CliContext.create(options);
-				const commitment = pubkey("--commitment", options.commitment as string);
+				const mint = pubkey("--mint", options.mint as string);
 				const address = options.address ??
-					(await findNoteCommitmentPda({ commitment }, {
+					(await findAssetVaultPda({ mint }, {
 						programAddress: context.programAddress,
 					}))[0];
-				const account = await fetchNoteCommitment(context.rpc, address);
+				const account = await fetchAssetVault(context.rpc, address);
 				if (account.programAddress !== context.programAddress) {
 					throw new CliError(
 						`account ${address} belongs to ${account.programAddress}, not the configured program`,
 					);
 				}
-				printAccount(context.json, "note-commitment", address, account.data);
+				printAccount(context.json, "asset-vault", address, account.data);
 			}),
 	)
 	.addCommand(
 		registerGlobals(new Command("disclosure-request"))
-			.description("One disclosure request and its state machine.")
+			.description(
+				"One disclosure request and its state machine. Stores `view_pubkey` after\n`RequestDisclosure` authenticates it against the Merkle tree so\n`GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.",
+			)
 			.option(
 				"--address <address>",
 				"Account address; overrides PDA derivation.",
@@ -236,7 +239,7 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 	.addCommand(
 		registerGlobals(new Command("disclosure-log"))
 			.description(
-				"Append-only public record of executed disclosures. The entry is written\nby the same instruction that marks the request executed, so execution\nwithout a log record cannot happen.",
+				"Append-only public record of executed disclosures. Stores a salted\n`scope_hash` rather than raw note commitments so observers cannot link log\nentries back to shielded notes.",
 			)
 			.option(
 				"--address <address>",
@@ -261,7 +264,7 @@ export const fetchCommand = registerGlobals(new Command("fetch"))
 	.addCommand(
 		registerGlobals(new Command("verifying-key-account"))
 			.description(
-				"One installed Groth16 verifying key. Slot 0 verifies withdraw proofs\n(root, nullifier, recipient hash), slot 1 transfer proofs\n(root, nullifier, output binding).",
+				"Single-input Groth16 verifying key. Every circuit compresses its statement\ninto one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are\nstored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).",
 			)
 			.option(
 				"--address <address>",

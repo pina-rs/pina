@@ -11,12 +11,12 @@
 pub const REQUEST_DISCLOSURE_DISCRIMINATOR: u8 = 7u8;
 /// Compute units `RequestDisclosure` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const REQUEST_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 11015;
+pub const REQUEST_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 17668;
 /// Compute unit limit to request for a transaction carrying `RequestDisclosure`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT: u32 = 13600;
+pub const REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT: u32 = 21600;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -24,7 +24,7 @@ pub struct RequestDisclosure {
 	pub requester: solana_pubkey::Pubkey,
 	pub pool_config: solana_pubkey::Pubkey,
 	pub requester_registry: solana_pubkey::Pubkey,
-	pub note_commitment: solana_pubkey::Pubkey,
+	pub merkle_tree: solana_pubkey::Pubkey,
 	pub disclosure_request: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 	pub clock: solana_pubkey::Pubkey,
@@ -33,7 +33,6 @@ pub struct RequestDisclosure {
 impl RequestDisclosure {
 	pub fn new(
 		requester: solana_pubkey::Pubkey,
-		note_commitment: solana_pubkey::Pubkey,
 		disclosure_request: solana_pubkey::Pubkey,
 		system_program: solana_pubkey::Pubkey,
 		clock: solana_pubkey::Pubkey,
@@ -50,7 +49,11 @@ impl RequestDisclosure {
 				&crate::PRIVACY_POOL_PROGRAM_ID,
 			)
 			.0,
-			note_commitment,
+			merkle_tree: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-tree".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			disclosure_request,
 			system_program,
 			clock,
@@ -81,7 +84,7 @@ impl RequestDisclosure {
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
-			self.note_commitment,
+			self.merkle_tree,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(
@@ -132,13 +135,13 @@ pub struct RequestDisclosureInstructionWire {
 	pub discriminator: u8,
 	pub bump: u8,
 	pub nonce: u64,
-	/// Tier being invoked; see the `TIER_*` constants.
 	pub tier: u8,
-	/// Target note commitment.
 	pub commitment: [u8; 32],
-	/// Active length of the encrypted notice.
+	/// Claimed consent key for `commitment`, authenticated via `path_elements`.
+	pub view_pubkey: [u8; 32],
+	pub leaf_index: u64,
+	pub path_elements: [u8; 512],
 	pub notice_len: u8,
 	pub notice: [u8; 96],
-	/// Hash of the legal basis; nonzero required above tier 0.
 	pub legal_basis_hash: [u8; 32],
 }

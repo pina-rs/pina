@@ -11,9 +11,9 @@
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// Append-only public record of executed disclosures. The entry is written
-/// by the same instruction that marks the request executed, so execution
-/// without a log record cannot happen.
+/// Append-only public record of executed disclosures. Stores a salted
+/// `scope_hash` rather than raw note commitments so observers cannot link log
+/// entries back to shielded notes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DisclosureLog {
 	pub bump: u8,

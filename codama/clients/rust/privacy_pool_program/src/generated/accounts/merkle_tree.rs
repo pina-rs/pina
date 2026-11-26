@@ -12,23 +12,21 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct MerkleTree {
-	/// Full-node incremental Merkle tree over Poseidon-2 hashes.
+	/// Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.
 	///
-	/// Level `ℓ` (0 = leaves) occupies `nodes` at offset
-	/// `(1 << (depth+1)) − (1 << (depth+1−ℓ))`, so the root sits in the final
-	/// slot. Empty subtrees hold the precomputed zero-hash chain, letting
-	/// witnesses cover unwritten leaves.
+	/// Holds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root
+	/// ring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
 	/// Number of leaves written so far.
 	pub next_leaf_index: u64,
-	/// Flat 32-byte node store; unwritten slots hold the zero-hash chain.
-	pub nodes: [u8; 8160],
+	/// Frontier of rightmost filled subtrees, one 32-byte hash per level.
+	pub filled_subtrees: [u8; 512],
 	/// Roots currently in the ring; evictions hold it at capacity.
 	pub roots_len: u16,
-	/// Ring of recent roots, oldest first, zero-padded until full.
-	pub roots: [u8; 256],
+	/// Ring of 32 recent roots, oldest first.
+	pub roots: [u8; 1024],
 }
 
 pub const MERKLE_TREE_DISCRIMINATOR: u8 = 3u8;

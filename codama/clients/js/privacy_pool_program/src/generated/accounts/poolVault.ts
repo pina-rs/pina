@@ -52,10 +52,7 @@ export function getPoolVaultDiscriminator2Bytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(POOL_VAULT_DISCRIMINATOR2);
 }
 
-/**
- * The pool's SOL custody. Data-less by design: every lamport in it is
- * backed by an unspent note commitment in the tree.
- */
+/** The pool's native SOL custody PDA. */
 export type PoolVault = {
 	discriminator: number;
 	migrationVersion: number;

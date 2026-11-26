@@ -68,14 +68,10 @@ export type CancelDisclosureInstruction<
 
 export type CancelDisclosureInstructionData = {
 	discriminator: number;
-	/** Reserved; must be zero. */
 	reserved: number;
 };
 
-export type CancelDisclosureInstructionDataArgs = {
-	/** Reserved; must be zero. */
-	reserved: number;
-};
+export type CancelDisclosureInstructionDataArgs = { reserved: number };
 
 export function getCancelDisclosureInstructionDataEncoder(): FixedSizeEncoder<
 	CancelDisclosureInstructionDataArgs

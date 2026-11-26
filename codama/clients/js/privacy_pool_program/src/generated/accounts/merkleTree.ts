@@ -62,12 +62,10 @@ export function getMerkleTreeDiscriminator2Bytes(): ReadonlyUint8Array {
 }
 
 /**
- * Full-node incremental Merkle tree over Poseidon-2 hashes.
+ * Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.
  *
- * Level `ℓ` (0 = leaves) occupies `nodes` at offset
- * `(1 << (depth+1)) − (1 << (depth+1−ℓ))`, so the root sits in the final
- * slot. Empty subtrees hold the precomputed zero-hash chain, letting
- * witnesses cover unwritten leaves.
+ * Holds up to 65,536 leaves in 512 bytes of `filled_subtrees` plus a 32-root
+ * ring, avoiding the 8 KB full-node layout and runtime zero-hash prefill.
  */
 export type MerkleTree = {
 	discriminator: number;
@@ -75,11 +73,11 @@ export type MerkleTree = {
 	bump: number;
 	/** Number of leaves written so far. */
 	nextLeafIndex: bigint;
-	/** Flat 32-byte node store; unwritten slots hold the zero-hash chain. */
-	nodes: ReadonlyUint8Array;
+	/** Frontier of rightmost filled subtrees, one 32-byte hash per level. */
+	filledSubtrees: ReadonlyUint8Array;
 	/** Roots currently in the ring; evictions hold it at capacity. */
 	rootsLen: number;
-	/** Ring of recent roots, oldest first, zero-padded until full. */
+	/** Ring of 32 recent roots, oldest first. */
 	roots: ReadonlyUint8Array;
 };
 
@@ -87,11 +85,11 @@ export type MerkleTreeArgs = {
 	bump: number;
 	/** Number of leaves written so far. */
 	nextLeafIndex: number | bigint;
-	/** Flat 32-byte node store; unwritten slots hold the zero-hash chain. */
-	nodes: ReadonlyUint8Array;
+	/** Frontier of rightmost filled subtrees, one 32-byte hash per level. */
+	filledSubtrees: ReadonlyUint8Array;
 	/** Roots currently in the ring; evictions hold it at capacity. */
 	rootsLen: number;
-	/** Ring of recent roots, oldest first, zero-padded until full. */
+	/** Ring of 32 recent roots, oldest first. */
 	roots: ReadonlyUint8Array;
 };
 
@@ -103,9 +101,9 @@ export function getMerkleTreeEncoder(): FixedSizeEncoder<MerkleTreeArgs> {
 			["migrationVersion", getU8Encoder()],
 			["bump", getU8Encoder()],
 			["nextLeafIndex", getU64Encoder()],
-			["nodes", fixPinaPodEncoderSize(getBytesEncoder(), 8160)],
+			["filledSubtrees", fixPinaPodEncoderSize(getBytesEncoder(), 512)],
 			["rootsLen", getU16Encoder()],
-			["roots", fixPinaPodEncoderSize(getBytesEncoder(), 256)],
+			["roots", fixPinaPodEncoderSize(getBytesEncoder(), 1024)],
 		]),
 		(value) => ({ ...value, discriminator: 3, migrationVersion: 0 }),
 	);
@@ -121,9 +119,9 @@ export function getMerkleTreeDecoder(): FixedSizeDecoder<MerkleTree> {
 		["migrationVersion", getPinaPodMigrationVersionDecoder(0, getU8Decoder())],
 		["bump", getU8Decoder()],
 		["nextLeafIndex", getU64Decoder()],
-		["nodes", fixDecoderSize(getBytesDecoder(), 8160)],
+		["filledSubtrees", fixDecoderSize(getBytesDecoder(), 512)],
 		["rootsLen", getU16Decoder()],
-		["roots", fixDecoderSize(getBytesDecoder(), 256)],
+		["roots", fixDecoderSize(getBytesDecoder(), 1024)],
 	]);
 }
 

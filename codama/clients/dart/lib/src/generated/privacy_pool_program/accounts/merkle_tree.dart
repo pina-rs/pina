@@ -15,7 +15,7 @@ class MerkleTree {
   const MerkleTree({
     required this.bump,
     required this.nextLeafIndex,
-    required this.nodes,
+    required this.filledSubtrees,
     required this.rootsLen,
     required this.roots,
   }) : discriminator = 3,
@@ -25,7 +25,7 @@ class MerkleTree {
   final int migrationVersion;
   final int bump;
   final BigInt nextLeafIndex;
-  final Uint8List nodes;
+  final Uint8List filledSubtrees;
   final int rootsLen;
   final Uint8List roots;
 
@@ -38,7 +38,7 @@ class MerkleTree {
           migrationVersion == other.migrationVersion &&
           bump == other.bump &&
           nextLeafIndex == other.nextLeafIndex &&
-          nodes == other.nodes &&
+          filledSubtrees == other.filledSubtrees &&
           rootsLen == other.rootsLen &&
           roots == other.roots;
 
@@ -48,14 +48,14 @@ class MerkleTree {
     migrationVersion,
     bump,
     nextLeafIndex,
-    nodes,
+    filledSubtrees,
     rootsLen,
     roots,
   );
 
   @override
   String toString() =>
-      'MerkleTree(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, nextLeafIndex: $nextLeafIndex, nodes: $nodes, rootsLen: $rootsLen, roots: $roots)';
+      'MerkleTree(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, nextLeafIndex: $nextLeafIndex, filledSubtrees: $filledSubtrees, rootsLen: $rootsLen, roots: $roots)';
 }
 
 Encoder<MerkleTree> getMerkleTreeEncoder() {
@@ -64,9 +64,12 @@ Encoder<MerkleTree> getMerkleTreeEncoder() {
     ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
     ('nextLeafIndex', getU64Encoder()),
-    ('nodes', fixEncoderSize(getBytesEncoder(), 8160, allowTruncation: false)),
+    (
+      'filledSubtrees',
+      fixEncoderSize(getBytesEncoder(), 512, allowTruncation: false),
+    ),
     ('rootsLen', getU16Encoder()),
-    ('roots', fixEncoderSize(getBytesEncoder(), 256, allowTruncation: false)),
+    ('roots', fixEncoderSize(getBytesEncoder(), 1024, allowTruncation: false)),
   ]);
 
   return transformEncoder(
@@ -76,7 +79,7 @@ Encoder<MerkleTree> getMerkleTreeEncoder() {
       'migrationVersion': 0,
       'bump': value.bump,
       'nextLeafIndex': value.nextLeafIndex,
-      'nodes': value.nodes,
+      'filledSubtrees': value.filledSubtrees,
       'rootsLen': value.rootsLen,
       'roots': value.roots,
     },
@@ -89,9 +92,9 @@ Decoder<MerkleTree> getMerkleTreeDecoder() {
     ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
     ('nextLeafIndex', getU64Decoder()),
-    ('nodes', fixDecoderSize(getBytesDecoder(), 8160)),
+    ('filledSubtrees', fixDecoderSize(getBytesDecoder(), 512)),
     ('rootsLen', getU16Decoder()),
-    ('roots', fixDecoderSize(getBytesDecoder(), 256)),
+    ('roots', fixDecoderSize(getBytesDecoder(), 1024)),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -118,7 +121,7 @@ Decoder<MerkleTree> getMerkleTreeDecoder() {
       MerkleTree(
         bump: map['bump']! as int,
         nextLeafIndex: map['nextLeafIndex']! as BigInt,
-        nodes: map['nodes']! as Uint8List,
+        filledSubtrees: map['filledSubtrees']! as Uint8List,
         rootsLen: map['rootsLen']! as int,
         roots: map['roots']! as Uint8List,
       ),

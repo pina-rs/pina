@@ -12,29 +12,19 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct VerifyingKeyAccount {
-	/// One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
-	/// (root, nullifier, recipient hash), slot 1 transfer proofs
-	/// (root, nullifier, output binding).
+	/// Single-input Groth16 verifying key. Every circuit compresses its statement
+	/// into one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are
+	/// stored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// Circuit slot; see the `VK_SLOT_*` constants.
 	pub slot: u8,
-	/// αG₁, little-endian affine coordinates.
 	pub alpha_g1: [u8; 64],
-	/// βG₂, little-endian affine coordinates.
 	pub beta_g2: [u8; 128],
-	/// γG₂, little-endian affine coordinates.
 	pub gamma_g2: [u8; 128],
-	/// δG₂, little-endian affine coordinates.
 	pub delta_g2: [u8; 128],
-	/// IC entries in use, including the constant term.
-	pub ic_len: u8,
-	/// IC G₁ points, little-endian; entries beyond `ic_len` are zero.
 	pub ic0: [u8; 64],
 	pub ic1: [u8; 64],
-	pub ic2: [u8; 64],
-	pub ic3: [u8; 64],
 }
 
 pub const VERIFYING_KEY_ACCOUNT_DISCRIMINATOR: u8 = 10u8;

@@ -27,8 +27,8 @@ fn privacy_pool_map_renders_every_instruction_and_hotspot() {
 	let project = example("privacy_pool_program");
 	let html = render_html(&project.map).unwrap_or_else(|error| panic!("render failed: {error}"));
 
-	assert_eq!(project.map.instruction_details.len(), 13);
-	assert_eq!(project.map.locks.hotspots.len(), 7);
+	assert_eq!(project.map.instruction_details.len(), 18);
+	assert_eq!(project.map.locks.hotspots.len(), 6);
 	assert!(html.contains("<title>privacy_pool_program · interlocking chart</title>"));
 	assert!(html.contains("\"name\":\"merkle_tree\""));
 	assert!(html.contains("BLquaQVntisnQpUoLpzbcFGDN9eG9Qf12TZZS5KVLaLz"));

@@ -16,12 +16,8 @@ pub struct RequesterRegistry {
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// Active entries in the parallel arrays below.
 	pub count: u8,
-	/// Requester keys as concatenated 32-byte addresses, parallel to
-	/// `max_tiers`.
 	pub keys: [u8; 512],
-	/// Highest tier each requester may file at.
 	pub max_tiers: [u8; 16],
 }
 

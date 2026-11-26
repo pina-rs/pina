@@ -19,20 +19,19 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct DepositArgs {
+	/// Variable SOL deposit amount in lamports.
 	#[arg(long)]
-	bump: u8,
-	/// Client-computed Poseidon commitment of the new note.
+	amount: u64,
+	/// Client-computed Poseidon note commitment.
 	#[arg(long)]
 	commitment: String,
 	/// Per-note consent/notification public key.
 	#[arg(long)]
 	view_pubkey: String,
-	/// Active length of the encrypted note plaintext.
 	#[arg(long)]
 	envelope_len: u8,
 	#[arg(long)]
 	envelope: String,
-	/// Encrypted per-custodian key shares.
 	#[arg(long)]
 	shares: String,
 	/// The `pool_config` account [default: derived]
@@ -44,15 +43,12 @@ pub struct DepositArgs {
 	/// The `merkle_tree` account [default: derived]
 	#[arg(long)]
 	merkle_tree: Option<String>,
-	/// The `note_commitment` account
-	#[arg(long)]
-	note_commitment: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliError> {
 	let commitment = CliContext::bytes::<32>("--commitment", &args.commitment)?;
 	let view_pubkey = CliContext::bytes::<32>("--view_pubkey", &args.view_pubkey)?;
-	let envelope = CliContext::bytes::<128>("--envelope", &args.envelope)?;
+	let envelope = CliContext::bytes::<96>("--envelope", &args.envelope)?;
 	let shares = CliContext::bytes::<144>("--shares", &args.shares)?;
 	let depositor = context.payer_pubkey();
 	let pool_config = match &args.pool_config {
@@ -85,9 +81,8 @@ pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliErro
 			.0
 		}
 	};
-	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let data = DepositInstructionData::new(|data| {
-		data.bump = args.bump;
+		data.amount.set(args.amount);
 		data.commitment = commitment;
 		data.view_pubkey = view_pubkey;
 		data.envelope_len = args.envelope_len;
@@ -105,7 +100,6 @@ pub(crate) fn run(context: &CliContext, args: DepositArgs) -> Result<(), CliErro
 		pool_config,
 		pool_vault,
 		merkle_tree,
-		note_commitment,
 		system_program: Pubkey::from_str_const("11111111111111111111111111111111"),
 	};
 

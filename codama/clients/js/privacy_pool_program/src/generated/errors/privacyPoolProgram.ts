@@ -19,16 +19,16 @@ import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "../programs";
 export const PRIVACY_POOL_PROGRAM_ERROR__INVALID_AUTHORITY = 0x0; // 0
 /** The commitment is the zero field element. */
 export const PRIVACY_POOL_PROGRAM_ERROR__ZERO_COMMITMENT = 0x1; // 1
-/** The note account already exists for this commitment. */
-export const PRIVACY_POOL_PROGRAM_ERROR__NOTE_ALREADY_EXISTS = 0x2; // 2
+/** The deposit or withdrawal amount is zero. */
+export const PRIVACY_POOL_PROGRAM_ERROR__ZERO_AMOUNT = 0x2; // 2
 /** The Merkle tree is full. */
 export const PRIVACY_POOL_PROGRAM_ERROR__TREE_FULL = 0x3; // 3
 /** The submitted root is not in the recent-root ring. */
 export const PRIVACY_POOL_PROGRAM_ERROR__UNKNOWN_ROOT = 0x4; // 4
 /** The nullifier has already been spent. */
 export const PRIVACY_POOL_PROGRAM_ERROR__NULLIFIER_ALREADY_SPENT = 0x5; // 5
-/** The nullifier set is full. */
-export const PRIVACY_POOL_PROGRAM_ERROR__NULLIFIER_SET_FULL = 0x6; // 6
+/** The pool is currently paused by policy. */
+export const PRIVACY_POOL_PROGRAM_ERROR__POOL_PAUSED = 0x6; // 6
 /** The Groth16 proof failed verification. */
 export const PRIVACY_POOL_PROGRAM_ERROR__PROOF_VERIFICATION_FAILED = 0x7; // 7
 /** The verifying key slot has not been installed. */
@@ -47,8 +47,8 @@ export const PRIVACY_POOL_PROGRAM_ERROR__INVALID_TIER = 0xd; // 13
 export const PRIVACY_POOL_PROGRAM_ERROR__REQUESTER_NOT_ENTITLED = 0xe; // 14
 /** The requester registry is full. */
 export const PRIVACY_POOL_PROGRAM_ERROR__REQUESTER_REGISTRY_FULL = 0xf; // 15
-/** The target note does not exist. */
-export const PRIVACY_POOL_PROGRAM_ERROR__NOTE_NOT_FOUND = 0x10; // 16
+/** The submitted Merkle membership proof does not match any known root. */
+export const PRIVACY_POOL_PROGRAM_ERROR__INVALID_MERKLE_PROOF = 0x10; // 16
 /** The request status does not allow this transition. */
 export const PRIVACY_POOL_PROGRAM_ERROR__INVALID_REQUEST_STATUS = 0x11; // 17
 /** Consent (tier 0) has not been granted by the note's view key. */
@@ -63,6 +63,10 @@ export const PRIVACY_POOL_PROGRAM_ERROR__LOG_FULL = 0x15; // 21
 export const PRIVACY_POOL_PROGRAM_ERROR__BUFFER_OVERFLOW = 0x16; // 22
 /** A primitive failed its own bounds check. */
 export const PRIVACY_POOL_PROGRAM_ERROR__ARITHMETIC_OVERFLOW = 0x17; // 23
+/** The required Custom Ring policy co-signer did not sign. */
+export const PRIVACY_POOL_PROGRAM_ERROR__POLICY_COSIGNER_REQUIRED = 0x18; // 24
+/** The token account or mint does not match the registered asset vault. */
+export const PRIVACY_POOL_PROGRAM_ERROR__INVALID_ASSET_VAULT = 0x19; // 25
 
 export type PrivacyPoolProgramError =
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__ALREADY_APPROVED
@@ -70,24 +74,26 @@ export type PrivacyPoolProgramError =
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__BUFFER_OVERFLOW
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__CHALLENGE_WINDOW_OPEN
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__CONSENT_REQUIRED
+	| typeof PRIVACY_POOL_PROGRAM_ERROR__INVALID_ASSET_VAULT
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__INVALID_AUTHORITY
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__INVALID_CUSTODIAN_SET
+	| typeof PRIVACY_POOL_PROGRAM_ERROR__INVALID_MERKLE_PROOF
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__INVALID_REQUEST_STATUS
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__INVALID_TIER
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__INVALID_VERIFYING_KEY_SLOT
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__LOG_FULL
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__NOT_ACUSTODIAN
-	| typeof PRIVACY_POOL_PROGRAM_ERROR__NOTE_ALREADY_EXISTS
-	| typeof PRIVACY_POOL_PROGRAM_ERROR__NOTE_NOT_FOUND
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__NOT_NOTE_VIEWER
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__NULLIFIER_ALREADY_SPENT
-	| typeof PRIVACY_POOL_PROGRAM_ERROR__NULLIFIER_SET_FULL
+	| typeof PRIVACY_POOL_PROGRAM_ERROR__POLICY_COSIGNER_REQUIRED
+	| typeof PRIVACY_POOL_PROGRAM_ERROR__POOL_PAUSED
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__PROOF_VERIFICATION_FAILED
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__REQUESTER_NOT_ENTITLED
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__REQUESTER_REGISTRY_FULL
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__TREE_FULL
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__UNKNOWN_ROOT
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__VERIFYING_KEY_MISSING
+	| typeof PRIVACY_POOL_PROGRAM_ERROR__ZERO_AMOUNT
 	| typeof PRIVACY_POOL_PROGRAM_ERROR__ZERO_COMMITMENT;
 
 let privacyPoolProgramErrorMessages:
@@ -105,10 +111,14 @@ if (process.env["NODE_ENV"] !== "production") {
 			`The tier-1 challenge window is still open.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__CONSENT_REQUIRED]:
 			`Consent (tier 0) has not been granted by the note's view key.`,
+		[PRIVACY_POOL_PROGRAM_ERROR__INVALID_ASSET_VAULT]:
+			`The token account or mint does not match the registered asset vault.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__INVALID_AUTHORITY]:
 			`The signer is not the pool authority.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__INVALID_CUSTODIAN_SET]:
 			`A custodian slot address is zero or duplicated.`,
+		[PRIVACY_POOL_PROGRAM_ERROR__INVALID_MERKLE_PROOF]:
+			`The submitted Merkle membership proof does not match any known root.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__INVALID_REQUEST_STATUS]:
 			`The request status does not allow this transition.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__INVALID_TIER]:
@@ -118,16 +128,14 @@ if (process.env["NODE_ENV"] !== "production") {
 		[PRIVACY_POOL_PROGRAM_ERROR__LOG_FULL]: `The disclosure log is full.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__NOT_ACUSTODIAN]:
 			`The signer is not a registered custodian.`,
-		[PRIVACY_POOL_PROGRAM_ERROR__NOTE_ALREADY_EXISTS]:
-			`The note account already exists for this commitment.`,
-		[PRIVACY_POOL_PROGRAM_ERROR__NOTE_NOT_FOUND]:
-			`The target note does not exist.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__NOT_NOTE_VIEWER]:
 			`Only the note's view key may perform this action.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__NULLIFIER_ALREADY_SPENT]:
 			`The nullifier has already been spent.`,
-		[PRIVACY_POOL_PROGRAM_ERROR__NULLIFIER_SET_FULL]:
-			`The nullifier set is full.`,
+		[PRIVACY_POOL_PROGRAM_ERROR__POLICY_COSIGNER_REQUIRED]:
+			`The required Custom Ring policy co-signer did not sign.`,
+		[PRIVACY_POOL_PROGRAM_ERROR__POOL_PAUSED]:
+			`The pool is currently paused by policy.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__PROOF_VERIFICATION_FAILED]:
 			`The Groth16 proof failed verification.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__REQUESTER_NOT_ENTITLED]:
@@ -139,6 +147,8 @@ if (process.env["NODE_ENV"] !== "production") {
 			`The submitted root is not in the recent-root ring.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__VERIFYING_KEY_MISSING]:
 			`The verifying key slot has not been installed.`,
+		[PRIVACY_POOL_PROGRAM_ERROR__ZERO_AMOUNT]:
+			`The deposit or withdrawal amount is zero.`,
 		[PRIVACY_POOL_PROGRAM_ERROR__ZERO_COMMITMENT]:
 			`The commitment is the zero field element.`,
 	};

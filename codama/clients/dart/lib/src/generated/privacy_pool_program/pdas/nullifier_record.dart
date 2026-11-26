@@ -5,20 +5,20 @@ import 'package:meta/meta.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 
 @immutable
-class NoteCommitmentSeeds {
-  const NoteCommitmentSeeds({required this.commitment});
+class NullifierRecordSeeds {
+  const NullifierRecordSeeds({required this.nullifier});
 
-  final Address commitment;
+  final Address nullifier;
 }
 
-/// Finds the program derived address for [NoteCommitment].
-Future<(Address, int)> findNoteCommitmentPda({
-  required NoteCommitmentSeeds seeds,
+/// Finds the program derived address for [NullifierRecord].
+Future<(Address, int)> findNullifierRecordPda({
+  required NullifierRecordSeeds seeds,
   required Address programAddress,
 }) async {
   final seedValues = <Object>[
-    'privacy-pool-note',
-    getAddressEncoder().encode(seeds.commitment),
+    'privacy-pool-nullifier',
+    getAddressEncoder().encode(seeds.nullifier),
   ];
 
   return getProgramDerivedAddress(

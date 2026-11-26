@@ -99,7 +99,6 @@ getChallengeDisclosureInstructionDataCodec() {
 Instruction getChallengeDisclosureInstruction({
   required Address programAddress,
   required Address disclosureRequest,
-  required Address noteCommitment,
   required Address viewer,
   required Address clock,
   required int reserved,
@@ -112,7 +111,6 @@ Instruction getChallengeDisclosureInstruction({
     programAddress: programAddress,
     accounts: [
       AccountMeta(address: disclosureRequest, role: AccountRole.writable),
-      AccountMeta(address: noteCommitment, role: AccountRole.readonly),
       AccountMeta(address: viewer, role: AccountRole.readonlySigner),
       AccountMeta(address: clock, role: AccountRole.readonly),
     ],

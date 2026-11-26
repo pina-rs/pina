@@ -11,12 +11,12 @@
 pub const APPROVE_DISCLOSURE_DISCRIMINATOR: u8 = 11u8;
 /// Compute units `ApproveDisclosure` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const APPROVE_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 438;
+pub const APPROVE_DISCLOSURE_MEASURED_COMPUTE_UNITS: u32 = 591;
 /// Compute unit limit to request for a transaction carrying `ApproveDisclosure`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT: u32 = 900;
+pub const APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT: u32 = 1100;
 
 /// Accounts.
 #[derive(Clone, Debug)]
@@ -129,6 +129,5 @@ impl ApproveDisclosureInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct ApproveDisclosureInstructionWire {
 	pub discriminator: u8,
-	/// Reserved; must be zero.
 	pub reserved: u8,
 }

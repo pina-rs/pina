@@ -62,27 +62,15 @@ export type RequesterRegistry = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
-	/** Active entries in the parallel arrays below. */
 	count: number;
-	/**
-	 * Requester keys as concatenated 32-byte addresses, parallel to
-	 * `max_tiers`.
-	 */
 	keys: ReadonlyUint8Array;
-	/** Highest tier each requester may file at. */
 	maxTiers: ReadonlyUint8Array;
 };
 
 export type RequesterRegistryArgs = {
 	bump: number;
-	/** Active entries in the parallel arrays below. */
 	count: number;
-	/**
-	 * Requester keys as concatenated 32-byte addresses, parallel to
-	 * `max_tiers`.
-	 */
 	keys: ReadonlyUint8Array;
-	/** Highest tier each requester may file at. */
 	maxTiers: ReadonlyUint8Array;
 };
 

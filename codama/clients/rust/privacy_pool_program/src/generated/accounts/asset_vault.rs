@@ -11,60 +11,47 @@
 #[allow(clippy::len_without_is_empty)]
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
-pub struct NoteCommitment {
-	/// Per-note audit record. The envelope and shares are encrypted by the
-	/// depositor's client and opaque to the program; the view key is the
-	/// per-note consent key that may grant tier-0 requests and file challenges.
-	///
-	/// Spent notes are *not* marked here: linking a nullifier to its commitment
-	/// would break the privacy the pool exists to provide. The nullifier set is
-	/// the only spent record.
+pub struct AssetVault {
+	/// Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL
+	/// Interface PDA).
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// The commitment; also the PDA seed.
-	pub commitment: [u8; 32],
-	/// Per-note consent/notification public key.
-	pub view_pubkey: [u8; 32],
-	/// Active bytes of the encrypted note plaintext, client-opaque.
-	pub envelope_len: u8,
-	pub envelope: [u8; 128],
-	/// Concatenated per-custodian encrypted key shares, client-opaque.
-	pub shares: [u8; 144],
+	pub mint: solana_pubkey::Pubkey,
+	pub token_program: solana_pubkey::Pubkey,
+	pub vault_token_account: solana_pubkey::Pubkey,
 }
 
-pub const NOTE_COMMITMENT_DISCRIMINATOR: u8 = 8u8;
+pub const ASSET_VAULT_DISCRIMINATOR: u8 = 8u8;
 
-pub const NOTE_COMMITMENT_MIGRATION_VERSION: u8 = 0u8;
+pub const ASSET_VAULT_MIGRATION_VERSION: u8 = 0u8;
 
-impl NoteCommitment {
-	pub const LEN: usize = core::mem::size_of::<NoteCommitmentZc>();
+impl AssetVault {
+	pub const LEN: usize = core::mem::size_of::<AssetVaultZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///
 	/// The destination is cleared again if configuration or validation fails.
 	pub fn initialize(
 		data: &mut [u8],
-		configure: impl FnOnce(&mut NoteCommitmentZc),
-	) -> Result<&mut NoteCommitmentZc, solana_program_error::ProgramError> {
+		configure: impl FnOnce(&mut AssetVaultZc),
+	) -> Result<&mut AssetVaultZc, solana_program_error::ProgramError> {
 		<Self as pina::PinaPodFixed>::initialize(data, |account| {
 			configure(account);
-			account.discriminator = NOTE_COMMITMENT_DISCRIMINATOR;
-			account.migration_version = NOTE_COMMITMENT_MIGRATION_VERSION;
+			account.discriminator = ASSET_VAULT_DISCRIMINATOR;
+			account.migration_version = ASSET_VAULT_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
-	pub fn from_bytes(
-		data: &[u8],
-	) -> Result<&NoteCommitmentZc, solana_program_error::ProgramError> {
+	pub fn from_bytes(data: &[u8]) -> Result<&AssetVaultZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		if account.discriminator != NOTE_COMMITMENT_DISCRIMINATOR {
+		if account.discriminator != ASSET_VAULT_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		if account.migration_version != NOTE_COMMITMENT_MIGRATION_VERSION {
+		if account.migration_version != ASSET_VAULT_MIGRATION_VERSION {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
@@ -72,49 +59,49 @@ impl NoteCommitment {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut NoteCommitmentZc, solana_program_error::ProgramError> {
+	) -> Result<&mut AssetVaultZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		if account.discriminator != NOTE_COMMITMENT_DISCRIMINATOR {
+		if account.discriminator != ASSET_VAULT_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		if account.migration_version != NOTE_COMMITMENT_MIGRATION_VERSION {
+		if account.migration_version != ASSET_VAULT_MIGRATION_VERSION {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
 	}
 }
 
-impl NoteCommitment {
-	pub fn find_pda(commitment: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
+impl AssetVault {
+	pub fn find_pda(mint: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["privacy-pool-note".as_bytes(), commitment.as_ref()],
+			&["privacy-pool-asset".as_bytes(), mint.as_ref()],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 
 	pub fn create_pda(
-		commitment: &solana_pubkey::Pubkey,
+		mint: &solana_pubkey::Pubkey,
 		bump: u8,
 	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["privacy-pool-note".as_bytes(), commitment.as_ref(), &[bump]],
+			&["privacy-pool-asset".as_bytes(), mint.as_ref(), &[bump]],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 }
 
 /// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
-/// [`NOTE_COMMITMENT_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
+/// [`ASSET_VAULT_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
 ///
 /// Version 0 is the initial version, so no bytes can ever be stale.
-pub fn note_commitment_needs_migration(_data: &[u8]) -> bool {
+pub fn asset_vault_needs_migration(_data: &[u8]) -> bool {
 	false
 }
 
-/// Why `NoteCommitment::try_from_bytes` rejected account bytes.
+/// Why `AssetVault::try_from_bytes` rejected account bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NoteCommitmentVersionError {
+pub enum AssetVaultVersionError {
 	/// The bytes do not decode as this account's layout at all.
 	InvalidData,
 	/// The envelope names this account but the stored version predates this client: migrate the account on-chain, then retry.
@@ -123,10 +110,10 @@ pub enum NoteCommitmentVersionError {
 	Future { stored: u8 },
 }
 
-impl core::fmt::Display for NoteCommitmentVersionError {
+impl core::fmt::Display for AssetVaultVersionError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
-			Self::InvalidData => write!(f, "invalid NoteCommitment account data"),
+			Self::InvalidData => write!(f, "invalid AssetVault account data"),
 			Self::Stale { stored } => {
 				write!(
 					f,
@@ -143,16 +130,16 @@ impl core::fmt::Display for NoteCommitmentVersionError {
 	}
 }
 
-impl NoteCommitment {
-	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`NoteCommitment::from_bytes`].
-	pub fn try_from_bytes(data: &[u8]) -> Result<&NoteCommitmentZc, NoteCommitmentVersionError> {
+impl AssetVault {
+	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`AssetVault::from_bytes`].
+	pub fn try_from_bytes(data: &[u8]) -> Result<&AssetVaultZc, AssetVaultVersionError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
-			.map_err(|_| NoteCommitmentVersionError::InvalidData)?;
-		if account.discriminator != NOTE_COMMITMENT_DISCRIMINATOR {
-			return Err(NoteCommitmentVersionError::InvalidData);
+			.map_err(|_| AssetVaultVersionError::InvalidData)?;
+		if account.discriminator != ASSET_VAULT_DISCRIMINATOR {
+			return Err(AssetVaultVersionError::InvalidData);
 		}
-		if account.migration_version > NOTE_COMMITMENT_MIGRATION_VERSION {
-			return Err(NoteCommitmentVersionError::Future {
+		if account.migration_version > ASSET_VAULT_MIGRATION_VERSION {
+			return Err(AssetVaultVersionError::Future {
 				stored: account.migration_version,
 			});
 		}
@@ -161,11 +148,11 @@ impl NoteCommitment {
 }
 
 #[cfg(test)]
-mod note_commitment_version_error_tests {
+mod asset_vault_version_error_tests {
 	use super::*;
 
 	fn envelope(version: u8) -> Vec<u8> {
-		let mut data = vec![0_u8; core::mem::size_of::<NoteCommitmentZc>()];
+		let mut data = vec![0_u8; core::mem::size_of::<AssetVaultZc>()];
 		data[..1].copy_from_slice(&[8]);
 		data[1..2].copy_from_slice(&version.to_le_bytes());
 		data
@@ -173,16 +160,16 @@ mod note_commitment_version_error_tests {
 
 	#[test]
 	fn stale_and_future_versions_are_distinguishable() {
-		let error = NoteCommitment::try_from_bytes(&envelope(1 as u8))
+		let error = AssetVault::try_from_bytes(&envelope(1 as u8))
 			.err()
 			.expect("a future envelope must fail");
-		assert_eq!(error, NoteCommitmentVersionError::Future { stored: 1 });
+		assert_eq!(error, AssetVaultVersionError::Future { stored: 1 });
 		assert_eq!(
-			NoteCommitmentVersionError::Future { stored: 1 }.to_string(),
+			AssetVaultVersionError::Future { stored: 1 }.to_string(),
 			"migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)"
 		);
 		assert!(
-			NoteCommitment::try_from_bytes(&envelope(0 as u8)).is_ok(),
+			AssetVault::try_from_bytes(&envelope(0 as u8)).is_ok(),
 			"the current version must decode",
 		);
 	}

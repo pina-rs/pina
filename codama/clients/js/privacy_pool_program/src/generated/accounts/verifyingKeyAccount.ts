@@ -61,52 +61,32 @@ export function getVerifyingKeyAccountDiscriminator2Bytes(): ReadonlyUint8Array 
 }
 
 /**
- * One installed Groth16 verifying key. Slot 0 verifies withdraw proofs
- * (root, nullifier, recipient hash), slot 1 transfer proofs
- * (root, nullifier, output binding).
+ * Single-input Groth16 verifying key. Every circuit compresses its statement
+ * into one BN254 scalar (`statement_hash`), so only `ic0` and `ic1` are
+ * stored (saving 128 bytes per key and 2+ `g1_mul` syscalls per spend).
  */
 export type VerifyingKeyAccount = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
-	/** Circuit slot; see the `VK_SLOT_*` constants. */
 	slot: number;
-	/** αG₁, little-endian affine coordinates. */
 	alphaG1: ReadonlyUint8Array;
-	/** βG₂, little-endian affine coordinates. */
 	betaG2: ReadonlyUint8Array;
-	/** γG₂, little-endian affine coordinates. */
 	gammaG2: ReadonlyUint8Array;
-	/** δG₂, little-endian affine coordinates. */
 	deltaG2: ReadonlyUint8Array;
-	/** IC entries in use, including the constant term. */
-	icLen: number;
-	/** IC G₁ points, little-endian; entries beyond `ic_len` are zero. */
 	ic0: ReadonlyUint8Array;
 	ic1: ReadonlyUint8Array;
-	ic2: ReadonlyUint8Array;
-	ic3: ReadonlyUint8Array;
 };
 
 export type VerifyingKeyAccountArgs = {
 	bump: number;
-	/** Circuit slot; see the `VK_SLOT_*` constants. */
 	slot: number;
-	/** αG₁, little-endian affine coordinates. */
 	alphaG1: ReadonlyUint8Array;
-	/** βG₂, little-endian affine coordinates. */
 	betaG2: ReadonlyUint8Array;
-	/** γG₂, little-endian affine coordinates. */
 	gammaG2: ReadonlyUint8Array;
-	/** δG₂, little-endian affine coordinates. */
 	deltaG2: ReadonlyUint8Array;
-	/** IC entries in use, including the constant term. */
-	icLen: number;
-	/** IC G₁ points, little-endian; entries beyond `ic_len` are zero. */
 	ic0: ReadonlyUint8Array;
 	ic1: ReadonlyUint8Array;
-	ic2: ReadonlyUint8Array;
-	ic3: ReadonlyUint8Array;
 };
 
 /** Gets the encoder for {@link VerifyingKeyAccountArgs} account data. */
@@ -123,11 +103,8 @@ export function getVerifyingKeyAccountEncoder(): FixedSizeEncoder<
 			["betaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
 			["gammaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
 			["deltaG2", fixPinaPodEncoderSize(getBytesEncoder(), 128)],
-			["icLen", getU8Encoder()],
 			["ic0", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 			["ic1", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic2", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
-			["ic3", fixPinaPodEncoderSize(getBytesEncoder(), 64)],
 		]),
 		(value) => ({ ...value, discriminator: 10, migrationVersion: 0 }),
 	);
@@ -152,11 +129,8 @@ export function getVerifyingKeyAccountDecoder(): FixedSizeDecoder<
 		["betaG2", fixDecoderSize(getBytesDecoder(), 128)],
 		["gammaG2", fixDecoderSize(getBytesDecoder(), 128)],
 		["deltaG2", fixDecoderSize(getBytesDecoder(), 128)],
-		["icLen", getU8Decoder()],
 		["ic0", fixDecoderSize(getBytesDecoder(), 64)],
 		["ic1", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic2", fixDecoderSize(getBytesDecoder(), 64)],
-		["ic3", fixDecoderSize(getBytesDecoder(), 64)],
 	]);
 }
 

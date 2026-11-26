@@ -24,10 +24,10 @@ pub struct Migrate {
 	pub pool_config: Option<solana_pubkey::Pubkey>,
 	pub pool_vault: Option<solana_pubkey::Pubkey>,
 	pub merkle_tree: Option<solana_pubkey::Pubkey>,
-	pub nullifier_set: Option<solana_pubkey::Pubkey>,
+	pub nullifier_record: Option<solana_pubkey::Pubkey>,
 	pub custodian_registry: Option<solana_pubkey::Pubkey>,
 	pub requester_registry: Option<solana_pubkey::Pubkey>,
-	pub note_commitment: Option<solana_pubkey::Pubkey>,
+	pub asset_vault: Option<solana_pubkey::Pubkey>,
 	pub disclosure_request: Option<solana_pubkey::Pubkey>,
 	pub disclosure_log: Option<solana_pubkey::Pubkey>,
 	pub verifying_key_account: Option<solana_pubkey::Pubkey>,
@@ -41,10 +41,10 @@ impl Migrate {
 			pool_config: None,
 			pool_vault: None,
 			merkle_tree: None,
-			nullifier_set: None,
+			nullifier_record: None,
 			custodian_registry: None,
 			requester_registry: None,
-			note_commitment: None,
+			asset_vault: None,
 			disclosure_request: None,
 			disclosure_log: None,
 			verifying_key_account: None,
@@ -104,8 +104,11 @@ impl Migrate {
 				false,
 			));
 		}
-		if let Some(nullifier_set) = self.nullifier_set {
-			accounts.push(solana_instruction::AccountMeta::new(nullifier_set, false));
+		if let Some(nullifier_record) = self.nullifier_record {
+			accounts.push(solana_instruction::AccountMeta::new(
+				nullifier_record,
+				false,
+			));
 		} else {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(
 				crate::PRIVACY_POOL_PROGRAM_ID,
@@ -134,8 +137,8 @@ impl Migrate {
 				false,
 			));
 		}
-		if let Some(note_commitment) = self.note_commitment {
-			accounts.push(solana_instruction::AccountMeta::new(note_commitment, false));
+		if let Some(asset_vault) = self.asset_vault {
+			accounts.push(solana_instruction::AccountMeta::new(asset_vault, false));
 		} else {
 			accounts.push(solana_instruction::AccountMeta::new_readonly(
 				crate::PRIVACY_POOL_PROGRAM_ID,

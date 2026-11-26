@@ -22,13 +22,12 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 	.requiredOption("--config-bump <configBump>", "configBump")
 	.requiredOption("--vault-bump <vaultBump>", "vaultBump")
 	.requiredOption("--tree-bump <treeBump>", "treeBump")
-	.requiredOption("--nullifiers-bump <nullifiersBump>", "nullifiersBump")
 	.requiredOption("--custodians-bump <custodiansBump>", "custodiansBump")
 	.requiredOption("--requesters-bump <requestersBump>", "requestersBump")
 	.requiredOption("--log-bump <logBump>", "logBump")
 	.requiredOption(
 		"--custodians <custodians>",
-		"Initial three-member disclosure committee as concatenated 32-byte",
+		"Initial three-member disclosure committee as concatenated 32-byte keys.",
 	)
 	.option(
 		"--pool-config <poolConfig>",
@@ -43,10 +42,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 		"The `merkle_tree` account [default: derived]",
 	)
 	.option(
-		"--nullifier-set <nullifierSet>",
-		"The `nullifier_set` account [default: derived]",
-	)
-	.option(
 		"--custodian-registry <custodianRegistry>",
 		"The `custodian_registry` account [default: derived]",
 	)
@@ -58,17 +53,13 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 		"--disclosure-log <disclosureLog>",
 		"The `disclosure_log` account [default: derived]",
 	)
-	.requiredOption(
-		"--program-data <programData>",
-		"Canonical `ProgramData` for this program, owned by the upgradeable loader",
-	)
+	.requiredOption("--program-data <programData>", "The `program_data` account")
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			configBump: smallInteger("--config-bump", options.configBump),
 			vaultBump: smallInteger("--vault-bump", options.vaultBump),
 			treeBump: smallInteger("--tree-bump", options.treeBump),
-			nullifiersBump: smallInteger("--nullifiers-bump", options.nullifiersBump),
 			custodiansBump: smallInteger("--custodians-bump", options.custodiansBump),
 			requestersBump: smallInteger("--requesters-bump", options.requestersBump),
 			logBump: smallInteger("--log-bump", options.logBump),
@@ -83,9 +74,6 @@ export const initializeCommand = registerGlobals(new Command("initialize"))
 			merkleTree: options.merkleTree === undefined
 				? undefined
 				: pubkey("--merkle-tree", options.merkleTree),
-			nullifierSet: options.nullifierSet === undefined
-				? undefined
-				: pubkey("--nullifier-set", options.nullifierSet),
 			custodianRegistry: options.custodianRegistry === undefined
 				? undefined
 				: pubkey("--custodian-registry", options.custodianRegistry),

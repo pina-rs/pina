@@ -24,7 +24,8 @@ final class FetchPoolConfigCommand extends Command<void> {
   String get name => 'pool-config';
 
   @override
-  String get description => "Global pool configuration and governance root.";
+  String get description =>
+      "Global pool configuration, governance root, and Custom Ring policy flags.";
 
   @override
   Future<void> run() async {
@@ -48,7 +49,8 @@ final class FetchPoolConfigCommand extends Command<void> {
       'authority': account.data.authority,
       'custodian_threshold': account.data.custodianThreshold,
       'challenge_window_secs': account.data.challengeWindowSecs,
-      'deposit_lamports': account.data.depositLamports,
+      'policy_flags': account.data.policyFlags,
+      'policy_cosigner': account.data.policyCosigner,
       'total_deposits': account.data.totalDeposits,
     });
   }
@@ -66,8 +68,7 @@ final class FetchPoolVaultCommand extends Command<void> {
   String get name => 'pool-vault';
 
   @override
-  String get description =>
-      "The pool's SOL custody. Data-less by design: every lamport in it is";
+  String get description => "The pool's native SOL custody PDA.";
 
   @override
   Future<void> run() async {
@@ -105,7 +106,7 @@ final class FetchMerkleTreeCommand extends Command<void> {
 
   @override
   String get description =>
-      "Full-node incremental Merkle tree over Poseidon-2 hashes.";
+      "Depth-16 frontier incremental Merkle tree over Poseidon-2 hashes.";
 
   @override
   Future<void> run() async {
@@ -127,34 +128,39 @@ final class FetchMerkleTreeCommand extends Command<void> {
     printFields(context.json, 'merkle-tree', address, <String, Object?>{
       'bump': account.data.bump,
       'next_leaf_index': account.data.nextLeafIndex,
-      'nodes': account.data.nodes,
+      'filled_subtrees': account.data.filledSubtrees,
       'roots_len': account.data.rootsLen,
       'roots': account.data.roots,
     });
   }
 }
 
-final class FetchNullifierSetCommand extends Command<void> {
-  FetchNullifierSetCommand() {
-    argParser..addOption(
-      'address',
-      help: 'Account address; overrides PDA derivation.',
-    );
+final class FetchNullifierRecordCommand extends Command<void> {
+  FetchNullifierRecordCommand() {
+    argParser
+      ..addOption('address', help: 'Account address; overrides PDA derivation.')
+      ..addOption('nullifier', mandatory: true, help: "PDA seed `nullifier`.");
   }
 
   @override
-  String get name => 'nullifier-set';
+  String get name => 'nullifier-record';
 
   @override
-  String get description => "Append-only set of spent nullifiers.";
+  String get description =>
+      "Per-nullifier spent marker PDA. Existence proves the nullifier was spent in";
 
   @override
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
+    final nullifierValue = pubkey(
+      '--nullifier',
+      results['nullifier']! as String,
+    );
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
-        : (await findNullifierSetPda(
+        : (await findNullifierRecordPda(
+            seeds: NullifierRecordSeeds(nullifier: nullifierValue),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -166,11 +172,9 @@ final class FetchNullifierSetCommand extends Command<void> {
       programAddress: context.programAddress,
       space: BigInt.from(data.length),
     );
-    final account = decodeNullifierSet(encoded);
-    printFields(context.json, 'nullifier-set', address, <String, Object?>{
+    final account = decodeNullifierRecord(encoded);
+    printFields(context.json, 'nullifier-record', address, <String, Object?>{
       'bump': account.data.bump,
-      'count': account.data.count,
-      'nullifiers': account.data.nullifiers,
     });
   }
 }
@@ -187,8 +191,7 @@ final class FetchCustodianRegistryCommand extends Command<void> {
   String get name => 'custodian-registry';
 
   @override
-  String get description =>
-      "The disclosure committee. A threshold of these keys must approve before";
+  String get description => "The disclosure committee.";
 
   @override
   Future<void> run() async {
@@ -259,36 +262,29 @@ final class FetchRequesterRegistryCommand extends Command<void> {
   }
 }
 
-final class FetchNoteCommitmentCommand extends Command<void> {
-  FetchNoteCommitmentCommand() {
+final class FetchAssetVaultCommand extends Command<void> {
+  FetchAssetVaultCommand() {
     argParser
       ..addOption('address', help: 'Account address; overrides PDA derivation.')
-      ..addOption(
-        'commitment',
-        mandatory: true,
-        help: "PDA seed `commitment`.",
-      );
+      ..addOption('mint', mandatory: true, help: "PDA seed `mint`.");
   }
 
   @override
-  String get name => 'note-commitment';
+  String get name => 'asset-vault';
 
   @override
   String get description =>
-      "Per-note audit record. The envelope and shares are encrypted by the";
+      "Per-mint SPL Token / Token-2022 escrow metadata (mirroring SPR's SPL";
 
   @override
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final commitmentValue = pubkey(
-      '--commitment',
-      results['commitment']! as String,
-    );
+    final mintValue = pubkey('--mint', results['mint']! as String);
     final address = (results['address'] as String?) != null
         ? pubkey('--address', results['address']! as String)
-        : (await findNoteCommitmentPda(
-            seeds: NoteCommitmentSeeds(commitment: commitmentValue),
+        : (await findAssetVaultPda(
+            seeds: AssetVaultSeeds(mint: mintValue),
             programAddress: context.programAddress,
           )).$1;
     final data = await context.fetchAccount(address);
@@ -300,14 +296,12 @@ final class FetchNoteCommitmentCommand extends Command<void> {
       programAddress: context.programAddress,
       space: BigInt.from(data.length),
     );
-    final account = decodeNoteCommitment(encoded);
-    printFields(context.json, 'note-commitment', address, <String, Object?>{
+    final account = decodeAssetVault(encoded);
+    printFields(context.json, 'asset-vault', address, <String, Object?>{
       'bump': account.data.bump,
-      'commitment': account.data.commitment,
-      'view_pubkey': account.data.viewPubkey,
-      'envelope_len': account.data.envelopeLen,
-      'envelope': account.data.envelope,
-      'shares': account.data.shares,
+      'mint': account.data.mint,
+      'token_program': account.data.tokenProgram,
+      'vault_token_account': account.data.vaultTokenAccount,
     });
   }
 }
@@ -324,7 +318,8 @@ final class FetchDisclosureRequestCommand extends Command<void> {
   String get name => 'disclosure-request';
 
   @override
-  String get description => "One disclosure request and its state machine.";
+  String get description =>
+      "One disclosure request and its state machine. Stores `view_pubkey` after";
 
   @override
   Future<void> run() async {
@@ -360,6 +355,7 @@ final class FetchDisclosureRequestCommand extends Command<void> {
       'nonce': account.data.nonce,
       'tier': account.data.tier,
       'commitment': account.data.commitment,
+      'view_pubkey': account.data.viewPubkey,
       'notice_len': account.data.noticeLen,
       'notice': account.data.notice,
       'legal_basis_hash': account.data.legalBasisHash,
@@ -385,7 +381,7 @@ final class FetchDisclosureLogCommand extends Command<void> {
 
   @override
   String get description =>
-      "Append-only public record of executed disclosures. The entry is written";
+      "Append-only public record of executed disclosures. Stores a salted";
 
   @override
   Future<void> run() async {
@@ -426,7 +422,7 @@ final class FetchVerifyingKeyAccountCommand extends Command<void> {
 
   @override
   String get description =>
-      "One installed Groth16 verifying key. Slot 0 verifies withdraw proofs";
+      "Single-input Groth16 verifying key. Every circuit compresses its statement";
 
   @override
   Future<void> run() async {
@@ -460,11 +456,8 @@ final class FetchVerifyingKeyAccountCommand extends Command<void> {
         'beta_g2': account.data.betaG2,
         'gamma_g2': account.data.gammaG2,
         'delta_g2': account.data.deltaG2,
-        'ic_len': account.data.icLen,
         'ic0': account.data.ic0,
         'ic1': account.data.ic1,
-        'ic2': account.data.ic2,
-        'ic3': account.data.ic3,
       },
     );
   }
@@ -475,10 +468,10 @@ final class FetchCommand extends Command<void> {
     addSubcommand(FetchPoolConfigCommand());
     addSubcommand(FetchPoolVaultCommand());
     addSubcommand(FetchMerkleTreeCommand());
-    addSubcommand(FetchNullifierSetCommand());
+    addSubcommand(FetchNullifierRecordCommand());
     addSubcommand(FetchCustodianRegistryCommand());
     addSubcommand(FetchRequesterRegistryCommand());
-    addSubcommand(FetchNoteCommitmentCommand());
+    addSubcommand(FetchAssetVaultCommand());
     addSubcommand(FetchDisclosureRequestCommand());
     addSubcommand(FetchDisclosureLogCommand());
     addSubcommand(FetchVerifyingKeyAccountCommand());

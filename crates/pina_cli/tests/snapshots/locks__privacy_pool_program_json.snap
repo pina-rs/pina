@@ -58,20 +58,6 @@ expression: report
       ]
     },
     {
-      "id": "pda:nullifier_set",
-      "name": "nullifier_set",
-      "class": "fixed",
-      "address": "Fme1vL3wChyjUdumDR9vhf1kxqp6V1vVBhn4eywLmvwj",
-      "pda": "nullifier_set",
-      "seeds": [
-        {
-          "kind": "constant",
-          "hex": "707269766163792d706f6f6c2d6e756c6c696669657273",
-          "text": "privacy-pool-nullifiers"
-        }
-      ]
-    },
-    {
       "id": "pda:custodian_registry",
       "name": "custodian_registry",
       "class": "fixed",
@@ -157,14 +143,6 @@ expression: report
       ]
     },
     {
-      "id": "caller:set_verification_key.system_program",
-      "name": "system_program",
-      "class": "caller",
-      "address": null,
-      "pda": null,
-      "seeds": []
-    },
-    {
       "id": "caller:set_custodians.authority",
       "name": "authority",
       "class": "caller",
@@ -189,20 +167,28 @@ expression: report
       "seeds": []
     },
     {
-      "id": "pda:note_commitment",
-      "name": "note_commitment",
+      "id": "caller:withdraw.payer",
+      "name": "payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:nullifier_record",
+      "name": "nullifier_record",
       "class": "keyed",
       "address": null,
-      "pda": "note_commitment",
+      "pda": "nullifier_record",
       "seeds": [
         {
           "kind": "constant",
-          "hex": "707269766163792d706f6f6c2d6e6f7465",
-          "text": "privacy-pool-note"
+          "hex": "707269766163792d706f6f6c2d6e756c6c6966696572",
+          "text": "privacy-pool-nullifier"
         },
         {
           "kind": "variable",
-          "name": "commitment",
+          "name": "nullifier",
           "type": "Address"
         }
       ]
@@ -216,8 +202,8 @@ expression: report
       "seeds": []
     },
     {
-      "id": "caller:transfer.pool_config",
-      "name": "pool_config",
+      "id": "caller:withdraw.policy_cosigner",
+      "name": "policy_cosigner",
       "class": "caller",
       "address": null,
       "pda": null,
@@ -226,6 +212,14 @@ expression: report
     {
       "id": "caller:transfer.payer",
       "name": "payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:transfer.policy_cosigner",
+      "name": "policy_cosigner",
       "class": "caller",
       "address": null,
       "pda": null,
@@ -334,6 +328,161 @@ expression: report
       "address": null,
       "pda": null,
       "seeds": []
+    },
+    {
+      "id": "caller:register_asset.payer",
+      "name": "payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:register_asset.mint",
+      "name": "mint",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "pda:asset_vault",
+      "name": "asset_vault",
+      "class": "keyed",
+      "address": null,
+      "pda": "asset_vault",
+      "seeds": [
+        {
+          "kind": "constant",
+          "hex": "707269766163792d706f6f6c2d6173736574",
+          "text": "privacy-pool-asset"
+        },
+        {
+          "kind": "variable",
+          "name": "mint",
+          "type": "Address"
+        }
+      ]
+    },
+    {
+      "id": "caller:register_asset.vault_token_account",
+      "name": "vault_token_account",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:register_asset.token_program",
+      "name": "token_program",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:deposit_token.depositor",
+      "name": "depositor",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:deposit_token.mint",
+      "name": "mint",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:deposit_token.depositor_token_account",
+      "name": "depositor_token_account",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:deposit_token.vault_token_account",
+      "name": "vault_token_account",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:deposit_token.token_program",
+      "name": "token_program",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:withdraw_token.payer",
+      "name": "payer",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:withdraw_token.mint",
+      "name": "mint",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:withdraw_token.vault_token_account",
+      "name": "vault_token_account",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:withdraw_token.recipient_token_account",
+      "name": "recipient_token_account",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:withdraw_token.relayer_token_account",
+      "name": "relayer_token_account",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:withdraw_token.policy_cosigner",
+      "name": "policy_cosigner",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:withdraw_token.token_program",
+      "name": "token_program",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
+    },
+    {
+      "id": "caller:set_policy.authority",
+      "name": "authority",
+      "class": "caller",
+      "address": null,
+      "pda": null,
+      "seeds": []
     }
   ],
   "instructions": [
@@ -361,12 +510,6 @@ expression: report
         {
           "node": "pda:merkle_tree",
           "slot": "merkle_tree",
-          "signer": false,
-          "optional": false
-        },
-        {
-          "node": "pda:nullifier_set",
-          "slot": "nullifier_set",
           "signer": false,
           "optional": false
         },
@@ -428,7 +571,7 @@ expression: report
           "optional": false
         },
         {
-          "node": "caller:set_verification_key.system_program",
+          "node": "address:11111111111111111111111111111111",
           "slot": "system_program",
           "signer": false,
           "optional": false
@@ -511,12 +654,6 @@ expression: report
           "slot": "merkle_tree",
           "signer": false,
           "optional": false
-        },
-        {
-          "node": "pda:note_commitment",
-          "slot": "note_commitment",
-          "signer": false,
-          "optional": false
         }
       ],
       "reads": [
@@ -532,14 +669,32 @@ expression: report
       "name": "withdraw",
       "writes": [
         {
+          "node": "caller:withdraw.payer",
+          "slot": "payer",
+          "signer": true,
+          "optional": false
+        },
+        {
           "node": "pda:pool_vault",
           "slot": "pool_vault",
           "signer": false,
           "optional": false
         },
         {
-          "node": "pda:nullifier_set",
-          "slot": "nullifier_set",
+          "node": "pda:merkle_tree",
+          "slot": "merkle_tree",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:nullifier_record",
+          "slot": "nullifier_record_0",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:nullifier_record",
+          "slot": "nullifier_record_1",
           "signer": false,
           "optional": false
         },
@@ -558,14 +713,14 @@ expression: report
           "optional": false
         },
         {
-          "node": "pda:merkle_tree",
-          "slot": "merkle_tree",
+          "node": "pda:verifying_key_account",
+          "slot": "verifying_key_account",
           "signer": false,
           "optional": false
         },
         {
-          "node": "pda:verifying_key_account",
-          "slot": "verifying_key_account",
+          "node": "caller:withdraw.policy_cosigner",
+          "slot": "policy_cosigner",
           "signer": false,
           "optional": false
         },
@@ -587,27 +742,33 @@ expression: report
           "optional": false
         },
         {
+          "node": "pda:pool_vault",
+          "slot": "pool_vault",
+          "signer": false,
+          "optional": false
+        },
+        {
           "node": "pda:merkle_tree",
           "slot": "merkle_tree",
           "signer": false,
           "optional": false
         },
         {
-          "node": "pda:nullifier_set",
-          "slot": "nullifier_set",
+          "node": "pda:nullifier_record",
+          "slot": "nullifier_record_0",
           "signer": false,
           "optional": false
         },
         {
-          "node": "pda:note_commitment",
-          "slot": "note_commitment",
+          "node": "pda:nullifier_record",
+          "slot": "nullifier_record_1",
           "signer": false,
           "optional": false
         }
       ],
       "reads": [
         {
-          "node": "caller:transfer.pool_config",
+          "node": "pda:pool_config",
           "slot": "pool_config",
           "signer": false,
           "optional": false
@@ -615,6 +776,12 @@ expression: report
         {
           "node": "pda:verifying_key_account",
           "slot": "verifying_key_account",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:transfer.policy_cosigner",
+          "slot": "policy_cosigner",
           "signer": false,
           "optional": false
         },
@@ -656,8 +823,8 @@ expression: report
           "optional": false
         },
         {
-          "node": "pda:note_commitment",
-          "slot": "note_commitment",
+          "node": "pda:merkle_tree",
+          "slot": "merkle_tree",
           "signer": false,
           "optional": false
         },
@@ -687,12 +854,6 @@ expression: report
       ],
       "reads": [
         {
-          "node": "pda:note_commitment",
-          "slot": "note_commitment",
-          "signer": false,
-          "optional": false
-        },
-        {
           "node": "caller:grant_disclosure.viewer",
           "slot": "viewer",
           "signer": true,
@@ -711,12 +872,6 @@ expression: report
         }
       ],
       "reads": [
-        {
-          "node": "pda:note_commitment",
-          "slot": "note_commitment",
-          "signer": false,
-          "optional": false
-        },
         {
           "node": "caller:challenge_disclosure.viewer",
           "slot": "viewer",
@@ -817,6 +972,226 @@ expression: report
           "optional": false
         }
       ]
+    },
+    {
+      "name": "register_asset",
+      "writes": [
+        {
+          "node": "caller:register_asset.payer",
+          "slot": "payer",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:asset_vault",
+          "slot": "asset_vault",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:register_asset.mint",
+          "slot": "mint",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:register_asset.vault_token_account",
+          "slot": "vault_token_account",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:register_asset.token_program",
+          "slot": "token_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "deposit_token",
+      "writes": [
+        {
+          "node": "caller:deposit_token.depositor",
+          "slot": "depositor",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:merkle_tree",
+          "slot": "merkle_tree",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:deposit_token.depositor_token_account",
+          "slot": "depositor_token_account",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:deposit_token.vault_token_account",
+          "slot": "vault_token_account",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:deposit_token.mint",
+          "slot": "mint",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:asset_vault",
+          "slot": "asset_vault",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:deposit_token.token_program",
+          "slot": "token_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "withdraw_token",
+      "writes": [
+        {
+          "node": "caller:withdraw_token.payer",
+          "slot": "payer",
+          "signer": true,
+          "optional": false
+        },
+        {
+          "node": "pda:merkle_tree",
+          "slot": "merkle_tree",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:nullifier_record",
+          "slot": "nullifier_record_0",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:nullifier_record",
+          "slot": "nullifier_record_1",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:withdraw_token.vault_token_account",
+          "slot": "vault_token_account",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:withdraw_token.recipient_token_account",
+          "slot": "recipient_token_account",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:withdraw_token.relayer_token_account",
+          "slot": "relayer_token_account",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:verifying_key_account",
+          "slot": "verifying_key_account",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:withdraw_token.mint",
+          "slot": "mint",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "pda:asset_vault",
+          "slot": "asset_vault",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:withdraw_token.policy_cosigner",
+          "slot": "policy_cosigner",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "caller:withdraw_token.token_program",
+          "slot": "token_program",
+          "signer": false,
+          "optional": false
+        },
+        {
+          "node": "address:11111111111111111111111111111111",
+          "slot": "system_program",
+          "signer": false,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "set_policy",
+      "writes": [
+        {
+          "node": "pda:pool_config",
+          "slot": "pool_config",
+          "signer": false,
+          "optional": false
+        }
+      ],
+      "reads": [
+        {
+          "node": "caller:set_policy.authority",
+          "slot": "authority",
+          "signer": true,
+          "optional": false
+        }
+      ]
+    },
+    {
+      "name": "verify_policy",
+      "writes": [],
+      "reads": [
+        {
+          "node": "pda:verifying_key_account",
+          "slot": "verifying_key_account",
+          "signer": false,
+          "optional": false
+        }
+      ]
     }
   ],
   "conflicts": [
@@ -830,7 +1205,6 @@ expression: report
         "pda:custodian_registry",
         "pda:disclosure_log",
         "pda:merkle_tree",
-        "pda:nullifier_set",
         "pda:pool_config",
         "pda:pool_vault",
         "pda:requester_registry"
@@ -888,7 +1262,6 @@ expression: report
       "kind": "always",
       "nodes": [
         "pda:merkle_tree",
-        "pda:nullifier_set",
         "pda:pool_config",
         "pda:pool_vault"
       ]
@@ -901,7 +1274,8 @@ expression: report
       "kind": "always",
       "nodes": [
         "pda:merkle_tree",
-        "pda:nullifier_set"
+        "pda:pool_config",
+        "pda:pool_vault"
       ]
     },
     {
@@ -911,6 +1285,7 @@ expression: report
       ],
       "kind": "always",
       "nodes": [
+        "pda:merkle_tree",
         "pda:pool_config",
         "pda:requester_registry"
       ]
@@ -934,6 +1309,38 @@ expression: report
       "nodes": [
         "pda:custodian_registry",
         "pda:disclosure_log",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "withdraw_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "initialize",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
         "pda:pool_config"
       ]
     },
@@ -979,6 +1386,46 @@ expression: report
     },
     {
       "instructions": [
+        "set_verification_key",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "set_verification_key",
+        "withdraw_token"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:verifying_key_account"
+      ]
+    },
+    {
+      "instructions": [
+        "set_verification_key",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "set_verification_key",
+        "verify_policy"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:verifying_key_account"
+      ]
+    },
+    {
+      "instructions": [
         "set_custodians",
         "set_custodians"
       ],
@@ -1005,6 +1452,26 @@ expression: report
       "kind": "always",
       "nodes": [
         "pda:custodian_registry"
+      ]
+    },
+    {
+      "instructions": [
+        "set_custodians",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "set_custodians",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
       ]
     },
     {
@@ -1039,6 +1506,26 @@ expression: report
     },
     {
       "instructions": [
+        "register_requester",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "register_requester",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
         "deposit",
         "deposit"
       ],
@@ -1068,7 +1555,9 @@ expression: report
       ],
       "kind": "always",
       "nodes": [
-        "pda:merkle_tree"
+        "pda:merkle_tree",
+        "pda:pool_config",
+        "pda:pool_vault"
       ]
     },
     {
@@ -1078,27 +1567,8 @@ expression: report
       ],
       "kind": "always",
       "nodes": [
+        "pda:merkle_tree",
         "pda:pool_config"
-      ]
-    },
-    {
-      "instructions": [
-        "deposit",
-        "grant_disclosure"
-      ],
-      "kind": "may",
-      "nodes": [
-        "pda:note_commitment"
-      ]
-    },
-    {
-      "instructions": [
-        "deposit",
-        "challenge_disclosure"
-      ],
-      "kind": "may",
-      "nodes": [
-        "pda:note_commitment"
       ]
     },
     {
@@ -1115,6 +1585,38 @@ expression: report
       "instructions": [
         "deposit",
         "approve_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "withdraw_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit",
+        "set_policy"
       ],
       "kind": "always",
       "nodes": [
@@ -1128,7 +1630,7 @@ expression: report
       ],
       "kind": "always",
       "nodes": [
-        "pda:nullifier_set",
+        "pda:merkle_tree",
         "pda:pool_vault"
       ]
     },
@@ -1140,7 +1642,48 @@ expression: report
       "kind": "always",
       "nodes": [
         "pda:merkle_tree",
-        "pda:nullifier_set"
+        "pda:pool_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "withdraw",
+        "request_disclosure"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree"
+      ]
+    },
+    {
+      "instructions": [
+        "withdraw",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "withdraw",
+        "withdraw_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree"
+      ]
+    },
+    {
+      "instructions": [
+        "withdraw",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
       ]
     },
     {
@@ -1151,7 +1694,7 @@ expression: report
       "kind": "always",
       "nodes": [
         "pda:merkle_tree",
-        "pda:nullifier_set"
+        "pda:pool_vault"
       ]
     },
     {
@@ -1159,29 +1702,40 @@ expression: report
         "transfer",
         "request_disclosure"
       ],
-      "kind": "may",
+      "kind": "always",
       "nodes": [
-        "pda:note_commitment"
+        "pda:merkle_tree"
       ]
     },
     {
       "instructions": [
         "transfer",
-        "grant_disclosure"
+        "deposit_token"
       ],
-      "kind": "may",
+      "kind": "always",
       "nodes": [
-        "pda:note_commitment"
+        "pda:merkle_tree",
+        "pda:pool_config"
       ]
     },
     {
       "instructions": [
         "transfer",
-        "challenge_disclosure"
+        "withdraw_token"
       ],
-      "kind": "may",
+      "kind": "always",
       "nodes": [
-        "pda:note_commitment"
+        "pda:merkle_tree"
+      ]
+    },
+    {
+      "instructions": [
+        "transfer",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
       ]
     },
     {
@@ -1246,6 +1800,37 @@ expression: report
     },
     {
       "instructions": [
+        "request_disclosure",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "request_disclosure",
+        "withdraw_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree"
+      ]
+    },
+    {
+      "instructions": [
+        "request_disclosure",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
         "grant_disclosure",
         "grant_disclosure"
       ],
@@ -1362,6 +1947,26 @@ expression: report
       "kind": "may",
       "nodes": [
         "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "resolve_challenge",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "resolve_challenge",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
       ]
     },
     {
@@ -1386,12 +1991,124 @@ expression: report
     },
     {
       "instructions": [
+        "approve_disclosure",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "approve_disclosure",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
         "cancel_disclosure",
         "cancel_disclosure"
       ],
       "kind": "may",
       "nodes": [
         "pda:disclosure_request"
+      ]
+    },
+    {
+      "instructions": [
+        "register_asset",
+        "register_asset"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:asset_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "register_asset",
+        "deposit_token"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:asset_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "register_asset",
+        "withdraw_token"
+      ],
+      "kind": "may",
+      "nodes": [
+        "pda:asset_vault"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit_token",
+        "deposit_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit_token",
+        "withdraw_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree",
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "deposit_token",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "withdraw_token",
+        "withdraw_token"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:merkle_tree"
+      ]
+    },
+    {
+      "instructions": [
+        "withdraw_token",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
+      ]
+    },
+    {
+      "instructions": [
+        "set_policy",
+        "set_policy"
+      ],
+      "kind": "always",
+      "nodes": [
+        "pda:pool_config"
       ]
     }
   ],
@@ -1401,16 +2118,20 @@ expression: report
       "name": "pool_config",
       "writers": [
         "initialize",
-        "deposit"
+        "deposit",
+        "deposit_token",
+        "set_policy"
       ],
       "readers": [
         "set_verification_key",
         "set_custodians",
         "register_requester",
         "withdraw",
+        "transfer",
         "request_disclosure",
         "resolve_challenge",
-        "approve_disclosure"
+        "approve_disclosure",
+        "withdraw_token"
       ],
       "allowed": false
     },
@@ -1420,7 +2141,8 @@ expression: report
       "writers": [
         "initialize",
         "deposit",
-        "withdraw"
+        "withdraw",
+        "transfer"
       ],
       "readers": [],
       "allowed": false
@@ -1431,22 +2153,14 @@ expression: report
       "writers": [
         "initialize",
         "deposit",
-        "transfer"
+        "withdraw",
+        "transfer",
+        "deposit_token",
+        "withdraw_token"
       ],
       "readers": [
-        "withdraw"
+        "request_disclosure"
       ],
-      "allowed": false
-    },
-    {
-      "node": "pda:nullifier_set",
-      "name": "nullifier_set",
-      "writers": [
-        "initialize",
-        "withdraw",
-        "transfer"
-      ],
-      "readers": [],
       "allowed": false
     },
     {

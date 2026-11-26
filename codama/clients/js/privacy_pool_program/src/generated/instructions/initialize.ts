@@ -45,7 +45,6 @@ import {
 	findCustodianRegistryPda,
 	findDisclosureLogPda,
 	findMerkleTreePda,
-	findNullifierSetPda,
 	findPoolConfigPda,
 	findPoolVaultPda,
 	findRequesterRegistryPda,
@@ -68,7 +67,6 @@ export type InitializeInstruction<
 	TAccountPoolConfig extends string | AccountMeta<string> = string,
 	TAccountPoolVault extends string | AccountMeta<string> = string,
 	TAccountMerkleTree extends string | AccountMeta<string> = string,
-	TAccountNullifierSet extends string | AccountMeta<string> = string,
 	TAccountCustodianRegistry extends string | AccountMeta<string> = string,
 	TAccountRequesterRegistry extends string | AccountMeta<string> = string,
 	TAccountDisclosureLog extends string | AccountMeta<string> = string,
@@ -91,9 +89,6 @@ export type InitializeInstruction<
 				: TAccountPoolVault,
 			TAccountMerkleTree extends string ? WritableAccount<TAccountMerkleTree>
 				: TAccountMerkleTree,
-			TAccountNullifierSet extends string
-				? WritableAccount<TAccountNullifierSet>
-				: TAccountNullifierSet,
 			TAccountCustodianRegistry extends string
 				? WritableAccount<TAccountCustodianRegistry>
 				: TAccountCustodianRegistry,
@@ -117,14 +112,10 @@ export type InitializeInstructionData = {
 	configBump: number;
 	vaultBump: number;
 	treeBump: number;
-	nullifiersBump: number;
 	custodiansBump: number;
 	requestersBump: number;
 	logBump: number;
-	/**
-	 * Initial three-member disclosure committee as concatenated 32-byte
-	 * addresses.
-	 */
+	/** Initial three-member disclosure committee as concatenated 32-byte keys. */
 	custodians: ReadonlyUint8Array;
 };
 
@@ -132,14 +123,10 @@ export type InitializeInstructionDataArgs = {
 	configBump: number;
 	vaultBump: number;
 	treeBump: number;
-	nullifiersBump: number;
 	custodiansBump: number;
 	requestersBump: number;
 	logBump: number;
-	/**
-	 * Initial three-member disclosure committee as concatenated 32-byte
-	 * addresses.
-	 */
+	/** Initial three-member disclosure committee as concatenated 32-byte keys. */
 	custodians: ReadonlyUint8Array;
 };
 
@@ -152,7 +139,6 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<
 			["configBump", getU8Encoder()],
 			["vaultBump", getU8Encoder()],
 			["treeBump", getU8Encoder()],
-			["nullifiersBump", getU8Encoder()],
 			["custodiansBump", getU8Encoder()],
 			["requestersBump", getU8Encoder()],
 			["logBump", getU8Encoder()],
@@ -173,7 +159,6 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<
 		["configBump", getU8Decoder()],
 		["vaultBump", getU8Decoder()],
 		["treeBump", getU8Decoder()],
-		["nullifiersBump", getU8Decoder()],
 		["custodiansBump", getU8Decoder()],
 		["requestersBump", getU8Decoder()],
 		["logBump", getU8Decoder()],
@@ -196,8 +181,6 @@ export type InitializeAsyncInput<
 	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
 	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
-	TAccountNullifierSet extends InstructionAccountInput =
-		InstructionAccountInput,
 	TAccountCustodianRegistry extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountRequesterRegistry extends InstructionAccountInput =
@@ -212,17 +195,14 @@ export type InitializeAsyncInput<
 	poolConfig?: TAccountPoolConfig;
 	poolVault?: TAccountPoolVault;
 	merkleTree?: TAccountMerkleTree;
-	nullifierSet?: TAccountNullifierSet;
 	custodianRegistry?: TAccountCustodianRegistry;
 	requesterRegistry?: TAccountRequesterRegistry;
 	disclosureLog?: TAccountDisclosureLog;
 	systemProgram?: TAccountSystemProgram;
-	/** Canonical `ProgramData` for this program, owned by the upgradeable loader. */
 	programData: TAccountProgramData;
 	configBump: InitializeInstructionDataArgs["configBump"];
 	vaultBump: InitializeInstructionDataArgs["vaultBump"];
 	treeBump: InitializeInstructionDataArgs["treeBump"];
-	nullifiersBump: InitializeInstructionDataArgs["nullifiersBump"];
 	custodiansBump: InitializeInstructionDataArgs["custodiansBump"];
 	requestersBump: InitializeInstructionDataArgs["requestersBump"];
 	logBump: InitializeInstructionDataArgs["logBump"];
@@ -234,7 +214,6 @@ export async function getInitializeInstructionAsync<
 	TAccountPoolConfig extends InstructionAccountInput,
 	TAccountPoolVault extends InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput,
-	TAccountNullifierSet extends InstructionAccountInput,
 	TAccountCustodianRegistry extends InstructionAccountInput,
 	TAccountRequesterRegistry extends InstructionAccountInput,
 	TAccountDisclosureLog extends InstructionAccountInput,
@@ -247,7 +226,6 @@ export async function getInitializeInstructionAsync<
 		TAccountPoolConfig,
 		TAccountPoolVault,
 		TAccountMerkleTree,
-		TAccountNullifierSet,
 		TAccountCustodianRegistry,
 		TAccountRequesterRegistry,
 		TAccountDisclosureLog,
@@ -275,10 +253,6 @@ export async function getInitializeInstructionAsync<
 		ResolvedInstructionAccountMeta<
 			TAccountMerkleTree,
 			InstructionAccountInputAddress<TAccountMerkleTree>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountNullifierSet,
-			InstructionAccountInputAddress<TAccountNullifierSet>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountCustodianRegistry,
@@ -334,11 +308,6 @@ export async function getInitializeInstructionAsync<
 			isSigner: false,
 			isWritable: true,
 		},
-		nullifierSet: {
-			value: input.nullifierSet ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
 		custodianRegistry: {
 			value: input.custodianRegistry ?? null,
 			isSigner: false,
@@ -383,9 +352,6 @@ export async function getInitializeInstructionAsync<
 	if (!accounts.merkleTree.value) {
 		accounts.merkleTree.value = await findMerkleTreePda({ programAddress });
 	}
-	if (!accounts.nullifierSet.value) {
-		accounts.nullifierSet.value = await findNullifierSetPda({ programAddress });
-	}
 	if (!accounts.custodianRegistry.value) {
 		accounts.custodianRegistry.value = await findCustodianRegistryPda({
 			programAddress,
@@ -414,7 +380,6 @@ export async function getInitializeInstructionAsync<
 			getAccountMeta("poolConfig", accounts.poolConfig),
 			getAccountMeta("poolVault", accounts.poolVault),
 			getAccountMeta("merkleTree", accounts.merkleTree),
-			getAccountMeta("nullifierSet", accounts.nullifierSet),
 			getAccountMeta("custodianRegistry", accounts.custodianRegistry),
 			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
 			getAccountMeta("disclosureLog", accounts.disclosureLog),
@@ -444,10 +409,6 @@ export async function getInitializeInstructionAsync<
 			InstructionAccountInputAddress<TAccountMerkleTree>
 		>,
 		ResolvedInstructionAccountMeta<
-			TAccountNullifierSet,
-			InstructionAccountInputAddress<TAccountNullifierSet>
-		>,
-		ResolvedInstructionAccountMeta<
 			TAccountCustodianRegistry,
 			InstructionAccountInputAddress<TAccountCustodianRegistry>
 		>,
@@ -475,8 +436,6 @@ export type InitializeInput<
 	TAccountPoolConfig extends InstructionAccountInput = InstructionAccountInput,
 	TAccountPoolVault extends InstructionAccountInput = InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput = InstructionAccountInput,
-	TAccountNullifierSet extends InstructionAccountInput =
-		InstructionAccountInput,
 	TAccountCustodianRegistry extends InstructionAccountInput =
 		InstructionAccountInput,
 	TAccountRequesterRegistry extends InstructionAccountInput =
@@ -491,17 +450,14 @@ export type InitializeInput<
 	poolConfig: TAccountPoolConfig;
 	poolVault: TAccountPoolVault;
 	merkleTree: TAccountMerkleTree;
-	nullifierSet: TAccountNullifierSet;
 	custodianRegistry: TAccountCustodianRegistry;
 	requesterRegistry: TAccountRequesterRegistry;
 	disclosureLog: TAccountDisclosureLog;
 	systemProgram?: TAccountSystemProgram;
-	/** Canonical `ProgramData` for this program, owned by the upgradeable loader. */
 	programData: TAccountProgramData;
 	configBump: InitializeInstructionDataArgs["configBump"];
 	vaultBump: InitializeInstructionDataArgs["vaultBump"];
 	treeBump: InitializeInstructionDataArgs["treeBump"];
-	nullifiersBump: InitializeInstructionDataArgs["nullifiersBump"];
 	custodiansBump: InitializeInstructionDataArgs["custodiansBump"];
 	requestersBump: InitializeInstructionDataArgs["requestersBump"];
 	logBump: InitializeInstructionDataArgs["logBump"];
@@ -513,7 +469,6 @@ export function getInitializeInstruction<
 	TAccountPoolConfig extends InstructionAccountInput,
 	TAccountPoolVault extends InstructionAccountInput,
 	TAccountMerkleTree extends InstructionAccountInput,
-	TAccountNullifierSet extends InstructionAccountInput,
 	TAccountCustodianRegistry extends InstructionAccountInput,
 	TAccountRequesterRegistry extends InstructionAccountInput,
 	TAccountDisclosureLog extends InstructionAccountInput,
@@ -526,7 +481,6 @@ export function getInitializeInstruction<
 		TAccountPoolConfig,
 		TAccountPoolVault,
 		TAccountMerkleTree,
-		TAccountNullifierSet,
 		TAccountCustodianRegistry,
 		TAccountRequesterRegistry,
 		TAccountDisclosureLog,
@@ -553,10 +507,6 @@ export function getInitializeInstruction<
 	ResolvedInstructionAccountMeta<
 		TAccountMerkleTree,
 		InstructionAccountInputAddress<TAccountMerkleTree>
-	>,
-	ResolvedInstructionAccountMeta<
-		TAccountNullifierSet,
-		InstructionAccountInputAddress<TAccountNullifierSet>
 	>,
 	ResolvedInstructionAccountMeta<
 		TAccountCustodianRegistry,
@@ -611,11 +561,6 @@ export function getInitializeInstruction<
 			isSigner: false,
 			isWritable: true,
 		},
-		nullifierSet: {
-			value: input.nullifierSet ?? null,
-			isSigner: false,
-			isWritable: true,
-		},
 		custodianRegistry: {
 			value: input.custodianRegistry ?? null,
 			isSigner: false,
@@ -664,7 +609,6 @@ export function getInitializeInstruction<
 			getAccountMeta("poolConfig", accounts.poolConfig),
 			getAccountMeta("poolVault", accounts.poolVault),
 			getAccountMeta("merkleTree", accounts.merkleTree),
-			getAccountMeta("nullifierSet", accounts.nullifierSet),
 			getAccountMeta("custodianRegistry", accounts.custodianRegistry),
 			getAccountMeta("requesterRegistry", accounts.requesterRegistry),
 			getAccountMeta("disclosureLog", accounts.disclosureLog),
@@ -692,10 +636,6 @@ export function getInitializeInstruction<
 		ResolvedInstructionAccountMeta<
 			TAccountMerkleTree,
 			InstructionAccountInputAddress<TAccountMerkleTree>
-		>,
-		ResolvedInstructionAccountMeta<
-			TAccountNullifierSet,
-			InstructionAccountInputAddress<TAccountNullifierSet>
 		>,
 		ResolvedInstructionAccountMeta<
 			TAccountCustodianRegistry,
@@ -730,13 +670,11 @@ export type ParsedInitializeInstruction<
 		poolConfig: TAccountMetas[1];
 		poolVault: TAccountMetas[2];
 		merkleTree: TAccountMetas[3];
-		nullifierSet: TAccountMetas[4];
-		custodianRegistry: TAccountMetas[5];
-		requesterRegistry: TAccountMetas[6];
-		disclosureLog: TAccountMetas[7];
-		systemProgram: TAccountMetas[8];
-		/** Canonical `ProgramData` for this program, owned by the upgradeable loader. */
-		programData: TAccountMetas[9];
+		custodianRegistry: TAccountMetas[4];
+		requesterRegistry: TAccountMetas[5];
+		disclosureLog: TAccountMetas[6];
+		systemProgram: TAccountMetas[7];
+		programData: TAccountMetas[8];
 	};
 	data: InitializeInstructionData;
 };
@@ -750,12 +688,12 @@ export function parseInitializeInstruction<
 		& InstructionWithAccounts<TAccountMetas>
 		& InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-	if (instruction.accounts.length < 10) {
+	if (instruction.accounts.length < 9) {
 		throw new SolanaError(
 			SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
 			{
 				actualAccountMetas: instruction.accounts.length,
-				expectedAccountMetas: 10,
+				expectedAccountMetas: 9,
 			},
 		);
 	}
@@ -772,7 +710,6 @@ export function parseInitializeInstruction<
 			poolConfig: getNextAccount(),
 			poolVault: getNextAccount(),
 			merkleTree: getNextAccount(),
-			nullifierSet: getNextAccount(),
 			custodianRegistry: getNextAccount(),
 			requesterRegistry: getNextAccount(),
 			disclosureLog: getNextAccount(),

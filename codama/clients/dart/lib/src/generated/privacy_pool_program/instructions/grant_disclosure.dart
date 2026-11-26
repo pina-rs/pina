@@ -99,7 +99,6 @@ getGrantDisclosureInstructionDataCodec() {
 Instruction getGrantDisclosureInstruction({
   required Address programAddress,
   required Address disclosureRequest,
-  required Address noteCommitment,
   required Address viewer,
   required int reserved,
 }) {
@@ -109,7 +108,6 @@ Instruction getGrantDisclosureInstruction({
     programAddress: programAddress,
     accounts: [
       AccountMeta(address: disclosureRequest, role: AccountRole.writable),
-      AccountMeta(address: noteCommitment, role: AccountRole.readonly),
       AccountMeta(address: viewer, role: AccountRole.readonlySigner),
     ],
     data: getGrantDisclosureInstructionDataEncoder().encode(instructionData),

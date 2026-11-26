@@ -5,89 +5,99 @@ import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
 import 'package:solana_kit_accounts/solana_kit_accounts.dart';
+import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_codecs_core/solana_kit_codecs_core.dart';
 import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structures.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
 @immutable
-class NullifierSet {
-  const NullifierSet({
+class AssetVault {
+  const AssetVault({
     required this.bump,
-    required this.count,
-    required this.nullifiers,
-  }) : discriminator = 4,
+    required this.mint,
+    required this.tokenProgram,
+    required this.vaultTokenAccount,
+  }) : discriminator = 8,
        migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
   final int bump;
-  final BigInt count;
-  final Uint8List nullifiers;
+  final Address mint;
+  final Address tokenProgram;
+  final Address vaultTokenAccount;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is NullifierSet &&
+      other is AssetVault &&
           runtimeType == other.runtimeType &&
           discriminator == other.discriminator &&
           migrationVersion == other.migrationVersion &&
           bump == other.bump &&
-          count == other.count &&
-          nullifiers == other.nullifiers;
+          mint == other.mint &&
+          tokenProgram == other.tokenProgram &&
+          vaultTokenAccount == other.vaultTokenAccount;
 
   @override
-  int get hashCode =>
-      Object.hash(discriminator, migrationVersion, bump, count, nullifiers);
+  int get hashCode => Object.hash(
+    discriminator,
+    migrationVersion,
+    bump,
+    mint,
+    tokenProgram,
+    vaultTokenAccount,
+  );
 
   @override
   String toString() =>
-      'NullifierSet(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, count: $count, nullifiers: $nullifiers)';
+      'AssetVault(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, mint: $mint, tokenProgram: $tokenProgram, vaultTokenAccount: $vaultTokenAccount)';
 }
 
-Encoder<NullifierSet> getNullifierSetEncoder() {
+Encoder<AssetVault> getAssetVaultEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('migrationVersion', getU8Encoder()),
     ('bump', getU8Encoder()),
-    ('count', getU64Encoder()),
-    (
-      'nullifiers',
-      fixEncoderSize(getBytesEncoder(), 4096, allowTruncation: false),
-    ),
+    ('mint', getAddressEncoder()),
+    ('tokenProgram', getAddressEncoder()),
+    ('vaultTokenAccount', getAddressEncoder()),
   ]);
 
   return transformEncoder(
     structEncoder,
-    (NullifierSet value) => <String, Object?>{
-      'discriminator': 4,
+    (AssetVault value) => <String, Object?>{
+      'discriminator': 8,
       'migrationVersion': 0,
       'bump': value.bump,
-      'count': value.count,
-      'nullifiers': value.nullifiers,
+      'mint': value.mint,
+      'tokenProgram': value.tokenProgram,
+      'vaultTokenAccount': value.vaultTokenAccount,
     },
   );
 }
 
-Decoder<NullifierSet> getNullifierSetDecoder() {
+Decoder<AssetVault> getAssetVaultDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('migrationVersion', getU8Decoder()),
     ('bump', getU8Decoder()),
-    ('count', getU64Decoder()),
-    ('nullifiers', fixDecoderSize(getBytesDecoder(), 4096)),
+    ('mint', getAddressDecoder()),
+    ('tokenProgram', getAddressDecoder()),
+    ('vaultTokenAccount', getAddressDecoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
     throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
-      'codecDescription': 'nullifierSet account decoder',
+      'codecDescription': 'assetVault account decoder',
       'expected': expected,
       'bytesLength': bytesLength,
     });
   }
 
-  (NullifierSet, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
+  (AssetVault, int) readTopLevel(Uint8List bytes, int offset) {
+    getConstantDecoder(getU8Encoder().encode(8)).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -99,17 +109,18 @@ Decoder<NullifierSet> getNullifierSetDecoder() {
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
     return (
-      NullifierSet(
+      AssetVault(
         bump: map['bump']! as int,
-        count: map['count']! as BigInt,
-        nullifiers: map['nullifiers']! as Uint8List,
+        mint: map['mint']! as Address,
+        tokenProgram: map['tokenProgram']! as Address,
+        vaultTokenAccount: map['vaultTokenAccount']! as Address,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<NullifierSet>(
+    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<AssetVault>(
       fixedSize: structDecoder.fixedSize,
       read: (bytes, offset) {
         final bytesLength = bytes.length - offset;
@@ -120,33 +131,33 @@ Decoder<NullifierSet> getNullifierSetDecoder() {
       },
     ),
     VariableSizeDecoder<Map<String, Object?>>() =>
-      VariableSizeDecoder<NullifierSet>(
+      VariableSizeDecoder<AssetVault>(
         read: readTopLevel,
         maxSize: structDecoder.maxSize,
       ),
   };
 }
 
-Codec<NullifierSet, NullifierSet> getNullifierSetCodec() {
-  return combineCodec(getNullifierSetEncoder(), getNullifierSetDecoder());
+Codec<AssetVault, AssetVault> getAssetVaultCodec() {
+  return combineCodec(getAssetVaultEncoder(), getAssetVaultDecoder());
 }
 
-Account<NullifierSet> decodeNullifierSet(EncodedAccount encodedAccount) {
-  return decodeAccount(encodedAccount, getNullifierSetDecoder());
+Account<AssetVault> decodeAssetVault(EncodedAccount encodedAccount) {
+  return decodeAccount(encodedAccount, getAssetVaultDecoder());
 }
 
 /// The account schema version this client was generated from.
-const int nullifierSetMigrationVersion = 0;
+const int assetVaultMigrationVersion = 0;
 
-/// Cheap envelope check for fetched `NullifierSet` bytes: returns true only when
+/// Cheap envelope check for fetched `AssetVault` bytes: returns true only when
 /// the bytes carry this account's discriminator and a migration version older
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
-bool nullifierSetNeedsMigration(List<int> data) {
+bool assetVaultNeedsMigration(List<int> data) {
   if (data.length < 2) {
     return false;
   }
-  if (data[0] != 4) {
+  if (data[0] != 8) {
     return false;
   }
   return data[1] < 0;

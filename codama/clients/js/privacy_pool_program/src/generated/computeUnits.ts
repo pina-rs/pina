@@ -16,33 +16,33 @@ import { PRIVACY_POOL_PROGRAM_PROGRAM_ADDRESS } from "./programs";
  * Compute units `initialize` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const INITIALIZE_MEASURED_COMPUTE_UNITS = 48260;
+export const INITIALIZE_MEASURED_COMPUTE_UNITS = 14980;
 
 /**
  * Compute unit limit to request for a transaction carrying `initialize`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const INITIALIZE_COMPUTE_UNIT_LIMIT = 58300;
+export const INITIALIZE_COMPUTE_UNIT_LIMIT = 18300;
 
 /**
  * Compute units `setVerificationKey` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const SET_VERIFICATION_KEY_MEASURED_COMPUTE_UNITS = 15258;
+export const SET_VERIFICATION_KEY_MEASURED_COMPUTE_UNITS = 4596;
 
 /**
  * Compute unit limit to request for a transaction carrying `setVerificationKey`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT = 18700;
+export const SET_VERIFICATION_KEY_COMPUTE_UNIT_LIMIT = 5900;
 
 /**
  * Compute units `setCustodians` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const SET_CUSTODIANS_MEASURED_COMPUTE_UNITS = 243;
+export const SET_CUSTODIANS_MEASURED_COMPUTE_UNITS = 230;
 
 /**
  * Compute unit limit to request for a transaction carrying `setCustodians`: the
@@ -55,98 +55,98 @@ export const SET_CUSTODIANS_COMPUTE_UNIT_LIMIT = 600;
  * Compute units `registerRequester` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const REGISTER_REQUESTER_MEASURED_COMPUTE_UNITS = 319;
+export const REGISTER_REQUESTER_MEASURED_COMPUTE_UNITS = 243;
 
 /**
  * Compute unit limit to request for a transaction carrying `registerRequester`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT = 700;
+export const REGISTER_REQUESTER_COMPUTE_UNIT_LIMIT = 600;
 
 /**
  * Compute units `deposit` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const DEPOSIT_MEASURED_COMPUTE_UNITS = 15996;
+export const DEPOSIT_MEASURED_COMPUTE_UNITS = 17804;
 
 /**
  * Compute unit limit to request for a transaction carrying `deposit`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const DEPOSIT_COMPUTE_UNIT_LIMIT = 19500;
+export const DEPOSIT_COMPUTE_UNIT_LIMIT = 21700;
 
 /**
  * Compute units `withdraw` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const WITHDRAW_MEASURED_COMPUTE_UNITS = 92269;
+export const WITHDRAW_MEASURED_COMPUTE_UNITS = 106428;
 
 /**
  * Compute unit limit to request for a transaction carrying `withdraw`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const WITHDRAW_COMPUTE_UNIT_LIMIT = 111100;
+export const WITHDRAW_COMPUTE_UNIT_LIMIT = 128100;
 
 /**
  * Compute units `transfer` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const TRANSFER_MEASURED_COMPUTE_UNITS = 105283;
+export const TRANSFER_MEASURED_COMPUTE_UNITS = 122195;
 
 /**
  * Compute unit limit to request for a transaction carrying `transfer`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const TRANSFER_COMPUTE_UNIT_LIMIT = 126700;
+export const TRANSFER_COMPUTE_UNIT_LIMIT = 147000;
 
 /**
  * Compute units `requestDisclosure` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const REQUEST_DISCLOSURE_MEASURED_COMPUTE_UNITS = 11015;
+export const REQUEST_DISCLOSURE_MEASURED_COMPUTE_UNITS = 17668;
 
 /**
  * Compute unit limit to request for a transaction carrying `requestDisclosure`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT = 13600;
+export const REQUEST_DISCLOSURE_COMPUTE_UNIT_LIMIT = 21600;
 
 /**
  * Compute units `grantDisclosure` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const GRANT_DISCLOSURE_MEASURED_COMPUTE_UNITS = 1893;
+export const GRANT_DISCLOSURE_MEASURED_COMPUTE_UNITS = 171;
 
 /**
  * Compute unit limit to request for a transaction carrying `grantDisclosure`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT = 2600;
+export const GRANT_DISCLOSURE_COMPUTE_UNIT_LIMIT = 600;
 
 /**
  * Compute units `challengeDisclosure` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const CHALLENGE_DISCLOSURE_MEASURED_COMPUTE_UNITS = 1943;
+export const CHALLENGE_DISCLOSURE_MEASURED_COMPUTE_UNITS = 212;
 
 /**
  * Compute unit limit to request for a transaction carrying `challengeDisclosure`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT = 2700;
+export const CHALLENGE_DISCLOSURE_COMPUTE_UNIT_LIMIT = 600;
 
 /**
  * Compute units `resolveChallenge` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const RESOLVE_CHALLENGE_MEASURED_COMPUTE_UNITS = 198;
+export const RESOLVE_CHALLENGE_MEASURED_COMPUTE_UNITS = 188;
 
 /**
  * Compute unit limit to request for a transaction carrying `resolveChallenge`: the
@@ -159,20 +159,20 @@ export const RESOLVE_CHALLENGE_COMPUTE_UNIT_LIMIT = 600;
  * Compute units `approveDisclosure` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const APPROVE_DISCLOSURE_MEASURED_COMPUTE_UNITS = 438;
+export const APPROVE_DISCLOSURE_MEASURED_COMPUTE_UNITS = 591;
 
 /**
  * Compute unit limit to request for a transaction carrying `approveDisclosure`: the
  * measurement plus the project's margin and the cost of the compute budget
  * instructions.
  */
-export const APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT = 900;
+export const APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT = 1100;
 
 /**
  * Compute units `cancelDisclosure` consumed in its most expensive recorded Surfpool
  * simulation.
  */
-export const CANCEL_DISCLOSURE_MEASURED_COMPUTE_UNITS = 121;
+export const CANCEL_DISCLOSURE_MEASURED_COMPUTE_UNITS = 125;
 
 /**
  * Compute unit limit to request for a transaction carrying `cancelDisclosure`: the
@@ -180,6 +180,71 @@ export const CANCEL_DISCLOSURE_MEASURED_COMPUTE_UNITS = 121;
  * instructions.
  */
 export const CANCEL_DISCLOSURE_COMPUTE_UNIT_LIMIT = 500;
+
+/**
+ * Compute units `registerAsset` consumed in its most expensive recorded Surfpool
+ * simulation.
+ */
+export const REGISTER_ASSET_MEASURED_COMPUTE_UNITS = 2438;
+
+/**
+ * Compute unit limit to request for a transaction carrying `registerAsset`: the
+ * measurement plus the project's margin and the cost of the compute budget
+ * instructions.
+ */
+export const REGISTER_ASSET_COMPUTE_UNIT_LIMIT = 3300;
+
+/**
+ * Compute units `depositToken` consumed in its most expensive recorded Surfpool
+ * simulation.
+ */
+export const DEPOSIT_TOKEN_MEASURED_COMPUTE_UNITS = 18492;
+
+/**
+ * Compute unit limit to request for a transaction carrying `depositToken`: the
+ * measurement plus the project's margin and the cost of the compute budget
+ * instructions.
+ */
+export const DEPOSIT_TOKEN_COMPUTE_UNIT_LIMIT = 22500;
+
+/**
+ * Compute units `withdrawToken` consumed in its most expensive recorded Surfpool
+ * simulation.
+ */
+export const WITHDRAW_TOKEN_MEASURED_COMPUTE_UNITS = 93216;
+
+/**
+ * Compute unit limit to request for a transaction carrying `withdrawToken`: the
+ * measurement plus the project's margin and the cost of the compute budget
+ * instructions.
+ */
+export const WITHDRAW_TOKEN_COMPUTE_UNIT_LIMIT = 112200;
+
+/**
+ * Compute units `setPolicy` consumed in its most expensive recorded Surfpool
+ * simulation.
+ */
+export const SET_POLICY_MEASURED_COMPUTE_UNITS = 131;
+
+/**
+ * Compute unit limit to request for a transaction carrying `setPolicy`: the
+ * measurement plus the project's margin and the cost of the compute budget
+ * instructions.
+ */
+export const SET_POLICY_COMPUTE_UNIT_LIMIT = 500;
+
+/**
+ * Compute units `verifyPolicy` consumed in its most expensive recorded Surfpool
+ * simulation.
+ */
+export const VERIFY_POLICY_MEASURED_COMPUTE_UNITS = 80148;
+
+/**
+ * Compute unit limit to request for a transaction carrying `verifyPolicy`: the
+ * measurement plus the project's margin and the cost of the compute budget
+ * instructions.
+ */
+export const VERIFY_POLICY_COMPUTE_UNIT_LIMIT = 96500;
 
 /** The most compute units a transaction may request. */
 const MAX_COMPUTE_UNIT_LIMIT = 1400000;
@@ -201,6 +266,11 @@ const COMPUTE_UNIT_LIMITS: ReadonlyArray<
 	[new Uint8Array([10]), RESOLVE_CHALLENGE_COMPUTE_UNIT_LIMIT],
 	[new Uint8Array([11]), APPROVE_DISCLOSURE_COMPUTE_UNIT_LIMIT],
 	[new Uint8Array([12]), CANCEL_DISCLOSURE_COMPUTE_UNIT_LIMIT],
+	[new Uint8Array([13]), REGISTER_ASSET_COMPUTE_UNIT_LIMIT],
+	[new Uint8Array([14]), DEPOSIT_TOKEN_COMPUTE_UNIT_LIMIT],
+	[new Uint8Array([15]), WITHDRAW_TOKEN_COMPUTE_UNIT_LIMIT],
+	[new Uint8Array([16]), SET_POLICY_COMPUTE_UNIT_LIMIT],
+	[new Uint8Array([17]), VERIFY_POLICY_COMPUTE_UNIT_LIMIT],
 ];
 
 /**

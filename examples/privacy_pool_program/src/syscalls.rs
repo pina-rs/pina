@@ -1,14 +1,14 @@
-//! Runtime syscall bindings for Poseidon and BN254 group operations.
+//! Runtime syscall bindings for Poseidon and BN254 group/compression
+//! operations.
 //!
 //! SBF-only. Pinocchio re-exports the raw extern declarations; this module
-//! is the narrow safe surface over exactly the three selectors the
-//! verifier needs: the Poseidon hash, big-endian G₁ addition and
-//! multiplication, and the big-endian product-of-pairings check. The
-//! big-endian (EIP-197) encoding is the one ecosystem Groth16 verifiers
-//! standardized on: points arrive as big-endian affine coordinates
-//! (`x.c1, x.c0, y.c1, y.c0` for G₂) and scalars as big-endian field
-//! elements, and the only point negation happens host-side when the proof
-//! is serialized — the on-chain equation needs none.
+//! is the narrow safe surface over the exact selectors the verifier needs:
+//! the Poseidon hash, big-endian G₁/G₂ point decompression, big-endian G₁
+//! addition and multiplication, and the big-endian product-of-pairings check.
+//! The big-endian (EIP-197) encoding is the one ecosystem Groth16 verifiers
+//! standardized on: compressed proofs arrive as 32-byte G₁ and 64-byte G₂
+//! points and expand on-chain via `sol_alt_bn128_compression`, while the only
+//! point negation happens host-side when the proof is serialized.
 //!
 //! Everything else in the workspace stays `unsafe`-free; the `unsafe` here
 //! is confined to passing fixed-size stack buffers to extern "C"
@@ -28,6 +28,7 @@
 #![cfg(target_os = "solana")]
 
 use pina::ProgramError;
+use pina::pinocchio::syscalls::sol_alt_bn128_compression;
 use pina::pinocchio::syscalls::sol_alt_bn128_group_op;
 use pina::pinocchio::syscalls::sol_poseidon;
 
@@ -39,6 +40,9 @@ const OP_G1_ADD_BE: u64 = 0;
 const OP_G1_MUL_BE: u64 = 2;
 /// Selector for the big-endian product-of-pairings check.
 const OP_PAIRING_BE: u64 = 3;
+
+/// `sol_alt_bn128_compression` selector for big-endian G₁ decompression.
+const OP_G1_DECOMPRESS_BE: u64 = 1;
 
 /// Poseidon-2 over little-endian BN254 field elements, matching the circom
 /// x5 parameters (state width 3) the runtime syscall implements.
@@ -61,6 +65,28 @@ pub fn poseidon2(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32], ProgramE
 	};
 	if status != 0 {
 		return Err(ProgramError::from(PrivacyPoolError::ArithmeticOverflow));
+	}
+	Ok(output)
+}
+
+/// Decompress a 32-byte big-endian G₁ point into its 64-byte affine form.
+pub fn g1_decompress_be(compressed: &[u8; 32]) -> Result<[u8; 64], ProgramError> {
+	let mut output = [0_u8; 64];
+	// SAFETY: `compressed` and `output` are non-aliasing fixed-size stack
+	// buffers whose sizes (32 and 64 bytes) match the G₁ decompression
+	// syscall contract.
+	let status = unsafe {
+		sol_alt_bn128_compression(
+			OP_G1_DECOMPRESS_BE,
+			compressed.as_ptr(),
+			compressed.len() as u64,
+			output.as_mut_ptr(),
+		)
+	};
+	if status != 0 {
+		return Err(ProgramError::from(
+			PrivacyPoolError::ProofVerificationFailed,
+		));
 	}
 	Ok(output)
 }

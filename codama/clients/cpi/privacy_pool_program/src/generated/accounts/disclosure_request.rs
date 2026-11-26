@@ -13,7 +13,9 @@ use pina::Address;
 #[allow(unused_imports)]
 use crate::generated_types::*;
 
-/// One disclosure request and its state machine.
+/// One disclosure request and its state machine. Stores `view_pubkey` after
+/// `RequestDisclosure` authenticates it against the Merkle tree so
+/// `GrantDisclosure` and `ChallengeDisclosure` require no per-note PDA.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DisclosureRequest {
 	pub bump: u8,
@@ -21,6 +23,7 @@ pub struct DisclosureRequest {
 	pub nonce: u64,
 	pub tier: u8,
 	pub commitment: [u8; 32],
+	pub view_pubkey: [u8; 32],
 	pub notice_len: u8,
 	pub notice: [u8; 96],
 	pub legal_basis_hash: [u8; 32],
@@ -36,7 +39,7 @@ pub const DISCLOSURE_REQUEST_DISCRIMINATOR: [u8; 2] = [9, 0];
 
 impl DisclosureRequest {
 	/// Encoded size of this account's data.
-	pub const LEN: usize = 224;
+	pub const LEN: usize = 256;
 
 	/// Whether `data` carries this account's discriminator.
 	#[inline(always)]
@@ -66,6 +69,8 @@ impl DisclosureRequest {
 		cursor += 1;
 		let commitment: [u8; 32] = data.get(cursor..cursor + 32)?.try_into().ok()?;
 		cursor += 32;
+		let view_pubkey: [u8; 32] = data.get(cursor..cursor + 32)?.try_into().ok()?;
+		cursor += 32;
 		let notice_len: u8 = u8::from_le_bytes(data.get(cursor..cursor + 1)?.try_into().ok()?);
 		cursor += 1;
 		let notice: [u8; 96] = data.get(cursor..cursor + 96)?.try_into().ok()?;
@@ -89,6 +94,7 @@ impl DisclosureRequest {
 			nonce,
 			tier,
 			commitment,
+			view_pubkey,
 			notice_len,
 			notice,
 			legal_basis_hash,

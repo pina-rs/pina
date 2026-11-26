@@ -11,47 +11,46 @@
 #[allow(clippy::len_without_is_empty)]
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
-pub struct NullifierSet {
-	/// Append-only set of spent nullifiers.
+pub struct NullifierRecord {
+	/// Per-nullifier spent marker PDA. Existence proves the nullifier was spent in
+	/// $O(1)$ without a global nullifier write-lock hotspot or fixed capacity cap.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,
-	/// Number of recorded nullifiers.
-	pub count: u64,
-	/// Flat 32-byte nullifier store.
-	pub nullifiers: [u8; 4096],
 }
 
-pub const NULLIFIER_SET_DISCRIMINATOR: u8 = 4u8;
+pub const NULLIFIER_RECORD_DISCRIMINATOR: u8 = 4u8;
 
-pub const NULLIFIER_SET_MIGRATION_VERSION: u8 = 0u8;
+pub const NULLIFIER_RECORD_MIGRATION_VERSION: u8 = 0u8;
 
-impl NullifierSet {
-	pub const LEN: usize = core::mem::size_of::<NullifierSetZc>();
+impl NullifierRecord {
+	pub const LEN: usize = core::mem::size_of::<NullifierRecordZc>();
 
 	/// Initialize and validate account storage in one pass.
 	///
 	/// The destination is cleared again if configuration or validation fails.
 	pub fn initialize(
 		data: &mut [u8],
-		configure: impl FnOnce(&mut NullifierSetZc),
-	) -> Result<&mut NullifierSetZc, solana_program_error::ProgramError> {
+		configure: impl FnOnce(&mut NullifierRecordZc),
+	) -> Result<&mut NullifierRecordZc, solana_program_error::ProgramError> {
 		<Self as pina::PinaPodFixed>::initialize(data, |account| {
 			configure(account);
-			account.discriminator = NULLIFIER_SET_DISCRIMINATOR;
-			account.migration_version = NULLIFIER_SET_MIGRATION_VERSION;
+			account.discriminator = NULLIFIER_RECORD_DISCRIMINATOR;
+			account.migration_version = NULLIFIER_RECORD_MIGRATION_VERSION;
 			Ok(())
 		})
 		.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)
 	}
 
-	pub fn from_bytes(data: &[u8]) -> Result<&NullifierSetZc, solana_program_error::ProgramError> {
+	pub fn from_bytes(
+		data: &[u8],
+	) -> Result<&NullifierRecordZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		if account.discriminator != NULLIFIER_SET_DISCRIMINATOR {
+		if account.discriminator != NULLIFIER_RECORD_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		if account.migration_version != NULLIFIER_SET_MIGRATION_VERSION {
+		if account.migration_version != NULLIFIER_RECORD_MIGRATION_VERSION {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
@@ -59,46 +58,53 @@ impl NullifierSet {
 
 	pub fn from_bytes_mut(
 		data: &mut [u8],
-	) -> Result<&mut NullifierSetZc, solana_program_error::ProgramError> {
+	) -> Result<&mut NullifierRecordZc, solana_program_error::ProgramError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact_mut(data)
 			.map_err(|_| solana_program_error::ProgramError::InvalidAccountData)?;
-		if account.discriminator != NULLIFIER_SET_DISCRIMINATOR {
+		if account.discriminator != NULLIFIER_RECORD_DISCRIMINATOR {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
-		if account.migration_version != NULLIFIER_SET_MIGRATION_VERSION {
+		if account.migration_version != NULLIFIER_RECORD_MIGRATION_VERSION {
 			return Err(solana_program_error::ProgramError::InvalidAccountData);
 		}
 		Ok(account)
 	}
 }
 
-impl NullifierSet {
-	pub fn find_pda() -> (solana_pubkey::Pubkey, u8) {
+impl NullifierRecord {
+	pub fn find_pda(nullifier: &solana_pubkey::Pubkey) -> (solana_pubkey::Pubkey, u8) {
 		solana_pubkey::Pubkey::find_program_address(
-			&["privacy-pool-nullifiers".as_bytes()],
+			&["privacy-pool-nullifier".as_bytes(), nullifier.as_ref()],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 
-	pub fn create_pda(bump: u8) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
+	pub fn create_pda(
+		nullifier: &solana_pubkey::Pubkey,
+		bump: u8,
+	) -> Result<solana_pubkey::Pubkey, solana_pubkey::PubkeyError> {
 		solana_pubkey::Pubkey::create_program_address(
-			&["privacy-pool-nullifiers".as_bytes(), &[bump]],
+			&[
+				"privacy-pool-nullifier".as_bytes(),
+				nullifier.as_ref(),
+				&[bump],
+			],
 			&crate::PRIVACY_POOL_PROGRAM_ID,
 		)
 	}
 }
 
 /// Whether raw account bytes are stale for this contract: the envelope names this account's discriminator and carries a version older than
-/// [`NULLIFIER_SET_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
+/// [`NULLIFIER_RECORD_MIGRATION_VERSION`]. Current or foreign bytes return false; decoding explains the difference.
 ///
 /// Version 0 is the initial version, so no bytes can ever be stale.
-pub fn nullifier_set_needs_migration(_data: &[u8]) -> bool {
+pub fn nullifier_record_needs_migration(_data: &[u8]) -> bool {
 	false
 }
 
-/// Why `NullifierSet::try_from_bytes` rejected account bytes.
+/// Why `NullifierRecord::try_from_bytes` rejected account bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NullifierSetVersionError {
+pub enum NullifierRecordVersionError {
 	/// The bytes do not decode as this account's layout at all.
 	InvalidData,
 	/// The envelope names this account but the stored version predates this client: migrate the account on-chain, then retry.
@@ -107,10 +113,10 @@ pub enum NullifierSetVersionError {
 	Future { stored: u8 },
 }
 
-impl core::fmt::Display for NullifierSetVersionError {
+impl core::fmt::Display for NullifierRecordVersionError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
-			Self::InvalidData => write!(f, "invalid NullifierSet account data"),
+			Self::InvalidData => write!(f, "invalid NullifierRecord account data"),
 			Self::Stale { stored } => {
 				write!(
 					f,
@@ -127,16 +133,16 @@ impl core::fmt::Display for NullifierSetVersionError {
 	}
 }
 
-impl NullifierSet {
-	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`NullifierSet::from_bytes`].
-	pub fn try_from_bytes(data: &[u8]) -> Result<&NullifierSetZc, NullifierSetVersionError> {
+impl NullifierRecord {
+	/// Decodes current-version bytes and tells stale envelopes (migrate the account) apart from future ones (upgrade this client). The failure message mirrors the generated JavaScript decoder. For the strict current-only convenience returning `ProgramError`, see [`NullifierRecord::from_bytes`].
+	pub fn try_from_bytes(data: &[u8]) -> Result<&NullifierRecordZc, NullifierRecordVersionError> {
 		let account = <Self as pina::PinaPodFixed>::read_exact(data)
-			.map_err(|_| NullifierSetVersionError::InvalidData)?;
-		if account.discriminator != NULLIFIER_SET_DISCRIMINATOR {
-			return Err(NullifierSetVersionError::InvalidData);
+			.map_err(|_| NullifierRecordVersionError::InvalidData)?;
+		if account.discriminator != NULLIFIER_RECORD_DISCRIMINATOR {
+			return Err(NullifierRecordVersionError::InvalidData);
 		}
-		if account.migration_version > NULLIFIER_SET_MIGRATION_VERSION {
-			return Err(NullifierSetVersionError::Future {
+		if account.migration_version > NULLIFIER_RECORD_MIGRATION_VERSION {
+			return Err(NullifierRecordVersionError::Future {
 				stored: account.migration_version,
 			});
 		}
@@ -145,11 +151,11 @@ impl NullifierSet {
 }
 
 #[cfg(test)]
-mod nullifier_set_version_error_tests {
+mod nullifier_record_version_error_tests {
 	use super::*;
 
 	fn envelope(version: u8) -> Vec<u8> {
-		let mut data = vec![0_u8; core::mem::size_of::<NullifierSetZc>()];
+		let mut data = vec![0_u8; core::mem::size_of::<NullifierRecordZc>()];
 		data[..1].copy_from_slice(&[4]);
 		data[1..2].copy_from_slice(&version.to_le_bytes());
 		data
@@ -157,16 +163,16 @@ mod nullifier_set_version_error_tests {
 
 	#[test]
 	fn stale_and_future_versions_are_distinguishable() {
-		let error = NullifierSet::try_from_bytes(&envelope(1 as u8))
+		let error = NullifierRecord::try_from_bytes(&envelope(1 as u8))
 			.err()
 			.expect("a future envelope must fail");
-		assert_eq!(error, NullifierSetVersionError::Future { stored: 1 });
+		assert_eq!(error, NullifierRecordVersionError::Future { stored: 1 });
 		assert_eq!(
-			NullifierSetVersionError::Future { stored: 1 }.to_string(),
+			NullifierRecordVersionError::Future { stored: 1 }.to_string(),
 			"migration version mismatch: expected 0, received 1 (the data was written by a newer program; upgrade this client)"
 		);
 		assert!(
-			NullifierSet::try_from_bytes(&envelope(0 as u8)).is_ok(),
+			NullifierRecord::try_from_bytes(&envelope(0 as u8)).is_ok(),
 			"the current version must decode",
 		);
 	}

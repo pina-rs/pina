@@ -18,20 +18,15 @@ use crate::context::CliError;
 
 #[derive(Debug, Args)]
 pub struct GrantDisclosureArgs {
-	/// Reserved; must be zero.
 	#[arg(long)]
 	reserved: u8,
 	/// The `disclosure_request` account
 	#[arg(long)]
 	disclosure_request: String,
-	/// The `note_commitment` account
-	#[arg(long)]
-	note_commitment: String,
 }
 
 pub(crate) fn run(context: &CliContext, args: GrantDisclosureArgs) -> Result<(), CliError> {
 	let disclosure_request = CliContext::pubkey("--disclosure_request", &args.disclosure_request)?;
-	let note_commitment = CliContext::pubkey("--note_commitment", &args.note_commitment)?;
 	let viewer = context.payer_pubkey();
 	let data = GrantDisclosureInstructionData::new(|data| {
 		data.reserved = args.reserved;
@@ -44,7 +39,6 @@ pub(crate) fn run(context: &CliContext, args: GrantDisclosureArgs) -> Result<(),
 
 	let accounts = GrantDisclosure {
 		disclosure_request,
-		note_commitment,
 		viewer,
 	};
 

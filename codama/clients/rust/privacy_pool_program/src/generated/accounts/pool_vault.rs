@@ -12,8 +12,7 @@
 #[derive(pina::PinaPod)]
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct PoolVault {
-	/// The pool's SOL custody. Data-less by design: every lamport in it is
-	/// backed by an unspent note commitment in the tree.
+	/// The pool's native SOL custody PDA.
 	pub discriminator: u8,
 	pub migration_version: u8,
 	pub bump: u8,

@@ -60,33 +60,49 @@ export function getPoolConfigDiscriminator2Bytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(POOL_CONFIG_DISCRIMINATOR2);
 }
 
-/** Global pool configuration and governance root. */
+/** Global pool configuration, governance root, and Custom Ring policy flags. */
 export type PoolConfig = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
-	/** The key that may rotate custodians, requesters, and verifying keys. */
+	/**
+	 * Governance key that rotates custodians, requesters, verifying keys, and
+	 * Custom Ring policy settings.
+	 */
 	authority: Address;
 	/** Custodian approvals required to execute a disclosure. */
 	custodianThreshold: number;
 	/** Tier-1 challenge window length in seconds. */
 	challengeWindowSecs: number;
-	/** SOL escrowed per deposit. */
-	depositLamports: bigint;
+	/** Custom Ring policy bitmask (`POLICY_PAUSED`, `POLICY_REQUIRE_COSIGNER`). */
+	policyFlags: number;
+	/**
+	 * Required co-signer or Custom Ring program PDA when
+	 * `POLICY_REQUIRE_COSIGNER` is active.
+	 */
+	policyCosigner: Address;
 	/** Lifetime deposit count, for analysis only. */
 	totalDeposits: bigint;
 };
 
 export type PoolConfigArgs = {
 	bump: number;
-	/** The key that may rotate custodians, requesters, and verifying keys. */
+	/**
+	 * Governance key that rotates custodians, requesters, verifying keys, and
+	 * Custom Ring policy settings.
+	 */
 	authority: Address | HasAddress;
 	/** Custodian approvals required to execute a disclosure. */
 	custodianThreshold: number;
 	/** Tier-1 challenge window length in seconds. */
 	challengeWindowSecs: number;
-	/** SOL escrowed per deposit. */
-	depositLamports: number | bigint;
+	/** Custom Ring policy bitmask (`POLICY_PAUSED`, `POLICY_REQUIRE_COSIGNER`). */
+	policyFlags: number;
+	/**
+	 * Required co-signer or Custom Ring program PDA when
+	 * `POLICY_REQUIRE_COSIGNER` is active.
+	 */
+	policyCosigner: Address | HasAddress;
 	/** Lifetime deposit count, for analysis only. */
 	totalDeposits: number | bigint;
 };
@@ -101,7 +117,8 @@ export function getPoolConfigEncoder(): FixedSizeEncoder<PoolConfigArgs> {
 			["authority", getAddressEncoder()],
 			["custodianThreshold", getU16Encoder()],
 			["challengeWindowSecs", getU32Encoder()],
-			["depositLamports", getU64Encoder()],
+			["policyFlags", getU8Encoder()],
+			["policyCosigner", getAddressEncoder()],
 			["totalDeposits", getU64Encoder()],
 		]),
 		(value) => ({ ...value, discriminator: 1, migrationVersion: 0 }),
@@ -120,7 +137,8 @@ export function getPoolConfigDecoder(): FixedSizeDecoder<PoolConfig> {
 		["authority", getAddressDecoder()],
 		["custodianThreshold", getU16Decoder()],
 		["challengeWindowSecs", getU32Decoder()],
-		["depositLamports", getU64Decoder()],
+		["policyFlags", getU8Decoder()],
+		["policyCosigner", getAddressDecoder()],
 		["totalDeposits", getU64Decoder()],
 	]);
 }

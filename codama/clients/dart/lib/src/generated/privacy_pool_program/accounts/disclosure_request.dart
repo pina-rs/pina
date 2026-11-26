@@ -19,6 +19,7 @@ class DisclosureRequest {
     required this.nonce,
     required this.tier,
     required this.commitment,
+    required this.viewPubkey,
     required this.noticeLen,
     required this.notice,
     required this.legalBasisHash,
@@ -37,6 +38,7 @@ class DisclosureRequest {
   final BigInt nonce;
   final int tier;
   final Uint8List commitment;
+  final Uint8List viewPubkey;
   final int noticeLen;
   final Uint8List notice;
   final Uint8List legalBasisHash;
@@ -58,6 +60,7 @@ class DisclosureRequest {
           nonce == other.nonce &&
           tier == other.tier &&
           commitment == other.commitment &&
+          viewPubkey == other.viewPubkey &&
           noticeLen == other.noticeLen &&
           notice == other.notice &&
           legalBasisHash == other.legalBasisHash &&
@@ -76,6 +79,7 @@ class DisclosureRequest {
     nonce,
     tier,
     commitment,
+    viewPubkey,
     noticeLen,
     notice,
     legalBasisHash,
@@ -88,7 +92,7 @@ class DisclosureRequest {
 
   @override
   String toString() =>
-      'DisclosureRequest(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, requester: $requester, nonce: $nonce, tier: $tier, commitment: $commitment, noticeLen: $noticeLen, notice: $notice, legalBasisHash: $legalBasisHash, createdAt: $createdAt, challengeDeadline: $challengeDeadline, status: $status, granted: $granted, approvals: $approvals)';
+      'DisclosureRequest(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, requester: $requester, nonce: $nonce, tier: $tier, commitment: $commitment, viewPubkey: $viewPubkey, noticeLen: $noticeLen, notice: $notice, legalBasisHash: $legalBasisHash, createdAt: $createdAt, challengeDeadline: $challengeDeadline, status: $status, granted: $granted, approvals: $approvals)';
 }
 
 Encoder<DisclosureRequest> getDisclosureRequestEncoder() {
@@ -101,6 +105,10 @@ Encoder<DisclosureRequest> getDisclosureRequestEncoder() {
     ('tier', getU8Encoder()),
     (
       'commitment',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    (
+      'viewPubkey',
       fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
     ),
     ('noticeLen', getU8Encoder()),
@@ -126,6 +134,7 @@ Encoder<DisclosureRequest> getDisclosureRequestEncoder() {
       'nonce': value.nonce,
       'tier': value.tier,
       'commitment': value.commitment,
+      'viewPubkey': value.viewPubkey,
       'noticeLen': value.noticeLen,
       'notice': value.notice,
       'legalBasisHash': value.legalBasisHash,
@@ -147,6 +156,7 @@ Decoder<DisclosureRequest> getDisclosureRequestDecoder() {
     ('nonce', getU64Decoder()),
     ('tier', getU8Decoder()),
     ('commitment', fixDecoderSize(getBytesDecoder(), 32)),
+    ('viewPubkey', fixDecoderSize(getBytesDecoder(), 32)),
     ('noticeLen', getU8Decoder()),
     ('notice', fixDecoderSize(getBytesDecoder(), 96)),
     ('legalBasisHash', fixDecoderSize(getBytesDecoder(), 32)),
@@ -184,6 +194,7 @@ Decoder<DisclosureRequest> getDisclosureRequestDecoder() {
         nonce: map['nonce']! as BigInt,
         tier: map['tier']! as int,
         commitment: map['commitment']! as Uint8List,
+        viewPubkey: map['viewPubkey']! as Uint8List,
         noticeLen: map['noticeLen']! as int,
         notice: map['notice']! as Uint8List,
         legalBasisHash: map['legalBasisHash']! as Uint8List,

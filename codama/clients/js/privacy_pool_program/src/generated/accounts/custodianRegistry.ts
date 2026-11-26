@@ -57,29 +57,18 @@ export function getCustodianRegistryDiscriminator2Bytes(): ReadonlyUint8Array {
 	return getU8Encoder().encode(CUSTODIAN_REGISTRY_DISCRIMINATOR2);
 }
 
-/**
- * The disclosure committee. A threshold of these keys must approve before
- * a disclosure may execute, and each approval is a signed transaction.
- */
+/** The disclosure committee. */
 export type CustodianRegistry = {
 	discriminator: number;
 	migrationVersion: number;
 	bump: number;
-	/**
-	 * Committee members as concatenated 32-byte addresses; raw bytes keep
-	 * the generated CLI clients renderable. A zero address marks the slot
-	 * unset.
-	 */
+	/** Committee members as concatenated 32-byte addresses. */
 	custodians: ReadonlyUint8Array;
 };
 
 export type CustodianRegistryArgs = {
 	bump: number;
-	/**
-	 * Committee members as concatenated 32-byte addresses; raw bytes keep
-	 * the generated CLI clients renderable. A zero address marks the slot
-	 * unset.
-	 */
+	/** Committee members as concatenated 32-byte addresses. */
 	custodians: ReadonlyUint8Array;
 };
 

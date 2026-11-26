@@ -24,17 +24,14 @@ export const setVerificationKeyCommand = registerGlobals(
 	.requiredOption("--bump <bump>", "bump")
 	.requiredOption(
 		"--slot <slot>",
-		"Circuit slot: [`VK_SLOT_WITHDRAW`] or [`VK_SLOT_TRANSFER`].",
+		"Circuit slot: [`VK_SLOT_JOIN_SPLIT`] or [`VK_SLOT_POLICY`].",
 	)
-	.requiredOption("--ic-len <icLen>", "icLen")
 	.requiredOption("--alpha-g1 <alphaG1>", "alphaG1")
 	.requiredOption("--beta-g2 <betaG2>", "betaG2")
 	.requiredOption("--gamma-g2 <gammaG2>", "gammaG2")
 	.requiredOption("--delta-g2 <deltaG2>", "deltaG2")
 	.requiredOption("--ic0 <ic0>", "ic0")
 	.requiredOption("--ic1 <ic1>", "ic1")
-	.requiredOption("--ic2 <ic2>", "ic2")
-	.requiredOption("--ic3 <ic3>", "ic3")
 	.option(
 		"--pool-config <poolConfig>",
 		"The `pool_config` account [default: derived]",
@@ -43,24 +40,17 @@ export const setVerificationKeyCommand = registerGlobals(
 		"--verifying-key-account <verifyingKeyAccount>",
 		"The `verifying_key_account` account",
 	)
-	.requiredOption(
-		"--system-program <systemProgram>",
-		"The `system_program` account",
-	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
 			bump: smallInteger("--bump", options.bump),
 			slot: smallInteger("--slot", options.slot),
-			icLen: smallInteger("--ic-len", options.icLen),
 			alphaG1: base58("--alpha-g1", options.alphaG1),
 			betaG2: base58("--beta-g2", options.betaG2),
 			gammaG2: base58("--gamma-g2", options.gammaG2),
 			deltaG2: base58("--delta-g2", options.deltaG2),
 			ic0: base58("--ic0", options.ic0),
 			ic1: base58("--ic1", options.ic1),
-			ic2: base58("--ic2", options.ic2),
-			ic3: base58("--ic3", options.ic3),
 			authority: context.payer,
 			poolConfig: options.poolConfig === undefined
 				? undefined
@@ -69,7 +59,6 @@ export const setVerificationKeyCommand = registerGlobals(
 				"--verifying-key-account",
 				options.verifyingKeyAccount,
 			),
-			systemProgram: pubkey("--system-program", options.systemProgram),
 		};
 		const instruction = await getSetVerificationKeyInstructionAsync(
 			...[input],

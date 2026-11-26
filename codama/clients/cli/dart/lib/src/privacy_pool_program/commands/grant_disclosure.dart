@@ -10,16 +10,11 @@ import 'package:pina_codama_clients/privacy_pool_program.dart';
 final class GrantDisclosureCommand extends Command<void> {
   GrantDisclosureCommand() {
     argParser
-      ..addOption('reserved', mandatory: true, help: "Reserved; must be zero.")
+      ..addOption('reserved', mandatory: true, help: "reserved")
       ..addOption(
         'disclosure_request',
         mandatory: true,
         help: "The disclosure_request account",
-      )
-      ..addOption(
-        'note_commitment',
-        mandatory: true,
-        help: "The note_commitment account",
       );
   }
 
@@ -37,16 +32,11 @@ final class GrantDisclosureCommand extends Command<void> {
       '--disclosure-request',
       results['disclosure_request']! as String,
     );
-    final noteCommitment = pubkey(
-      '--note-commitment',
-      results['note_commitment']! as String,
-    );
     final viewer = context.payerAddress;
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getGrantDisclosureInstruction(
       programAddress: context.programAddress,
       disclosureRequest: disclosureRequest,
-      noteCommitment: noteCommitment,
       viewer: viewer,
       reserved: reservedValue,
     );

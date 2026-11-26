@@ -37,10 +37,6 @@ pub struct Initialize<'account> {
 	/// Required privileges: writable.
 	pub merkle_tree: &'account AccountView,
 
-	/// CPI account `nullifierSet`.
-	/// Required privileges: writable.
-	pub nullifier_set: &'account AccountView,
-
 	/// CPI account `custodianRegistry`.
 	/// Required privileges: writable.
 	pub custodian_registry: &'account AccountView,
@@ -58,7 +54,6 @@ pub struct Initialize<'account> {
 	pub system_program: &'account AccountView,
 
 	/// CPI account `programData`.
-	/// Canonical `ProgramData` for this program, owned by the upgradeable loader.
 	/// Required privileges: read-only.
 	pub program_data: &'account AccountView,
 
@@ -78,9 +73,6 @@ pub struct InitializeIx {
 	/// Instruction argument `treeBump`.
 	pub tree_bump: u8,
 
-	/// Instruction argument `nullifiersBump`.
-	pub nullifiers_bump: u8,
-
 	/// Instruction argument `custodiansBump`.
 	pub custodians_bump: u8,
 
@@ -91,28 +83,26 @@ pub struct InitializeIx {
 	pub log_bump: u8,
 
 	/// Instruction argument `custodians`.
-	/// Initial three-member disclosure committee as concatenated 32-byte
-	/// addresses.
+	/// Initial three-member disclosure committee as concatenated 32-byte keys.
 	pub custodians: [u8; 96],
 }
 
 impl InitializeIx {
 	/// Number of bytes in the encoded instruction, including its discriminator.
-	pub const LEN: usize = 104;
+	pub const LEN: usize = 103;
 
 	/// Encodes the discriminator and instruction arguments for CPI.
 	#[inline(always)]
-	pub fn to_bytes(&self) -> Result<[u8; 104], ProgramError> {
-		let mut data = [0u8; 104];
+	pub fn to_bytes(&self) -> Result<[u8; 103], ProgramError> {
+		let mut data = [0u8; 103];
 		data[..1].copy_from_slice(&INITIALIZE_DISCRIMINATOR);
 		data[1..2].copy_from_slice(&self.config_bump.to_le_bytes());
 		data[2..3].copy_from_slice(&self.vault_bump.to_le_bytes());
 		data[3..4].copy_from_slice(&self.tree_bump.to_le_bytes());
-		data[4..5].copy_from_slice(&self.nullifiers_bump.to_le_bytes());
-		data[5..6].copy_from_slice(&self.custodians_bump.to_le_bytes());
-		data[6..7].copy_from_slice(&self.requesters_bump.to_le_bytes());
-		data[7..8].copy_from_slice(&self.log_bump.to_le_bytes());
-		data[8..104].copy_from_slice(&self.custodians);
+		data[4..5].copy_from_slice(&self.custodians_bump.to_le_bytes());
+		data[5..6].copy_from_slice(&self.requesters_bump.to_le_bytes());
+		data[6..7].copy_from_slice(&self.log_bump.to_le_bytes());
+		data[7..103].copy_from_slice(&self.custodians);
 
 		Ok(data)
 	}
@@ -132,12 +122,11 @@ impl<'account> Initialize<'account> {
 		program: &ProgramAccount<'_>,
 		signers: &[Signer<'_, '_>],
 	) -> ProgramResult {
-		let accounts: [CpiHandle<'_>; 10] = [
+		let accounts: [CpiHandle<'_>; 9] = [
 			CpiHandle::writable_signer(self.authority)?,
 			CpiHandle::writable(self.pool_config)?,
 			CpiHandle::writable(self.pool_vault)?,
 			CpiHandle::writable(self.merkle_tree)?,
-			CpiHandle::writable(self.nullifier_set)?,
 			CpiHandle::writable(self.custodian_registry)?,
 			CpiHandle::writable(self.requester_registry)?,
 			CpiHandle::writable(self.disclosure_log)?,

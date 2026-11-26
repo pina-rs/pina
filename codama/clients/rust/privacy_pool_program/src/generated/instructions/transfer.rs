@@ -11,51 +11,57 @@
 pub const TRANSFER_DISCRIMINATOR: u8 = 6u8;
 /// Compute units `Transfer` consumed in its most expensive recorded
 /// Surfpool simulation.
-pub const TRANSFER_MEASURED_COMPUTE_UNITS: u32 = 105283;
+pub const TRANSFER_MEASURED_COMPUTE_UNITS: u32 = 122195;
 /// Compute unit limit to request for a transaction carrying `Transfer`:
 /// the measurement plus the project's margin and the cost of the compute budget
 /// instructions. Pass it, or the sum for several instructions, to
 /// `set_compute_unit_limit_instruction`.
-pub const TRANSFER_COMPUTE_UNIT_LIMIT: u32 = 126700;
+pub const TRANSFER_COMPUTE_UNIT_LIMIT: u32 = 147000;
 
 /// Accounts.
 #[derive(Clone, Debug)]
 pub struct Transfer {
-	pub pool_config: solana_pubkey::Pubkey,
-	/// Funds the successor note's rent. Transfers are anonymous with respect
-	/// to the spent note, not to fees: this example has no relayer, so the
-	/// submitting wallet signs and pays. Production routes this through a
-	/// relayer so even this linkage disappears.
+	/// Relayer / transaction fee payer; receives `relayer_fee` directly.
 	pub payer: solana_pubkey::Pubkey,
+	pub pool_config: solana_pubkey::Pubkey,
+	pub pool_vault: solana_pubkey::Pubkey,
 	pub merkle_tree: solana_pubkey::Pubkey,
-	pub nullifier_set: solana_pubkey::Pubkey,
+	pub nullifier_record0: solana_pubkey::Pubkey,
+	pub nullifier_record1: solana_pubkey::Pubkey,
 	pub verifying_key_account: solana_pubkey::Pubkey,
-	pub note_commitment: solana_pubkey::Pubkey,
+	pub policy_cosigner: solana_pubkey::Pubkey,
 	pub system_program: solana_pubkey::Pubkey,
 }
 
 impl Transfer {
 	pub fn new(
-		pool_config: solana_pubkey::Pubkey,
 		payer: solana_pubkey::Pubkey,
+		nullifier_record0: solana_pubkey::Pubkey,
+		nullifier_record1: solana_pubkey::Pubkey,
 		verifying_key_account: solana_pubkey::Pubkey,
-		note_commitment: solana_pubkey::Pubkey,
+		policy_cosigner: solana_pubkey::Pubkey,
 	) -> Self {
 		Self {
-			pool_config,
 			payer,
+			pool_config: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-config".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
+			pool_vault: solana_pubkey::Pubkey::find_program_address(
+				&["privacy-pool-vault".as_bytes()],
+				&crate::PRIVACY_POOL_PROGRAM_ID,
+			)
+			.0,
 			merkle_tree: solana_pubkey::Pubkey::find_program_address(
 				&["privacy-pool-tree".as_bytes()],
 				&crate::PRIVACY_POOL_PROGRAM_ID,
 			)
 			.0,
-			nullifier_set: solana_pubkey::Pubkey::find_program_address(
-				&["privacy-pool-nullifiers".as_bytes()],
-				&crate::PRIVACY_POOL_PROGRAM_ID,
-			)
-			.0,
+			nullifier_record0,
+			nullifier_record1,
 			verifying_key_account,
-			note_commitment,
+			policy_cosigner,
 			system_program: solana_pubkey::pubkey!("11111111111111111111111111111111"),
 		}
 	}
@@ -70,26 +76,31 @@ impl Transfer {
 		data: TransferInstructionData,
 		remaining_accounts: &[solana_instruction::AccountMeta],
 	) -> solana_instruction::Instruction {
-		let mut accounts = Vec::with_capacity(7 + remaining_accounts.len());
+		let mut accounts = Vec::with_capacity(9 + remaining_accounts.len());
+		accounts.push(solana_instruction::AccountMeta::new(self.payer, true));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.pool_config,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new(self.payer, true));
+		accounts.push(solana_instruction::AccountMeta::new(self.pool_vault, false));
 		accounts.push(solana_instruction::AccountMeta::new(
 			self.merkle_tree,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new(
-			self.nullifier_set,
+			self.nullifier_record0,
+			false,
+		));
+		accounts.push(solana_instruction::AccountMeta::new(
+			self.nullifier_record1,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
 			self.verifying_key_account,
 			false,
 		));
-		accounts.push(solana_instruction::AccountMeta::new(
-			self.note_commitment,
+		accounts.push(solana_instruction::AccountMeta::new_readonly(
+			self.policy_cosigner,
 			false,
 		));
 		accounts.push(solana_instruction::AccountMeta::new_readonly(
@@ -131,17 +142,23 @@ impl TransferInstructionData {
 #[pinapod(crate = pina::pinapod, no_inherent)]
 pub struct TransferInstructionWire {
 	pub discriminator: u8,
-	pub bump: u8,
-	pub nullifier: [u8; 32],
+	pub nullifier0_bump: u8,
+	pub nullifier1_bump: u8,
+	pub nullifier0: [u8; 32],
+	pub nullifier1: [u8; 32],
 	pub root: [u8; 32],
-	/// Commitment of the successor note.
-	pub new_commitment: [u8; 32],
-	/// Successor note's consent key.
-	pub new_view_pubkey: [u8; 32],
-	pub envelope_len: u8,
-	pub envelope: [u8; 128],
-	pub shares: [u8; 144],
-	pub proof_a: [u8; 64],
+	/// Optional SOL relayer fee deducted from shielded inputs.
+	pub relayer_fee: u64,
+	pub out0_commitment: [u8; 32],
+	pub out0_view_pubkey: [u8; 32],
+	pub out0_envelope_len: u8,
+	pub out0_envelope: [u8; 96],
+	pub out1_commitment: [u8; 32],
+	pub out1_view_pubkey: [u8; 32],
+	pub out1_envelope_len: u8,
+	pub out1_envelope: [u8; 96],
+	/// 192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).
+	pub proof_a: [u8; 32],
 	pub proof_b: [u8; 128],
-	pub proof_c: [u8; 64],
+	pub proof_c: [u8; 32],
 }

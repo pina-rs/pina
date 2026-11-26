@@ -19,21 +19,21 @@ import {
 
 export const depositCommand = registerGlobals(new Command("deposit"))
 	.description("deposit")
-	.requiredOption("--bump <bump>", "bump")
+	.requiredOption(
+		"--amount <amount>",
+		"Variable SOL deposit amount in lamports.",
+	)
 	.requiredOption(
 		"--commitment <commitment>",
-		"Client-computed Poseidon commitment of the new note.",
+		"Client-computed Poseidon note commitment.",
 	)
 	.requiredOption(
 		"--view-pubkey <viewPubkey>",
 		"Per-note consent/notification public key.",
 	)
-	.requiredOption(
-		"--envelope-len <envelopeLen>",
-		"Active length of the encrypted note plaintext.",
-	)
+	.requiredOption("--envelope-len <envelopeLen>", "envelopeLen")
 	.requiredOption("--envelope <envelope>", "envelope")
-	.requiredOption("--shares <shares>", "Encrypted per-custodian key shares.")
+	.requiredOption("--shares <shares>", "shares")
 	.option(
 		"--pool-config <poolConfig>",
 		"The `pool_config` account [default: derived]",
@@ -46,14 +46,10 @@ export const depositCommand = registerGlobals(new Command("deposit"))
 		"--merkle-tree <merkleTree>",
 		"The `merkle_tree` account [default: derived]",
 	)
-	.requiredOption(
-		"--note-commitment <noteCommitment>",
-		"The `note_commitment` account",
-	)
 	.action(async (options) => {
 		const context = await CliContext.create(options);
 		const input = {
-			bump: smallInteger("--bump", options.bump),
+			amount: bigInteger("--amount", options.amount),
 			commitment: base58("--commitment", options.commitment),
 			viewPubkey: base58("--view-pubkey", options.viewPubkey),
 			envelopeLen: smallInteger("--envelope-len", options.envelopeLen),
@@ -69,7 +65,6 @@ export const depositCommand = registerGlobals(new Command("deposit"))
 			merkleTree: options.merkleTree === undefined
 				? undefined
 				: pubkey("--merkle-tree", options.merkleTree),
-			noteCommitment: pubkey("--note-commitment", options.noteCommitment),
 		};
 		const instruction = await getDepositInstructionAsync(
 			...[input],

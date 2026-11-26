@@ -19,11 +19,8 @@ class VerifyingKeyAccount {
     required this.betaG2,
     required this.gammaG2,
     required this.deltaG2,
-    required this.icLen,
     required this.ic0,
     required this.ic1,
-    required this.ic2,
-    required this.ic3,
   }) : discriminator = 10,
        migrationVersion = 0;
 
@@ -35,11 +32,8 @@ class VerifyingKeyAccount {
   final Uint8List betaG2;
   final Uint8List gammaG2;
   final Uint8List deltaG2;
-  final int icLen;
   final Uint8List ic0;
   final Uint8List ic1;
-  final Uint8List ic2;
-  final Uint8List ic3;
 
   @override
   bool operator ==(Object other) =>
@@ -54,11 +48,8 @@ class VerifyingKeyAccount {
           betaG2 == other.betaG2 &&
           gammaG2 == other.gammaG2 &&
           deltaG2 == other.deltaG2 &&
-          icLen == other.icLen &&
           ic0 == other.ic0 &&
-          ic1 == other.ic1 &&
-          ic2 == other.ic2 &&
-          ic3 == other.ic3;
+          ic1 == other.ic1;
 
   @override
   int get hashCode => Object.hash(
@@ -70,16 +61,13 @@ class VerifyingKeyAccount {
     betaG2,
     gammaG2,
     deltaG2,
-    icLen,
     ic0,
     ic1,
-    ic2,
-    ic3,
   );
 
   @override
   String toString() =>
-      'VerifyingKeyAccount(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, slot: $slot, alphaG1: $alphaG1, betaG2: $betaG2, gammaG2: $gammaG2, deltaG2: $deltaG2, icLen: $icLen, ic0: $ic0, ic1: $ic1, ic2: $ic2, ic3: $ic3)';
+      'VerifyingKeyAccount(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, slot: $slot, alphaG1: $alphaG1, betaG2: $betaG2, gammaG2: $gammaG2, deltaG2: $deltaG2, ic0: $ic0, ic1: $ic1)';
 }
 
 Encoder<VerifyingKeyAccount> getVerifyingKeyAccountEncoder() {
@@ -92,11 +80,8 @@ Encoder<VerifyingKeyAccount> getVerifyingKeyAccountEncoder() {
     ('betaG2', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
     ('gammaG2', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
     ('deltaG2', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
-    ('icLen', getU8Encoder()),
     ('ic0', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
     ('ic1', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
-    ('ic2', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
-    ('ic3', fixEncoderSize(getBytesEncoder(), 64, allowTruncation: false)),
   ]);
 
   return transformEncoder(
@@ -110,11 +95,8 @@ Encoder<VerifyingKeyAccount> getVerifyingKeyAccountEncoder() {
       'betaG2': value.betaG2,
       'gammaG2': value.gammaG2,
       'deltaG2': value.deltaG2,
-      'icLen': value.icLen,
       'ic0': value.ic0,
       'ic1': value.ic1,
-      'ic2': value.ic2,
-      'ic3': value.ic3,
     },
   );
 }
@@ -129,11 +111,8 @@ Decoder<VerifyingKeyAccount> getVerifyingKeyAccountDecoder() {
     ('betaG2', fixDecoderSize(getBytesDecoder(), 128)),
     ('gammaG2', fixDecoderSize(getBytesDecoder(), 128)),
     ('deltaG2', fixDecoderSize(getBytesDecoder(), 128)),
-    ('icLen', getU8Decoder()),
     ('ic0', fixDecoderSize(getBytesDecoder(), 64)),
     ('ic1', fixDecoderSize(getBytesDecoder(), 64)),
-    ('ic2', fixDecoderSize(getBytesDecoder(), 64)),
-    ('ic3', fixDecoderSize(getBytesDecoder(), 64)),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
@@ -164,11 +143,8 @@ Decoder<VerifyingKeyAccount> getVerifyingKeyAccountDecoder() {
         betaG2: map['betaG2']! as Uint8List,
         gammaG2: map['gammaG2']! as Uint8List,
         deltaG2: map['deltaG2']! as Uint8List,
-        icLen: map['icLen']! as int,
         ic0: map['ic0']! as Uint8List,
         ic1: map['ic1']! as Uint8List,
-        ic2: map['ic2']! as Uint8List,
-        ic3: map['ic3']! as Uint8List,
       ),
       newOffset,
     );
