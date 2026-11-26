@@ -29,6 +29,8 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { minifyCss, minifyHtml, minifyJs } from "./optimize-book.ts";
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 export interface Measurement {
@@ -524,11 +526,11 @@ export function renderBenchmarks(
 
 const MARKS: Record<CapabilityCell["status"], string> = {
 	yes:
-		'<span class="mark mark-yes" role="img" aria-label="First-class"><svg viewBox="0 0 12 12"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></svg></span>',
+		'<span class="mark mark-yes" role="img" aria-label="First-class"><svg viewBox="0 0 12 12"><use href="#i-yes"/></svg></span>',
 	partial:
-		'<span class="mark mark-partial" role="img" aria-label="Partial"><svg viewBox="0 0 12 12"><path d="M3 6h6"/></svg></span>',
+		'<span class="mark mark-partial" role="img" aria-label="Partial"><svg viewBox="0 0 12 12"><use href="#i-part"/></svg></span>',
 	no:
-		'<span class="mark mark-no" role="img" aria-label="Not available"><svg viewBox="0 0 12 12"><path d="M3.5 3.5l5 5M8.5 3.5l-5 5"/></svg></span>',
+		'<span class="mark mark-no" role="img" aria-label="Not available"><svg viewBox="0 0 12 12"><use href="#i-no"/></svg></span>',
 };
 
 /** Renders the capability matrix, with Pina's column first and highlighted. */
@@ -609,8 +611,28 @@ function copyInto(source: string, destination: string): void {
 }
 
 /**
+ * Maps base font names (e.g. `inter-latin-wght-normal.woff2`) to mdBook's
+ * content-hashed output paths under `<bookDir>/fonts/` so the landing page and
+ * book chapters share one browser cache entry per font.
+ */
+function discoverBookFonts(bookDir: string): Map<string, string> {
+	const map = new Map<string, string>();
+	const bookFontsDir = join(bookDir, "fonts");
+	if (!existsSync(bookFontsDir)) {
+		return map;
+	}
+	for (const file of readdirSync(bookFontsDir)) {
+		const match = /^(.+)-[a-f0-9]{8}(\.woff2)$/.exec(file);
+		if (match) {
+			map.set(`${match[1]}${match[2]}`, `fonts/${file}`);
+		}
+	}
+	return map;
+}
+
+/**
  * Writes the landing page over a built book's `index.html` and copies the
- * page's assets, the favicon, and the theme fonts into `<bookDir>/landing/`.
+ * page's assets into `<bookDir>/landing/`.
  */
 export function buildLanding(bookDir: string, root = ROOT): void {
 	if (!existsSync(join(bookDir, "introduction.html"))) {
@@ -619,7 +641,10 @@ export function buildLanding(bookDir: string, root = ROOT): void {
 		);
 	}
 	const landing = join(root, "docs/landing");
-	const html = renderLanding(
+	const bookFonts = discoverBookFonts(bookDir);
+	const shareBookFonts = bookFonts.size > 0;
+
+	let html = renderLanding(
 		readFileSync(join(landing, "index.html"), "utf8"),
 		{
 			manifest: readFileSync(join(root, "Cargo.toml"), "utf8"),
@@ -630,22 +655,80 @@ export function buildLanding(bookDir: string, root = ROOT): void {
 			readme: readFileSync(join(root, "readme.md"), "utf8"),
 		},
 	);
-	writeFileSync(join(bookDir, "index.html"), html);
+
+	// Resolve font paths: share mdBook's hashed fonts when present, otherwise
+	// fall back to `landing/fonts/<file>`.
+	let css = readFileSync(join(landing, "landing.css"), "utf8");
+	css = css.replace(
+		/url\((['"]?)fonts\/([^)'"]+)\1\)/g,
+		(_full, quote: string, fileName: string) => {
+			const shared = bookFonts.get(fileName);
+			const target = shared ?? `landing/fonts/${fileName}`;
+			return `url(${quote}${target}${quote})`;
+		},
+	);
+	if (shareBookFonts) {
+		html = html.replace(
+			/landing\/fonts\/([a-z0-9-]+\.woff2)/g,
+			(full, fileName: string) => bookFonts.get(fileName) ?? full,
+		);
+	}
+
+	// Share mdBook's hashed SVG favicon when present.
+	const bookFaviconSvg = readdirSync(bookDir).find((f) =>
+		/^favicon-[a-f0-9]{8}\.svg$/.test(f)
+	);
+	if (bookFaviconSvg) {
+		html = html.replace(
+			'href="landing/favicon.svg"',
+			`href="${bookFaviconSvg}"`,
+		);
+	}
+
+	// Inline minified CSS and JS for 1-RTT First Contentful Paint with zero
+	// external render-blocking requests.
+	const minCss = minifyCss(css);
+	const minJs = minifyJs(readFileSync(join(landing, "landing.js"), "utf8"));
+	html = html.replace(
+		/<link rel="stylesheet" href="landing\/landing\.css(?:\?[^"]*)?">/,
+		() => `<style>${minCss}</style>`,
+	);
+	html = html.replace(
+		/<script src="landing\/landing\.js(?:\?[^"]*)?" defer><\/script>/,
+		() => `<script>${minJs}</script>`,
+	);
+
+	writeFileSync(join(bookDir, "index.html"), minifyHtml(html));
 
 	const output = join(bookDir, "landing");
 	for (const file of readdirSync(landing)) {
-		if (file !== "index.html") {
+		if (
+			file !== "index.html" &&
+			file !== "landing.css" &&
+			file !== "landing.js"
+		) {
 			copyInto(join(landing, file), join(output, file));
 		}
 	}
-	copyInto(
-		join(root, "docs/theme/favicon.svg"),
-		join(output, "favicon.svg"),
-	);
+	if (!bookFaviconSvg) {
+		copyInto(
+			join(root, "docs/theme/favicon.svg"),
+			join(output, "favicon.svg"),
+		);
+	}
 	const fonts = join(root, "docs/theme/fonts");
-	for (const file of readdirSync(fonts)) {
-		if (file.endsWith(".woff2") || file.endsWith(".txt")) {
-			copyInto(join(fonts, file), join(output, "fonts", file));
+	const fontFiles = readdirSync(fonts);
+	const missingFonts = fontFiles.filter(
+		(file) => file.endsWith(".woff2") && !bookFonts.has(file),
+	);
+	for (const file of missingFonts) {
+		copyInto(join(fonts, file), join(output, "fonts", file));
+	}
+	if (missingFonts.length > 0) {
+		for (const file of fontFiles) {
+			if (file.endsWith(".txt")) {
+				copyInto(join(fonts, file), join(output, "fonts", file));
+			}
 		}
 	}
 }

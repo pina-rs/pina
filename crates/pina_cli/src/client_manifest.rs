@@ -7,12 +7,75 @@
 //! scaffolded client there would fail to parse. This module rewrites those
 //! manifests to name concrete requirements and to form their own workspace.
 
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::fmt;
 use std::path::Path;
 
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::de::IgnoredAny;
+use serde::de::MapAccess;
+use serde::de::Visitor;
 use toml::Table;
 use toml::Value;
 
 use crate::error::CodamaError;
+
+fn deserialize_key_set<'de, D>(deserializer: D) -> Result<BTreeSet<String>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	struct KeySetVisitor;
+
+	impl<'de> Visitor<'de> for KeySetVisitor {
+		type Value = BTreeSet<String>;
+
+		fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+			formatter.write_str("a dependency table")
+		}
+
+		fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+		where
+			A: MapAccess<'de>,
+		{
+			let mut keys = BTreeSet::new();
+			while let Some((key, _)) = map.next_entry::<String, IgnoredAny>()? {
+				keys.insert(key);
+			}
+			Ok(keys)
+		}
+	}
+
+	deserializer.deserialize_map(KeySetVisitor)
+}
+
+#[derive(Deserialize)]
+struct WorkspaceDepsManifest {
+	workspace: Option<WorkspaceDepsSection>,
+}
+
+#[derive(Deserialize)]
+struct WorkspaceDepsSection {
+	#[serde(default, deserialize_with = "deserialize_key_set")]
+	dependencies: BTreeSet<String>,
+}
+
+#[derive(Deserialize)]
+struct ClientDepsManifest {
+	#[serde(default)]
+	dependencies: BTreeMap<String, ClientDepEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ClientDepEntry {
+	Table {
+		#[serde(default)]
+		workspace: bool,
+	},
+	Other(#[allow(dead_code)] IgnoredAny),
+}
 
 /// Requirements for every crate a scaffolded client inherits, pinned to the
 /// ranges this Pina release is built and tested with: `(crate, version,
@@ -51,26 +114,26 @@ pub(crate) fn inherits_workspace_dependencies(crate_dir: &Path) -> bool {
 		.skip(1)
 		.find_map(|directory| {
 			let contents = std::fs::read_to_string(directory.join("Cargo.toml")).ok()?;
-			let manifest = contents.parse::<Table>().ok()?;
-			manifest.get("workspace").cloned()
+			let manifest = toml::from_str::<WorkspaceDepsManifest>(&contents).ok()?;
+			manifest.workspace
 		})
 		.is_some_and(|workspace| {
-			let declared = workspace.get("dependencies").and_then(Value::as_table);
-			let declared = declared.cloned().unwrap_or_default();
-			declared.contains_key("pina")
-				&& inherited_dependencies(crate_dir).all(|name| declared.contains_key(&name))
+			workspace.dependencies.contains("pina")
+				&& inherited_dependencies(crate_dir)
+					.all(|name| workspace.dependencies.contains(&name))
 		})
 }
 
 /// The `[dependencies]` a client manifest inherits with `workspace = true`.
 fn inherited_dependencies(crate_dir: &Path) -> impl Iterator<Item = String> {
 	let contents = std::fs::read_to_string(crate_dir.join("Cargo.toml")).unwrap_or_default();
-	let manifest = contents.parse::<Table>().unwrap_or_default();
-	let dependencies = manifest.get("dependencies").and_then(Value::as_table);
-	let dependencies = dependencies.cloned().unwrap_or_default();
-	dependencies
+	let manifest = toml::from_str::<ClientDepsManifest>(&contents).unwrap_or(ClientDepsManifest {
+		dependencies: BTreeMap::new(),
+	});
+	manifest
+		.dependencies
 		.into_iter()
-		.filter(|(_, value)| value.get("workspace").and_then(Value::as_bool) == Some(true))
+		.filter(|(_, entry)| matches!(entry, ClientDepEntry::Table { workspace: true }))
 		.map(|(name, _)| name)
 }
 
@@ -336,5 +399,26 @@ serde = "1"
 				"{name} {requirement} must admit a locked version"
 			);
 		}
+	}
+
+	#[test]
+	fn key_set_deserializer_rejects_non_tables_and_handles_string_deps() {
+		let err = toml::from_str::<WorkspaceDepsManifest>("[workspace]\ndependencies = 1\n")
+			.err()
+			.expect("non-table dependencies should fail");
+		assert!(err.to_string().contains("a dependency table"));
+
+		let parsed = toml::from_str::<ClientDepsManifest>(
+			"[dependencies]\npina = { workspace = true }\nbs58 = \"0.5\"\n",
+		)
+		.expect("parse mixed client deps");
+		assert!(matches!(
+			parsed.dependencies.get("pina"),
+			Some(ClientDepEntry::Table { workspace: true })
+		));
+		assert!(matches!(
+			parsed.dependencies.get("bs58"),
+			Some(ClientDepEntry::Other(_))
+		));
 	}
 }

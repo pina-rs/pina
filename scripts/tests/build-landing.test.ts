@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
+import vm from "node:vm";
 
 import {
 	buildLanding,
@@ -157,4 +164,256 @@ test("the committed landing page renders from the repository's sources", () => {
 		readFileSync(join(book, "landing/fonts/inter-latin-wght-normal.woff2"))
 			.length > 0,
 	);
+});
+
+test("buildLanding copies fallback fonts individually when only one face is shared", () => {
+	const book = mkdtempSync(join(tmpdir(), "pina-landing-partial-fonts-"));
+	writeFileSync(join(book, "introduction.html"), "");
+	mkdirSync(join(book, "fonts"));
+	writeFileSync(
+		join(book, "fonts/inter-latin-wght-normal-12345678.woff2"),
+		"shared-inter",
+	);
+
+	buildLanding(book);
+
+	const html = readFileSync(join(book, "index.html"), "utf8");
+	assert.match(html, /fonts\/inter-latin-wght-normal-12345678\.woff2/);
+	assert.match(html, /landing\/fonts\/fraunces-latin-opsz-italic\.woff2/);
+	assert.equal(
+		existsSync(join(book, "landing/fonts/inter-latin-wght-normal.woff2")),
+		false,
+	);
+	assert.equal(
+		existsSync(join(book, "landing/fonts/fraunces-latin-opsz-italic.woff2")),
+		true,
+	);
+	assert.equal(
+		existsSync(join(book, "landing/fonts/fraunces-latin-opsz-normal.woff2")),
+		true,
+	);
+});
+
+test("landing.js runs rAF reveal callbacks and prefetches only eligible internal links", () => {
+	const landingJs = read("docs/landing/landing.js");
+
+	const makeClassList = (initial: string[] = []) => {
+		const set = new Set(initial);
+		return {
+			add: (...names: string[]) => names.forEach((n) => set.add(n)),
+			remove: (...names: string[]) => names.forEach((n) => set.delete(n)),
+			contains: (name: string) => set.has(name),
+			toggle: (name: string, force?: boolean) => {
+				const on = force === undefined ? !set.has(name) : Boolean(force);
+				if (on) {
+					set.add(name);
+				} else {
+					set.delete(name);
+				}
+				return on;
+			},
+		};
+	};
+
+	const runLanding = (
+		connection?: { saveData?: boolean; effectiveType?: string },
+	) => {
+		const rafQueue: Array<() => void> = [];
+		const docListeners = new Map<string, Array<(event: unknown) => void>>();
+		const headLinks: Array<Record<string, string>> = [];
+		const observers: Array<{
+			cb: (
+				entries: Array<{ isIntersecting: boolean; target: unknown }>,
+			) => void;
+			observed: unknown[];
+			unobserved: unknown[];
+		}> = [];
+
+		const bars = { classList: makeClassList(["bars"]) };
+		const visiblePanel = {
+			querySelector: (sel: string) => (sel === ".bars" ? bars : null),
+		};
+		const chartTarget = {
+			classList: makeClassList(["chart"]),
+			getBoundingClientRect: () => ({ top: 1200 }),
+			querySelector: (sel: string) =>
+				sel === ".chart-panel:not([hidden])" ? visiblePanel : null,
+		};
+		const aboveFoldCard = {
+			classList: makeClassList(["card"]),
+			getBoundingClientRect: () => ({ top: 100 }),
+			querySelector: () => null,
+		};
+		const nav = {
+			offsetHeight: 64,
+			classList: makeClassList(),
+		};
+		const hero = { classList: makeClassList(["hero"]) };
+		const rootEl = {
+			classList: makeClassList(["no-js"]),
+			dataset: {} as Record<string, string>,
+		};
+
+		class FakeIntersectionObserver {
+			cb: (
+				entries: Array<{ isIntersecting: boolean; target: unknown }>,
+			) => void;
+			observed: unknown[] = [];
+			unobserved: unknown[] = [];
+			constructor(
+				cb: (
+					entries: Array<{ isIntersecting: boolean; target: unknown }>,
+				) => void,
+			) {
+				this.cb = cb;
+				observers.push(this);
+			}
+			observe(target: unknown) {
+				this.observed.push(target);
+			}
+			unobserve(target: unknown) {
+				this.unobserved.push(target);
+			}
+		}
+
+		const documentStub = {
+			documentElement: rootEl,
+			activeElement: null,
+			head: {
+				appendChild: (node: Record<string, string>) => {
+					headLinks.push(node);
+					return node;
+				},
+			},
+			createElement: (tag: string) => ({ tagName: tag.toUpperCase() }),
+			getElementById: () => null,
+			querySelector: (sel: string) => {
+				if (sel === "[data-nav]") {
+					return nav;
+				}
+				if (sel === ".hero") {
+					return hero;
+				}
+				return null;
+			},
+			querySelectorAll: (sel: string) => {
+				if (sel.includes(".chart")) {
+					return [aboveFoldCard, chartTarget];
+				}
+				return [];
+			},
+			addEventListener: (type: string, fn: (event: unknown) => void) => {
+				const list = docListeners.get(type) ?? [];
+				list.push(fn);
+				docListeners.set(type, list);
+			},
+		};
+
+		const sandbox: Record<string, unknown> = {
+			document: documentStub,
+			location: {
+				origin: "https://pina.rs",
+				href: "https://pina.rs/index.html",
+			},
+			navigator: { connection },
+			localStorage: { setItem: () => {} },
+			IntersectionObserver: FakeIntersectionObserver,
+			requestAnimationFrame: (cb: () => void) => {
+				rafQueue.push(cb);
+				return rafQueue.length;
+			},
+			setTimeout: () => 0,
+			matchMedia: () => ({ matches: false }),
+			innerHeight: 800,
+		};
+		sandbox.window = sandbox;
+
+		vm.runInNewContext(landingJs, sandbox);
+
+		return {
+			rafQueue,
+			docListeners,
+			headLinks,
+			observers,
+			bars,
+			chartTarget,
+			aboveFoldCard,
+			nav,
+			rootEl,
+		};
+	};
+
+	const makeLink = (opts: {
+		href: string;
+		origin?: string;
+		target?: string;
+		download?: boolean;
+	}) => {
+		const link = {
+			href: opts.href,
+			origin: opts.origin ?? new URL(opts.href).origin,
+			target: opts.target ?? "",
+			hasAttribute: (name: string) =>
+				name === "download" && Boolean(opts.download),
+			closest: (sel: string) => (sel === "a[href]" ? link : null),
+		};
+		return link;
+	};
+
+	// 1. Default connection: execute deferred scroll-reveal rAF, chart reveal -> reveal-bars rAF,
+	//    and pointerover prefetch filtering.
+	const env = runLanding({ saveData: false, effectiveType: "4g" });
+	assert.equal(env.rafQueue.length, 1);
+	env.rafQueue.shift()!();
+	assert.equal(env.rootEl.classList.contains("reveal-ready"), true);
+	assert.equal(env.aboveFoldCard.classList.contains("is-in"), true);
+	assert.equal(env.chartTarget.classList.contains("is-in"), false);
+	assert.equal(env.observers.length, 2);
+
+	// Nav observer toggles `is-page` when hero leaves viewport.
+	env.observers[0].cb([{ isIntersecting: false, target: {} }]);
+	assert.equal(env.nav.classList.contains("is-page"), true);
+
+	// Chart observer triggers replayBars -> queues second rAF that adds `reveal-bars`.
+	env.observers[1].cb([{ isIntersecting: true, target: env.chartTarget }]);
+	assert.equal(env.chartTarget.classList.contains("is-in"), true);
+	assert.equal(env.bars.classList.contains("reveal-bars"), false);
+	assert.equal(env.rafQueue.length, 1);
+	env.rafQueue.shift()!();
+	assert.equal(env.bars.classList.contains("reveal-bars"), true);
+
+	const pointerHandlers = env.docListeners.get("pointerover") ?? [];
+	assert.equal(pointerHandlers.length, 1);
+	const dispatchOver = (target: unknown) => {
+		for (const fn of pointerHandlers) {
+			fn({ target });
+		}
+	};
+
+	// Eligible internal .html link adds exactly one prefetch hint (deduped on repeat hover).
+	dispatchOver(makeLink({ href: "https://pina.rs/introduction.html#top" }));
+	dispatchOver(makeLink({ href: "https://pina.rs/introduction.html#section" }));
+	assert.equal(env.headLinks.length, 1);
+	assert.equal(env.headLinks[0].rel, "prefetch");
+	assert.equal(env.headLinks[0].as, "document");
+	assert.equal(env.headLinks[0].href, "https://pina.rs/introduction.html");
+
+	// Excluded links add zero hints: external, download, new-tab, non-.html, current page.
+	dispatchOver(makeLink({ href: "https://example.com/guide.html" }));
+	dispatchOver(
+		makeLink({ href: "https://pina.rs/book.html", download: true }),
+	);
+	dispatchOver(
+		makeLink({ href: "https://pina.rs/other.html", target: "_blank" }),
+	);
+	dispatchOver(makeLink({ href: "https://pina.rs/spec.pdf" }));
+	dispatchOver(makeLink({ href: "https://pina.rs/index.html#hero" }));
+	assert.equal(env.headLinks.length, 1);
+
+	// 2. Data-saver and 2G connections skip prefetch registration entirely.
+	const saveDataEnv = runLanding({ saveData: true, effectiveType: "4g" });
+	assert.equal((saveDataEnv.docListeners.get("pointerover") ?? []).length, 0);
+
+	const slowEnv = runLanding({ saveData: false, effectiveType: "slow-2g" });
+	assert.equal((slowEnv.docListeners.get("pointerover") ?? []).length, 0);
 });

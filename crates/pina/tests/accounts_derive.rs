@@ -894,3 +894,67 @@ fn test_accounts_derive_mutable_then_readonly_allows_duplicate() {
 	assert_eq!(parsed.one.address(), &shared_key);
 	assert_eq!(parsed.two.address(), &shared_key);
 }
+
+struct TestAccountsFourUniqueMut<'a> {
+	pub one: &'a mut AccountView,
+	pub two: &'a mut AccountView,
+	pub three: &'a mut AccountView,
+	pub four: &'a mut AccountView,
+}
+
+impl<'a> ParseAccounts<'a> for TestAccountsFourUniqueMut<'a> {
+	const ACCOUNT_BOUND: usize = 4;
+	const ACCOUNT_LIMIT: usize = 4;
+	const ACCOUNT_MINIMUM: usize = 4;
+	const ALIAS_LAYOUT: __AliasLayout = __AliasLayout {
+		static_layout: true,
+		mut_mask: [0b1111, 0, 0, 0],
+		optional_mask: [0; 4],
+		unique_mask: [0b0001, 0, 0, 0],
+		remaining_mut_start: usize::MAX,
+		remaining_mut_distinct: false,
+	};
+
+	fn parse_accounts(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError> {
+		Ok(Self {
+			one: cursor.next_mut()?,
+			two: cursor.next_mut()?,
+			three: cursor.next_mut()?,
+			four: cursor.next_mut()?,
+		})
+	}
+}
+
+#[test]
+fn test_accounts_derive_four_unique_mut_fast_path_and_alias_rejection() {
+	let ix_data = [0u8; 16];
+	let mut distinct_input =
+		create_input_with_layout(4, &ix_data, |_| true, |_| false, unique_keys);
+	let mut distinct_accounts = [UNINIT; 4];
+	// SAFETY: the buffer encodes exactly four accounts.
+	let distinct_accounts = unsafe { slice_input(&mut distinct_input, &mut distinct_accounts) };
+	let parsed = __parse_derived_accounts::<TestAccountsFourUniqueMut<'_>, true>(
+		&MOCK_PROGRAM_ID,
+		distinct_accounts,
+	)
+	.unwrap();
+	assert_eq!(parsed.one.address(), &unique_keys(0));
+	assert_eq!(parsed.two.address(), &unique_keys(1));
+	assert_eq!(parsed.three.address(), &unique_keys(2));
+	assert_eq!(parsed.four.address(), &unique_keys(3));
+
+	let mut aliased = [
+		distinct_accounts[0],
+		distinct_accounts[1],
+		distinct_accounts[2],
+		distinct_accounts[2],
+	];
+	let expected: ProgramError = PinaProgramError::DuplicateMutableAccount.into();
+	assert!(matches!(
+		__parse_derived_accounts::<TestAccountsFourUniqueMut<'_>, true>(
+			&MOCK_PROGRAM_ID,
+			&mut aliased,
+		),
+		Err(err) if err == expected
+	));
+}

@@ -852,11 +852,13 @@ impl_account_validation!(
 
 #[cfg(feature = "token")]
 impl AsTokenAccount for AccountView {
+	#[inline]
 	#[cfg_attr(feature = "verbose-logs", track_caller)]
 	fn as_token_mint(&self) -> Result<Ref<'_, crate::token::state::Mint>, ProgramError> {
 		crate::token::state::Mint::from_account_view(self)
 	}
 
+	#[inline]
 	#[cfg_attr(feature = "verbose-logs", track_caller)]
 	fn as_token_mint_for_program(
 		&self,
@@ -865,11 +867,13 @@ impl AsTokenAccount for AccountView {
 		crate::token::TokenMintRef::from_account_view(self, token_program)
 	}
 
+	#[inline]
 	#[cfg_attr(feature = "verbose-logs", track_caller)]
 	fn as_token_account(&self) -> Result<Ref<'_, crate::token::state::TokenAccount>, ProgramError> {
 		crate::token::state::TokenAccount::from_account_view(self)
 	}
 
+	#[inline]
 	#[cfg_attr(feature = "verbose-logs", track_caller)]
 	fn as_token_account_for_program(
 		&self,

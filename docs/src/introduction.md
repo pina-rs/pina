@@ -2,9 +2,10 @@
 
 <p align="center">
 	<img
-		src="./assets/logo.png"
+		src="./assets/logo.svg"
 		alt="Pina: a pineapple made from interlocking ribbons"
 		width="140"
+		height="140"
 	>
 </p>
 

@@ -536,3 +536,36 @@ fn keys_point_at_the_migration_rebind_when_history_records_another_program() {
 	assert!(synced.status.success());
 	assert!(String::from_utf8_lossy(&synced.stdout).contains("still records program"));
 }
+
+#[test]
+fn version_fast_path_prints_package_version() {
+	let expected = format!("pina {}\n", env!("CARGO_PKG_VERSION"));
+	for flag in ["--version", "-V"] {
+		let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+			.arg(flag)
+			.output()
+			.expect("version command failed to launch");
+		assert!(output.status.success());
+		assert_eq!(String::from_utf8_lossy(&output.stdout), expected);
+	}
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn docs_reports_stdout_write_failures_and_exits_nonzero() {
+	let full = fs::OpenOptions::new()
+		.write(true)
+		.open("/dev/full")
+		.expect("open /dev/full");
+	let output = Command::new(env!("CARGO_BIN_EXE_pina"))
+		.args(["docs", "pina-overview"])
+		.stdout(std::process::Stdio::from(full))
+		.output()
+		.expect("docs command failed to launch");
+	assert!(!output.status.success());
+	assert!(
+		String::from_utf8_lossy(&output.stderr).contains("Failed to write documentation"),
+		"stderr: {}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+}

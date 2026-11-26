@@ -9,7 +9,7 @@
 	font-family: "Inter";
 	font-style: normal;
 	font-display: swap;
-	font-weight: 100 900;
+	font-weight: 400 700;
 	src: url('{{ resource "fonts/inter-latin-wght-normal.woff2" }}') format("woff2");
 }
 
@@ -17,7 +17,7 @@
 	font-family: "Inter";
 	font-style: italic;
 	font-display: swap;
-	font-weight: 100 900;
+	font-weight: 400 700;
 	src: url('{{ resource "fonts/inter-latin-wght-italic.woff2" }}') format("woff2");
 }
 
@@ -25,7 +25,7 @@
 	font-family: "Fraunces";
 	font-style: normal;
 	font-display: swap;
-	font-weight: 100 900;
+	font-weight: 560 650;
 	src: url('{{ resource "fonts/fraunces-latin-opsz-normal.woff2" }}') format("woff2");
 }
 
@@ -33,7 +33,7 @@
 	font-family: "Fraunces";
 	font-style: italic;
 	font-display: swap;
-	font-weight: 100 900;
+	font-weight: 400 700;
 	src: url('{{ resource "fonts/fraunces-latin-opsz-italic.woff2" }}') format("woff2");
 }
 
@@ -41,6 +41,6 @@
 	font-family: "JetBrains Mono";
 	font-style: normal;
 	font-display: swap;
-	font-weight: 100 800;
+	font-weight: 400 650;
 	src: url('{{ resource "fonts/jetbrains-mono-latin-wght-normal.woff2" }}') format("woff2");
 }

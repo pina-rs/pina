@@ -1034,9 +1034,10 @@ fn assert_bootstrap_authority(
 	authority: &AccountView,
 	program_data: &AccountView,
 ) -> ProgramResult {
-	let (expected, _) = Address::find_program_address(&[ID.as_ref()], &UPGRADEABLE_LOADER);
+	const PROGRAM_DATA: Address =
+		find_program_address_const(&[ID.as_array().as_slice()], &UPGRADEABLE_LOADER).0;
 	program_data
-		.assert_address(&expected)?
+		.assert_address(&PROGRAM_DATA)?
 		.assert_owner(&UPGRADEABLE_LOADER)?;
 	let data = program_data.try_borrow()?;
 

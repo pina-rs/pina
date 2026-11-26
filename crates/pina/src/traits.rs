@@ -1418,10 +1418,19 @@ impl<'a> AccountsCursor<'a> {
 	where
 		T: ParseAccounts<'a>,
 	{
-		if !self.check_duplicates {
+		if pinocchio::hint::likely(!self.check_duplicates) {
 			return Ok(());
 		}
 
+		self.validate_child_aliasing_slow::<T>()
+	}
+
+	#[cold]
+	#[inline(never)]
+	fn validate_child_aliasing_slow<T>(&self) -> ProgramResult
+	where
+		T: ParseAccounts<'a>,
+	{
 		let bounded = self
 			.remaining
 			.get(..T::ACCOUNT_LIMIT)
@@ -1822,6 +1831,18 @@ const fn nth_set_bit(mut mask: u64, mut n: usize) -> usize {
 	mask.trailing_zeros() as usize
 }
 
+const fn alias_pair_forbidden(
+	limit: usize,
+	mut_mask: u64,
+	unique_mask: u64,
+	i: usize,
+	j: usize,
+) -> bool {
+	j < limit
+		&& ((((unique_mask >> i) | (unique_mask >> j)) & 1) != 0
+			|| (((mut_mask >> i) & (mut_mask >> j) & 1) != 0))
+}
+
 #[inline(always)]
 fn run_static_alias_check<'a, T: ParseAccounts<'a>>(
 	program_id: &Address,
@@ -1880,6 +1901,77 @@ fn run_static_alias_check<'a, T: ParseAccounts<'a>>(
 		}
 	} else if const { T::ALIAS_LAYOUT.is_simple_mut_64() } {
 		validate_mut_aliasing_64(accounts, const { T::ALIAS_LAYOUT.mut_mask[0] })
+	} else if const {
+		T::ALIAS_LAYOUT.is_compact_32()
+			&& T::ALIAS_LAYOUT.optional_mask[0] == 0
+			&& T::ALIAS_LAYOUT.remaining_mut_start == usize::MAX
+			&& T::ACCOUNT_LIMIT <= 4
+	} {
+		let distinct = accounts.len() >= T::ACCOUNT_LIMIT
+			&& (const {
+				!alias_pair_forbidden(
+					T::ACCOUNT_LIMIT,
+					T::ALIAS_LAYOUT.mut_mask[0],
+					T::ALIAS_LAYOUT.unique_mask[0],
+					0,
+					1,
+				)
+			} || accounts[0] != accounts[1])
+			&& (const {
+				!alias_pair_forbidden(
+					T::ACCOUNT_LIMIT,
+					T::ALIAS_LAYOUT.mut_mask[0],
+					T::ALIAS_LAYOUT.unique_mask[0],
+					0,
+					2,
+				)
+			} || accounts[0] != accounts[2])
+			&& (const {
+				!alias_pair_forbidden(
+					T::ACCOUNT_LIMIT,
+					T::ALIAS_LAYOUT.mut_mask[0],
+					T::ALIAS_LAYOUT.unique_mask[0],
+					0,
+					3,
+				)
+			} || accounts[0] != accounts[3])
+			&& (const {
+				!alias_pair_forbidden(
+					T::ACCOUNT_LIMIT,
+					T::ALIAS_LAYOUT.mut_mask[0],
+					T::ALIAS_LAYOUT.unique_mask[0],
+					1,
+					2,
+				)
+			} || accounts[1] != accounts[2])
+			&& (const {
+				!alias_pair_forbidden(
+					T::ACCOUNT_LIMIT,
+					T::ALIAS_LAYOUT.mut_mask[0],
+					T::ALIAS_LAYOUT.unique_mask[0],
+					1,
+					3,
+				)
+			} || accounts[1] != accounts[3])
+			&& (const {
+				!alias_pair_forbidden(
+					T::ACCOUNT_LIMIT,
+					T::ALIAS_LAYOUT.mut_mask[0],
+					T::ALIAS_LAYOUT.unique_mask[0],
+					2,
+					3,
+				)
+			} || accounts[2] != accounts[3]);
+		if pinocchio::hint::likely(distinct) {
+			ALIAS_OK
+		} else {
+			let bounded = accounts.get(..T::ACCOUNT_LIMIT).unwrap_or(accounts);
+			let mut_and_opt = const { T::ALIAS_LAYOUT.mut_mask[0] & 0xFFFF_FFFF };
+			let unique_and_rem = const {
+				(T::ALIAS_LAYOUT.unique_mask[0] & 0xFFFF_FFFF) | (COMPACT_NO_REMAINING_MUT << 32)
+			};
+			validate_account_aliasing_compact(program_id, bounded, mut_and_opt, unique_and_rem)
+		}
 	} else if const { T::ALIAS_LAYOUT.is_compact_32() } {
 		let bounded = accounts.get(..T::ACCOUNT_LIMIT).unwrap_or(accounts);
 		let mut_and_opt = const {
@@ -2799,5 +2891,24 @@ mod tests {
 		assert_eq!(nth_set_bit(mask, 1), 5);
 		assert_eq!(nth_set_bit(mask, 2), 11);
 		assert_eq!(nth_set_bit(mask, 3), 40);
+	}
+
+	#[test]
+	fn alias_pair_forbidden_matches_unique_and_mutable_rules() {
+		// 3 slots: slot 0 ro, slot 1 unique mut, slot 2 mut.
+		let mut_mask = 0b110;
+		let unique_mask = 0b010;
+		assert!(alias_pair_forbidden(3, mut_mask, unique_mask, 0, 1));
+		assert!(!alias_pair_forbidden(3, mut_mask, unique_mask, 0, 2));
+		assert!(!alias_pair_forbidden(3, mut_mask, unique_mask, 0, 3));
+		assert!(alias_pair_forbidden(3, mut_mask, unique_mask, 1, 2));
+		assert!(!alias_pair_forbidden(3, mut_mask, unique_mask, 1, 3));
+		assert!(!alias_pair_forbidden(3, mut_mask, unique_mask, 2, 3));
+
+		// 4 slots: slot 0 unique ro, slot 1 ro, slot 2 mut, slot 3 mut.
+		assert!(alias_pair_forbidden(4, 0b1100, 0b0001, 0, 1));
+		assert!(alias_pair_forbidden(4, 0b1100, 0b0001, 0, 3));
+		assert!(!alias_pair_forbidden(4, 0b1100, 0b0001, 1, 2));
+		assert!(alias_pair_forbidden(4, 0b1100, 0b0001, 2, 3));
 	}
 }

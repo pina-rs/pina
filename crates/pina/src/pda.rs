@@ -118,9 +118,10 @@ fn sbf_derive_pda(
 	}
 
 	// When `search_bump` is false, starting at `1` makes `bump <= 1` exit after
-	// a single hash with zero extra branch inside the hot loop.
-	let mut bump = if search_bump { u8::MAX } else { 1 };
-	let mut bump_seed = [bump];
+	// a single hash with zero extra branch inside the hot loop. Keeping `bump`
+	// as `u64` avoids zero-extending `u8` on every bump iteration.
+	let mut bump = if search_bump { u8::MAX as u64 } else { 1_u64 };
+	let mut bump_seed = [bump as u8];
 	let bump_ptr = bump_seed.as_mut_ptr();
 	let mut inputs = [const { core::mem::MaybeUninit::<SolBytes>::uninit() }; crate::MAX_SEEDS + 2];
 
@@ -170,14 +171,91 @@ fn sbf_derive_pda(
 		loop {
 			solana_sha256_hasher::sol_sha256(dst.cast::<u8>(), count, out_ptr);
 			if !solana_address::bytes_are_curve_point(out.assume_init_ref()) {
-				return bump;
+				return bump as u8;
 			}
 
 			if bump <= 1 {
 				return 0;
 			}
 			bump -= 1;
-			*bump_ptr = bump;
+			*bump_ptr = bump as u8;
+		}
+	}
+}
+
+/// Dedicated SBF ATA PDA derivation kernel.
+///
+/// Exploits the fixed 3×32-byte seed shape (`[wallet, token_program, mint]`)
+/// and coalesces `[bump (1 B) || ATA_PROGRAM_ID (32 B)]` into a single 33-byte
+/// stack slice so `sol_sha256` charges `max(10, 33 / 2) = 16 CU` instead of
+/// `max(10, 0) + max(10, 16) = 26 CU` on every bump iteration (-10 CU/bump)
+/// without seed-length loops or intermediate slice copies.
+#[cfg(all(feature = "token", any(target_os = "solana", target_arch = "bpf")))]
+#[inline(never)]
+#[allow(unsafe_code)]
+pub(crate) fn sbf_derive_ata(
+	wallet_address: &Address,
+	token_mint_address: &Address,
+	token_program_id: &Address,
+) -> Option<(Address, u8)> {
+	const TAIL_LEN: usize = 1 + crate::ADDRESS_BYTES;
+	const INITIAL_TAIL: [u8; TAIL_LEN] = {
+		let mut buf = [0_u8; TAIL_LEN];
+		buf[0] = u8::MAX;
+		let id = pinocchio_associated_token_account::ID.as_array();
+		let mut i = 0;
+		while i < crate::ADDRESS_BYTES {
+			buf[i + 1] = id[i];
+			i += 1;
+		}
+		buf
+	};
+
+	let mut tail = INITIAL_TAIL;
+	let bump_ptr = tail.as_mut_ptr();
+	let inputs = [
+		SolBytes {
+			addr: wallet_address.as_ref().as_ptr(),
+			len: crate::ADDRESS_BYTES as u64,
+		},
+		SolBytes {
+			addr: token_program_id.as_ref().as_ptr(),
+			len: crate::ADDRESS_BYTES as u64,
+		},
+		SolBytes {
+			addr: token_mint_address.as_ref().as_ptr(),
+			len: crate::ADDRESS_BYTES as u64,
+		},
+		SolBytes {
+			addr: bump_ptr.cast_const(),
+			len: TAIL_LEN as u64,
+		},
+		SolBytes {
+			addr: solana_address::PDA_MARKER.as_ptr(),
+			len: solana_address::PDA_MARKER.len() as u64,
+		},
+	];
+	let mut out = core::mem::MaybeUninit::<[u8; crate::ADDRESS_BYTES]>::uninit();
+	let mut bump = u8::MAX as u64;
+
+	// SAFETY: All 5 `SolBytes` descriptors point to valid memory for the
+	// lifetime of this function; `bump_ptr` is the sole pointer provenance for
+	// `tail`, and `sol_sha256` initializes all 32 bytes of `out`.
+	unsafe {
+		let inputs_ptr = inputs.as_ptr().cast::<u8>();
+		let out_ptr = out.as_mut_ptr().cast::<u8>();
+
+		loop {
+			solana_sha256_hasher::sol_sha256(inputs_ptr, inputs.len() as u64, out_ptr);
+			if !solana_address::bytes_are_curve_point(out.assume_init_ref()) {
+				return Some((Address::new_from_array(out.assume_init()), bump as u8));
+			}
+
+			if bump <= 1 {
+				return None;
+			}
+			bump -= 1;
+			*bump_ptr = bump as u8;
 		}
 	}
 }
@@ -224,11 +302,45 @@ pub fn try_find_program_address(seeds: &[&[u8]], program_id: &Address) -> Option
 
 	#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
 	{
-		if seeds.len() >= crate::MAX_SEEDS {
+		host_find_program_address_with_range(seeds, program_id, u8::MAX)
+	}
+}
+
+#[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+fn host_find_program_address_with_range(
+	seeds: &[&[u8]],
+	program_id: &Address,
+	start_bump: u8,
+) -> Option<(Address, u8)> {
+	if seeds.len() >= crate::MAX_SEEDS {
+		return None;
+	}
+
+	let mut prefix_hasher = solana_sha256_hasher::Hasher::default();
+	for seed in seeds {
+		if seed.len() > crate::MAX_SEED_LEN {
 			return None;
 		}
-		Address::try_find_program_address(seeds, program_id)
+		prefix_hasher.hash(seed);
 	}
+
+	let mut bump = start_bump;
+	while bump > 0 {
+		let bump_seed = [bump];
+		let mut hasher = prefix_hasher.clone();
+		hasher.hashv(&[
+			&bump_seed,
+			program_id.as_ref(),
+			solana_address::PDA_MARKER.as_slice(),
+		]);
+		let derived = hasher.result().to_bytes();
+		if !is_on_curve_const(&derived) {
+			return Some((Address::new_from_array(derived), bump));
+		}
+		bump -= 1;
+	}
+
+	None
 }
 
 /// Create a valid program derived address without searching for a bump seed.
@@ -300,7 +412,7 @@ pub fn create_program_address(
 		hasher.hashv(&[program_id.as_ref(), solana_address::PDA_MARKER.as_slice()]);
 		let derived = hasher.result().to_bytes();
 
-		if solana_address::bytes_are_curve_point(derived) {
+		if is_on_curve_const(&derived) {
 			return Err(ProgramError::InvalidSeeds);
 		}
 
@@ -433,7 +545,6 @@ impl Fe51 {
 	]);
 	const MASK: u64 = (1_u64 << 51) - 1;
 	const ONE: Self = Self([1, 0, 0, 0, 0]);
-	const ZERO: Self = Self([0, 0, 0, 0, 0]);
 
 	const fn load8(bytes: &[u8; 32], offset: usize) -> u64 {
 		u64::from_le_bytes([
@@ -541,28 +652,37 @@ impl Fe51 {
 		Self::reduce([h0, h1, h2, h3, h4])
 	}
 
-	const fn pow2k(mut self, mut k: u32) -> Self {
-		while k > 0 {
-			self = self.mul(self);
-			k -= 1;
-		}
-		self
-	}
+	const fn square(self) -> Self {
+		let a0 = self.0[0] as u128;
+		let a1 = self.0[1] as u128;
+		let a2 = self.0[2] as u128;
+		let a3 = self.0[3] as u128;
+		let a4 = self.0[4] as u128;
 
-	/// Computes `self^((p - 5) / 8) = self^(2^252 - 3)`.
-	const fn pow_p58(self) -> Self {
-		let t0 = self.mul(self);
-		let t1 = t0.pow2k(2).mul(self);
-		let t2 = t1.mul(t0);
-		let t3 = t2.mul(t2).mul(t1);
-		let t4 = t3.pow2k(5).mul(t3);
-		let t5 = t4.pow2k(10).mul(t4);
-		let t6 = t5.pow2k(20).mul(t5);
-		let t7 = t6.pow2k(10).mul(t4);
-		let t8 = t7.pow2k(50).mul(t7);
-		let t9 = t8.pow2k(100).mul(t8);
-		let t10 = t9.pow2k(50).mul(t7);
-		t10.pow2k(2).mul(self)
+		let a0_2 = a0 * 2;
+		let a1_2 = a1 * 2;
+		let a3_19 = a3 * 19;
+		let a4_19 = a4 * 19;
+		let a4_38 = a4_19 * 2;
+
+		let c0 = a0 * a0 + a1 * a4_38 + (a2 * 2) * a3_19;
+		let mut c1 = a0_2 * a1 + a2 * a4_38 + a3 * a3_19;
+		let mut c2 = a0_2 * a2 + a1 * a1 + a3 * a4_38;
+		let mut c3 = a0_2 * a3 + a1_2 * a2 + a4 * a4_19;
+		let mut c4 = a0_2 * a4 + a1_2 * a3 + a2 * a2;
+
+		let mut h0 = (c0 as u64) & Self::MASK;
+		c1 += c0 >> 51;
+		let h1 = (c1 as u64) & Self::MASK;
+		c2 += c1 >> 51;
+		let h2 = (c2 as u64) & Self::MASK;
+		c3 += c2 >> 51;
+		let h3 = (c3 as u64) & Self::MASK;
+		c4 += c3 >> 51;
+		let h4 = (c4 as u64) & Self::MASK;
+		h0 += ((c4 >> 51) as u64) * 19;
+
+		Self::reduce([h0, h1, h2, h3, h4])
 	}
 
 	const fn canonical(self) -> [u64; 5] {
@@ -585,28 +705,140 @@ impl Fe51 {
 			h
 		}
 	}
+}
 
-	const fn eq_canonical(self, other: Self) -> bool {
-		let a = self.canonical();
-		let b = other.canonical();
-		a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3] && a[4] == b[4]
+#[inline(always)]
+const fn sub_with_borrow(lhs: u64, rhs: u64, borrow_in: bool) -> (u64, bool) {
+	let (diff, underflow) = lhs.overflowing_sub(rhs);
+	let (final_diff, borrow_underflow) = diff.overflowing_sub(borrow_in as u64);
+	(final_diff, underflow | borrow_underflow)
+}
+
+/// Evaluates whether canonical `a` in `[0, p)` is zero or a quadratic residue
+/// modulo $p = 2^{255} - 19$ using a branchless binary Jacobi symbol.
+///
+/// Since $p$ is prime, for any $0 < a < p$ we have $\gcd(a, p) = 1$, so the
+/// binary Euclidean loop preserves $\gcd(a, b) = 1$ until reaching `a == 1`.
+const fn jacobi_is_non_negative_mod_p(mut a: [u64; 4]) -> bool {
+	if (a[0] | a[1] | a[2] | a[3]) == 0 {
+		return true;
 	}
+
+	let mut b: [u64; 4] = [u64::MAX - 18, u64::MAX, u64::MAX, 0x7FFF_FFFF_FFFF_FFFF];
+	// Bit 0 tracks the sign parity (`0` => +1, `1` => -1).
+	let mut sign = 0_u64;
+
+	// Strip initial powers of 2 from `a` once before the loop so every later
+	// difference `|a - b|` is guaranteed non-zero and even (`tz >= 1`).
+	while a[0] == 0 {
+		a = [a[1], a[2], a[3], 0];
+	}
+	let init_tz = a[0].trailing_zeros();
+	if init_tz != 0 {
+		sign ^= (init_tz as u64) & (b[0].wrapping_add(2) >> 2);
+		let rev = 64 - init_tz;
+		a[0] = (a[0] >> init_tz) | (a[1] << rev);
+		a[1] = (a[1] >> init_tz) | (a[2] << rev);
+		a[2] = (a[2] >> init_tz) | (a[3] << rev);
+		a[3] >>= init_tz;
+	}
+
+	if a[0] == 1 && (a[1] | a[2] | a[3]) == 0 {
+		return (sign & 1) == 0;
+	}
+
+	while (a[2] | a[3] | b[2] | b[3]) != 0 && !(a[0] == 1 && (a[1] | a[2] | a[3]) == 0) {
+		let a_lt_b = if a[3] != b[3] {
+			a[3] < b[3]
+		} else if a[2] != b[2] {
+			a[2] < b[2]
+		} else if a[1] != b[1] {
+			a[1] < b[1]
+		} else {
+			a[0] < b[0]
+		};
+
+		if a_lt_b {
+			sign ^= (a[0] & b[0]) >> 1;
+			let tmp = a;
+			a = b;
+			b = tmp;
+		}
+
+		let (d0, b0) = a[0].overflowing_sub(b[0]);
+		let (d1, b1) = sub_with_borrow(a[1], b[1], b0);
+		let (d2, b2) = sub_with_borrow(a[2], b[2], b1);
+		let d3 = a[3].wrapping_sub(b[3]).wrapping_sub(b2 as u64);
+		a = [d0, d1, d2, d3];
+
+		while a[0] == 0 {
+			a = [a[1], a[2], a[3], 0];
+		}
+		let tz = a[0].trailing_zeros();
+		if tz != 0 {
+			sign ^= (tz as u64) & (b[0].wrapping_add(2) >> 2);
+			let rev = 64 - tz;
+			a[0] = (a[0] >> tz) | (a[1] << rev);
+			a[1] = (a[1] >> tz) | (a[2] << rev);
+			a[2] = (a[2] >> tz) | (a[3] << rev);
+			a[3] >>= tz;
+		}
+	}
+
+	let mut a128 = (a[0] as u128) | ((a[1] as u128) << 64);
+	let mut b128 = (b[0] as u128) | ((b[1] as u128) << 64);
+
+	while a128 != 1 && ((a128 | b128) >> 64) != 0 {
+		if a128 < b128 {
+			sign ^= ((a128 as u64) & (b128 as u64)) >> 1;
+			let tmp = a128;
+			a128 = b128;
+			b128 = tmp;
+		}
+		a128 -= b128;
+		let tz = a128.trailing_zeros();
+		sign ^= (tz as u64) & ((b128 as u64).wrapping_add(2) >> 2);
+		a128 >>= tz;
+	}
+
+	let mut a64 = a128 as u64;
+	let mut b64 = b128 as u64;
+
+	while a64 != 1 {
+		if a64 < b64 {
+			sign ^= (a64 & b64) >> 1;
+			let tmp = a64;
+			a64 = b64;
+			b64 = tmp;
+		}
+		a64 -= b64;
+		let tz = a64.trailing_zeros();
+		sign ^= (tz as u64) & (b64.wrapping_add(2) >> 2);
+		a64 >>= tz;
+	}
+
+	(sign & 1) == 0
 }
 
 /// Pure `const fn` check matching `solana_address::bytes_are_curve_point`
 /// (`curve25519_dalek::edwards::CompressedEdwardsY::decompress().is_some()`).
+///
+/// Since $v = d y^2 + 1 \not\equiv 0 \pmod p$ for all $y \in \mathbb{F}_p$,
+/// $x^2 = u / v$ has a root in $\mathbb{F}_p$ iff $u v \equiv 0 \pmod p$ or
+/// the Legendre symbol $\left(\frac{u v}{p}\right) = +1$.
 pub(crate) const fn is_on_curve_const(bytes: &[u8; 32]) -> bool {
 	let y = Fe51::from_bytes(bytes);
-	let yy = y.mul(y);
+	let yy = y.square();
 	let u = yy.sub(Fe51::ONE);
 	let v = yy.mul(Fe51::EDWARDS_D).add(Fe51::ONE);
+	let uv = u.mul(v).canonical();
 
-	let v3 = v.mul(v).mul(v);
-	let v7 = v3.mul(v3).mul(v);
-	let r = u.mul(v3).mul(u.mul(v7).pow_p58());
-	let check = v.mul(r.mul(r));
+	let a0 = uv[0] | (uv[1] << 51);
+	let a1 = (uv[1] >> 13) | (uv[2] << 38);
+	let a2 = (uv[2] >> 26) | (uv[3] << 25);
+	let a3 = (uv[3] >> 39) | (uv[4] << 12);
 
-	check.eq_canonical(u) || check.eq_canonical(Fe51::ZERO.sub(u))
+	jacobi_is_non_negative_mod_p([a0, a1, a2, a3])
 }
 
 /// Derive a canonical PDA and bump seed at compile time.
@@ -920,10 +1152,79 @@ mod tests {
 
 		// Confirm `Fe51::canonical` uniquely normalizes limb-1 carry states
 		// (`h[1] == 2^51` when value < p, and all-MASK wrap carry).
-		assert!(Fe51([0, 1_u64 << 51, 0, 0, 0]).eq_canonical(Fe51([0, 0, 1, 0, 0])));
-		assert!(
-			Fe51([Fe51::MASK, 1_u64 << 51, Fe51::MASK, Fe51::MASK, Fe51::MASK])
-				.eq_canonical(Fe51([18, 1, 0, 0, 0]))
+		assert_eq!(
+			Fe51([0, 1_u64 << 51, 0, 0, 0]).canonical(),
+			Fe51([0, 0, 1, 0, 0]).canonical()
+		);
+		assert_eq!(
+			Fe51([Fe51::MASK, 1_u64 << 51, Fe51::MASK, Fe51::MASK, Fe51::MASK]).canonical(),
+			Fe51([18, 1, 0, 0, 0]).canonical()
+		);
+
+		// Exercise every branch of `jacobi_is_non_negative_mod_p`:
+		// zero, powers of 2^64 (whole-limb shifts), quadratic residue/non-residue
+		// small values, and all four limb-comparison tie-breakers against `p`.
+		assert!(jacobi_is_non_negative_mod_p([0, 0, 0, 0]));
+		assert!(jacobi_is_non_negative_mod_p([1, 0, 0, 0]));
+		// 2 is a non-residue mod p since p == 5 (mod 8).
+		assert!(!jacobi_is_non_negative_mod_p([2, 0, 0, 0]));
+		// 2^64 = (2^32)^2, 2^128, 2^192 are squares mod p.
+		assert!(jacobi_is_non_negative_mod_p([0, 1, 0, 0]));
+		assert!(jacobi_is_non_negative_mod_p([0, 0, 1, 0]));
+		assert!(jacobi_is_non_negative_mod_p([0, 0, 0, 1]));
+		// Tie-breakers where top 1, 2, or 3 limbs equal `p`'s limbs:
+		// `p == 1 (mod 4)`, so `-1 == p - 1` is a square and `-2 == p - 2` is not.
+		assert!(jacobi_is_non_negative_mod_p([
+			u64::MAX - 19,
+			u64::MAX,
+			u64::MAX,
+			0x7FFF_FFFF_FFFF_FFFF,
+		]));
+		// Odd `p - 2` matches `p` in limbs 3, 2, 1 so `a[0] < b[0]` breaks the tie.
+		assert!(!jacobi_is_non_negative_mod_p([
+			u64::MAX - 20,
+			u64::MAX,
+			u64::MAX,
+			0x7FFF_FFFF_FFFF_FFFF,
+		]));
+		// Matches `p` in limb 3 only (`a[2] != b[2]`) and in limbs 3..=2 (`a[1] != b[1]`).
+		let _ = jacobi_is_non_negative_mod_p([1, 0, 1, 0x7FFF_FFFF_FFFF_FFFF]);
+		let _ = jacobi_is_non_negative_mod_p([1, 1, u64::MAX, 0x7FFF_FFFF_FFFF_FFFF]);
+		// `p - 2^64`: matches `p` in limbs 3, 2, 0 so `b - a = 2^64` triggers
+		// the post-subtraction whole-limb shift and early `a == 1` exit.
+		// `-2^64 == (-1) * (2^32)^2` is a square mod p since p == 1 (mod 4).
+		assert!(jacobi_is_non_negative_mod_p([
+			u64::MAX - 18,
+			u64::MAX - 1,
+			u64::MAX,
+			0x7FFF_FFFF_FFFF_FFFF,
+		]));
+
+		// Host PDA search matches `solana_address::Address::try_find_program_address`
+		// and handles all error / exhaustion boundaries.
+		for seed in [
+			b"a".as_slice(),
+			b"vault",
+			b"escrow",
+			b"profile-seed-longer-than-block-12345",
+		] {
+			assert_eq!(
+				try_find_program_address(&[seed], &crate::system::ID),
+				Address::try_find_program_address(&[seed], &crate::system::ID)
+			);
+		}
+		assert_eq!(
+			try_find_program_address(&[&[0_u8; 33]], &crate::system::ID),
+			None
+		);
+		let too_many: [&[u8]; crate::MAX_SEEDS] = [b"s"; crate::MAX_SEEDS];
+		assert_eq!(
+			try_find_program_address(&too_many, &crate::system::ID),
+			None
+		);
+		assert_eq!(
+			host_find_program_address_with_range(&[b"x"], &crate::system::ID, 0),
+			None
 		);
 	}
 }

@@ -443,10 +443,15 @@ function taskDocsApi(): void {
 }
 
 function taskDocsBuild(): void {
+	const bookDir = join(REPO_ROOT, "docs/book");
 	run("mdbook", ["build", join(REPO_ROOT, "docs")]);
 	run(process.execPath, [
+		join(REPO_ROOT, "scripts/docs/optimize-book.ts"),
+		bookDir,
+	]);
+	run(process.execPath, [
 		join(REPO_ROOT, "scripts/docs/build-landing.ts"),
-		join(REPO_ROOT, "docs/book"),
+		bookDir,
 	]);
 }
 
@@ -459,15 +464,20 @@ function taskVerifyDocs(): void {
 		}
 	}
 
+	const bookDir = join(REPO_ROOT, "target/mdbook");
 	run("mdbook", [
 		"build",
 		join(REPO_ROOT, "docs"),
 		"-d",
-		join(REPO_ROOT, "target/mdbook"),
+		bookDir,
+	]);
+	run(process.execPath, [
+		join(REPO_ROOT, "scripts/docs/optimize-book.ts"),
+		bookDir,
 	]);
 	run(process.execPath, [
 		join(REPO_ROOT, "scripts/docs/build-landing.ts"),
-		join(REPO_ROOT, "target/mdbook"),
+		bookDir,
 	]);
 	taskDocsApi();
 	run(process.execPath, [join(REPO_ROOT, "scripts/check-migration-docs.mjs")]);

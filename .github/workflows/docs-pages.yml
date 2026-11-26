@@ -10,7 +10,7 @@ on:
       - "api-docs.t.md"
       - "readme.md"
       - "devenv.nix"
-      - "scripts/docs/build-landing.ts"
+      - "scripts/docs/**"
       - ".github/workflows/docs-pages.yml"
   release:
     types: [published]
