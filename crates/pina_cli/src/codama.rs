@@ -9,16 +9,17 @@ use std::process::ExitStatus;
 use std::process::Stdio;
 
 use atomic_write_file::AtomicWriteFile;
+use codama_nodes::RootNode;
 use pina_cli_renderer::RenderConfig as CliRenderConfig;
 use pina_cli_renderer::RenderMode as CliRenderMode;
-use pina_cli_renderer::render_idl_file as render_cli_idl_file;
+use pina_cli_renderer::render_root_node as render_cli_root_node;
 use pina_codama_renderer::RenderConfig;
 use pina_codama_renderer::RenderMode as RustRenderMode;
-use pina_codama_renderer::render_idl_file;
+use pina_codama_renderer::render_root_node;
 use pina_cpi_renderer::RenderConfig as CpiRenderConfig;
 use pina_cpi_renderer::RenderMode as CpiRenderMode;
 use pina_cpi_renderer::ScaffoldDependency as CpiScaffoldDependency;
-use pina_cpi_renderer::render_idl_file as render_cpi_idl_file;
+use pina_cpi_renderer::render_root_node as render_cpi_root_node;
 
 use crate::compute_units::MeasurementUse;
 use crate::compute_units::stale_measurement_warning;
@@ -1102,6 +1103,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	}
 
 	let mut idl_paths = Vec::with_capacity(plan.programs.len());
+	let mut idl_roots = Vec::with_capacity(plan.programs.len());
 	for (example, program_path) in &plan.programs {
 		let name_override = plan.override_idl_names.then_some(example.as_str());
 		// Generated clients are committed, so a measurement for an undeclared
@@ -1130,12 +1132,13 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 			}
 		})?;
 		idl_paths.push(idl_path);
+		idl_roots.push(idl);
 	}
 
 	if plan.clients.contains(&ClientLanguage::Rust) {
 		let settings = plan.generation[&ClientLanguage::Rust];
 
-		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
+		for (example, idl_root) in examples.iter().zip(idl_roots.iter()) {
 			let crate_dir = plan.rust_out.join(example);
 			validate_render_target(&crate_dir)?;
 			let render_config = RenderConfig {
@@ -1144,7 +1147,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 				..RenderConfig::default()
 			};
 			let scaffolds_manifest = scaffolds_manifest(&crate_dir, settings.scaffold);
-			render_rust_client(idl_path, &crate_dir, &render_config)?;
+			render_rust_client(idl_root, &crate_dir, &render_config)?;
 			finish_client_manifest(&crate_dir, scaffolds_manifest)?;
 		}
 	}
@@ -1152,7 +1155,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	if plan.clients.contains(&ClientLanguage::Cpi) {
 		let settings = plan.generation[&ClientLanguage::Cpi];
 
-		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
+		for (example, idl_root) in examples.iter().zip(idl_roots.iter()) {
 			let crate_dir = plan.cpi_out.join(example);
 			validate_render_target(&crate_dir)?;
 			let render_config = CpiRenderConfig {
@@ -1167,7 +1170,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 				..CpiRenderConfig::default()
 			};
 			let scaffolds_manifest = scaffolds_manifest(&crate_dir, settings.scaffold);
-			render_cpi_client(idl_path, &crate_dir, &render_config)?;
+			render_cpi_client(idl_root, &crate_dir, &render_config)?;
 			finish_client_manifest(&crate_dir, scaffolds_manifest)?;
 		}
 	}
@@ -1222,7 +1225,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 	if plan.clients.contains(&ClientLanguage::CliRust) {
 		let settings = plan.generation[&ClientLanguage::CliRust];
 
-		for (example, idl_path) in examples.iter().zip(idl_paths.iter()) {
+		for (example, idl_root) in examples.iter().zip(idl_roots.iter()) {
 			let crate_dir = plan.cli_rust_out.join(example);
 			validate_generation_target(&crate_dir, settings)?;
 			let client_dir = plan.rust_out.join(example);
@@ -1235,7 +1238,7 @@ fn generate_plan(plan: &GenerationPlan) -> Result<Vec<PathBuf>, CodamaError> {
 				client_path,
 			};
 			let scaffolds_manifest = scaffolds_manifest(&crate_dir, settings.scaffold);
-			render_cli_idl_file(idl_path, &crate_dir, &render_config).map_err(|source| {
+			render_cli_root_node(idl_root, &crate_dir, &render_config).map_err(|source| {
 				CodamaError::RenderCli {
 					path: crate_dir.clone(),
 					source,
@@ -1832,11 +1835,11 @@ fn create_output_dir(path: &Path) -> Result<(), CodamaError> {
 }
 
 fn render_rust_client(
-	idl_path: &Path,
+	root: &RootNode,
 	crate_dir: &Path,
 	config: &RenderConfig,
 ) -> Result<(), CodamaError> {
-	render_idl_file(idl_path, crate_dir, config).map_err(|source| {
+	render_root_node(root, crate_dir, config).map_err(|source| {
 		CodamaError::RenderRust {
 			path: crate_dir.to_path_buf(),
 			source,
@@ -1845,11 +1848,11 @@ fn render_rust_client(
 }
 
 fn render_cpi_client(
-	idl_path: &Path,
+	root: &RootNode,
 	crate_dir: &Path,
 	config: &CpiRenderConfig,
 ) -> Result<(), CodamaError> {
-	render_cpi_idl_file(idl_path, crate_dir, config)
+	render_cpi_root_node(root, crate_dir, config)
 		.map_err(|source| cpi_render_error(crate_dir, source))
 }
 
@@ -1952,6 +1955,12 @@ const fn has_windows_reparse_attribute(attributes: u32) -> bool {
 
 fn write_idl_atomic(path: &Path, contents: &[u8]) -> std::io::Result<()> {
 	use std::io::Write;
+
+	if std::fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file())
+		&& std::fs::read(path).ok().as_deref() == Some(contents)
+	{
+		return Ok(());
+	}
 
 	let mut file = AtomicWriteFile::open(path)?;
 	file.write_all(contents)?;
@@ -3445,13 +3454,13 @@ mod tests {
 
 	#[test]
 	fn cpi_renderer_failures_preserve_the_output_path() {
-		let output = Path::new("clients/cpi");
-		let error = render_cpi_client(
-			Path::new("missing-cpi-idl.json"),
-			output,
-			&CpiRenderConfig::default(),
-		)
-		.expect_err("missing IDL should fail");
+		let temp =
+			tempfile::TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
+		let output = temp.path().join("blocked-cpi");
+		std::fs::write(&output, b"not a directory").expect("failed to write blocking file");
+		let root = RootNode::new(codama_nodes::ProgramNode::default());
+		let error = render_cpi_client(&root, &output, &CpiRenderConfig::default())
+			.expect_err("blocked output directory should fail");
 
 		assert!(matches!(error, CodamaError::RenderCpi { path, .. } if path == output));
 	}
@@ -3706,17 +3715,22 @@ mod tests {
 
 		std::fs::remove_dir_all(&plan.idls_dir)
 			.unwrap_or_else(|error| panic!("failed to clear IDL output: {error}"));
-		let invalid_idl = temp_root.join("invalid.json");
-		std::fs::write(&invalid_idl, b"not json")
-			.unwrap_or_else(|error| panic!("failed to write invalid IDL: {error}"));
+		let blocked_rust = temp_root.join("blocked-rust");
+		std::fs::write(&blocked_rust, b"not a dir").expect("failed to write blocking file");
+		let root = RootNode::new(codama_nodes::ProgramNode::default());
 		assert!(matches!(
-			render_rust_client(
-				&invalid_idl,
-				&temp_root.join("rust"),
-				&RenderConfig::default(),
-			),
+			render_rust_client(&root, &blocked_rust, &RenderConfig::default()),
 			Err(CodamaError::RenderRust { .. })
 		));
+
+		let idl_file = temp_root.join("unchanged.json");
+		write_idl_atomic(&idl_file, b"{\"kind\":\"rootNode\"}").expect("initial write failed");
+		write_idl_atomic(&idl_file, b"{\"kind\":\"rootNode\"}").expect("unchanged rewrite failed");
+		write_idl_atomic(&idl_file, b"{\"kind\":\"updated\"}").expect("changed rewrite failed");
+		assert_eq!(
+			std::fs::read(&idl_file).expect("read failed"),
+			b"{\"kind\":\"updated\"}"
+		);
 	}
 
 	#[cfg(unix)]

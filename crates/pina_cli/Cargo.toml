@@ -41,7 +41,6 @@ pina_cpi_renderer = { workspace = true }
 pina_profile = { workspace = true }
 proc-macro2 = { workspace = true, features = ["span-locations"], default-features = true }
 quote = { workspace = true, default-features = true }
-rayon = { workspace = true, default-features = true }
 same-file = { workspace = true, default-features = true }
 semver = { workspace = true, default-features = true }
 serde = { workspace = true, features = ["derive"], default-features = true }

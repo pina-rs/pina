@@ -6,8 +6,6 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use rayon::prelude::*;
-
 use crate::error::IdlError;
 
 /// A resolved source file with its parsed AST.
@@ -27,9 +25,9 @@ struct PendingModule {
 
 /// Resolve all source files in a crate starting from `lib.rs`.
 ///
-/// Reads sibling modules for each discovery depth in parallel, then parses
-/// them deterministically to discover nested `mod` declarations. Each file is
-/// read once, and I/O or parse failures are surfaced as `IdlError`s.
+/// Follows sibling modules for each discovery depth deterministically to
+/// discover nested `mod` declarations. Each file is read once, and I/O or
+/// parse failures are surfaced as `IdlError`s.
 pub fn resolve_crate(src_dir: &Path, lib_path: &Path) -> Result<Vec<ResolvedFile>, IdlError> {
 	let source = std::fs::read_to_string(lib_path).map_err(|e| IdlError::io(lib_path, e))?;
 	let file = syn::parse_file(&source).map_err(|e| IdlError::parse(lib_path, &e))?;
@@ -42,18 +40,11 @@ pub fn resolve_crate(src_dir: &Path, lib_path: &Path) -> Result<Vec<ResolvedFile
 	let mut pending = discover_module_paths(src_dir, &files[0].file, &mut seen)?;
 
 	while !pending.is_empty() {
-		let read_modules: Vec<(PendingModule, String)> = pending
-			.into_par_iter()
-			.map(|module| {
-				let source = std::fs::read_to_string(&module.path)
-					.map_err(|e| IdlError::io(&module.path, e))?;
-				Ok((module, source))
-			})
-			.collect::<Result<_, IdlError>>()?;
-
 		let mut next_pending = Vec::new();
 
-		for (module, source) in read_modules {
+		for module in pending {
+			let source =
+				std::fs::read_to_string(&module.path).map_err(|e| IdlError::io(&module.path, e))?;
 			let file = syn::parse_file(&source).map_err(|e| IdlError::parse(&module.path, &e))?;
 			next_pending.extend(discover_module_paths(
 				&module.child_base_dir,

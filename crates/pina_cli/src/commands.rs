@@ -1828,7 +1828,7 @@ fn run_skill_command(command: Option<SkillCommands>) {
 	pina_cli::skill::report(pina_cli::skill::run(action));
 }
 
-fn run_docs(topic: Option<&str>) {
+pub(crate) fn run_docs(topic: Option<&str>) {
 	let Some(topic) = topic else {
 		println!("Bundled documentation topics:");
 
@@ -1934,8 +1934,26 @@ fn doc_topic_basename(topic: &str) -> Option<&str> {
 }
 
 fn render_docs(content: &str) {
-	let skin = termimad::MadSkin::default();
-	skin.print_text(content);
+	use std::io::IsTerminal;
+	use std::io::Write;
+
+	let stdout = std::io::stdout();
+	let is_tty = stdout.is_terminal();
+	let mut out = std::io::BufWriter::with_capacity(64 * 1024, stdout.lock());
+	render_docs_to(&mut out, content, is_tty);
+	let _ = out.flush();
+}
+
+fn render_docs_to(writer: &mut impl Write, content: &str, is_terminal: bool) {
+	if is_terminal {
+		let skin = termimad::MadSkin::default();
+		let _ = skin.write_text_on(writer, content);
+	} else {
+		let _ = writer.write_all(content.as_bytes());
+		if !content.ends_with('\n') {
+			let _ = writer.write_all(b"\n");
+		}
+	}
 }
 
 fn run_init(name: &str, path: Option<&Path>, force: bool, sbpf_linker: bool) {
@@ -3108,4 +3126,26 @@ fn run_import(command: &ImportCommand<'_>) {
 		outcome.idl_sha256,
 		outcome.source
 	);
+}
+
+#[cfg(test)]
+mod docs_render_tests {
+	use super::*;
+
+	#[test]
+	fn render_docs_to_handles_terminal_and_non_terminal_outputs() {
+		let mut piped = Vec::new();
+		render_docs_to(&mut piped, "# Title\nBody", false);
+		assert_eq!(String::from_utf8_lossy(&piped), "# Title\nBody\n");
+
+		let mut piped_with_nl = Vec::new();
+		render_docs_to(&mut piped_with_nl, "# Title\n", false);
+		assert_eq!(String::from_utf8_lossy(&piped_with_nl), "# Title\n");
+
+		let mut tty = Vec::new();
+		render_docs_to(&mut tty, "# Title\nBody\n", true);
+		let tty_text = String::from_utf8_lossy(&tty);
+		assert!(tty_text.contains("Title"));
+		assert!(tty_text.contains("Body"));
+	}
 }

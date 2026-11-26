@@ -295,7 +295,6 @@ quote = { default-features = false, version = "^1" }
 # — ark-std 0.5 re-exports rand 0.8, so a 0.10 `StdRng` implements a different
 # `rand_core` and does not satisfy the bound. Move this with ark-std, not alone.
 rand = { default-features = false, version = "0.8.5" }
-rayon = { default-features = false, version = "^1.10" }
 rustc-demangle = { default-features = false, version = "^0.1.28" }
 same-file = { default-features = false, version = "^1" }
 schemars = { default-features = false, version = "^1", features = ["derive"] }

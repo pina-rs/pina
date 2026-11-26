@@ -488,20 +488,51 @@ impl Project {
 				path: manifest_path,
 			});
 		}
-		// Cargo resolves relative environment paths, including CARGO_TARGET_DIR,
-		// against its working directory. Build commands use the configuration root,
-		// so metadata must use the same root to report the artifact directory.
-		let metadata = cargo_metadata(&root, Some(&manifest_path))?;
-		let package = package_for_manifest(&metadata, &manifest_path, &root)?;
-		let (library_name, library_source, library_crate_types) = library_details(package)?;
+		let fast = try_discover_package_fast(&root, &manifest_path)?;
+		let (
+			package_name,
+			library_name,
+			library_source,
+			library_crate_types,
+			workspace_root,
+			target,
+		) = if let Some(discovered) = fast {
+			(
+				discovered.package_name,
+				discovered.library_name,
+				discovered.library_source,
+				discovered.library_crate_types,
+				discovered.workspace_root,
+				discovered.target_directory,
+			)
+		} else {
+			// Cargo resolves relative environment paths, including CARGO_TARGET_DIR,
+			// against its working directory. Build commands use the configuration root,
+			// so metadata must use the same root to report the artifact directory.
+			let metadata = cargo_metadata(&root, Some(&manifest_path))?;
+			let package = package_for_manifest(&metadata, &manifest_path, &root)?;
+			let (library_name, library_source, library_crate_types) = library_details(package)?;
+			(
+				package.name.to_string(),
+				library_name,
+				library_source,
+				library_crate_types,
+				metadata.workspace_root.as_std_path().to_path_buf(),
+				metadata.target_directory.as_std_path().to_path_buf(),
+			)
+		};
 		let configured_idl_dir = config
 			.project
 			.idl_dir
 			.as_deref()
 			.map(|raw| templates.resolve_dir(&root, "project.idl_dir", raw))
 			.transpose()?;
-		let (target_dir, idl_dir) =
-			resolve_build_output_dirs(&templates, &metadata, configured_idl_dir)?;
+		let (target_dir, idl_dir) = resolve_build_output_dirs_from_paths(
+			&templates,
+			&workspace_root,
+			&target,
+			configured_idl_dir,
+		)?;
 		let clients_dir = templates.resolve_dir(&root, "clients.output", &config.clients.output)?;
 		let client_generation = config
 			.clients
@@ -510,7 +541,7 @@ impl Project {
 
 		Ok(Self {
 			program_dir,
-			package_name: package.name.to_string(),
+			package_name,
 			library_name,
 			library_source,
 			library_crate_types,
@@ -527,6 +558,39 @@ impl Project {
 	}
 
 	fn from_cargo_metadata(start: &Path) -> Result<Self, ProjectError> {
+		if let Some(manifest_path) = find_ancestor_manifest(start)
+			&& let Some(discovered) = try_discover_package_fast(start, &manifest_path)?
+		{
+			let root = discovered.program_dir.clone();
+			let (target_dir, idl_dir) = resolve_build_output_dirs_from_paths(
+				&PathTemplates::empty(root.clone()),
+				&discovered.workspace_root,
+				&discovered.target_directory,
+				None,
+			)?;
+			let clients_dir = root.join("clients");
+			let clients_config = ClientsConfig::default();
+			let client_generation = clients_config
+				.resolved_generation(&PathTemplates::empty(root.clone()), &clients_dir)?;
+
+			return Ok(Self {
+				program_dir: root.clone(),
+				package_name: discovered.package_name,
+				library_name: discovered.library_name,
+				library_source: discovered.library_source,
+				library_crate_types: discovered.library_crate_types,
+				idl_dir,
+				target_dir,
+				clients_dir,
+				clients: clients_config.languages,
+				client_generation,
+				migration_answers: MigrationsAnswersConfig::default(),
+				lint_levels: BTreeMap::new(),
+				sbpf_linker: false,
+				root,
+			});
+		}
+
 		let metadata = cargo_metadata(start, None)?;
 		let mut candidates = metadata
 			.packages
@@ -570,8 +634,12 @@ impl Project {
 
 		let (library_name, library_source, library_crate_types) = library_details(package)?;
 		let root = program_dir.to_path_buf();
-		let (target_dir, idl_dir) =
-			resolve_build_output_dirs(&PathTemplates::empty(root.clone()), &metadata, None)?;
+		let (target_dir, idl_dir) = resolve_build_output_dirs_from_paths(
+			&PathTemplates::empty(root.clone()),
+			metadata.workspace_root.as_std_path(),
+			metadata.target_directory.as_std_path(),
+			None,
+		)?;
 		let clients_dir = root.join("clients");
 		let clients_config = ClientsConfig::default();
 		let client_generation = clients_config
@@ -602,6 +670,10 @@ impl Project {
 	/// Returns an error when Cargo metadata cannot be loaded.
 	pub fn workspace_root(&self) -> Result<PathBuf, ProjectError> {
 		let manifest_path = self.program_dir.join("Cargo.toml");
+		if let Some(root) = discover_workspace_root_from_manifest(&self.program_dir, &manifest_path)
+		{
+			return Ok(root);
+		}
 		cargo_metadata(&self.root, Some(&manifest_path))
 			.map(|metadata| metadata.workspace_root.as_std_path().to_path_buf())
 	}
@@ -994,17 +1066,17 @@ fn discover_git_root(start: &Path) -> Option<PathBuf> {
 }
 
 /// Resolve build and IDL destinations before any output directories are created.
-fn resolve_build_output_dirs(
+fn resolve_build_output_dirs_from_paths(
 	templates: &PathTemplates,
-	metadata: &Metadata,
+	workspace_root: &Path,
+	target: &Path,
 	configured_idl_dir: Option<PathBuf>,
 ) -> Result<(PathBuf, PathBuf), ProjectError> {
 	let output_root = output_containment_root(
 		&templates.discovery_dir,
-		Some(metadata.workspace_root.as_std_path()),
+		Some(workspace_root),
 		templates.discover_git_root(),
 	);
-	let target = metadata.target_directory.as_std_path();
 	// The invoking environment is an operator choice. Repository Cargo
 	// configuration cannot grant itself permission to write outside the tree.
 	let operator_target = ["CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR"]
@@ -1022,6 +1094,273 @@ fn resolve_build_output_dirs(
 	};
 
 	Ok((target_dir, idl_dir))
+}
+
+struct FastPackageMetadata {
+	program_dir: PathBuf,
+	package_name: String,
+	library_name: String,
+	library_source: PathBuf,
+	library_crate_types: Vec<String>,
+	workspace_root: PathBuf,
+	target_directory: PathBuf,
+}
+
+#[derive(Deserialize)]
+struct FastManifest {
+	package: Option<FastPackage>,
+	lib: Option<FastLib>,
+	workspace: Option<FastWorkspace>,
+}
+
+#[derive(Deserialize)]
+struct FastPackage {
+	name: String,
+	workspace: Option<toml::Value>,
+	autolib: Option<bool>,
+}
+
+#[derive(Deserialize)]
+struct FastLib {
+	name: Option<String>,
+	path: Option<String>,
+	#[serde(rename = "crate-type", alias = "crate_type")]
+	crate_type: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+struct FastWorkspaceManifest {
+	workspace: Option<FastWorkspace>,
+}
+
+#[derive(Deserialize)]
+struct FastWorkspace {
+	#[serde(default)]
+	members: Vec<String>,
+	#[serde(default)]
+	exclude: Vec<String>,
+}
+
+fn find_ancestor_manifest(start: &Path) -> Option<PathBuf> {
+	let mut current = Some(start);
+	while let Some(dir) = current {
+		let candidate = dir.join("Cargo.toml");
+		if candidate.is_file() {
+			return Some(candidate);
+		}
+		current = dir.parent();
+	}
+	None
+}
+
+fn is_custom_cargo_binary(cargo: Option<&std::ffi::OsStr>) -> bool {
+	let Some(cargo) = cargo.filter(|value| !value.is_empty()) else {
+		return false;
+	};
+	!matches!(
+		Path::new(cargo).file_name().and_then(|name| name.to_str()),
+		Some("cargo" | "cargo.exe")
+	)
+}
+
+fn uses_custom_cargo_wrapper() -> bool {
+	is_custom_cargo_binary(std::env::var_os("CARGO").as_deref())
+}
+
+fn try_discover_package_fast(
+	start_dir: &Path,
+	manifest_path: &Path,
+) -> Result<Option<FastPackageMetadata>, ProjectError> {
+	if uses_custom_cargo_wrapper() {
+		return Ok(None);
+	}
+	let Some(program_dir) = manifest_path.parent() else {
+		return Ok(None);
+	};
+	let Ok(raw) = std::fs::read_to_string(manifest_path) else {
+		return Ok(None);
+	};
+	let Ok(manifest) = toml::from_str::<FastManifest>(&raw) else {
+		return Ok(None);
+	};
+	let Some(package) = manifest.package else {
+		return Ok(None);
+	};
+	if package.workspace.is_some() || (manifest.lib.is_none() && package.autolib == Some(false)) {
+		return Ok(None);
+	}
+
+	let default_lib_name = || package.name.replace('-', "_");
+	let (library_name, library_source, library_crate_types) = match manifest.lib {
+		Some(lib) => {
+			let crate_types = lib.crate_type.unwrap_or_else(|| vec!["lib".to_owned()]);
+			if !crate_types.iter().any(|t| t == "lib" || t == "cdylib") {
+				return Ok(None);
+			}
+			(
+				lib.name.unwrap_or_else(default_lib_name),
+				program_dir.join(lib.path.as_deref().unwrap_or("src/lib.rs")),
+				crate_types,
+			)
+		}
+		None => {
+			(
+				default_lib_name(),
+				program_dir.join("src/lib.rs"),
+				vec!["lib".to_owned()],
+			)
+		}
+	};
+
+	if !library_source.is_file() {
+		return Ok(None);
+	}
+	validate_library_name(&library_name)?;
+
+	let Some(workspace_root) =
+		discover_workspace_root_from_flag(program_dir, manifest.workspace.is_some())
+	else {
+		return Ok(None);
+	};
+	if has_cargo_config_target_dir(start_dir) {
+		return Ok(None);
+	}
+
+	let target_override = ["CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR"]
+		.into_iter()
+		.find_map(|key| std::env::var_os(key).filter(|val| !val.is_empty()));
+	let target_directory = resolve_target_directory(start_dir, &workspace_root, target_override);
+
+	Ok(Some(FastPackageMetadata {
+		program_dir: program_dir.to_path_buf(),
+		package_name: package.name,
+		library_name,
+		library_source,
+		library_crate_types,
+		workspace_root,
+		target_directory,
+	}))
+}
+
+fn resolve_target_directory(
+	start_dir: &Path,
+	workspace_root: &Path,
+	override_dir: Option<OsString>,
+) -> PathBuf {
+	match override_dir {
+		Some(override_dir) => {
+			let path = PathBuf::from(override_dir);
+			if path.is_absolute() {
+				path
+			} else {
+				start_dir.join(path)
+			}
+		}
+		None => workspace_root.join("target"),
+	}
+}
+
+fn discover_workspace_root_from_manifest(
+	program_dir: &Path,
+	manifest_path: &Path,
+) -> Option<PathBuf> {
+	if uses_custom_cargo_wrapper() {
+		return None;
+	}
+	let raw = std::fs::read_to_string(manifest_path).ok()?;
+	let manifest = toml::from_str::<FastWorkspaceManifest>(&raw).ok()?;
+	discover_workspace_root_from_flag(program_dir, manifest.workspace.is_some())
+}
+
+fn discover_workspace_root_from_flag(
+	program_dir: &Path,
+	has_own_workspace: bool,
+) -> Option<PathBuf> {
+	if has_own_workspace {
+		return Some(program_dir.to_path_buf());
+	}
+
+	let mut ancestor = program_dir.parent();
+	while let Some(dir) = ancestor {
+		let candidate = dir.join("Cargo.toml");
+		if candidate.is_file() {
+			let raw = std::fs::read_to_string(&candidate).ok()?;
+			let parsed = toml::from_str::<FastWorkspaceManifest>(&raw).ok()?;
+			if let Some(ws) = parsed.workspace {
+				let rel = program_dir.strip_prefix(dir).ok()?;
+				let rel_posix = rel
+					.components()
+					.map(|c| c.as_os_str().to_string_lossy())
+					.collect::<Vec<_>>()
+					.join("/");
+				for pat in &ws.exclude {
+					match workspace_pattern_matches(pat, &rel_posix) {
+						Some(true) => return Some(program_dir.to_path_buf()),
+						Some(false) => {}
+						None => return None,
+					}
+				}
+				for pat in &ws.members {
+					if workspace_pattern_matches(pat, &rel_posix) == Some(true) {
+						return Some(dir.to_path_buf());
+					}
+				}
+				return None;
+			}
+		}
+		ancestor = dir.parent();
+	}
+
+	Some(program_dir.to_path_buf())
+}
+
+/// Matches simple Cargo workspace member/exclude patterns (`exact/path` or
+/// single-segment `prefix/*`) without pulling in a glob crate. Returns `None`
+/// for complex wildcards so the caller falls back to `cargo metadata`.
+fn workspace_pattern_matches(pattern: &str, rel_posix: &str) -> Option<bool> {
+	let pat = pattern.trim_end_matches('/');
+	if !pat.contains(['*', '?', '[']) {
+		return Some(pat == rel_posix);
+	}
+	if let Some(prefix) = pat.strip_suffix("/*")
+		&& !prefix.contains(['*', '?', '['])
+	{
+		let Some(rest) = rel_posix.strip_prefix(prefix) else {
+			return Some(false);
+		};
+		let Some(segment) = rest.strip_prefix('/') else {
+			return Some(false);
+		};
+		return Some(!segment.is_empty() && !segment.contains('/'));
+	}
+	None
+}
+
+fn config_file_sets_target_dir(path: &Path) -> bool {
+	path.is_file()
+		&& std::fs::read_to_string(path)
+			.is_ok_and(|text| text.contains("target-dir") || text.contains("target_dir"))
+}
+
+fn has_cargo_config_target_dir(start_dir: &Path) -> bool {
+	let mut current = Some(start_dir);
+	while let Some(dir) = current {
+		if [".cargo/config.toml", ".cargo/config"]
+			.into_iter()
+			.any(|name| config_file_sets_target_dir(&dir.join(name)))
+		{
+			return true;
+		}
+		current = dir.parent();
+	}
+	std::env::var_os("CARGO_HOME")
+		.filter(|v| !v.is_empty())
+		.map(PathBuf::from)
+		.is_some_and(|home| {
+			["config.toml", "config"]
+				.into_iter()
+				.any(|name| config_file_sets_target_dir(&home.join(name)))
+		})
 }
 
 /// Normalize an output and require containment beneath its trusted root.
@@ -2758,5 +3097,269 @@ mode = "overwrite"
 			format!("[project]\nprogram = \".\"\n\n[migrations]\n{migrations}"),
 		)
 		.unwrap_or_else(|error| panic!("failed to write config: {error}"));
+	}
+
+	#[test]
+	fn workspace_pattern_matches_exact_glob_and_complex_patterns() {
+		assert_eq!(
+			workspace_pattern_matches("examples/counter", "examples/counter"),
+			Some(true)
+		);
+		assert_eq!(
+			workspace_pattern_matches("examples/counter/", "examples/counter"),
+			Some(true)
+		);
+		assert_eq!(
+			workspace_pattern_matches("examples/other", "examples/counter"),
+			Some(false)
+		);
+		assert_eq!(
+			workspace_pattern_matches("examples/*", "examples/counter"),
+			Some(true)
+		);
+		assert_eq!(
+			workspace_pattern_matches("examples/*", "crates/counter"),
+			Some(false)
+		);
+		assert_eq!(
+			workspace_pattern_matches("examples/*", "examples"),
+			Some(false)
+		);
+		assert_eq!(
+			workspace_pattern_matches("examples/*", "examples/nested/counter"),
+			Some(false)
+		);
+		assert_eq!(
+			workspace_pattern_matches("examples/*/sub", "examples/a/sub"),
+			None
+		);
+		assert_eq!(workspace_pattern_matches("examples/?", "examples/a"), None);
+	}
+
+	#[test]
+	fn fast_package_discovery_handles_standalone_workspace_and_fallbacks() {
+		let temp = TempDir::new().unwrap();
+		let root = fs::canonicalize(temp.path()).unwrap();
+
+		// Standalone crate with custom [lib] name/path/crate-type.
+		let standalone = root.join("standalone");
+		fs::create_dir_all(standalone.join("src")).unwrap();
+		fs::write(standalone.join("src/entry.rs"), "").unwrap();
+		fs::write(
+			standalone.join("Cargo.toml"),
+			"[package]\nname = \"my-prog\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
+			 [lib]\nname = \"custom_lib\"\npath = \"src/entry.rs\"\ncrate-type = [\"cdylib\", \"lib\"]\n",
+		)
+		.unwrap();
+		let manifest = standalone.join("Cargo.toml");
+		assert_eq!(
+			find_ancestor_manifest(&standalone.join("src")),
+			Some(manifest.clone())
+		);
+		let fast = try_discover_package_fast(&standalone, &manifest)
+			.unwrap()
+			.expect("standalone package should use fast path");
+		assert_eq!(fast.package_name, "my-prog");
+		assert_eq!(fast.library_name, "custom_lib");
+		assert_eq!(fast.library_source, standalone.join("src/entry.rs"));
+		assert_eq!(fast.library_crate_types, vec!["cdylib", "lib"]);
+		assert_eq!(fast.workspace_root, standalone);
+
+		// Package with own [workspace] uses its own directory as workspace root.
+		let own_ws = root.join("own_ws");
+		fs::create_dir_all(own_ws.join("src")).unwrap();
+		fs::write(own_ws.join("src/lib.rs"), "").unwrap();
+		fs::write(
+			own_ws.join("Cargo.toml"),
+			"[package]\nname = \"own-ws\"\nversion = \"0.1.0\"\n[workspace]\n",
+		)
+		.unwrap();
+		assert_eq!(
+			discover_workspace_root_from_manifest(&own_ws, &own_ws.join("Cargo.toml")),
+			Some(own_ws.clone())
+		);
+
+		// Ancestor workspace member, excluded crate, unlisted crate, and complex exclude pattern.
+		let ws_root = root.join("ws");
+		let member = ws_root.join("members/alpha");
+		let excluded = ws_root.join("excluded/beta");
+		let unlisted = ws_root.join("other/gamma");
+		for dir in [&member, &excluded, &unlisted] {
+			fs::create_dir_all(dir.join("src")).unwrap();
+			fs::write(dir.join("src/lib.rs"), "").unwrap();
+			fs::write(
+				dir.join("Cargo.toml"),
+				"[package]\nname = \"pkg\"\nversion = \"0.1.0\"\n",
+			)
+			.unwrap();
+		}
+		fs::write(
+			ws_root.join("Cargo.toml"),
+			"[workspace]\nmembers = [\"members/*\"]\nexclude = [\"excluded/*\"]\n",
+		)
+		.unwrap();
+		assert_eq!(
+			discover_workspace_root_from_manifest(&member, &member.join("Cargo.toml")),
+			Some(ws_root.clone())
+		);
+		assert_eq!(
+			discover_workspace_root_from_manifest(&excluded, &excluded.join("Cargo.toml")),
+			Some(excluded.clone())
+		);
+		assert_eq!(
+			discover_workspace_root_from_manifest(&unlisted, &unlisted.join("Cargo.toml")),
+			None
+		);
+		assert!(
+			try_discover_package_fast(&unlisted, &unlisted.join("Cargo.toml"))
+				.unwrap()
+				.is_none()
+		);
+
+		// Complex exclude glob triggers fallback (None).
+		fs::write(
+			ws_root.join("Cargo.toml"),
+			"[workspace]\nmembers = [\"members/*\"]\nexclude = [\"excluded/*/deep\"]\n",
+		)
+		.unwrap();
+		assert_eq!(
+			discover_workspace_root_from_manifest(&member, &member.join("Cargo.toml")),
+			None
+		);
+
+		// Fallback cases: missing parent, unreadable, invalid TOML, virtual workspace,
+		// autolib=false, non-lib crate-type, missing lib.rs, and .cargo/config.toml target-dir.
+		assert!(
+			try_discover_package_fast(&root, Path::new("/"))
+				.unwrap()
+				.is_none()
+		);
+		assert!(
+			try_discover_package_fast(&root, &root.join("missing/Cargo.toml"))
+				.unwrap()
+				.is_none()
+		);
+
+		let invalid_toml = root.join("invalid");
+		fs::create_dir_all(&invalid_toml).unwrap();
+		fs::write(invalid_toml.join("Cargo.toml"), "not = [valid").unwrap();
+		assert!(
+			try_discover_package_fast(&invalid_toml, &invalid_toml.join("Cargo.toml"))
+				.unwrap()
+				.is_none()
+		);
+
+		let virtual_ws = root.join("virtual_ws");
+		fs::create_dir_all(&virtual_ws).unwrap();
+		fs::write(virtual_ws.join("Cargo.toml"), "[workspace]\nmembers = []\n").unwrap();
+		assert!(
+			try_discover_package_fast(&virtual_ws, &virtual_ws.join("Cargo.toml"))
+				.unwrap()
+				.is_none()
+		);
+
+		let no_autolib = root.join("no_autolib");
+		fs::create_dir_all(no_autolib.join("src")).unwrap();
+		fs::write(no_autolib.join("src/lib.rs"), "").unwrap();
+		fs::write(
+			no_autolib.join("Cargo.toml"),
+			"[package]\nname = \"x\"\nautolib = false\n",
+		)
+		.unwrap();
+		assert!(
+			try_discover_package_fast(&no_autolib, &no_autolib.join("Cargo.toml"))
+				.unwrap()
+				.is_none()
+		);
+
+		let proc_macro_only = root.join("proc_macro_only");
+		fs::create_dir_all(proc_macro_only.join("src")).unwrap();
+		fs::write(proc_macro_only.join("src/lib.rs"), "").unwrap();
+		fs::write(
+			proc_macro_only.join("Cargo.toml"),
+			"[package]\nname = \"x\"\n[lib]\ncrate-type = [\"proc-macro\"]\n",
+		)
+		.unwrap();
+		assert!(
+			try_discover_package_fast(&proc_macro_only, &proc_macro_only.join("Cargo.toml"))
+				.unwrap()
+				.is_none()
+		);
+
+		let no_src = root.join("no_src");
+		fs::create_dir_all(&no_src).unwrap();
+		fs::write(no_src.join("Cargo.toml"), "[package]\nname = \"x\"\n").unwrap();
+		assert!(
+			try_discover_package_fast(&no_src, &no_src.join("Cargo.toml"))
+				.unwrap()
+				.is_none()
+		);
+
+		let with_cfg = root.join("with_cfg");
+		fs::create_dir_all(with_cfg.join("src")).unwrap();
+		fs::create_dir_all(with_cfg.join(".cargo")).unwrap();
+		fs::write(with_cfg.join("src/lib.rs"), "").unwrap();
+		fs::write(with_cfg.join("Cargo.toml"), "[package]\nname = \"x\"\n").unwrap();
+		fs::write(
+			with_cfg.join(".cargo/config.toml"),
+			"[build]\ntarget-dir = \"out\"\n",
+		)
+		.unwrap();
+		assert!(has_cargo_config_target_dir(&with_cfg));
+		assert!(
+			try_discover_package_fast(&with_cfg, &with_cfg.join("Cargo.toml"))
+				.unwrap()
+				.is_none()
+		);
+
+		assert!(find_ancestor_manifest(Path::new("/")).is_none());
+
+		assert!(!is_custom_cargo_binary(None));
+		assert!(!is_custom_cargo_binary(Some(std::ffi::OsStr::new(""))));
+		assert!(!is_custom_cargo_binary(Some(std::ffi::OsStr::new("cargo"))));
+		assert!(!is_custom_cargo_binary(Some(std::ffi::OsStr::new(
+			"/usr/bin/cargo"
+		))));
+		assert!(!is_custom_cargo_binary(Some(std::ffi::OsStr::new(
+			"C:/toolchain/cargo.exe"
+		))));
+		assert!(is_custom_cargo_binary(Some(std::ffi::OsStr::new(
+			"/tmp/fake-cargo.sh"
+		))));
+
+		// Relative, absolute, and default target directory resolution.
+		assert_eq!(
+			resolve_target_directory(&root, &ws_root, None),
+			ws_root.join("target")
+		);
+		assert_eq!(
+			resolve_target_directory(&root, &ws_root, Some(OsString::from("custom-out"))),
+			root.join("custom-out")
+		);
+		let abs_out = root.join("abs-out");
+		assert_eq!(
+			resolve_target_directory(&root, &ws_root, Some(abs_out.as_os_str().to_os_string())),
+			abs_out
+		);
+
+		// Ancestor Cargo.toml without a [workspace] table is skipped while walking up.
+		let parent_pkg = root.join("parent_pkg");
+		let child_pkg = parent_pkg.join("child_pkg");
+		fs::create_dir_all(child_pkg.join("src")).unwrap();
+		fs::write(child_pkg.join("src/lib.rs"), "").unwrap();
+		fs::write(
+			parent_pkg.join("Cargo.toml"),
+			"[package]\nname = \"parent\"\nversion = \"0.1.0\"\n",
+		)
+		.unwrap();
+		fs::write(
+			child_pkg.join("Cargo.toml"),
+			"[package]\nname = \"child\"\nversion = \"0.1.0\"\n",
+		)
+		.unwrap();
+		assert_eq!(
+			discover_workspace_root_from_manifest(&child_pkg, &child_pkg.join("Cargo.toml")),
+			Some(child_pkg)
+		);
 	}
 }
