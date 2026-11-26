@@ -553,6 +553,20 @@ pub fn note_leaf(commitment: &[u8; 32], view_pubkey: &[u8; 32]) -> Result<[u8; 3
 	poseidon2(commitment, &vk_hash)
 }
 
+/// Compute a deposit note commitment `Poseidon(note_id, Poseidon(asset, amount))`
+/// on-chain so the credited commitment is cryptographically bound to the
+/// escrowed `asset` and `amount`.
+pub fn compute_note_commitment(
+	note_id: &[u8; 32],
+	asset: &[u8; 32],
+	amount: u64,
+) -> Result<[u8; 32], ProgramError> {
+	let mut amt = [0_u8; 32];
+	amt[..8].copy_from_slice(&amount.to_le_bytes());
+	let asset_amt = poseidon2(asset, &amt)?;
+	poseidon2(note_id, &asset_amt)
+}
+
 /// Pack `(public_in, public_out, relayer_fee)` losslessly into one little-endian
 /// 192-bit BN254 scalar: `public_in + public_out * 2^64 + relayer_fee * 2^128`.
 pub fn pack_amounts(public_in: u64, public_out: u64, relayer_fee: u64) -> [u8; 32] {
@@ -810,7 +824,20 @@ fn validate_custodian_set(custodians: &[u8; 96]) -> Result<(), ProgramError> {
 	Ok(())
 }
 
-/// Enforce Custom Ring policy flags on deposits and spends.
+/// Enforce only the pause gate on deposits (keeping deposits open under
+/// spend-only co-signer policies).
+fn check_not_paused(pool_config: &AccountView) -> Result<(), ProgramError> {
+	let config = pool_config.as_account::<PoolConfig>(&ID)?;
+	let flags = config.policy_flags;
+	drop(config);
+	if flags & POLICY_PAUSED != 0 {
+		return Err(PrivacyPoolError::PoolPaused.into());
+	}
+	Ok(())
+}
+
+/// Enforce Custom Ring policy flags on spends (`POLICY_PAUSED` and optional
+/// `POLICY_REQUIRE_COSIGNER`).
 fn check_policy(
 	pool_config: &AccountView,
 	cosigner: Option<&AccountView>,
@@ -1575,7 +1602,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		self.depositor.assert_signer()?.assert_writable()?;
 		self.system_program.assert_address(&system::ID)?;
 		PoolVault::assert_seeds(self.pool_vault, &ID)?;
-		check_policy(self.pool_config, None)?;
+		check_not_paused(self.pool_config)?;
 
 		let amount = args.amount.get();
 		if amount == 0 {
@@ -1584,6 +1611,9 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 		if args.commitment == [0_u8; 32] {
 			return Err(PrivacyPoolError::ZeroCommitment.into());
 		}
+		// `args.commitment` carries the private `note_id = Poseidon(secret, nullifier_seed)`;
+		// bind it on-chain to the actual escrowed SOL `amount` and native asset id `[0; 32]`.
+		let commitment = compute_note_commitment(&args.commitment, &[0_u8; 32], amount)?;
 
 		system::instructions::Transfer {
 			from: self.depositor,
@@ -1594,7 +1624,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositAccounts<'a> {
 
 		insert_and_emit_note(
 			self.merkle_tree,
-			&args.commitment,
+			&commitment,
 			&args.view_pubkey,
 			args.envelope_len,
 			&args.envelope,
@@ -1941,7 +1971,7 @@ impl<'a> ProcessAccountInfos<'a> for DepositTokenAccounts<'a> {
 		let args = DepositTokenIx::try_from_bytes(data)?;
 
 		self.depositor.assert_signer()?;
-		check_policy(self.pool_config, None)?;
+		check_not_paused(self.pool_config)?;
 
 		let amount = args.amount.get();
 		if amount == 0 {
@@ -1992,9 +2022,13 @@ impl<'a> ProcessAccountInfos<'a> for DepositTokenAccounts<'a> {
 			return Err(PrivacyPoolError::InvalidAssetVault.into());
 		}
 
+		// Bind `note_id` on-chain to the verified mint asset id and received token amount.
+		let mint_asset = asset_id(self.mint.address())?;
+		let commitment = compute_note_commitment(&args.commitment, &mint_asset, received)?;
+
 		insert_and_emit_note(
 			self.merkle_tree,
-			&args.commitment,
+			&commitment,
 			&args.view_pubkey,
 			args.envelope_len,
 			&args.envelope,
@@ -2374,7 +2408,8 @@ impl<'a> ProcessAccountInfos<'a> for ApproveDisclosureAccounts<'a> {
 			nonce = request.nonce.get();
 		}
 
-		// Record a privacy-preserving salted scope hash in the append-only log.
+		// Record a domain-separated scope hash instead of the raw commitment in
+		// the append-only log.
 		let scope_hash = disclosure_scope_hash(&commitment, &requester, nonce);
 		let mut log = self.disclosure_log.as_account_mut::<DisclosureLog>(&ID)?;
 		let count = log.count.get();
@@ -2743,18 +2778,21 @@ pub mod prover {
 			}
 		}
 
+		pub fn note_id_bytes(&self) -> [u8; 32] {
+			if self.amount == 0 {
+				return [0_u8; 32];
+			}
+			super::poseidon2(&fr_to_le(&self.secret), &fr_to_le(&self.nullifier_seed))
+				.unwrap_or_else(|e| panic!("note_id: {e:?}"))
+		}
+
 		pub fn commitment_bytes(&self) -> [u8; 32] {
 			if self.amount == 0 {
 				return [0_u8; 32];
 			}
-			let note_id =
-				super::poseidon2(&fr_to_le(&self.secret), &fr_to_le(&self.nullifier_seed))
-					.unwrap_or_else(|e| panic!("note_id: {e:?}"));
-			let mut amt = [0_u8; 32];
-			amt[..8].copy_from_slice(&self.amount.to_le_bytes());
-			let asset_amt = super::poseidon2(&fr_to_le(&self.asset_id), &amt)
-				.unwrap_or_else(|e| panic!("asset_amt: {e:?}"));
-			super::poseidon2(&note_id, &asset_amt).unwrap_or_else(|e| panic!("commitment: {e:?}"))
+			let note_id = self.note_id_bytes();
+			super::compute_note_commitment(&note_id, &fr_to_le(&self.asset_id), self.amount)
+				.unwrap_or_else(|e| panic!("commitment: {e:?}"))
 		}
 
 		pub fn leaf_bytes(&self) -> [u8; 32] {

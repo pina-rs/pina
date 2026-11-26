@@ -107,13 +107,16 @@ pub struct EncryptedEnvelope {
 
 /// Encrypt a 40-byte note payload (`amount: u64 || secret: [u8; 32]`) to a
 /// recipient's X25519 viewing public key using an ephemeral secret.
+///
+/// Returns `None` if the peer key is a low-order point producing an all-zero
+/// X25519 shared secret (RFC 7748 §6.1).
 pub fn encrypt_note_envelope(
 	recipient_viewing_pubkey: &[u8; 32],
 	ephemeral_secret: &[u8; 32],
 	plaintext: &[u8; 40],
-) -> EncryptedEnvelope {
+) -> Option<EncryptedEnvelope> {
 	let ephemeral_pubkey = x25519_public_key(ephemeral_secret);
-	let shared = x25519(ephemeral_secret, recipient_viewing_pubkey);
+	let shared = x25519_checked(ephemeral_secret, recipient_viewing_pubkey)?;
 	let tx_viewing_key = hashv(&[DOMAIN_NOTE_KDF, &shared, &ephemeral_pubkey]).to_bytes();
 
 	let (ciphertext, tag) = aead_seal(&tx_viewing_key, &ephemeral_pubkey, plaintext);
@@ -122,11 +125,11 @@ pub fn encrypt_note_envelope(
 	bytes[32..72].copy_from_slice(&ciphertext);
 	bytes[72..88].copy_from_slice(&tag);
 
-	EncryptedEnvelope {
+	Some(EncryptedEnvelope {
 		bytes,
 		len: 88,
 		tx_viewing_key,
-	}
+	})
 }
 
 /// Decrypt an 88-byte note envelope using the recipient's X25519 viewing secret.
@@ -138,7 +141,7 @@ pub fn decrypt_note_envelope(
 		return None;
 	}
 	let ephemeral_pubkey: [u8; 32] = envelope[..32].try_into().ok()?;
-	let shared = x25519(recipient_viewing_secret, &ephemeral_pubkey);
+	let shared = x25519_checked(recipient_viewing_secret, &ephemeral_pubkey)?;
 	let tx_viewing_key = hashv(&[DOMAIN_NOTE_KDF, &shared, &ephemeral_pubkey]).to_bytes();
 	decrypt_with_tx_viewing_key(&tx_viewing_key, envelope)
 }
@@ -155,26 +158,20 @@ pub fn decrypt_with_tx_viewing_key(tx_viewing_key: &[u8; 32], envelope: &[u8]) -
 	aead_open(tx_viewing_key, &aad, &ciphertext, &tag)
 }
 
-/// Encrypt a 32-byte `tx_viewing_key` into 3 custodian shares (2-of-3 threshold
-/// via 2-of-3 pairwise replicated secret sharing) encrypted under each
-/// custodian's X25519 public key.
+/// Encrypt a 32-byte `tx_viewing_key` into 3 custodian shares using 2-of-3
+/// GF(256) Shamir secret sharing, encrypted under each custodian's X25519
+/// viewing public key.
 ///
-/// Each 48-byte slot holds `ephemeral_pk (32B) || encrypted_share (16B)`?
-/// Even better: share one ephemeral key per custodian or derive per-custodian
-/// key from `(note_ephemeral_sk, custodian_vk)`:
-/// - Split `tx_viewing_key` (32 bytes) into 3 pieces `s0, s1, s2` of 16 bytes?
-///   No — use GF(256) Shamir 2-of-3 over all 32 bytes! Each share is 32 bytes
-///   `f(x) = secret + a1 * x` for `x in {1, 2, 3}`, encrypted with
-///   `k_i = Hash(DOMAIN_SHARE_KDF || ECDH(ephemeral_sk, custodian_vk_i))` and
-///   authenticated with a 16-byte MAC tag -> `32 + 16 = 48` bytes per custodian
-///   × 3 custodians = **144 bytes** (`SHARE_BLOB_BYTES`)!
-///   (The ephemeral public key is already stored in `envelope[..32]`!)
+/// Each 48-byte slot holds `encrypted_share (32B) || mac_tag (16B)` (3 × 48 =
+/// 144 bytes = `SHARE_BLOB_BYTES`); the ephemeral public key is carried in
+/// `envelope[..32]`. Returns `None` if any custodian public key produces an
+/// all-zero X25519 shared secret.
 pub fn encrypt_custodian_shares(
 	custodian_viewing_pubkeys: &[[u8; 32]; CUSTODIAN_COUNT],
 	ephemeral_secret: &[u8; 32],
 	tx_viewing_key: &[u8; 32],
 	mask_seed: &[u8; 32],
-) -> [u8; SHARE_BLOB_BYTES] {
+) -> Option<[u8; SHARE_BLOB_BYTES]> {
 	let ephemeral_pubkey = x25519_public_key(ephemeral_secret);
 	let slope = hashv(&[b"pina:shamir:slope", mask_seed, tx_viewing_key]).to_bytes();
 
@@ -185,14 +182,14 @@ pub fn encrypt_custodian_shares(
 		for byte_idx in 0..32 {
 			share[byte_idx] = tx_viewing_key[byte_idx] ^ gf256_mul(slope[byte_idx], x);
 		}
-		let shared = x25519(ephemeral_secret, custodian_vk);
+		let shared = x25519_checked(ephemeral_secret, custodian_vk)?;
 		let key = hashv(&[DOMAIN_SHARE_KDF, &shared, &ephemeral_pubkey, &[x]]).to_bytes();
 		let (ct, tag) = aead_seal_32(&key, &ephemeral_pubkey, &share);
 		let slot = &mut out[idx * 48..(idx + 1) * 48];
 		slot[..32].copy_from_slice(&ct);
 		slot[32..48].copy_from_slice(&tag);
 	}
-	out
+	Some(out)
 }
 
 /// Decrypt one custodian's 32-byte Shamir share from `shares[slot * 48..]`
@@ -211,7 +208,7 @@ pub fn decrypt_custodian_share(
 	let slot = &shares[custodian_index * 48..(custodian_index + 1) * 48];
 	let ct: [u8; 32] = slot[..32].try_into().ok()?;
 	let tag: [u8; 16] = slot[32..48].try_into().ok()?;
-	let dh_secret = x25519(custodian_viewing_secret, ephemeral_pubkey);
+	let dh_secret = x25519_checked(custodian_viewing_secret, ephemeral_pubkey)?;
 	let key = hashv(&[DOMAIN_SHARE_KDF, &dh_secret, ephemeral_pubkey, &[x]]).to_bytes();
 	aead_open_32(&key, ephemeral_pubkey, &ct, &tag)
 }
@@ -364,6 +361,17 @@ fn gf256_inv(a: u8) -> u8 {
 /// Compute the X25519 public key for a 32-byte secret scalar.
 pub fn x25519_public_key(secret: &[u8; 32]) -> [u8; 32] {
 	x25519(secret, &X25519_BASEPOINT)
+}
+
+/// RFC 7748 X25519 key agreement rejecting all-zero outputs from low-order
+/// peer points.
+fn x25519_checked(scalar: &[u8; 32], u_coord: &[u8; 32]) -> Option<[u8; 32]> {
+	let shared = x25519(scalar, u_coord);
+	let mut acc = 0_u8;
+	for byte in shared {
+		acc |= byte;
+	}
+	(acc != 0).then_some(shared)
 }
 
 /// RFC 7748 X25519 scalar multiplication `scalar * u_coord`.
@@ -685,7 +693,9 @@ mod tests {
 		plaintext[8..].fill(0x5A);
 
 		let ephemeral = [0x42; 32];
-		let encrypted = encrypt_note_envelope(&recipient.viewing_pubkey, &ephemeral, &plaintext);
+		assert!(encrypt_note_envelope(&[0_u8; 32], &ephemeral, &plaintext).is_none());
+		let encrypted =
+			encrypt_note_envelope(&recipient.viewing_pubkey, &ephemeral, &plaintext).unwrap();
 		let slice = &encrypted.bytes[..usize::from(encrypted.len)];
 
 		// Recipient decrypts with master viewing secret.
@@ -697,6 +707,14 @@ mod tests {
 			Some(plaintext)
 		);
 
+		// Low-order ephemeral key is rejected on decrypt.
+		let mut zero_eph = encrypted.bytes;
+		zero_eph[..32].fill(0);
+		assert_eq!(
+			recipient.decrypt_envelope(&zero_eph[..usize::from(encrypted.len)]),
+			None
+		);
+
 		// Tampered ciphertext is rejected.
 		let mut tampered = encrypted.bytes;
 		tampered[40] ^= 1;
@@ -706,13 +724,27 @@ mod tests {
 		);
 
 		// 2-of-3 Shamir custodian shares recover `tx_viewing_key`.
+		assert!(
+			encrypt_custodian_shares(
+				&[[0_u8; 32], c1.viewing_pubkey, c2.viewing_pubkey],
+				&ephemeral,
+				&encrypted.tx_viewing_key,
+				&[0x99; 32],
+			)
+			.is_none()
+		);
 		let shares = encrypt_custodian_shares(
 			&[c0.viewing_pubkey, c1.viewing_pubkey, c2.viewing_pubkey],
 			&ephemeral,
 			&encrypted.tx_viewing_key,
 			&[0x99; 32],
-		);
+		)
+		.unwrap();
 		let eph_pk: [u8; 32] = encrypted.bytes[..32].try_into().unwrap();
+		assert_eq!(
+			decrypt_custodian_share(0, &c0.viewing_secret, &[0_u8; 32], &shares),
+			None
+		);
 		let s0 = decrypt_custodian_share(0, &c0.viewing_secret, &eph_pk, &shares).unwrap();
 		let s1 = decrypt_custodian_share(1, &c1.viewing_secret, &eph_pk, &shares).unwrap();
 		let s2 = decrypt_custodian_share(2, &c2.viewing_secret, &eph_pk, &shares).unwrap();

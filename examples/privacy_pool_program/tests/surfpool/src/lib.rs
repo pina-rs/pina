@@ -270,7 +270,8 @@ async fn start_pool() -> StartedPool {
 	let mut pt = [0_u8; 40];
 	pt[..8].copy_from_slice(&note.amount.to_le_bytes());
 	pt[8..].copy_from_slice(&prover::fr_to_le(&note.secret));
-	let enc = shielded::encrypt_note_envelope(&recipient_kp.viewing_pubkey, &[0x44; 32], &pt);
+	let enc =
+		shielded::encrypt_note_envelope(&recipient_kp.viewing_pubkey, &[0x44; 32], &pt).unwrap();
 	let shares = shielded::encrypt_custodian_shares(
 		&[
 			shielded::ShieldedKeypair::from_seed([0xA1; 32]).viewing_pubkey,
@@ -280,12 +281,13 @@ async fn start_pool() -> StartedPool {
 		&[0x44; 32],
 		&enc.tx_viewing_key,
 		&[0x55; 32],
-	);
+	)
+	.unwrap();
 
 	let mut deposit = vec![0_u8; DepositIx::SIZE];
 	DepositIx::initialize(&mut deposit, |ix| {
 		ix.amount.set(note.amount);
-		ix.commitment = note.commitment_bytes();
+		ix.commitment = note.note_id_bytes();
 		ix.view_pubkey = note.view_pubkey;
 		ix.envelope_len = enc.len;
 		ix.envelope = enc.bytes;
@@ -1044,7 +1046,7 @@ fn tier_zero_disclosure_and_every_remaining_instruction() {
 		let mut dep_tok = vec![0_u8; DepositTokenIx::SIZE];
 		DepositTokenIx::initialize(&mut dep_tok, |ix| {
 			ix.amount.set(tok_note.amount);
-			ix.commitment = tok_note.commitment_bytes();
+			ix.commitment = tok_note.note_id_bytes();
 			ix.view_pubkey = tok_note.view_pubkey;
 			ix.envelope_len = 0;
 			ix.envelope = zero_env;

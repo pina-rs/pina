@@ -301,7 +301,8 @@ fn deposit_sol(pool: &mut Pool, depositor: Pubkey, note: &prover::NoteSecrets) -
 	let mut pt = [0_u8; 40];
 	pt[..8].copy_from_slice(&note.amount.to_le_bytes());
 	pt[8..].copy_from_slice(&prover::fr_to_le(&note.secret));
-	let enc = shielded::encrypt_note_envelope(&recipient_kp.viewing_pubkey, &[0x44; 32], &pt);
+	let enc =
+		shielded::encrypt_note_envelope(&recipient_kp.viewing_pubkey, &[0x44; 32], &pt).unwrap();
 	let shares = shielded::encrypt_custodian_shares(
 		&[
 			shielded::ShieldedKeypair::from_seed([0xA1; 32]).viewing_pubkey,
@@ -311,12 +312,13 @@ fn deposit_sol(pool: &mut Pool, depositor: Pubkey, note: &prover::NoteSecrets) -
 		&[0x44; 32],
 		&enc.tx_viewing_key,
 		&[0x55; 32],
-	);
+	)
+	.unwrap();
 
 	let mut data = vec![0_u8; DepositIx::SIZE];
 	DepositIx::initialize(&mut data, |ix| {
 		ix.amount.set(note.amount);
-		ix.commitment = note.commitment_bytes();
+		ix.commitment = note.note_id_bytes();
 		ix.view_pubkey = note.view_pubkey;
 		ix.envelope_len = enc.len;
 		ix.envelope = enc.bytes;
@@ -510,7 +512,7 @@ fn policy_pause_cosigner_and_zk_policy_proof() {
 	let mut dep_data = vec![0_u8; DepositIx::SIZE];
 	DepositIx::initialize(&mut dep_data, |ix| {
 		ix.amount.set(note.amount);
-		ix.commitment = note.commitment_bytes();
+		ix.commitment = note.note_id_bytes();
 		ix.view_pubkey = note.view_pubkey;
 		ix.envelope_len = 0;
 		ix.envelope = [0_u8; MAX_ENVELOPE_BYTES];
