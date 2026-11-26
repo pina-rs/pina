@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,7 +11,6 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class VerifyPolicyInstructionData {
   const VerifyPolicyInstructionData({
@@ -20,8 +18,7 @@ class VerifyPolicyInstructionData {
     required this.proofA,
     required this.proofB,
     required this.proofC,
-  }) :
-      discriminator = 17;
+  }) : discriminator = 17;
 
   final int discriminator;
   final Uint8List policyHash;
@@ -33,7 +30,10 @@ class VerifyPolicyInstructionData {
 Encoder<VerifyPolicyInstructionData> getVerifyPolicyInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
-    ('policyHash', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    (
+      'policyHash',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
     ('proofA', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
     ('proofB', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
     ('proofC', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
@@ -61,20 +61,15 @@ Decoder<VerifyPolicyInstructionData> getVerifyPolicyInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'verifyPolicy instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'verifyPolicy instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (VerifyPolicyInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(17),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(17)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -82,10 +77,10 @@ Decoder<VerifyPolicyInstructionData> getVerifyPolicyInstructionDataDecoder() {
 
     return (
       VerifyPolicyInstructionData(
-      policyHash: map['policyHash']! as Uint8List,
-      proofA: map['proofA']! as Uint8List,
-      proofB: map['proofB']! as Uint8List,
-      proofC: map['proofC']! as Uint8List,
+        policyHash: map['policyHash']! as Uint8List,
+        proofA: map['proofA']! as Uint8List,
+        proofB: map['proofB']! as Uint8List,
+        proofC: map['proofC']! as Uint8List,
       ),
       newOffset,
     );
@@ -111,8 +106,12 @@ Decoder<VerifyPolicyInstructionData> getVerifyPolicyInstructionDataDecoder() {
   };
 }
 
-Codec<VerifyPolicyInstructionData, VerifyPolicyInstructionData> getVerifyPolicyInstructionDataCodec() {
-  return combineCodec(getVerifyPolicyInstructionDataEncoder(), getVerifyPolicyInstructionDataDecoder());
+Codec<VerifyPolicyInstructionData, VerifyPolicyInstructionData>
+getVerifyPolicyInstructionDataCodec() {
+  return combineCodec(
+    getVerifyPolicyInstructionDataEncoder(),
+    getVerifyPolicyInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [VerifyPolicy] instruction.
@@ -125,22 +124,24 @@ Instruction getVerifyPolicyInstruction({
   required Uint8List proofC,
 }) {
   final instructionData = VerifyPolicyInstructionData(
-      policyHash: policyHash,
-      proofA: proofA,
-      proofB: proofB,
-      proofC: proofC,
+    policyHash: policyHash,
+    proofA: proofA,
+    proofB: proofB,
+    proofC: proofC,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: verifyingKeyAccount, role: AccountRole.readonly),
+      AccountMeta(address: verifyingKeyAccount, role: AccountRole.readonly),
     ],
     data: getVerifyPolicyInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [VerifyPolicy] instruction from raw instruction data.
-VerifyPolicyInstructionData parseVerifyPolicyInstruction(Instruction instruction) {
+VerifyPolicyInstructionData parseVerifyPolicyInstruction(
+  Instruction instruction,
+) {
   return getVerifyPolicyInstructionDataDecoder().decode(instruction.data!);
 }

@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,13 +10,10 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
-
 @immutable
 class NullifierRecord {
-  const NullifierRecord({
-    required this.bump,
-  }) :
-      discriminator = 4,
+  const NullifierRecord({required this.bump})
+    : discriminator = 4,
       migrationVersion = 0;
 
   final int discriminator;
@@ -37,9 +33,9 @@ class NullifierRecord {
   int get hashCode => Object.hash(discriminator, migrationVersion, bump);
 
   @override
-  String toString() => 'NullifierRecord(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump)';
+  String toString() =>
+      'NullifierRecord(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump)';
 }
-
 
 Encoder<NullifierRecord> getNullifierRecordEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -66,20 +62,15 @@ Decoder<NullifierRecord> getNullifierRecordDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'nullifierRecord account decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'nullifierRecord account decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (NullifierRecord, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(4),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(4)).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -90,12 +81,7 @@ Decoder<NullifierRecord> getNullifierRecordDecoder() {
     }
     final (map, newOffset) = structDecoder.read(bytes, offset);
 
-    return (
-      NullifierRecord(
-      bump: map['bump']! as int,
-      ),
-      newOffset,
-    );
+    return (NullifierRecord(bump: map['bump']! as int), newOffset);
   }
 
   return switch (structDecoder) {
@@ -134,11 +120,11 @@ const int nullifierRecordMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool nullifierRecordNeedsMigration(List<int> data) {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] != 4) {
-		return false;
-	}
-	return data[1] < 0;
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 4) {
+    return false;
+  }
+  return data[1] < 0;
 }

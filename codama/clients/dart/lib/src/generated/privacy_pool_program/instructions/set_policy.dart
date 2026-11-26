@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,14 +11,12 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class SetPolicyInstructionData {
   const SetPolicyInstructionData({
     required this.policyFlags,
     required this.policyCosigner,
-  }) :
-      discriminator = 16;
+  }) : discriminator = 16;
 
   final int discriminator;
   final int policyFlags;
@@ -51,20 +48,15 @@ Decoder<SetPolicyInstructionData> getSetPolicyInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'setPolicy instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'setPolicy instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (SetPolicyInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(16),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(16)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -72,8 +64,8 @@ Decoder<SetPolicyInstructionData> getSetPolicyInstructionDataDecoder() {
 
     return (
       SetPolicyInstructionData(
-      policyFlags: map['policyFlags']! as int,
-      policyCosigner: map['policyCosigner']! as Address,
+        policyFlags: map['policyFlags']! as int,
+        policyCosigner: map['policyCosigner']! as Address,
       ),
       newOffset,
     );
@@ -99,8 +91,12 @@ Decoder<SetPolicyInstructionData> getSetPolicyInstructionDataDecoder() {
   };
 }
 
-Codec<SetPolicyInstructionData, SetPolicyInstructionData> getSetPolicyInstructionDataCodec() {
-  return combineCodec(getSetPolicyInstructionDataEncoder(), getSetPolicyInstructionDataDecoder());
+Codec<SetPolicyInstructionData, SetPolicyInstructionData>
+getSetPolicyInstructionDataCodec() {
+  return combineCodec(
+    getSetPolicyInstructionDataEncoder(),
+    getSetPolicyInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [SetPolicy] instruction.
@@ -112,15 +108,15 @@ Instruction getSetPolicyInstruction({
   required Address policyCosigner,
 }) {
   final instructionData = SetPolicyInstructionData(
-      policyFlags: policyFlags,
-      policyCosigner: policyCosigner,
+    policyFlags: policyFlags,
+    policyCosigner: policyCosigner,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: authority, role: AccountRole.readonlySigner),
-    AccountMeta(address: poolConfig, role: AccountRole.writable),
+      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+      AccountMeta(address: poolConfig, role: AccountRole.writable),
     ],
     data: getSetPolicyInstructionDataEncoder().encode(instructionData),
   );

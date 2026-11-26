@@ -7,6 +7,7 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class WithdrawTokenCommand extends Command<void> {
@@ -19,25 +20,77 @@ final class WithdrawTokenCommand extends Command<void> {
       ..addOption('root', mandatory: true, help: "root")
       ..addOption('public_out', mandatory: true, help: "publicOut")
       ..addOption('relayer_fee', mandatory: true, help: "relayerFee")
-      ..addOption('change_commitment', mandatory: true, help: "changeCommitment")
-      ..addOption('change_view_pubkey', mandatory: true, help: "changeViewPubkey")
+      ..addOption(
+        'change_commitment',
+        mandatory: true,
+        help: "changeCommitment",
+      )
+      ..addOption(
+        'change_view_pubkey',
+        mandatory: true,
+        help: "changeViewPubkey",
+      )
       ..addOption('envelope_len', mandatory: true, help: "envelopeLen")
       ..addOption('envelope', mandatory: true, help: "envelope")
       ..addOption('proof_a', mandatory: true, help: "proofA")
       ..addOption('proof_b', mandatory: true, help: "proofB")
       ..addOption('proof_c', mandatory: true, help: "proofC")
-      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
-      ..addOption('merkle_tree', mandatory: false, help: "The merkle_tree account [default: derived]")
-      ..addOption('nullifier_record0', mandatory: true, help: "The nullifier_record0 account")
-      ..addOption('nullifier_record1', mandatory: true, help: "The nullifier_record1 account")
-      ..addOption('verifying_key_account', mandatory: true, help: "The verifying_key_account account")
+      ..addOption(
+        'pool_config',
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
+      )
+      ..addOption(
+        'merkle_tree',
+        mandatory: false,
+        help: "The merkle_tree account [default: derived]",
+      )
+      ..addOption(
+        'nullifier_record0',
+        mandatory: true,
+        help: "The nullifier_record0 account",
+      )
+      ..addOption(
+        'nullifier_record1',
+        mandatory: true,
+        help: "The nullifier_record1 account",
+      )
+      ..addOption(
+        'verifying_key_account',
+        mandatory: true,
+        help: "The verifying_key_account account",
+      )
       ..addOption('mint', mandatory: true, help: "The mint account")
-      ..addOption('asset_vault', mandatory: false, help: "The asset_vault account [default: derived]")
-      ..addOption('vault_token_account', mandatory: true, help: "The vault_token_account account")
-      ..addOption('recipient_token_account', mandatory: true, help: "The recipient_token_account account")
-      ..addOption('relayer_token_account', mandatory: true, help: "The relayer_token_account account")
-      ..addOption('policy_cosigner', mandatory: true, help: "The policy_cosigner account")
-      ..addOption('token_program', mandatory: true, help: "The token_program account");
+      ..addOption(
+        'asset_vault',
+        mandatory: false,
+        help: "The asset_vault account [default: derived]",
+      )
+      ..addOption(
+        'vault_token_account',
+        mandatory: true,
+        help: "The vault_token_account account",
+      )
+      ..addOption(
+        'recipient_token_account',
+        mandatory: true,
+        help: "The recipient_token_account account",
+      )
+      ..addOption(
+        'relayer_token_account',
+        mandatory: true,
+        help: "The relayer_token_account account",
+      )
+      ..addOption(
+        'policy_cosigner',
+        mandatory: true,
+        help: "The policy_cosigner account",
+      )
+      ..addOption(
+        'token_program',
+        mandatory: true,
+        help: "The token_program account",
+      );
   }
 
   @override
@@ -53,40 +106,90 @@ final class WithdrawTokenCommand extends Command<void> {
     final payer = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
-        : (await findMerkleTreePda(
-          programAddress: context.programAddress,
-        )).$1;
-    final nullifierRecord0 = pubkey('--nullifier-record0', results['nullifier_record0']! as String);
-    final nullifierRecord1 = pubkey('--nullifier-record1', results['nullifier_record1']! as String);
-    final verifyingKeyAccount = pubkey('--verifying-key-account', results['verifying_key_account']! as String);
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
+    final nullifierRecord0 = pubkey(
+      '--nullifier-record0',
+      results['nullifier_record0']! as String,
+    );
+    final nullifierRecord1 = pubkey(
+      '--nullifier-record1',
+      results['nullifier_record1']! as String,
+    );
+    final verifyingKeyAccount = pubkey(
+      '--verifying-key-account',
+      results['verifying_key_account']! as String,
+    );
     final mint = pubkey('--mint', results['mint']! as String);
     final assetVault = (results['asset_vault'] as String?) != null
         ? pubkey('--asset-vault', results['asset_vault']! as String)
         : (await findAssetVaultPda(
-          seeds: AssetVaultSeeds(mint: mint),
-          programAddress: context.programAddress,
-        )).$1;
-    final vaultTokenAccount = pubkey('--vault-token-account', results['vault_token_account']! as String);
-    final recipientTokenAccount = pubkey('--recipient-token-account', results['recipient_token_account']! as String);
-    final relayerTokenAccount = pubkey('--relayer-token-account', results['relayer_token_account']! as String);
-    final policyCosigner = pubkey('--policy-cosigner', results['policy_cosigner']! as String);
-    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
-    final nullifier0BumpValue = integer('--nullifier0-bump', results['nullifier0_bump']! as String);
-    final nullifier1BumpValue = integer('--nullifier1-bump', results['nullifier1_bump']! as String);
-    final nullifier0Value = base58Bytes('--nullifier0', results['nullifier0']! as String);
-    final nullifier1Value = base58Bytes('--nullifier1', results['nullifier1']! as String);
+            seeds: AssetVaultSeeds(mint: mint),
+            programAddress: context.programAddress,
+          )).$1;
+    final vaultTokenAccount = pubkey(
+      '--vault-token-account',
+      results['vault_token_account']! as String,
+    );
+    final recipientTokenAccount = pubkey(
+      '--recipient-token-account',
+      results['recipient_token_account']! as String,
+    );
+    final relayerTokenAccount = pubkey(
+      '--relayer-token-account',
+      results['relayer_token_account']! as String,
+    );
+    final policyCosigner = pubkey(
+      '--policy-cosigner',
+      results['policy_cosigner']! as String,
+    );
+    final tokenProgram = pubkey(
+      '--token-program',
+      results['token_program']! as String,
+    );
+    final nullifier0BumpValue = integer(
+      '--nullifier0-bump',
+      results['nullifier0_bump']! as String,
+    );
+    final nullifier1BumpValue = integer(
+      '--nullifier1-bump',
+      results['nullifier1_bump']! as String,
+    );
+    final nullifier0Value = base58Bytes(
+      '--nullifier0',
+      results['nullifier0']! as String,
+    );
+    final nullifier1Value = base58Bytes(
+      '--nullifier1',
+      results['nullifier1']! as String,
+    );
     final rootValue = base58Bytes('--root', results['root']! as String);
-    final publicOutValue = bigInteger('--public-out', results['public_out']! as String);
-    final relayerFeeValue = bigInteger('--relayer-fee', results['relayer_fee']! as String);
-    final changeCommitmentValue = base58Bytes('--change-commitment', results['change_commitment']! as String);
-    final changeViewPubkeyValue = base58Bytes('--change-view-pubkey', results['change_view_pubkey']! as String);
-    final envelopeLenValue = integer('--envelope-len', results['envelope_len']! as String);
-    final envelopeValue = base58Bytes('--envelope', results['envelope']! as String);
+    final publicOutValue = bigInteger(
+      '--public-out',
+      results['public_out']! as String,
+    );
+    final relayerFeeValue = bigInteger(
+      '--relayer-fee',
+      results['relayer_fee']! as String,
+    );
+    final changeCommitmentValue = base58Bytes(
+      '--change-commitment',
+      results['change_commitment']! as String,
+    );
+    final changeViewPubkeyValue = base58Bytes(
+      '--change-view-pubkey',
+      results['change_view_pubkey']! as String,
+    );
+    final envelopeLenValue = integer(
+      '--envelope-len',
+      results['envelope_len']! as String,
+    );
+    final envelopeValue = base58Bytes(
+      '--envelope',
+      results['envelope']! as String,
+    );
     final proofAValue = base58Bytes('--proof-a', results['proof_a']! as String);
     final proofBValue = base58Bytes('--proof-b', results['proof_b']! as String);
     final proofCValue = base58Bytes('--proof-c', results['proof_c']! as String);
@@ -121,6 +224,8 @@ final class WithdrawTokenCommand extends Command<void> {
       proofB: proofBValue,
       proofC: proofCValue,
     );
-    await context.send([instruction], recordedLimit: withdrawTokenComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: withdrawTokenComputeUnitLimit);
   }
 }

@@ -5,16 +5,33 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class ApproveDisclosureCommand extends Command<void> {
   ApproveDisclosureCommand() {
     argParser
       ..addOption('reserved', mandatory: true, help: "reserved")
-      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
-      ..addOption('custodian_registry', mandatory: false, help: "The custodian_registry account [default: derived]")
-      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account")
-      ..addOption('disclosure_log', mandatory: false, help: "The disclosure_log account [default: derived]")
+      ..addOption(
+        'pool_config',
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
+      )
+      ..addOption(
+        'custodian_registry',
+        mandatory: false,
+        help: "The custodian_registry account [default: derived]",
+      )
+      ..addOption(
+        'disclosure_request',
+        mandatory: true,
+        help: "The disclosure_request account",
+      )
+      ..addOption(
+        'disclosure_log',
+        mandatory: false,
+        help: "The disclosure_log account [default: derived]",
+      )
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -31,20 +48,23 @@ final class ApproveDisclosureCommand extends Command<void> {
     final custodian = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final custodianRegistry = (results['custodian_registry'] as String?) != null
-        ? pubkey('--custodian-registry', results['custodian_registry']! as String)
+        ? pubkey(
+            '--custodian-registry',
+            results['custodian_registry']! as String,
+          )
         : (await findCustodianRegistryPda(
-          programAddress: context.programAddress,
-        )).$1;
-    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
+            programAddress: context.programAddress,
+          )).$1;
+    final disclosureRequest = pubkey(
+      '--disclosure-request',
+      results['disclosure_request']! as String,
+    );
     final disclosureLog = (results['disclosure_log'] as String?) != null
         ? pubkey('--disclosure-log', results['disclosure_log']! as String)
-        : (await findDisclosureLogPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findDisclosureLogPda(programAddress: context.programAddress))
+              .$1;
     final clock = pubkey('--clock', results['clock']! as String);
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getApproveDisclosureInstruction(
@@ -57,6 +77,8 @@ final class ApproveDisclosureCommand extends Command<void> {
       clock: clock,
       reserved: reservedValue,
     );
-    await context.send([instruction], recordedLimit: approveDisclosureComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: approveDisclosureComputeUnitLimit);
   }
 }

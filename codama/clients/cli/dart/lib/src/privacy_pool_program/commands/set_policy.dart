@@ -5,6 +5,7 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class SetPolicyCommand extends Command<void> {
@@ -12,7 +13,11 @@ final class SetPolicyCommand extends Command<void> {
     argParser
       ..addOption('policy_flags', mandatory: true, help: "policyFlags")
       ..addOption('policy_cosigner', mandatory: true, help: "policyCosigner")
-      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]");
+      ..addOption(
+        'pool_config',
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
+      );
   }
 
   @override
@@ -28,11 +33,15 @@ final class SetPolicyCommand extends Command<void> {
     final authority = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
-    final policyFlagsValue = integer('--policy-flags', results['policy_flags']! as String);
-    final policyCosignerValue = pubkey('--policy-cosigner', results['policy_cosigner']! as String);
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
+    final policyFlagsValue = integer(
+      '--policy-flags',
+      results['policy_flags']! as String,
+    );
+    final policyCosignerValue = pubkey(
+      '--policy-cosigner',
+      results['policy_cosigner']! as String,
+    );
     final instruction = getSetPolicyInstruction(
       programAddress: context.programAddress,
       authority: authority,

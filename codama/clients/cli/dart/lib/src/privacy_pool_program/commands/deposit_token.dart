@@ -5,6 +5,7 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class DepositTokenCommand extends Command<void> {
@@ -16,13 +17,37 @@ final class DepositTokenCommand extends Command<void> {
       ..addOption('envelope_len', mandatory: true, help: "envelopeLen")
       ..addOption('envelope', mandatory: true, help: "envelope")
       ..addOption('shares', mandatory: true, help: "shares")
-      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
-      ..addOption('merkle_tree', mandatory: false, help: "The merkle_tree account [default: derived]")
+      ..addOption(
+        'pool_config',
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
+      )
+      ..addOption(
+        'merkle_tree',
+        mandatory: false,
+        help: "The merkle_tree account [default: derived]",
+      )
       ..addOption('mint', mandatory: true, help: "The mint account")
-      ..addOption('asset_vault', mandatory: false, help: "The asset_vault account [default: derived]")
-      ..addOption('depositor_token_account', mandatory: true, help: "The depositor_token_account account")
-      ..addOption('vault_token_account', mandatory: true, help: "The vault_token_account account")
-      ..addOption('token_program', mandatory: true, help: "The token_program account");
+      ..addOption(
+        'asset_vault',
+        mandatory: false,
+        help: "The asset_vault account [default: derived]",
+      )
+      ..addOption(
+        'depositor_token_account',
+        mandatory: true,
+        help: "The depositor_token_account account",
+      )
+      ..addOption(
+        'vault_token_account',
+        mandatory: true,
+        help: "The vault_token_account account",
+      )
+      ..addOption(
+        'token_program',
+        mandatory: true,
+        help: "The token_program account",
+      );
   }
 
   @override
@@ -38,29 +63,46 @@ final class DepositTokenCommand extends Command<void> {
     final depositor = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
-        : (await findMerkleTreePda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
     final mint = pubkey('--mint', results['mint']! as String);
     final assetVault = (results['asset_vault'] as String?) != null
         ? pubkey('--asset-vault', results['asset_vault']! as String)
         : (await findAssetVaultPda(
-          seeds: AssetVaultSeeds(mint: mint),
-          programAddress: context.programAddress,
-        )).$1;
-    final depositorTokenAccount = pubkey('--depositor-token-account', results['depositor_token_account']! as String);
-    final vaultTokenAccount = pubkey('--vault-token-account', results['vault_token_account']! as String);
-    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
+            seeds: AssetVaultSeeds(mint: mint),
+            programAddress: context.programAddress,
+          )).$1;
+    final depositorTokenAccount = pubkey(
+      '--depositor-token-account',
+      results['depositor_token_account']! as String,
+    );
+    final vaultTokenAccount = pubkey(
+      '--vault-token-account',
+      results['vault_token_account']! as String,
+    );
+    final tokenProgram = pubkey(
+      '--token-program',
+      results['token_program']! as String,
+    );
     final amountValue = bigInteger('--amount', results['amount']! as String);
-    final commitmentValue = base58Bytes('--commitment', results['commitment']! as String);
-    final viewPubkeyValue = base58Bytes('--view-pubkey', results['view_pubkey']! as String);
-    final envelopeLenValue = integer('--envelope-len', results['envelope_len']! as String);
-    final envelopeValue = base58Bytes('--envelope', results['envelope']! as String);
+    final commitmentValue = base58Bytes(
+      '--commitment',
+      results['commitment']! as String,
+    );
+    final viewPubkeyValue = base58Bytes(
+      '--view-pubkey',
+      results['view_pubkey']! as String,
+    );
+    final envelopeLenValue = integer(
+      '--envelope-len',
+      results['envelope_len']! as String,
+    );
+    final envelopeValue = base58Bytes(
+      '--envelope',
+      results['envelope']! as String,
+    );
     final sharesValue = base58Bytes('--shares', results['shares']! as String);
     final instruction = getDepositTokenInstruction(
       programAddress: context.programAddress,
@@ -79,6 +121,8 @@ final class DepositTokenCommand extends Command<void> {
       envelope: envelopeValue,
       shares: sharesValue,
     );
-    await context.send([instruction], recordedLimit: depositTokenComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: depositTokenComputeUnitLimit);
   }
 }

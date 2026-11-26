@@ -7,6 +7,7 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class TransferCommand extends Command<void> {
@@ -17,7 +18,11 @@ final class TransferCommand extends Command<void> {
       ..addOption('nullifier0', mandatory: true, help: "nullifier0")
       ..addOption('nullifier1', mandatory: true, help: "nullifier1")
       ..addOption('root', mandatory: true, help: "root")
-      ..addOption('relayer_fee', mandatory: true, help: "Optional SOL relayer fee deducted from shielded inputs.")
+      ..addOption(
+        'relayer_fee',
+        mandatory: true,
+        help: "Optional SOL relayer fee deducted from shielded inputs.",
+      )
       ..addOption('out0_commitment', mandatory: true, help: "out0Commitment")
       ..addOption('out0_view_pubkey', mandatory: true, help: "out0ViewPubkey")
       ..addOption('out0_envelope_len', mandatory: true, help: "out0EnvelopeLen")
@@ -26,16 +31,48 @@ final class TransferCommand extends Command<void> {
       ..addOption('out1_view_pubkey', mandatory: true, help: "out1ViewPubkey")
       ..addOption('out1_envelope_len', mandatory: true, help: "out1EnvelopeLen")
       ..addOption('out1_envelope', mandatory: true, help: "out1Envelope")
-      ..addOption('proof_a', mandatory: true, help: "192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).")
+      ..addOption(
+        'proof_a',
+        mandatory: true,
+        help: "192-byte compressed Groth16 proof (`A: 32B, B: 128B, C: 32B`).",
+      )
       ..addOption('proof_b', mandatory: true, help: "proofB")
       ..addOption('proof_c', mandatory: true, help: "proofC")
-      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
-      ..addOption('pool_vault', mandatory: false, help: "The pool_vault account [default: derived]")
-      ..addOption('merkle_tree', mandatory: false, help: "The merkle_tree account [default: derived]")
-      ..addOption('nullifier_record0', mandatory: true, help: "The nullifier_record0 account")
-      ..addOption('nullifier_record1', mandatory: true, help: "The nullifier_record1 account")
-      ..addOption('verifying_key_account', mandatory: true, help: "The verifying_key_account account")
-      ..addOption('policy_cosigner', mandatory: true, help: "The policy_cosigner account");
+      ..addOption(
+        'pool_config',
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
+      )
+      ..addOption(
+        'pool_vault',
+        mandatory: false,
+        help: "The pool_vault account [default: derived]",
+      )
+      ..addOption(
+        'merkle_tree',
+        mandatory: false,
+        help: "The merkle_tree account [default: derived]",
+      )
+      ..addOption(
+        'nullifier_record0',
+        mandatory: true,
+        help: "The nullifier_record0 account",
+      )
+      ..addOption(
+        'nullifier_record1',
+        mandatory: true,
+        help: "The nullifier_record1 account",
+      )
+      ..addOption(
+        'verifying_key_account',
+        mandatory: true,
+        help: "The verifying_key_account account",
+      )
+      ..addOption(
+        'policy_cosigner',
+        mandatory: true,
+        help: "The policy_cosigner account",
+      );
   }
 
   @override
@@ -51,37 +88,82 @@ final class TransferCommand extends Command<void> {
     final payer = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final poolVault = (results['pool_vault'] as String?) != null
         ? pubkey('--pool-vault', results['pool_vault']! as String)
-        : (await findPoolVaultPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolVaultPda(programAddress: context.programAddress)).$1;
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
-        : (await findMerkleTreePda(
-          programAddress: context.programAddress,
-        )).$1;
-    final nullifierRecord0 = pubkey('--nullifier-record0', results['nullifier_record0']! as String);
-    final nullifierRecord1 = pubkey('--nullifier-record1', results['nullifier_record1']! as String);
-    final verifyingKeyAccount = pubkey('--verifying-key-account', results['verifying_key_account']! as String);
-    final policyCosigner = pubkey('--policy-cosigner', results['policy_cosigner']! as String);
-    final nullifier0BumpValue = integer('--nullifier0-bump', results['nullifier0_bump']! as String);
-    final nullifier1BumpValue = integer('--nullifier1-bump', results['nullifier1_bump']! as String);
-    final nullifier0Value = base58Bytes('--nullifier0', results['nullifier0']! as String);
-    final nullifier1Value = base58Bytes('--nullifier1', results['nullifier1']! as String);
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
+    final nullifierRecord0 = pubkey(
+      '--nullifier-record0',
+      results['nullifier_record0']! as String,
+    );
+    final nullifierRecord1 = pubkey(
+      '--nullifier-record1',
+      results['nullifier_record1']! as String,
+    );
+    final verifyingKeyAccount = pubkey(
+      '--verifying-key-account',
+      results['verifying_key_account']! as String,
+    );
+    final policyCosigner = pubkey(
+      '--policy-cosigner',
+      results['policy_cosigner']! as String,
+    );
+    final nullifier0BumpValue = integer(
+      '--nullifier0-bump',
+      results['nullifier0_bump']! as String,
+    );
+    final nullifier1BumpValue = integer(
+      '--nullifier1-bump',
+      results['nullifier1_bump']! as String,
+    );
+    final nullifier0Value = base58Bytes(
+      '--nullifier0',
+      results['nullifier0']! as String,
+    );
+    final nullifier1Value = base58Bytes(
+      '--nullifier1',
+      results['nullifier1']! as String,
+    );
     final rootValue = base58Bytes('--root', results['root']! as String);
-    final relayerFeeValue = bigInteger('--relayer-fee', results['relayer_fee']! as String);
-    final out0CommitmentValue = base58Bytes('--out0-commitment', results['out0_commitment']! as String);
-    final out0ViewPubkeyValue = base58Bytes('--out0-view-pubkey', results['out0_view_pubkey']! as String);
-    final out0EnvelopeLenValue = integer('--out0-envelope-len', results['out0_envelope_len']! as String);
-    final out0EnvelopeValue = base58Bytes('--out0-envelope', results['out0_envelope']! as String);
-    final out1CommitmentValue = base58Bytes('--out1-commitment', results['out1_commitment']! as String);
-    final out1ViewPubkeyValue = base58Bytes('--out1-view-pubkey', results['out1_view_pubkey']! as String);
-    final out1EnvelopeLenValue = integer('--out1-envelope-len', results['out1_envelope_len']! as String);
-    final out1EnvelopeValue = base58Bytes('--out1-envelope', results['out1_envelope']! as String);
+    final relayerFeeValue = bigInteger(
+      '--relayer-fee',
+      results['relayer_fee']! as String,
+    );
+    final out0CommitmentValue = base58Bytes(
+      '--out0-commitment',
+      results['out0_commitment']! as String,
+    );
+    final out0ViewPubkeyValue = base58Bytes(
+      '--out0-view-pubkey',
+      results['out0_view_pubkey']! as String,
+    );
+    final out0EnvelopeLenValue = integer(
+      '--out0-envelope-len',
+      results['out0_envelope_len']! as String,
+    );
+    final out0EnvelopeValue = base58Bytes(
+      '--out0-envelope',
+      results['out0_envelope']! as String,
+    );
+    final out1CommitmentValue = base58Bytes(
+      '--out1-commitment',
+      results['out1_commitment']! as String,
+    );
+    final out1ViewPubkeyValue = base58Bytes(
+      '--out1-view-pubkey',
+      results['out1_view_pubkey']! as String,
+    );
+    final out1EnvelopeLenValue = integer(
+      '--out1-envelope-len',
+      results['out1_envelope_len']! as String,
+    );
+    final out1EnvelopeValue = base58Bytes(
+      '--out1-envelope',
+      results['out1_envelope']! as String,
+    );
     final proofAValue = base58Bytes('--proof-a', results['proof_a']! as String);
     final proofBValue = base58Bytes('--proof-b', results['proof_b']! as String);
     final proofCValue = base58Bytes('--proof-c', results['proof_c']! as String);

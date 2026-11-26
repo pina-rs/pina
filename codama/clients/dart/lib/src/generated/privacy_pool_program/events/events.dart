@@ -8,7 +8,8 @@ import 'event_log.dart';
 import 'note_encrypted_event.dart';
 
 /// The program whose invocation frames emit the events decoded here.
-const privacyPoolProgramEventSourceAddress = 'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D';
+const privacyPoolProgramEventSourceAddress =
+    'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D';
 
 final _programInvokeLog = RegExp(r'^Program (\S+) invoke \[\d+\]$');
 final _programExitLog = RegExp(r'^Program (\S+) (?:success|failed: .*)$');

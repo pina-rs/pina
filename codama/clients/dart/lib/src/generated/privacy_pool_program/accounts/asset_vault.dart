@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,7 +11,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
-
 @immutable
 class AssetVault {
   const AssetVault({
@@ -20,9 +18,8 @@ class AssetVault {
     required this.mint,
     required this.tokenProgram,
     required this.vaultTokenAccount,
-  }) :
-      discriminator = 8,
-      migrationVersion = 0;
+  }) : discriminator = 8,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -44,12 +41,19 @@ class AssetVault {
           vaultTokenAccount == other.vaultTokenAccount;
 
   @override
-  int get hashCode => Object.hash(discriminator, migrationVersion, bump, mint, tokenProgram, vaultTokenAccount);
+  int get hashCode => Object.hash(
+    discriminator,
+    migrationVersion,
+    bump,
+    mint,
+    tokenProgram,
+    vaultTokenAccount,
+  );
 
   @override
-  String toString() => 'AssetVault(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, mint: $mint, tokenProgram: $tokenProgram, vaultTokenAccount: $vaultTokenAccount)';
+  String toString() =>
+      'AssetVault(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, mint: $mint, tokenProgram: $tokenProgram, vaultTokenAccount: $vaultTokenAccount)';
 }
-
 
 Encoder<AssetVault> getAssetVaultEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -85,20 +89,15 @@ Decoder<AssetVault> getAssetVaultDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'assetVault account decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'assetVault account decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (AssetVault, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(8),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(8)).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -111,27 +110,26 @@ Decoder<AssetVault> getAssetVaultDecoder() {
 
     return (
       AssetVault(
-      bump: map['bump']! as int,
-      mint: map['mint']! as Address,
-      tokenProgram: map['tokenProgram']! as Address,
-      vaultTokenAccount: map['vaultTokenAccount']! as Address,
+        bump: map['bump']! as int,
+        mint: map['mint']! as Address,
+        tokenProgram: map['tokenProgram']! as Address,
+        vaultTokenAccount: map['vaultTokenAccount']! as Address,
       ),
       newOffset,
     );
   }
 
   return switch (structDecoder) {
-    FixedSizeDecoder<Map<String, Object?>>() =>
-      FixedSizeDecoder<AssetVault>(
-        fixedSize: structDecoder.fixedSize,
-        read: (bytes, offset) {
-          final bytesLength = bytes.length - offset;
-          if (bytesLength < structDecoder.fixedSize) {
-            throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
-          }
-          return readTopLevel(bytes, offset);
-        },
-      ),
+    FixedSizeDecoder<Map<String, Object?>>() => FixedSizeDecoder<AssetVault>(
+      fixedSize: structDecoder.fixedSize,
+      read: (bytes, offset) {
+        final bytesLength = bytes.length - offset;
+        if (bytesLength < structDecoder.fixedSize) {
+          throwInvalidByteLength(structDecoder.fixedSize, bytesLength);
+        }
+        return readTopLevel(bytes, offset);
+      },
+    ),
     VariableSizeDecoder<Map<String, Object?>>() =>
       VariableSizeDecoder<AssetVault>(
         read: readTopLevel,
@@ -156,11 +154,11 @@ const int assetVaultMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool assetVaultNeedsMigration(List<int> data) {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] != 8) {
-		return false;
-	}
-	return data[1] < 0;
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 8) {
+    return false;
+  }
+  return data[1] < 0;
 }

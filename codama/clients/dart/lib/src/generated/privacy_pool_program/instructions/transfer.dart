@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,7 +10,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
-
 
 @immutable
 class TransferInstructionData {
@@ -33,8 +31,7 @@ class TransferInstructionData {
     required this.proofA,
     required this.proofB,
     required this.proofC,
-  }) :
-      discriminator = 6;
+  }) : discriminator = 6;
 
   final int discriminator;
   final int nullifier0Bump;
@@ -61,18 +58,42 @@ Encoder<TransferInstructionData> getTransferInstructionDataEncoder() {
     ('discriminator', getU8Encoder()),
     ('nullifier0Bump', getU8Encoder()),
     ('nullifier1Bump', getU8Encoder()),
-    ('nullifier0', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
-    ('nullifier1', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    (
+      'nullifier0',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    (
+      'nullifier1',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
     ('root', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
     ('relayerFee', getU64Encoder()),
-    ('out0Commitment', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
-    ('out0ViewPubkey', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    (
+      'out0Commitment',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    (
+      'out0ViewPubkey',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
     ('out0EnvelopeLen', getU8Encoder()),
-    ('out0Envelope', fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false)),
-    ('out1Commitment', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
-    ('out1ViewPubkey', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    (
+      'out0Envelope',
+      fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false),
+    ),
+    (
+      'out1Commitment',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    (
+      'out1ViewPubkey',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
     ('out1EnvelopeLen', getU8Encoder()),
-    ('out1Envelope', fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false)),
+    (
+      'out1Envelope',
+      fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false),
+    ),
     ('proofA', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
     ('proofB', fixEncoderSize(getBytesEncoder(), 128, allowTruncation: false)),
     ('proofC', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
@@ -126,20 +147,15 @@ Decoder<TransferInstructionData> getTransferInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'transfer instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'transfer instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (TransferInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(6),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(6)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -147,23 +163,23 @@ Decoder<TransferInstructionData> getTransferInstructionDataDecoder() {
 
     return (
       TransferInstructionData(
-      nullifier0Bump: map['nullifier0Bump']! as int,
-      nullifier1Bump: map['nullifier1Bump']! as int,
-      nullifier0: map['nullifier0']! as Uint8List,
-      nullifier1: map['nullifier1']! as Uint8List,
-      root: map['root']! as Uint8List,
-      relayerFee: map['relayerFee']! as BigInt,
-      out0Commitment: map['out0Commitment']! as Uint8List,
-      out0ViewPubkey: map['out0ViewPubkey']! as Uint8List,
-      out0EnvelopeLen: map['out0EnvelopeLen']! as int,
-      out0Envelope: map['out0Envelope']! as Uint8List,
-      out1Commitment: map['out1Commitment']! as Uint8List,
-      out1ViewPubkey: map['out1ViewPubkey']! as Uint8List,
-      out1EnvelopeLen: map['out1EnvelopeLen']! as int,
-      out1Envelope: map['out1Envelope']! as Uint8List,
-      proofA: map['proofA']! as Uint8List,
-      proofB: map['proofB']! as Uint8List,
-      proofC: map['proofC']! as Uint8List,
+        nullifier0Bump: map['nullifier0Bump']! as int,
+        nullifier1Bump: map['nullifier1Bump']! as int,
+        nullifier0: map['nullifier0']! as Uint8List,
+        nullifier1: map['nullifier1']! as Uint8List,
+        root: map['root']! as Uint8List,
+        relayerFee: map['relayerFee']! as BigInt,
+        out0Commitment: map['out0Commitment']! as Uint8List,
+        out0ViewPubkey: map['out0ViewPubkey']! as Uint8List,
+        out0EnvelopeLen: map['out0EnvelopeLen']! as int,
+        out0Envelope: map['out0Envelope']! as Uint8List,
+        out1Commitment: map['out1Commitment']! as Uint8List,
+        out1ViewPubkey: map['out1ViewPubkey']! as Uint8List,
+        out1EnvelopeLen: map['out1EnvelopeLen']! as int,
+        out1Envelope: map['out1Envelope']! as Uint8List,
+        proofA: map['proofA']! as Uint8List,
+        proofB: map['proofB']! as Uint8List,
+        proofC: map['proofC']! as Uint8List,
       ),
       newOffset,
     );
@@ -189,8 +205,12 @@ Decoder<TransferInstructionData> getTransferInstructionDataDecoder() {
   };
 }
 
-Codec<TransferInstructionData, TransferInstructionData> getTransferInstructionDataCodec() {
-  return combineCodec(getTransferInstructionDataEncoder(), getTransferInstructionDataDecoder());
+Codec<TransferInstructionData, TransferInstructionData>
+getTransferInstructionDataCodec() {
+  return combineCodec(
+    getTransferInstructionDataEncoder(),
+    getTransferInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [Transfer] instruction.
@@ -224,37 +244,37 @@ Instruction getTransferInstruction({
   required Uint8List proofC,
 }) {
   final instructionData = TransferInstructionData(
-      nullifier0Bump: nullifier0Bump,
-      nullifier1Bump: nullifier1Bump,
-      nullifier0: nullifier0,
-      nullifier1: nullifier1,
-      root: root,
-      relayerFee: relayerFee,
-      out0Commitment: out0Commitment,
-      out0ViewPubkey: out0ViewPubkey,
-      out0EnvelopeLen: out0EnvelopeLen,
-      out0Envelope: out0Envelope,
-      out1Commitment: out1Commitment,
-      out1ViewPubkey: out1ViewPubkey,
-      out1EnvelopeLen: out1EnvelopeLen,
-      out1Envelope: out1Envelope,
-      proofA: proofA,
-      proofB: proofB,
-      proofC: proofC,
+    nullifier0Bump: nullifier0Bump,
+    nullifier1Bump: nullifier1Bump,
+    nullifier0: nullifier0,
+    nullifier1: nullifier1,
+    root: root,
+    relayerFee: relayerFee,
+    out0Commitment: out0Commitment,
+    out0ViewPubkey: out0ViewPubkey,
+    out0EnvelopeLen: out0EnvelopeLen,
+    out0Envelope: out0Envelope,
+    out1Commitment: out1Commitment,
+    out1ViewPubkey: out1ViewPubkey,
+    out1EnvelopeLen: out1EnvelopeLen,
+    out1Envelope: out1Envelope,
+    proofA: proofA,
+    proofB: proofB,
+    proofC: proofC,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: payer, role: AccountRole.writableSigner),
-    AccountMeta(address: poolConfig, role: AccountRole.readonly),
-    AccountMeta(address: poolVault, role: AccountRole.writable),
-    AccountMeta(address: merkleTree, role: AccountRole.writable),
-    AccountMeta(address: nullifierRecord0, role: AccountRole.writable),
-    AccountMeta(address: nullifierRecord1, role: AccountRole.writable),
-    AccountMeta(address: verifyingKeyAccount, role: AccountRole.readonly),
-    AccountMeta(address: policyCosigner, role: AccountRole.readonly),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: payer, role: AccountRole.writableSigner),
+      AccountMeta(address: poolConfig, role: AccountRole.readonly),
+      AccountMeta(address: poolVault, role: AccountRole.writable),
+      AccountMeta(address: merkleTree, role: AccountRole.writable),
+      AccountMeta(address: nullifierRecord0, role: AccountRole.writable),
+      AccountMeta(address: nullifierRecord1, role: AccountRole.writable),
+      AccountMeta(address: verifyingKeyAccount, role: AccountRole.readonly),
+      AccountMeta(address: policyCosigner, role: AccountRole.readonly),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getTransferInstructionDataEncoder().encode(instructionData),
   );

@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,7 +10,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 
-
 @immutable
 class RequesterRegistry {
   const RequesterRegistry({
@@ -19,9 +17,8 @@ class RequesterRegistry {
     required this.count,
     required this.keys,
     required this.maxTiers,
-  }) :
-      discriminator = 6,
-      migrationVersion = 0;
+  }) : discriminator = 6,
+       migrationVersion = 0;
 
   final int discriminator;
   final int migrationVersion;
@@ -43,12 +40,13 @@ class RequesterRegistry {
           maxTiers == other.maxTiers;
 
   @override
-  int get hashCode => Object.hash(discriminator, migrationVersion, bump, count, keys, maxTiers);
+  int get hashCode =>
+      Object.hash(discriminator, migrationVersion, bump, count, keys, maxTiers);
 
   @override
-  String toString() => 'RequesterRegistry(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, count: $count, keys: $keys, maxTiers: $maxTiers)';
+  String toString() =>
+      'RequesterRegistry(discriminator: $discriminator, migrationVersion: $migrationVersion, bump: $bump, count: $count, keys: $keys, maxTiers: $maxTiers)';
 }
-
 
 Encoder<RequesterRegistry> getRequesterRegistryEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
@@ -84,20 +82,15 @@ Decoder<RequesterRegistry> getRequesterRegistryDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'requesterRegistry account decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'requesterRegistry account decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (RequesterRegistry, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(6),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(6)).read(bytes, offset + 0);
     final (storedMigrationVersion, _) = getU8Decoder().read(bytes, offset + 1);
     if (storedMigrationVersion != 0) {
       throw StateError(
@@ -110,10 +103,10 @@ Decoder<RequesterRegistry> getRequesterRegistryDecoder() {
 
     return (
       RequesterRegistry(
-      bump: map['bump']! as int,
-      count: map['count']! as int,
-      keys: map['keys']! as Uint8List,
-      maxTiers: map['maxTiers']! as Uint8List,
+        bump: map['bump']! as int,
+        count: map['count']! as int,
+        keys: map['keys']! as Uint8List,
+        maxTiers: map['maxTiers']! as Uint8List,
       ),
       newOffset,
     );
@@ -140,10 +133,15 @@ Decoder<RequesterRegistry> getRequesterRegistryDecoder() {
 }
 
 Codec<RequesterRegistry, RequesterRegistry> getRequesterRegistryCodec() {
-  return combineCodec(getRequesterRegistryEncoder(), getRequesterRegistryDecoder());
+  return combineCodec(
+    getRequesterRegistryEncoder(),
+    getRequesterRegistryDecoder(),
+  );
 }
 
-Account<RequesterRegistry> decodeRequesterRegistry(EncodedAccount encodedAccount) {
+Account<RequesterRegistry> decodeRequesterRegistry(
+  EncodedAccount encodedAccount,
+) {
   return decodeAccount(encodedAccount, getRequesterRegistryDecoder());
 }
 
@@ -155,11 +153,11 @@ const int requesterRegistryMigrationVersion = 0;
 /// than this client's schema — exactly the accounts [getMigrateInstruction]
 /// can bring current. Decoding reports every other mismatch.
 bool requesterRegistryNeedsMigration(List<int> data) {
-	if (data.length < 2) {
-		return false;
-	}
-	if (data[0] != 6) {
-		return false;
-	}
-	return data[1] < 0;
+  if (data.length < 2) {
+    return false;
+  }
+  if (data[0] != 6) {
+    return false;
+  }
+  return data[1] < 0;
 }

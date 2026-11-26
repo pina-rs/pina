@@ -12,7 +12,9 @@ import 'package:test/test.dart';
 void main() {
   const payer = Address('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin');
   final instruction = Instruction(
-    programAddress: const Address('So11111111111111111111111111111111111111112'),
+    programAddress: const Address(
+      'So11111111111111111111111111111111111111112',
+    ),
     data: Uint8List.fromList([1]),
   );
 

@@ -5,16 +5,29 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class VerifyPolicyCommand extends Command<void> {
   VerifyPolicyCommand() {
     argParser
-      ..addOption('policy_hash', mandatory: true, help: "Single BN254 scalar representing the Custom Ring policy statement.")
-      ..addOption('proof_a', mandatory: true, help: "192-byte compressed Groth16 policy proof (`A: 32B, B: 128B, C: 32B`).")
+      ..addOption(
+        'policy_hash',
+        mandatory: true,
+        help: "Single BN254 scalar representing the Custom Ring policy statement.",
+      )
+      ..addOption(
+        'proof_a',
+        mandatory: true,
+        help: "192-byte compressed Groth16 policy proof (`A: 32B, B: 128B, C: 32B`).",
+      )
       ..addOption('proof_b', mandatory: true, help: "proofB")
       ..addOption('proof_c', mandatory: true, help: "proofC")
-      ..addOption('verifying_key_account', mandatory: true, help: "The verifying_key_account account");
+      ..addOption(
+        'verifying_key_account',
+        mandatory: true,
+        help: "The verifying_key_account account",
+      );
   }
 
   @override
@@ -27,8 +40,14 @@ final class VerifyPolicyCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final verifyingKeyAccount = pubkey('--verifying-key-account', results['verifying_key_account']! as String);
-    final policyHashValue = base58Bytes('--policy-hash', results['policy_hash']! as String);
+    final verifyingKeyAccount = pubkey(
+      '--verifying-key-account',
+      results['verifying_key_account']! as String,
+    );
+    final policyHashValue = base58Bytes(
+      '--policy-hash',
+      results['policy_hash']! as String,
+    );
     final proofAValue = base58Bytes('--proof-a', results['proof_a']! as String);
     final proofBValue = base58Bytes('--proof-b', results['proof_b']! as String);
     final proofCValue = base58Bytes('--proof-c', results['proof_c']! as String);
@@ -40,6 +59,8 @@ final class VerifyPolicyCommand extends Command<void> {
       proofB: proofBValue,
       proofC: proofCValue,
     );
-    await context.send([instruction], recordedLimit: verifyPolicyComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: verifyPolicyComputeUnitLimit);
   }
 }

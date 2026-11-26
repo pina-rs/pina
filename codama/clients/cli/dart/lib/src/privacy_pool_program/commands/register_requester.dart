@@ -5,6 +5,7 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class RegisterRequesterCommand extends Command<void> {
@@ -12,8 +13,16 @@ final class RegisterRequesterCommand extends Command<void> {
     argParser
       ..addOption('requester', mandatory: true, help: "requester")
       ..addOption('max_tier', mandatory: true, help: "maxTier")
-      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
-      ..addOption('requester_registry', mandatory: false, help: "The requester_registry account [default: derived]");
+      ..addOption(
+        'pool_config',
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
+      )
+      ..addOption(
+        'requester_registry',
+        mandatory: false,
+        help: "The requester_registry account [default: derived]",
+      );
   }
 
   @override
@@ -29,15 +38,19 @@ final class RegisterRequesterCommand extends Command<void> {
     final authority = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final requesterRegistry = (results['requester_registry'] as String?) != null
-        ? pubkey('--requester-registry', results['requester_registry']! as String)
+        ? pubkey(
+            '--requester-registry',
+            results['requester_registry']! as String,
+          )
         : (await findRequesterRegistryPda(
-          programAddress: context.programAddress,
-        )).$1;
-    final requesterValue = pubkey('--requester', results['requester']! as String);
+            programAddress: context.programAddress,
+          )).$1;
+    final requesterValue = pubkey(
+      '--requester',
+      results['requester']! as String,
+    );
     final maxTierValue = integer('--max-tier', results['max_tier']! as String);
     final instruction = getRegisterRequesterInstruction(
       programAddress: context.programAddress,
@@ -47,6 +60,8 @@ final class RegisterRequesterCommand extends Command<void> {
       requester: requesterValue,
       maxTier: maxTierValue,
     );
-    await context.send([instruction], recordedLimit: registerRequesterComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: registerRequesterComputeUnitLimit);
   }
 }

@@ -7,6 +7,7 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class RegisterAssetCommand extends Command<void> {
@@ -14,9 +15,21 @@ final class RegisterAssetCommand extends Command<void> {
     argParser
       ..addOption('bump', mandatory: true, help: "bump")
       ..addOption('mint', mandatory: true, help: "The mint account")
-      ..addOption('asset_vault', mandatory: false, help: "The asset_vault account [default: derived]")
-      ..addOption('vault_token_account', mandatory: true, help: "The vault_token_account account")
-      ..addOption('token_program', mandatory: true, help: "The token_program account");
+      ..addOption(
+        'asset_vault',
+        mandatory: false,
+        help: "The asset_vault account [default: derived]",
+      )
+      ..addOption(
+        'vault_token_account',
+        mandatory: true,
+        help: "The vault_token_account account",
+      )
+      ..addOption(
+        'token_program',
+        mandatory: true,
+        help: "The token_program account",
+      );
   }
 
   @override
@@ -34,11 +47,17 @@ final class RegisterAssetCommand extends Command<void> {
     final assetVault = (results['asset_vault'] as String?) != null
         ? pubkey('--asset-vault', results['asset_vault']! as String)
         : (await findAssetVaultPda(
-          seeds: AssetVaultSeeds(mint: mint),
-          programAddress: context.programAddress,
-        )).$1;
-    final vaultTokenAccount = pubkey('--vault-token-account', results['vault_token_account']! as String);
-    final tokenProgram = pubkey('--token-program', results['token_program']! as String);
+            seeds: AssetVaultSeeds(mint: mint),
+            programAddress: context.programAddress,
+          )).$1;
+    final vaultTokenAccount = pubkey(
+      '--vault-token-account',
+      results['vault_token_account']! as String,
+    );
+    final tokenProgram = pubkey(
+      '--token-program',
+      results['token_program']! as String,
+    );
     final bumpValue = integer('--bump', results['bump']! as String);
     final instruction = getRegisterAssetInstruction(
       programAddress: context.programAddress,
@@ -50,6 +69,8 @@ final class RegisterAssetCommand extends Command<void> {
       systemProgram: Address("11111111111111111111111111111111"),
       bump: bumpValue,
     );
-    await context.send([instruction], recordedLimit: registerAssetComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: registerAssetComputeUnitLimit);
   }
 }

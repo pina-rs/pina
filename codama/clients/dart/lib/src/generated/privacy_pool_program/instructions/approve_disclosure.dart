@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,19 +11,17 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class ApproveDisclosureInstructionData {
-  const ApproveDisclosureInstructionData({
-    required this.reserved,
-  }) :
-      discriminator = 11;
+  const ApproveDisclosureInstructionData({required this.reserved})
+    : discriminator = 11;
 
   final int discriminator;
   final int reserved;
 }
 
-Encoder<ApproveDisclosureInstructionData> getApproveDisclosureInstructionDataEncoder() {
+Encoder<ApproveDisclosureInstructionData>
+getApproveDisclosureInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('reserved', getU8Encoder()),
@@ -39,36 +36,33 @@ Encoder<ApproveDisclosureInstructionData> getApproveDisclosureInstructionDataEnc
   );
 }
 
-Decoder<ApproveDisclosureInstructionData> getApproveDisclosureInstructionDataDecoder() {
+Decoder<ApproveDisclosureInstructionData>
+getApproveDisclosureInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('reserved', getU8Decoder()),
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'approveDisclosure instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'approveDisclosure instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
-  (ApproveDisclosureInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(11),
-    ).read(bytes, offset + 0);
+  (ApproveDisclosureInstructionData, int) readTopLevel(
+    Uint8List bytes,
+    int offset,
+  ) {
+    getConstantDecoder(getU8Encoder().encode(11)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
     }
 
     return (
-      ApproveDisclosureInstructionData(
-      reserved: map['reserved']! as int,
-      ),
+      ApproveDisclosureInstructionData(reserved: map['reserved']! as int),
       newOffset,
     );
   }
@@ -93,8 +87,12 @@ Decoder<ApproveDisclosureInstructionData> getApproveDisclosureInstructionDataDec
   };
 }
 
-Codec<ApproveDisclosureInstructionData, ApproveDisclosureInstructionData> getApproveDisclosureInstructionDataCodec() {
-  return combineCodec(getApproveDisclosureInstructionDataEncoder(), getApproveDisclosureInstructionDataDecoder());
+Codec<ApproveDisclosureInstructionData, ApproveDisclosureInstructionData>
+getApproveDisclosureInstructionDataCodec() {
+  return combineCodec(
+    getApproveDisclosureInstructionDataEncoder(),
+    getApproveDisclosureInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [ApproveDisclosure] instruction.
@@ -108,25 +106,25 @@ Instruction getApproveDisclosureInstruction({
   required Address clock,
   required int reserved,
 }) {
-  final instructionData = ApproveDisclosureInstructionData(
-      reserved: reserved,
-  );
+  final instructionData = ApproveDisclosureInstructionData(reserved: reserved);
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: custodian, role: AccountRole.readonlySigner),
-    AccountMeta(address: poolConfig, role: AccountRole.readonly),
-    AccountMeta(address: custodianRegistry, role: AccountRole.readonly),
-    AccountMeta(address: disclosureRequest, role: AccountRole.writable),
-    AccountMeta(address: disclosureLog, role: AccountRole.writable),
-    AccountMeta(address: clock, role: AccountRole.readonly),
+      AccountMeta(address: custodian, role: AccountRole.readonlySigner),
+      AccountMeta(address: poolConfig, role: AccountRole.readonly),
+      AccountMeta(address: custodianRegistry, role: AccountRole.readonly),
+      AccountMeta(address: disclosureRequest, role: AccountRole.writable),
+      AccountMeta(address: disclosureLog, role: AccountRole.writable),
+      AccountMeta(address: clock, role: AccountRole.readonly),
     ],
     data: getApproveDisclosureInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [ApproveDisclosure] instruction from raw instruction data.
-ApproveDisclosureInstructionData parseApproveDisclosureInstruction(Instruction instruction) {
+ApproveDisclosureInstructionData parseApproveDisclosureInstruction(
+  Instruction instruction,
+) {
   return getApproveDisclosureInstructionDataDecoder().decode(instruction.data!);
 }

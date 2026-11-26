@@ -8,39 +8,40 @@ import 'commands/commands.dart';
 
 CommandRunner<void> buildRunner() {
   return CommandRunner<void>(
-    'privacy-pool-program-cli',
-    "A programmable, tiered-disclosure privacy pool built with pina.\n\nCombines Helius Solana Privacy Rings' production architecture with Pina's\ngoverned, publicly-logged disclosure state machine — all inside one\n`no_std` crate with no `unsafe` code outside `syscalls.rs` and zero\nrequired off-chain infrastructure:\n\n- **Per-nullifier PDAs ([`NullifierRecord`])** — \$O(1)\$ double-spend\ndetection, unbounded spend capacity, and zero shared nullifier write-lock\ncontention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.\n- **Depth-16 frontier Merkle tree ([`MerkleTree`])** — holds 65,536 leaves\nin a 512-byte frontier plus a 32-root ring using compile-time\n[`ZERO_HASHES`], eliminating runtime zero-hash recomputation on\ninitialization.\n- **Variable-amount 2-in-2-out join-split circuit** — one unified Groth16\ncircuit (`VK_SLOT_JOIN_SPLIT`) handles arbitrary-amount withdrawals,\nchange outputs, UTXO splits, and UTXO merges with 64-bit range checks and\nsingle-input `statement_hash` compression (one `g1_mul` + `g1_add`).\n- **SPL Token & Token-2022 escrows ([`AssetVault`])** — permissionless\nper-mint asset registration, variable-amount token deposits, and\njoin-split token withdrawals.\n- **128-byte compressed Groth16 proofs** — decompressed on-chain via\n`sol_alt_bn128_compression` before the four-pairing check.\n- **Relayer & fee-payer decoupling** — optional relayer address and fee\nbound into the Groth16 statement so users can pay fees out of shielded\nbalances without leaking a public fee payer.\n- **Real shielded keypair & X25519 + AEAD (`shielded` module)** — host-side\nRFC 7748 X25519 viewing keys, per-transaction viewing keys for selective\ndisclosure, and 2-of-3 GF(256) Shamir custodian shares.\n- **Rent-free note emission & privacy-preserving [`DisclosureLog`]** —\nencrypted note envelopes and shares emit via [`NoteEncryptedEvent`] with\nzero per-note PDA rent; [`RequestDisclosure`] authenticates `view_pubkey`\nvia Merkle membership; [`DisclosureLog`] stores a salted `scope_hash`\nrather than raw commitments; verifying keys support authority rotation.\n- **Custom Ring policy & composable CPI** — configurable pause and\nco-signer / CPI authority gates ([`SetPolicy`]) plus composable ZK policy\nverification ([`VerifyPolicy`] on `VK_SLOT_POLICY`).",
-  )
+      'privacy-pool-program-cli',
+      "A programmable, tiered-disclosure privacy pool built with pina.\n\nCombines Helius Solana Privacy Rings' production architecture with Pina's\ngoverned, publicly-logged disclosure state machine — all inside one\n`no_std` crate with no `unsafe` code outside `syscalls.rs` and zero\nrequired off-chain infrastructure:\n\n- **Per-nullifier PDAs ([`NullifierRecord`])** — \$O(1)\$ double-spend\ndetection, unbounded spend capacity, and zero shared nullifier write-lock\ncontention. Dummy inputs (`nullifier == [0; 32]`) skip PDA creation.\n- **Depth-16 frontier Merkle tree ([`MerkleTree`])** — holds 65,536 leaves\nin a 512-byte frontier plus a 32-root ring using compile-time\n[`ZERO_HASHES`], eliminating runtime zero-hash recomputation on\ninitialization.\n- **Variable-amount 2-in-2-out join-split circuit** — one unified Groth16\ncircuit (`VK_SLOT_JOIN_SPLIT`) handles arbitrary-amount withdrawals,\nchange outputs, UTXO splits, and UTXO merges with 64-bit range checks and\nsingle-input `statement_hash` compression (one `g1_mul` + `g1_add`).\n- **SPL Token & Token-2022 escrows ([`AssetVault`])** — permissionless\nper-mint asset registration, variable-amount token deposits, and\njoin-split token withdrawals.\n- **128-byte compressed Groth16 proofs** — decompressed on-chain via\n`sol_alt_bn128_compression` before the four-pairing check.\n- **Relayer & fee-payer decoupling** — optional relayer address and fee\nbound into the Groth16 statement so users can pay fees out of shielded\nbalances without leaking a public fee payer.\n- **Real shielded keypair & X25519 + AEAD (`shielded` module)** — host-side\nRFC 7748 X25519 viewing keys, per-transaction viewing keys for selective\ndisclosure, and 2-of-3 GF(256) Shamir custodian shares.\n- **Rent-free note emission & privacy-preserving [`DisclosureLog`]** —\nencrypted note envelopes and shares emit via [`NoteEncryptedEvent`] with\nzero per-note PDA rent; [`RequestDisclosure`] authenticates `view_pubkey`\nvia Merkle membership; [`DisclosureLog`] stores a salted `scope_hash`\nrather than raw commitments; verifying keys support authority rotation.\n- **Custom Ring policy & composable CPI** — configurable pause and\nco-signer / CPI authority gates ([`SetPolicy`]) plus composable ZK policy\nverification ([`VerifyPolicy`] on `VK_SLOT_POLICY`).",
+    )
     ..argParser.addOption(
-        'url',
-        abbr: 'u',
-        defaultsTo: 'devnet',
-        help: 'RPC endpoint: mainnet, devnet, testnet, localhost, or an https URL.',
-      )
+      'url',
+      abbr: 'u',
+      defaultsTo: 'devnet',
+      help:
+          'RPC endpoint: mainnet, devnet, testnet, localhost, or an https URL.',
+    )
     ..argParser.addOption(
-        'keypair',
-        abbr: 'k',
-        defaultsTo: '~/.config/solana/id.json',
-        help: 'Payer keypair JSON file.',
-      )
+      'keypair',
+      abbr: 'k',
+      defaultsTo: '~/.config/solana/id.json',
+      help: 'Payer keypair JSON file.',
+    )
     ..argParser.addOption(
-        'program-id',
-        help: 'Override the on-chain program address.',
-      )
+      'program-id',
+      help: 'Override the on-chain program address.',
+    )
     ..argParser.addFlag(
-        'simulate',
-        help: 'Simulate the transaction and print logs instead of sending.',
-      )
+      'simulate',
+      help: 'Simulate the transaction and print logs instead of sending.',
+    )
     ..argParser.addFlag(
-        'json',
-        negatable: false,
-        help: 'Print machine-readable JSON output.',
-      )
+      'json',
+      negatable: false,
+      help: 'Print machine-readable JSON output.',
+    )
     ..argParser.addOption(
-        'compute-unit-limit',
-        valueHelp: 'units',
-        help: 'Compute unit limit to request instead of the one recorded for the instruction.',
-      )
+      'compute-unit-limit',
+      valueHelp: 'units',
+      help: 'Compute unit limit to request instead of the one recorded for the instruction.',
+    )
     ..addCommand(InitializeCommand())
     ..addCommand(SetVerificationKeyCommand())
     ..addCommand(SetCustodiansCommand())

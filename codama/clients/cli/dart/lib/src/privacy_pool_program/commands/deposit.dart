@@ -7,20 +7,45 @@ import 'package:args/command_runner.dart';
 import 'package:solana_kit_address/solana_kit_address.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class DepositCommand extends Command<void> {
   DepositCommand() {
     argParser
-      ..addOption('amount', mandatory: true, help: "Variable SOL deposit amount in lamports.")
-      ..addOption('commitment', mandatory: true, help: "Client-computed Poseidon note commitment.")
-      ..addOption('view_pubkey', mandatory: true, help: "Per-note consent/notification public key.")
+      ..addOption(
+        'amount',
+        mandatory: true,
+        help: "Variable SOL deposit amount in lamports.",
+      )
+      ..addOption(
+        'commitment',
+        mandatory: true,
+        help: "Client-computed Poseidon note commitment.",
+      )
+      ..addOption(
+        'view_pubkey',
+        mandatory: true,
+        help: "Per-note consent/notification public key.",
+      )
       ..addOption('envelope_len', mandatory: true, help: "envelopeLen")
       ..addOption('envelope', mandatory: true, help: "envelope")
       ..addOption('shares', mandatory: true, help: "shares")
-      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
-      ..addOption('pool_vault', mandatory: false, help: "The pool_vault account [default: derived]")
-      ..addOption('merkle_tree', mandatory: false, help: "The merkle_tree account [default: derived]");
+      ..addOption(
+        'pool_config',
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
+      )
+      ..addOption(
+        'pool_vault',
+        mandatory: false,
+        help: "The pool_vault account [default: derived]",
+      )
+      ..addOption(
+        'merkle_tree',
+        mandatory: false,
+        help: "The merkle_tree account [default: derived]",
+      );
   }
 
   @override
@@ -36,24 +61,30 @@ final class DepositCommand extends Command<void> {
     final depositor = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final poolVault = (results['pool_vault'] as String?) != null
         ? pubkey('--pool-vault', results['pool_vault']! as String)
-        : (await findPoolVaultPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolVaultPda(programAddress: context.programAddress)).$1;
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
-        : (await findMerkleTreePda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
     final amountValue = bigInteger('--amount', results['amount']! as String);
-    final commitmentValue = base58Bytes('--commitment', results['commitment']! as String);
-    final viewPubkeyValue = base58Bytes('--view-pubkey', results['view_pubkey']! as String);
-    final envelopeLenValue = integer('--envelope-len', results['envelope_len']! as String);
-    final envelopeValue = base58Bytes('--envelope', results['envelope']! as String);
+    final commitmentValue = base58Bytes(
+      '--commitment',
+      results['commitment']! as String,
+    );
+    final viewPubkeyValue = base58Bytes(
+      '--view-pubkey',
+      results['view_pubkey']! as String,
+    );
+    final envelopeLenValue = integer(
+      '--envelope-len',
+      results['envelope_len']! as String,
+    );
+    final envelopeValue = base58Bytes(
+      '--envelope',
+      results['envelope']! as String,
+    );
     final sharesValue = base58Bytes('--shares', results['shares']! as String);
     final instruction = getDepositInstruction(
       programAddress: context.programAddress,

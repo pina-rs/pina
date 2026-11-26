@@ -29,12 +29,13 @@
 //!   disclosure, and 2-of-3 GF(256) Shamir custodian shares.
 //! - **Rent-free note emission & privacy-preserving [`DisclosureLog`]** —
 //!   encrypted note envelopes and shares emit via [`NoteEncryptedEvent`] with
-//!   zero per-note PDA rent; [`RequestDisclosure`] authenticates `view_pubkey`
-//!   via Merkle membership; [`DisclosureLog`] stores a salted `scope_hash`
-//!   rather than raw commitments; verifying keys support authority rotation.
+//!   zero per-note PDA rent; [`RequestDisclosureIx`] authenticates
+//!   `view_pubkey` via Merkle membership; [`DisclosureLog`] stores a salted
+//!   `scope_hash` rather than raw commitments; verifying keys support authority
+//!   rotation.
 //! - **Custom Ring policy & composable CPI** — configurable pause and
-//!   co-signer / CPI authority gates ([`SetPolicy`]) plus composable ZK policy
-//!   verification ([`VerifyPolicy`] on `VK_SLOT_POLICY`).
+//!   co-signer / CPI authority gates ([`SetPolicyIx`]) plus composable ZK
+//!   policy verification ([`VerifyPolicyIx`] on [`VK_SLOT_POLICY`]).
 
 #![allow(missing_docs)]
 #![allow(clippy::inline_always)]

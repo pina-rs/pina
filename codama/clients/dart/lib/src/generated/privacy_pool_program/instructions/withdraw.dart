@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,7 +10,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
-
 
 @immutable
 class WithdrawInstructionData {
@@ -31,8 +29,7 @@ class WithdrawInstructionData {
     required this.proofA,
     required this.proofB,
     required this.proofC,
-  }) :
-      discriminator = 5;
+  }) : discriminator = 5;
 
   final int discriminator;
   final int nullifier0Bump;
@@ -57,13 +54,25 @@ Encoder<WithdrawInstructionData> getWithdrawInstructionDataEncoder() {
     ('discriminator', getU8Encoder()),
     ('nullifier0Bump', getU8Encoder()),
     ('nullifier1Bump', getU8Encoder()),
-    ('nullifier0', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
-    ('nullifier1', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    (
+      'nullifier0',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    (
+      'nullifier1',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
     ('root', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
     ('publicOut', getU64Encoder()),
     ('relayerFee', getU64Encoder()),
-    ('changeCommitment', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
-    ('changeViewPubkey', fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false)),
+    (
+      'changeCommitment',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
+    (
+      'changeViewPubkey',
+      fixEncoderSize(getBytesEncoder(), 32, allowTruncation: false),
+    ),
     ('envelopeLen', getU8Encoder()),
     ('envelope', fixEncoderSize(getBytesEncoder(), 96, allowTruncation: false)),
     ('shares', fixEncoderSize(getBytesEncoder(), 144, allowTruncation: false)),
@@ -116,20 +125,15 @@ Decoder<WithdrawInstructionData> getWithdrawInstructionDataDecoder() {
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'withdraw instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'withdraw instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
   (WithdrawInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(5),
-    ).read(bytes, offset + 0);
+    getConstantDecoder(getU8Encoder().encode(5)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -137,21 +141,21 @@ Decoder<WithdrawInstructionData> getWithdrawInstructionDataDecoder() {
 
     return (
       WithdrawInstructionData(
-      nullifier0Bump: map['nullifier0Bump']! as int,
-      nullifier1Bump: map['nullifier1Bump']! as int,
-      nullifier0: map['nullifier0']! as Uint8List,
-      nullifier1: map['nullifier1']! as Uint8List,
-      root: map['root']! as Uint8List,
-      publicOut: map['publicOut']! as BigInt,
-      relayerFee: map['relayerFee']! as BigInt,
-      changeCommitment: map['changeCommitment']! as Uint8List,
-      changeViewPubkey: map['changeViewPubkey']! as Uint8List,
-      envelopeLen: map['envelopeLen']! as int,
-      envelope: map['envelope']! as Uint8List,
-      shares: map['shares']! as Uint8List,
-      proofA: map['proofA']! as Uint8List,
-      proofB: map['proofB']! as Uint8List,
-      proofC: map['proofC']! as Uint8List,
+        nullifier0Bump: map['nullifier0Bump']! as int,
+        nullifier1Bump: map['nullifier1Bump']! as int,
+        nullifier0: map['nullifier0']! as Uint8List,
+        nullifier1: map['nullifier1']! as Uint8List,
+        root: map['root']! as Uint8List,
+        publicOut: map['publicOut']! as BigInt,
+        relayerFee: map['relayerFee']! as BigInt,
+        changeCommitment: map['changeCommitment']! as Uint8List,
+        changeViewPubkey: map['changeViewPubkey']! as Uint8List,
+        envelopeLen: map['envelopeLen']! as int,
+        envelope: map['envelope']! as Uint8List,
+        shares: map['shares']! as Uint8List,
+        proofA: map['proofA']! as Uint8List,
+        proofB: map['proofB']! as Uint8List,
+        proofC: map['proofC']! as Uint8List,
       ),
       newOffset,
     );
@@ -177,8 +181,12 @@ Decoder<WithdrawInstructionData> getWithdrawInstructionDataDecoder() {
   };
 }
 
-Codec<WithdrawInstructionData, WithdrawInstructionData> getWithdrawInstructionDataCodec() {
-  return combineCodec(getWithdrawInstructionDataEncoder(), getWithdrawInstructionDataDecoder());
+Codec<WithdrawInstructionData, WithdrawInstructionData>
+getWithdrawInstructionDataCodec() {
+  return combineCodec(
+    getWithdrawInstructionDataEncoder(),
+    getWithdrawInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [Withdraw] instruction.
@@ -211,36 +219,36 @@ Instruction getWithdrawInstruction({
   required Uint8List proofC,
 }) {
   final instructionData = WithdrawInstructionData(
-      nullifier0Bump: nullifier0Bump,
-      nullifier1Bump: nullifier1Bump,
-      nullifier0: nullifier0,
-      nullifier1: nullifier1,
-      root: root,
-      publicOut: publicOut,
-      relayerFee: relayerFee,
-      changeCommitment: changeCommitment,
-      changeViewPubkey: changeViewPubkey,
-      envelopeLen: envelopeLen,
-      envelope: envelope,
-      shares: shares,
-      proofA: proofA,
-      proofB: proofB,
-      proofC: proofC,
+    nullifier0Bump: nullifier0Bump,
+    nullifier1Bump: nullifier1Bump,
+    nullifier0: nullifier0,
+    nullifier1: nullifier1,
+    root: root,
+    publicOut: publicOut,
+    relayerFee: relayerFee,
+    changeCommitment: changeCommitment,
+    changeViewPubkey: changeViewPubkey,
+    envelopeLen: envelopeLen,
+    envelope: envelope,
+    shares: shares,
+    proofA: proofA,
+    proofB: proofB,
+    proofC: proofC,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: payer, role: AccountRole.writableSigner),
-    AccountMeta(address: poolConfig, role: AccountRole.readonly),
-    AccountMeta(address: poolVault, role: AccountRole.writable),
-    AccountMeta(address: merkleTree, role: AccountRole.writable),
-    AccountMeta(address: nullifierRecord0, role: AccountRole.writable),
-    AccountMeta(address: nullifierRecord1, role: AccountRole.writable),
-    AccountMeta(address: verifyingKeyAccount, role: AccountRole.readonly),
-    AccountMeta(address: recipient, role: AccountRole.writable),
-    AccountMeta(address: policyCosigner, role: AccountRole.readonly),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: payer, role: AccountRole.writableSigner),
+      AccountMeta(address: poolConfig, role: AccountRole.readonly),
+      AccountMeta(address: poolVault, role: AccountRole.writable),
+      AccountMeta(address: merkleTree, role: AccountRole.writable),
+      AccountMeta(address: nullifierRecord0, role: AccountRole.writable),
+      AccountMeta(address: nullifierRecord1, role: AccountRole.writable),
+      AccountMeta(address: verifyingKeyAccount, role: AccountRole.readonly),
+      AccountMeta(address: recipient, role: AccountRole.writable),
+      AccountMeta(address: policyCosigner, role: AccountRole.readonly),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getWithdrawInstructionDataEncoder().encode(instructionData),
   );

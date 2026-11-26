@@ -5,13 +5,18 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class GrantDisclosureCommand extends Command<void> {
   GrantDisclosureCommand() {
     argParser
       ..addOption('reserved', mandatory: true, help: "reserved")
-      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account");
+      ..addOption(
+        'disclosure_request',
+        mandatory: true,
+        help: "The disclosure_request account",
+      );
   }
 
   @override
@@ -24,7 +29,10 @@ final class GrantDisclosureCommand extends Command<void> {
   Future<void> run() async {
     final results = argResults!;
     final context = await createContext(globalResults!);
-    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
+    final disclosureRequest = pubkey(
+      '--disclosure-request',
+      results['disclosure_request']! as String,
+    );
     final viewer = context.payerAddress;
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getGrantDisclosureInstruction(
@@ -33,6 +41,8 @@ final class GrantDisclosureCommand extends Command<void> {
       viewer: viewer,
       reserved: reservedValue,
     );
-    await context.send([instruction], recordedLimit: grantDisclosureComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: grantDisclosureComputeUnitLimit);
   }
 }

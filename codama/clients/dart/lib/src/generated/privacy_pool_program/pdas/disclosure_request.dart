@@ -1,19 +1,13 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
-
 import 'package:meta/meta.dart';
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 
-
 @immutable
 class DisclosureRequestSeeds {
-  const DisclosureRequestSeeds({
-    required this.requester,
-    required this.nonce,
-  });
+  const DisclosureRequestSeeds({required this.requester, required this.nonce});
 
   final Address requester;
   final BigInt nonce;

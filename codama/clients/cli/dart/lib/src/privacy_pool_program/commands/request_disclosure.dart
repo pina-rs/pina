@@ -5,6 +5,7 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class RequestDisclosureCommand extends Command<void> {
@@ -14,17 +15,41 @@ final class RequestDisclosureCommand extends Command<void> {
       ..addOption('nonce', mandatory: true, help: "nonce")
       ..addOption('tier', mandatory: true, help: "tier")
       ..addOption('commitment', mandatory: true, help: "commitment")
-      ..addOption('view_pubkey', mandatory: true, help: "Claimed consent key for `commitment`, authenticated via `path_elements`.")
+      ..addOption(
+        'view_pubkey',
+        mandatory: true,
+        help: "Claimed consent key for `commitment`, authenticated via `path_elements`.",
+      )
       ..addOption('leaf_index', mandatory: true, help: "leafIndex")
       ..addOption('path_elements', mandatory: true, help: "pathElements")
       ..addOption('notice_len', mandatory: true, help: "noticeLen")
       ..addOption('notice', mandatory: true, help: "notice")
       ..addOption('legal_basis_hash', mandatory: true, help: "legalBasisHash")
-      ..addOption('pool_config', mandatory: false, help: "The pool_config account [default: derived]")
-      ..addOption('requester_registry', mandatory: false, help: "The requester_registry account [default: derived]")
-      ..addOption('merkle_tree', mandatory: false, help: "The merkle_tree account [default: derived]")
-      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account")
-      ..addOption('system_program', mandatory: true, help: "The system_program account")
+      ..addOption(
+        'pool_config',
+        mandatory: false,
+        help: "The pool_config account [default: derived]",
+      )
+      ..addOption(
+        'requester_registry',
+        mandatory: false,
+        help: "The requester_registry account [default: derived]",
+      )
+      ..addOption(
+        'merkle_tree',
+        mandatory: false,
+        help: "The merkle_tree account [default: derived]",
+      )
+      ..addOption(
+        'disclosure_request',
+        mandatory: true,
+        help: "The disclosure_request account",
+      )
+      ..addOption(
+        'system_program',
+        mandatory: true,
+        help: "The system_program account",
+      )
       ..addOption('clock', mandatory: true, help: "The clock account");
   }
 
@@ -41,32 +66,55 @@ final class RequestDisclosureCommand extends Command<void> {
     final requester = context.payerAddress;
     final poolConfig = (results['pool_config'] as String?) != null
         ? pubkey('--pool-config', results['pool_config']! as String)
-        : (await findPoolConfigPda(
-          programAddress: context.programAddress,
-        )).$1;
+        : (await findPoolConfigPda(programAddress: context.programAddress)).$1;
     final requesterRegistry = (results['requester_registry'] as String?) != null
-        ? pubkey('--requester-registry', results['requester_registry']! as String)
+        ? pubkey(
+            '--requester-registry',
+            results['requester_registry']! as String,
+          )
         : (await findRequesterRegistryPda(
-          programAddress: context.programAddress,
-        )).$1;
+            programAddress: context.programAddress,
+          )).$1;
     final merkleTree = (results['merkle_tree'] as String?) != null
         ? pubkey('--merkle-tree', results['merkle_tree']! as String)
-        : (await findMerkleTreePda(
-          programAddress: context.programAddress,
-        )).$1;
-    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
-    final systemProgram = pubkey('--system-program', results['system_program']! as String);
+        : (await findMerkleTreePda(programAddress: context.programAddress)).$1;
+    final disclosureRequest = pubkey(
+      '--disclosure-request',
+      results['disclosure_request']! as String,
+    );
+    final systemProgram = pubkey(
+      '--system-program',
+      results['system_program']! as String,
+    );
     final clock = pubkey('--clock', results['clock']! as String);
     final bumpValue = integer('--bump', results['bump']! as String);
     final nonceValue = bigInteger('--nonce', results['nonce']! as String);
     final tierValue = integer('--tier', results['tier']! as String);
-    final commitmentValue = base58Bytes('--commitment', results['commitment']! as String);
-    final viewPubkeyValue = base58Bytes('--view-pubkey', results['view_pubkey']! as String);
-    final leafIndexValue = bigInteger('--leaf-index', results['leaf_index']! as String);
-    final pathElementsValue = base58Bytes('--path-elements', results['path_elements']! as String);
-    final noticeLenValue = integer('--notice-len', results['notice_len']! as String);
+    final commitmentValue = base58Bytes(
+      '--commitment',
+      results['commitment']! as String,
+    );
+    final viewPubkeyValue = base58Bytes(
+      '--view-pubkey',
+      results['view_pubkey']! as String,
+    );
+    final leafIndexValue = bigInteger(
+      '--leaf-index',
+      results['leaf_index']! as String,
+    );
+    final pathElementsValue = base58Bytes(
+      '--path-elements',
+      results['path_elements']! as String,
+    );
+    final noticeLenValue = integer(
+      '--notice-len',
+      results['notice_len']! as String,
+    );
     final noticeValue = base58Bytes('--notice', results['notice']! as String);
-    final legalBasisHashValue = base58Bytes('--legal-basis-hash', results['legal_basis_hash']! as String);
+    final legalBasisHashValue = base58Bytes(
+      '--legal-basis-hash',
+      results['legal_basis_hash']! as String,
+    );
     final instruction = getRequestDisclosureInstruction(
       programAddress: context.programAddress,
       requester: requester,
@@ -87,6 +135,8 @@ final class RequestDisclosureCommand extends Command<void> {
       notice: noticeValue,
       legalBasisHash: legalBasisHashValue,
     );
-    await context.send([instruction], recordedLimit: requestDisclosureComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: requestDisclosureComputeUnitLimit);
   }
 }

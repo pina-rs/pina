@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -11,7 +10,6 @@ import 'package:solana_kit_codecs_data_structures/solana_kit_codecs_data_structu
 import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
-
 
 @immutable
 class SetVerificationKeyInstructionData {
@@ -24,8 +22,7 @@ class SetVerificationKeyInstructionData {
     required this.deltaG2,
     required this.ic0,
     required this.ic1,
-  }) :
-      discriminator = 1;
+  }) : discriminator = 1;
 
   final int discriminator;
   final int bump;
@@ -38,7 +35,8 @@ class SetVerificationKeyInstructionData {
   final Uint8List ic1;
 }
 
-Encoder<SetVerificationKeyInstructionData> getSetVerificationKeyInstructionDataEncoder() {
+Encoder<SetVerificationKeyInstructionData>
+getSetVerificationKeyInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('bump', getU8Encoder()),
@@ -67,7 +65,8 @@ Encoder<SetVerificationKeyInstructionData> getSetVerificationKeyInstructionDataE
   );
 }
 
-Decoder<SetVerificationKeyInstructionData> getSetVerificationKeyInstructionDataDecoder() {
+Decoder<SetVerificationKeyInstructionData>
+getSetVerificationKeyInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('bump', getU8Decoder()),
@@ -81,20 +80,18 @@ Decoder<SetVerificationKeyInstructionData> getSetVerificationKeyInstructionDataD
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'setVerificationKey instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'setVerificationKey instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
-  (SetVerificationKeyInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(1),
-    ).read(bytes, offset + 0);
+  (SetVerificationKeyInstructionData, int) readTopLevel(
+    Uint8List bytes,
+    int offset,
+  ) {
+    getConstantDecoder(getU8Encoder().encode(1)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -102,14 +99,14 @@ Decoder<SetVerificationKeyInstructionData> getSetVerificationKeyInstructionDataD
 
     return (
       SetVerificationKeyInstructionData(
-      bump: map['bump']! as int,
-      slot: map['slot']! as int,
-      alphaG1: map['alphaG1']! as Uint8List,
-      betaG2: map['betaG2']! as Uint8List,
-      gammaG2: map['gammaG2']! as Uint8List,
-      deltaG2: map['deltaG2']! as Uint8List,
-      ic0: map['ic0']! as Uint8List,
-      ic1: map['ic1']! as Uint8List,
+        bump: map['bump']! as int,
+        slot: map['slot']! as int,
+        alphaG1: map['alphaG1']! as Uint8List,
+        betaG2: map['betaG2']! as Uint8List,
+        gammaG2: map['gammaG2']! as Uint8List,
+        deltaG2: map['deltaG2']! as Uint8List,
+        ic0: map['ic0']! as Uint8List,
+        ic1: map['ic1']! as Uint8List,
       ),
       newOffset,
     );
@@ -135,8 +132,12 @@ Decoder<SetVerificationKeyInstructionData> getSetVerificationKeyInstructionDataD
   };
 }
 
-Codec<SetVerificationKeyInstructionData, SetVerificationKeyInstructionData> getSetVerificationKeyInstructionDataCodec() {
-  return combineCodec(getSetVerificationKeyInstructionDataEncoder(), getSetVerificationKeyInstructionDataDecoder());
+Codec<SetVerificationKeyInstructionData, SetVerificationKeyInstructionData>
+getSetVerificationKeyInstructionDataCodec() {
+  return combineCodec(
+    getSetVerificationKeyInstructionDataEncoder(),
+    getSetVerificationKeyInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [SetVerificationKey] instruction.
@@ -156,29 +157,33 @@ Instruction getSetVerificationKeyInstruction({
   required Uint8List ic1,
 }) {
   final instructionData = SetVerificationKeyInstructionData(
-      bump: bump,
-      slot: slot,
-      alphaG1: alphaG1,
-      betaG2: betaG2,
-      gammaG2: gammaG2,
-      deltaG2: deltaG2,
-      ic0: ic0,
-      ic1: ic1,
+    bump: bump,
+    slot: slot,
+    alphaG1: alphaG1,
+    betaG2: betaG2,
+    gammaG2: gammaG2,
+    deltaG2: deltaG2,
+    ic0: ic0,
+    ic1: ic1,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: authority, role: AccountRole.writableSigner),
-    AccountMeta(address: poolConfig, role: AccountRole.readonly),
-    AccountMeta(address: verifyingKeyAccount, role: AccountRole.writable),
-    AccountMeta(address: systemProgram, role: AccountRole.readonly),
+      AccountMeta(address: authority, role: AccountRole.writableSigner),
+      AccountMeta(address: poolConfig, role: AccountRole.readonly),
+      AccountMeta(address: verifyingKeyAccount, role: AccountRole.writable),
+      AccountMeta(address: systemProgram, role: AccountRole.readonly),
     ],
     data: getSetVerificationKeyInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [SetVerificationKey] instruction from raw instruction data.
-SetVerificationKeyInstructionData parseSetVerificationKeyInstruction(Instruction instruction) {
-  return getSetVerificationKeyInstructionDataDecoder().decode(instruction.data!);
+SetVerificationKeyInstructionData parseSetVerificationKeyInstruction(
+  Instruction instruction,
+) {
+  return getSetVerificationKeyInstructionDataDecoder().decode(
+    instruction.data!,
+  );
 }

@@ -5,13 +5,18 @@
 import 'package:args/command_runner.dart';
 
 import '../context.dart';
+
 import 'package:pina_codama_clients/privacy_pool_program.dart';
 
 final class CancelDisclosureCommand extends Command<void> {
   CancelDisclosureCommand() {
     argParser
       ..addOption('reserved', mandatory: true, help: "reserved")
-      ..addOption('disclosure_request', mandatory: true, help: "The disclosure_request account");
+      ..addOption(
+        'disclosure_request',
+        mandatory: true,
+        help: "The disclosure_request account",
+      );
   }
 
   @override
@@ -25,7 +30,10 @@ final class CancelDisclosureCommand extends Command<void> {
     final results = argResults!;
     final context = await createContext(globalResults!);
     final requester = context.payerAddress;
-    final disclosureRequest = pubkey('--disclosure-request', results['disclosure_request']! as String);
+    final disclosureRequest = pubkey(
+      '--disclosure-request',
+      results['disclosure_request']! as String,
+    );
     final reservedValue = integer('--reserved', results['reserved']! as String);
     final instruction = getCancelDisclosureInstruction(
       programAddress: context.programAddress,
@@ -33,6 +41,8 @@ final class CancelDisclosureCommand extends Command<void> {
       disclosureRequest: disclosureRequest,
       reserved: reservedValue,
     );
-    await context.send([instruction], recordedLimit: cancelDisclosureComputeUnitLimit);
+    await context.send([
+      instruction,
+    ], recordedLimit: cancelDisclosureComputeUnitLimit);
   }
 }

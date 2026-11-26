@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -12,21 +11,20 @@ import 'package:solana_kit_codecs_numbers/solana_kit_codecs_numbers.dart';
 import 'package:solana_kit_errors/solana_kit_errors.dart';
 import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
-
 @immutable
 class RegisterRequesterInstructionData {
   const RegisterRequesterInstructionData({
     required this.requester,
     required this.maxTier,
-  }) :
-      discriminator = 3;
+  }) : discriminator = 3;
 
   final int discriminator;
   final Address requester;
   final int maxTier;
 }
 
-Encoder<RegisterRequesterInstructionData> getRegisterRequesterInstructionDataEncoder() {
+Encoder<RegisterRequesterInstructionData>
+getRegisterRequesterInstructionDataEncoder() {
   final structEncoder = getStructEncoder(<(String, Encoder<Object?>)>[
     ('discriminator', getU8Encoder()),
     ('requester', getAddressEncoder()),
@@ -43,7 +41,8 @@ Encoder<RegisterRequesterInstructionData> getRegisterRequesterInstructionDataEnc
   );
 }
 
-Decoder<RegisterRequesterInstructionData> getRegisterRequesterInstructionDataDecoder() {
+Decoder<RegisterRequesterInstructionData>
+getRegisterRequesterInstructionDataDecoder() {
   final structDecoder = getStructDecoder(<(String, Decoder<Object?>)>[
     ('discriminator', getU8Decoder()),
     ('requester', getAddressDecoder()),
@@ -51,20 +50,18 @@ Decoder<RegisterRequesterInstructionData> getRegisterRequesterInstructionDataDec
   ]);
 
   Never throwInvalidByteLength(int expected, int bytesLength) {
-    throw SolanaError(
-      SolanaErrorCode.codecsInvalidByteLength,
-      {
-        'codecDescription': 'registerRequester instruction decoder',
-        'expected': expected,
-        'bytesLength': bytesLength,
-      },
-    );
+    throw SolanaError(SolanaErrorCode.codecsInvalidByteLength, {
+      'codecDescription': 'registerRequester instruction decoder',
+      'expected': expected,
+      'bytesLength': bytesLength,
+    });
   }
 
-  (RegisterRequesterInstructionData, int) readTopLevel(Uint8List bytes, int offset) {
-    getConstantDecoder(
-      getU8Encoder().encode(3),
-    ).read(bytes, offset + 0);
+  (RegisterRequesterInstructionData, int) readTopLevel(
+    Uint8List bytes,
+    int offset,
+  ) {
+    getConstantDecoder(getU8Encoder().encode(3)).read(bytes, offset + 0);
     final (map, newOffset) = structDecoder.read(bytes, offset);
     if (newOffset != bytes.length) {
       throwInvalidByteLength(newOffset - offset, bytes.length - offset);
@@ -72,8 +69,8 @@ Decoder<RegisterRequesterInstructionData> getRegisterRequesterInstructionDataDec
 
     return (
       RegisterRequesterInstructionData(
-      requester: map['requester']! as Address,
-      maxTier: map['maxTier']! as int,
+        requester: map['requester']! as Address,
+        maxTier: map['maxTier']! as int,
       ),
       newOffset,
     );
@@ -99,8 +96,12 @@ Decoder<RegisterRequesterInstructionData> getRegisterRequesterInstructionDataDec
   };
 }
 
-Codec<RegisterRequesterInstructionData, RegisterRequesterInstructionData> getRegisterRequesterInstructionDataCodec() {
-  return combineCodec(getRegisterRequesterInstructionDataEncoder(), getRegisterRequesterInstructionDataDecoder());
+Codec<RegisterRequesterInstructionData, RegisterRequesterInstructionData>
+getRegisterRequesterInstructionDataCodec() {
+  return combineCodec(
+    getRegisterRequesterInstructionDataEncoder(),
+    getRegisterRequesterInstructionDataDecoder(),
+  );
 }
 
 /// Creates a [RegisterRequester] instruction.
@@ -113,22 +114,24 @@ Instruction getRegisterRequesterInstruction({
   required int maxTier,
 }) {
   final instructionData = RegisterRequesterInstructionData(
-      requester: requester,
-      maxTier: maxTier,
+    requester: requester,
+    maxTier: maxTier,
   );
 
   return Instruction(
     programAddress: programAddress,
     accounts: [
-    AccountMeta(address: authority, role: AccountRole.readonlySigner),
-    AccountMeta(address: poolConfig, role: AccountRole.readonly),
-    AccountMeta(address: requesterRegistry, role: AccountRole.writable),
+      AccountMeta(address: authority, role: AccountRole.readonlySigner),
+      AccountMeta(address: poolConfig, role: AccountRole.readonly),
+      AccountMeta(address: requesterRegistry, role: AccountRole.writable),
     ],
     data: getRegisterRequesterInstructionDataEncoder().encode(instructionData),
   );
 }
 
 /// Parses a [RegisterRequester] instruction from raw instruction data.
-RegisterRequesterInstructionData parseRegisterRequesterInstruction(Instruction instruction) {
+RegisterRequesterInstructionData parseRegisterRequesterInstruction(
+  Instruction instruction,
+) {
   return getRegisterRequesterInstructionDataDecoder().decode(instruction.data!);
 }

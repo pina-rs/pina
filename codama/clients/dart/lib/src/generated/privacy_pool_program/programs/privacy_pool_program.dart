@@ -1,7 +1,6 @@
 // Auto-generated. Do not edit.
 // ignore_for_file: type=lint
 
-
 import 'dart:typed_data';
 
 import 'package:solana_kit_addresses/solana_kit_addresses.dart';
@@ -12,9 +11,10 @@ import 'package:solana_kit_instructions/solana_kit_instructions.dart';
 
 import '../instructions/instructions.dart';
 
-
 /// The address of the PrivacyPoolProgram program.
-const privacyPoolProgramProgramAddress = Address('DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D');
+const privacyPoolProgramProgramAddress = Address(
+  'DGHJjbUsSzAiSypH4dupxkQK1WLVcevvYchmM7mNLn9D',
+);
 
 /// Known accounts for the PrivacyPoolProgram program.
 enum PrivacyPoolProgramAccount {
@@ -111,13 +111,10 @@ PrivacyPoolProgramInstruction identifyPrivacyPoolProgramInstruction(
     return PrivacyPoolProgramInstruction.verifyPolicy;
   }
 
-  throw SolanaError(
-    SolanaErrorCode.programClientsFailedToIdentifyInstruction,
-    {
-      'instructionData': data,
-      'programName': 'privacyPoolProgram',
-    },
-  );
+  throw SolanaError(SolanaErrorCode.programClientsFailedToIdentifyInstruction, {
+    'instructionData': data,
+    'programName': 'privacyPoolProgram',
+  });
 }
 
 /// A parsed instruction from the PrivacyPoolProgram program.
@@ -130,15 +127,16 @@ sealed class ParsedPrivacyPoolProgramInstruction {
 /// A parsed Initialize instruction.
 final class ParsedInitialize extends ParsedPrivacyPoolProgramInstruction {
   const ParsedInitialize({required this.data})
-      : super(PrivacyPoolProgramInstruction.initialize);
+    : super(PrivacyPoolProgramInstruction.initialize);
 
   final InitializeInstructionData data;
 }
 
 /// A parsed SetVerificationKey instruction.
-final class ParsedSetVerificationKey extends ParsedPrivacyPoolProgramInstruction {
+final class ParsedSetVerificationKey
+    extends ParsedPrivacyPoolProgramInstruction {
   const ParsedSetVerificationKey({required this.data})
-      : super(PrivacyPoolProgramInstruction.setVerificationKey);
+    : super(PrivacyPoolProgramInstruction.setVerificationKey);
 
   final SetVerificationKeyInstructionData data;
 }
@@ -146,15 +144,16 @@ final class ParsedSetVerificationKey extends ParsedPrivacyPoolProgramInstruction
 /// A parsed SetCustodians instruction.
 final class ParsedSetCustodians extends ParsedPrivacyPoolProgramInstruction {
   const ParsedSetCustodians({required this.data})
-      : super(PrivacyPoolProgramInstruction.setCustodians);
+    : super(PrivacyPoolProgramInstruction.setCustodians);
 
   final SetCustodiansInstructionData data;
 }
 
 /// A parsed RegisterRequester instruction.
-final class ParsedRegisterRequester extends ParsedPrivacyPoolProgramInstruction {
+final class ParsedRegisterRequester
+    extends ParsedPrivacyPoolProgramInstruction {
   const ParsedRegisterRequester({required this.data})
-      : super(PrivacyPoolProgramInstruction.registerRequester);
+    : super(PrivacyPoolProgramInstruction.registerRequester);
 
   final RegisterRequesterInstructionData data;
 }
@@ -162,7 +161,7 @@ final class ParsedRegisterRequester extends ParsedPrivacyPoolProgramInstruction 
 /// A parsed Deposit instruction.
 final class ParsedDeposit extends ParsedPrivacyPoolProgramInstruction {
   const ParsedDeposit({required this.data})
-      : super(PrivacyPoolProgramInstruction.deposit);
+    : super(PrivacyPoolProgramInstruction.deposit);
 
   final DepositInstructionData data;
 }
@@ -170,7 +169,7 @@ final class ParsedDeposit extends ParsedPrivacyPoolProgramInstruction {
 /// A parsed Withdraw instruction.
 final class ParsedWithdraw extends ParsedPrivacyPoolProgramInstruction {
   const ParsedWithdraw({required this.data})
-      : super(PrivacyPoolProgramInstruction.withdraw);
+    : super(PrivacyPoolProgramInstruction.withdraw);
 
   final WithdrawInstructionData data;
 }
@@ -178,15 +177,16 @@ final class ParsedWithdraw extends ParsedPrivacyPoolProgramInstruction {
 /// A parsed Transfer instruction.
 final class ParsedTransfer extends ParsedPrivacyPoolProgramInstruction {
   const ParsedTransfer({required this.data})
-      : super(PrivacyPoolProgramInstruction.transfer);
+    : super(PrivacyPoolProgramInstruction.transfer);
 
   final TransferInstructionData data;
 }
 
 /// A parsed RequestDisclosure instruction.
-final class ParsedRequestDisclosure extends ParsedPrivacyPoolProgramInstruction {
+final class ParsedRequestDisclosure
+    extends ParsedPrivacyPoolProgramInstruction {
   const ParsedRequestDisclosure({required this.data})
-      : super(PrivacyPoolProgramInstruction.requestDisclosure);
+    : super(PrivacyPoolProgramInstruction.requestDisclosure);
 
   final RequestDisclosureInstructionData data;
 }
@@ -194,15 +194,16 @@ final class ParsedRequestDisclosure extends ParsedPrivacyPoolProgramInstruction 
 /// A parsed GrantDisclosure instruction.
 final class ParsedGrantDisclosure extends ParsedPrivacyPoolProgramInstruction {
   const ParsedGrantDisclosure({required this.data})
-      : super(PrivacyPoolProgramInstruction.grantDisclosure);
+    : super(PrivacyPoolProgramInstruction.grantDisclosure);
 
   final GrantDisclosureInstructionData data;
 }
 
 /// A parsed ChallengeDisclosure instruction.
-final class ParsedChallengeDisclosure extends ParsedPrivacyPoolProgramInstruction {
+final class ParsedChallengeDisclosure
+    extends ParsedPrivacyPoolProgramInstruction {
   const ParsedChallengeDisclosure({required this.data})
-      : super(PrivacyPoolProgramInstruction.challengeDisclosure);
+    : super(PrivacyPoolProgramInstruction.challengeDisclosure);
 
   final ChallengeDisclosureInstructionData data;
 }
@@ -210,15 +211,16 @@ final class ParsedChallengeDisclosure extends ParsedPrivacyPoolProgramInstructio
 /// A parsed ResolveChallenge instruction.
 final class ParsedResolveChallenge extends ParsedPrivacyPoolProgramInstruction {
   const ParsedResolveChallenge({required this.data})
-      : super(PrivacyPoolProgramInstruction.resolveChallenge);
+    : super(PrivacyPoolProgramInstruction.resolveChallenge);
 
   final ResolveChallengeInstructionData data;
 }
 
 /// A parsed ApproveDisclosure instruction.
-final class ParsedApproveDisclosure extends ParsedPrivacyPoolProgramInstruction {
+final class ParsedApproveDisclosure
+    extends ParsedPrivacyPoolProgramInstruction {
   const ParsedApproveDisclosure({required this.data})
-      : super(PrivacyPoolProgramInstruction.approveDisclosure);
+    : super(PrivacyPoolProgramInstruction.approveDisclosure);
 
   final ApproveDisclosureInstructionData data;
 }
@@ -226,7 +228,7 @@ final class ParsedApproveDisclosure extends ParsedPrivacyPoolProgramInstruction 
 /// A parsed CancelDisclosure instruction.
 final class ParsedCancelDisclosure extends ParsedPrivacyPoolProgramInstruction {
   const ParsedCancelDisclosure({required this.data})
-      : super(PrivacyPoolProgramInstruction.cancelDisclosure);
+    : super(PrivacyPoolProgramInstruction.cancelDisclosure);
 
   final CancelDisclosureInstructionData data;
 }
@@ -234,7 +236,7 @@ final class ParsedCancelDisclosure extends ParsedPrivacyPoolProgramInstruction {
 /// A parsed RegisterAsset instruction.
 final class ParsedRegisterAsset extends ParsedPrivacyPoolProgramInstruction {
   const ParsedRegisterAsset({required this.data})
-      : super(PrivacyPoolProgramInstruction.registerAsset);
+    : super(PrivacyPoolProgramInstruction.registerAsset);
 
   final RegisterAssetInstructionData data;
 }
@@ -242,7 +244,7 @@ final class ParsedRegisterAsset extends ParsedPrivacyPoolProgramInstruction {
 /// A parsed DepositToken instruction.
 final class ParsedDepositToken extends ParsedPrivacyPoolProgramInstruction {
   const ParsedDepositToken({required this.data})
-      : super(PrivacyPoolProgramInstruction.depositToken);
+    : super(PrivacyPoolProgramInstruction.depositToken);
 
   final DepositTokenInstructionData data;
 }
@@ -250,7 +252,7 @@ final class ParsedDepositToken extends ParsedPrivacyPoolProgramInstruction {
 /// A parsed WithdrawToken instruction.
 final class ParsedWithdrawToken extends ParsedPrivacyPoolProgramInstruction {
   const ParsedWithdrawToken({required this.data})
-      : super(PrivacyPoolProgramInstruction.withdrawToken);
+    : super(PrivacyPoolProgramInstruction.withdrawToken);
 
   final WithdrawTokenInstructionData data;
 }
@@ -258,7 +260,7 @@ final class ParsedWithdrawToken extends ParsedPrivacyPoolProgramInstruction {
 /// A parsed SetPolicy instruction.
 final class ParsedSetPolicy extends ParsedPrivacyPoolProgramInstruction {
   const ParsedSetPolicy({required this.data})
-      : super(PrivacyPoolProgramInstruction.setPolicy);
+    : super(PrivacyPoolProgramInstruction.setPolicy);
 
   final SetPolicyInstructionData data;
 }
@@ -266,7 +268,7 @@ final class ParsedSetPolicy extends ParsedPrivacyPoolProgramInstruction {
 /// A parsed VerifyPolicy instruction.
 final class ParsedVerifyPolicy extends ParsedPrivacyPoolProgramInstruction {
   const ParsedVerifyPolicy({required this.data})
-      : super(PrivacyPoolProgramInstruction.verifyPolicy);
+    : super(PrivacyPoolProgramInstruction.verifyPolicy);
 
   final VerifyPolicyInstructionData data;
 }
@@ -281,9 +283,10 @@ ParsedPrivacyPoolProgramInstruction parsePrivacyPoolProgramInstruction(
     PrivacyPoolProgramInstruction.initialize => ParsedInitialize(
       data: parseInitializeInstruction(instruction),
     ),
-    PrivacyPoolProgramInstruction.setVerificationKey => ParsedSetVerificationKey(
-      data: parseSetVerificationKeyInstruction(instruction),
-    ),
+    PrivacyPoolProgramInstruction.setVerificationKey =>
+      ParsedSetVerificationKey(
+        data: parseSetVerificationKeyInstruction(instruction),
+      ),
     PrivacyPoolProgramInstruction.setCustodians => ParsedSetCustodians(
       data: parseSetCustodiansInstruction(instruction),
     ),
@@ -305,9 +308,10 @@ ParsedPrivacyPoolProgramInstruction parsePrivacyPoolProgramInstruction(
     PrivacyPoolProgramInstruction.grantDisclosure => ParsedGrantDisclosure(
       data: parseGrantDisclosureInstruction(instruction),
     ),
-    PrivacyPoolProgramInstruction.challengeDisclosure => ParsedChallengeDisclosure(
-      data: parseChallengeDisclosureInstruction(instruction),
-    ),
+    PrivacyPoolProgramInstruction.challengeDisclosure =>
+      ParsedChallengeDisclosure(
+        data: parseChallengeDisclosureInstruction(instruction),
+      ),
     PrivacyPoolProgramInstruction.resolveChallenge => ParsedResolveChallenge(
       data: parseResolveChallengeInstruction(instruction),
     ),
