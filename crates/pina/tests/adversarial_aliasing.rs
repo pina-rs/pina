@@ -2212,6 +2212,350 @@ fn opt_mut_aliasing_64_handles_indices_32_to_63_and_slices_over_64() {
 	check_bit_63(&over64_ro, 1);
 }
 
+#[allow(dead_code)]
+#[derive(Accounts)]
+struct LowOptMutWithImmutableRemaining<'a> {
+	opt_a: Option<&'a mut AccountView>,
+	opt_b: Option<&'a mut AccountView>,
+	#[pina(remaining)]
+	rest: &'a [AccountView],
+}
+
+#[test]
+fn opt_mut_aliasing_64_pins_64_slot_clamp_against_wraparound() {
+	let dup: ProgramError = PinaProgramError::DuplicateMutableAccount.into();
+
+	// Confirm the derived shape (`Option<&mut>` in low slots 0/1 + immutable
+	// `#[pina(remaining)]`) routes to `validate_opt_mut_aliasing_64` and accepts
+	// unbounded slices (`>= 65` accounts).
+	const {
+		assert!(LowOptMutWithImmutableRemaining::ALIAS_LAYOUT.is_mut_only_64());
+		assert!(!LowOptMutWithImmutableRemaining::ALIAS_LAYOUT.is_simple_mut_64());
+		assert!(LowOptMutWithImmutableRemaining::ALIAS_LAYOUT.needs_alias_check());
+		assert!(LowOptMutWithImmutableRemaining::ACCOUNT_LIMIT == usize::MAX);
+		assert!(LowOptMutWithImmutableRemaining::ALIAS_LAYOUT.mut_mask[0] == 0b11);
+		assert!(LowOptMutWithImmutableRemaining::ALIAS_LAYOUT.optional_mask[0] == 0b11);
+	}
+
+	// Layout with optional-mutable slots at indices 0, 1, 32, and 63 plus a
+	// required mutable slot at index 2. Without `.min(64)`, `1_u64.wrapping_shl(i)`
+	// wraps index 64 -> bit 0 and index 65 -> bit 1, letting `program_id` in
+	// slots 64/65 clear slot 0/1's bit or a readonly account in slot 64 falsely
+	// reject a valid transaction.
+	let wrap_layout = __AliasLayout {
+		static_layout: true,
+		mut_mask: [
+			(1_u64 << 0) | (1_u64 << 1) | (1_u64 << 2) | (1_u64 << 32) | (1_u64 << 63),
+			0,
+			0,
+			0,
+		],
+		optional_mask: [
+			(1_u64 << 0) | (1_u64 << 1) | (1_u64 << 32) | (1_u64 << 63),
+			0,
+			0,
+			0,
+		],
+		unique_mask: [0; 4],
+		remaining_mut_start: usize::MAX,
+		remaining_mut_distinct: true,
+	};
+
+	let check_wrap = |slots: &[Slot], expected: u8| {
+		let (mut input, _) = serialize(slots, &[], &ID);
+		let mut views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 72];
+		// SAFETY: `input` holds at most 69 serialized accounts (`<= 72`).
+		let (pid, count, _) =
+			unsafe { entrypoint::deserialize::<72>(input.as_mut_ptr().cast(), &mut views) };
+		assert_eq!(count, slots.len());
+		// SAFETY: `deserialize` initialized `count` entries.
+		let slice =
+			unsafe { core::slice::from_raw_parts(views.as_mut_ptr().cast::<AccountView>(), count) };
+		let fast = validate_opt_mut_aliasing_64(
+			pid,
+			slice,
+			wrap_layout.mut_mask[0],
+			wrap_layout.optional_mask[0] & wrap_layout.mut_mask[0],
+		);
+		let general = validate_account_aliasing(pid, slice, usize::MAX, &wrap_layout);
+		assert_eq!(fast, expected, "unexpected status for len={}", slots.len());
+		assert_eq!(
+			fast,
+			general,
+			"mismatch vs validate_account_aliasing for len={}",
+			slots.len()
+		);
+	};
+
+	let run_derived_both = |slots: &[Slot]| -> (u64, Result<(), ProgramError>) {
+		let (mut direct_in, _) = serialize(slots, &[], &ID);
+		let mut direct_views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 72];
+		// SAFETY: `direct_in` holds at most 69 serialized accounts (`<= 72`).
+		let (pid, count, _) = unsafe {
+			entrypoint::deserialize::<72>(direct_in.as_mut_ptr().cast(), &mut direct_views)
+		};
+		assert_eq!(count, slots.len());
+		// SAFETY: `deserialize` initialized `count` entries.
+		let direct_slice = unsafe {
+			core::slice::from_raw_parts_mut(direct_views.as_mut_ptr().cast::<AccountView>(), count)
+		};
+		let direct_res = LowOptMutWithImmutableRemaining::try_from((pid, direct_slice)).map(|_| ());
+
+		let (mut route_in, offset) = serialize(slots, &[], &ID);
+		let ptr = route_in.as_mut_ptr().cast::<u8>();
+		// SAFETY: `route_in` is a valid serialized entrypoint buffer.
+		let route_status = unsafe {
+			__dispatch_entrypoint(
+				ptr,
+				ptr.add(offset),
+				|entry: EntrypointInput, pid: &Address, _data: &[u8]| {
+					let mut views = [const { core::mem::MaybeUninit::<AccountView>::uninit() }; 72];
+					let route = entry.parse_route::<72, { ROUTE_UNBOUNDED }, true>(&mut views)?;
+					let _ = LowOptMutWithImmutableRemaining::try_from_route(pid, route)?;
+					Ok(())
+				},
+			)
+		};
+
+		(route_status, direct_res)
+	};
+
+	for len in [65_usize, 66, 69] {
+		let base = || -> Vec<Slot> { (0..len).map(|idx| rw((idx + 1) as u8)).collect() };
+
+		// 1. Present optional at slot 0 aliases required mutable slot 2 while
+		// slot 64 holds `program_id` (both readonly and writable). Must reject
+		// as duplicate (`2`).
+		for sentinel_writable in [false, true] {
+			let mut dup_slot0 = base();
+			dup_slot0[2] = Slot::Duplicate(0);
+			dup_slot0[64] = program_sentinel(sentinel_writable);
+			if len > 65 {
+				dup_slot0[65] = Slot::Duplicate(64);
+			}
+			check_wrap(&dup_slot0, 2);
+		}
+
+		// 2. Present optional at slot 1 aliases required mutable slot 2 while
+		// slot 65 holds `program_id` (for slices of length `>= 66`). Must reject
+		// as duplicate (`2`).
+		if len > 65 {
+			for sentinel_writable in [false, true] {
+				let mut dup_slot1 = base();
+				dup_slot1[2] = Slot::Duplicate(1);
+				dup_slot1[64] = program_sentinel(false);
+				dup_slot1[65] = program_sentinel(sentinel_writable);
+				check_wrap(&dup_slot1, 2);
+			}
+		}
+
+		// 3. Present optional at slot 0 aliases present optional at slot 1 while
+		// slots 64 (and 65) hold `program_id`. Must reject as duplicate (`2`).
+		let mut dup_0_1 = base();
+		dup_0_1[1] = Slot::Duplicate(0);
+		dup_0_1[64] = program_sentinel(false);
+		if len > 65 {
+			dup_0_1[65] = program_sentinel(true);
+		}
+		check_wrap(&dup_0_1, 2);
+
+		// 4. Non-writable present optional at slot 0 or slot 1 while slots 64/65
+		// hold `program_id`. Must reject as not-writable (`1`).
+		let mut ro_slot0 = base();
+		ro_slot0[0] = ro(100);
+		ro_slot0[64] = program_sentinel(true);
+		if len > 65 {
+			ro_slot0[65] = program_sentinel(false);
+		}
+		check_wrap(&ro_slot0, 1);
+
+		let mut ro_slot1 = base();
+		ro_slot1[1] = ro(101);
+		ro_slot1[64] = program_sentinel(false);
+		if len > 65 {
+			ro_slot1[65] = program_sentinel(true);
+		}
+		check_wrap(&ro_slot1, 1);
+
+		// Writability-before-duplicate precedence with slot 64 = `program_id`.
+		let mut prec_wrap = base();
+		prec_wrap[1] = Slot::Duplicate(0);
+		prec_wrap[2] = ro(102);
+		prec_wrap[64] = program_sentinel(true);
+		check_wrap(&prec_wrap, 1);
+
+		// 5. Distinct valid present optionals at 0, 1, 32, 63 with readonly
+		// non-`program_id` accounts at slots `64..len` must succeed (`0`).
+		let mut ro_tail = base();
+		for slot in &mut ro_tail[64..] {
+			*slot = ro(150);
+		}
+		check_wrap(&ro_tail, 0);
+
+		// 6. End-to-end derived `LowOptMutWithImmutableRemaining` (direct +
+		// dispatch) across lengths 65, 66, and 69.
+		assert_eq!(run_derived_both(&ro_tail), (SUCCESS, Ok(())));
+		assert_eq!(
+			run_derived_both(&dup_0_1),
+			(u64::from(dup.clone()), Err(dup.clone()))
+		);
+		assert_eq!(
+			run_derived_both(&ro_slot0),
+			(
+				u64::from(ProgramError::InvalidAccountData),
+				Err(ProgramError::InvalidAccountData)
+			)
+		);
+	}
+}
+
+#[test]
+fn validate_opt_mut_aliasing_64_matches_general_across_lengths_0_to_69() {
+	use pinocchio::account::NOT_BORROWED;
+	use pinocchio::account::RuntimeAccount;
+
+	fn make_runtime(address: Address, writable: bool) -> RuntimeAccount {
+		RuntimeAccount {
+			borrow_state: NOT_BORROWED,
+			is_signer: 0,
+			is_writable: u8::from(writable),
+			executable: 0,
+			padding: [0; 4],
+			address,
+			owner: ID,
+			lamports: 1,
+			data_len: 0,
+		}
+	}
+
+	let mut pool_raw = [
+		make_runtime(addr(1), true),  // 0: rw(1)
+		make_runtime(addr(2), true),  // 1: rw(2)
+		make_runtime(addr(3), false), // 2: ro(3)
+		make_runtime(addr(4), false), // 3: ro(4)
+		make_runtime(ID, true),       // 4: rw(ID)
+		make_runtime(ID, false),      // 5: ro(ID)
+		make_runtime(addr(5), true),  // 6: rw(5), dedicated to wide-layout slot 32
+		make_runtime(addr(6), true),  // 7: rw(6), dedicated to wide-layout slot 63
+	];
+	// SAFETY: `pool_raw` remains pinned for the duration of this test.
+	let pool: [AccountView; 8] = core::array::from_fn(|idx| unsafe {
+		AccountView::new_unchecked(core::ptr::from_mut(&mut pool_raw[idx]))
+	});
+
+	let layouts: &[(u64, u64)] = &[
+		// Wide layout spanning low bits 0/1, mid bit 32, and bit 63.
+		(
+			(1_u64 << 0) | (1_u64 << 1) | (1_u64 << 32) | (1_u64 << 63),
+			(1_u64 << 0) | (1_u64 << 1) | (1_u64 << 63),
+		),
+		// Optional-mutable at bits 0 and 1.
+		(0b11, 0b11),
+		// Optional-mutable at bits 0, 1 + required mutable at bit 2.
+		(0b111, 0b011),
+		// Required mutable at bit 0 + optional-mutable at bits 1, 2.
+		(0b111, 0b110),
+		// Mixed readonly (bit 1), required mut (bit 2), optional mut (bits 0, 3).
+		(0b1101, 0b1001),
+	];
+
+	// Adversarial head prefixes exercising duplicates, non-writable slots,
+	// writability-before-duplicate precedence, and `program_id` sentinels.
+	let heads: &[[usize; 4]] = &[
+		[0, 1, 0, 1], // distinct or aliasing on slot 0/2
+		[0, 0, 1, 1], // slot 0 == slot 1 (writable duplicate)
+		[0, 0, 2, 1], // earlier writable duplicate + later readonly slot
+		[0, 2, 0, 1], // interleaved readonly slot between aliasing mutables
+		[2, 1, 0, 1], // readonly slot 0
+		[0, 2, 1, 1], // readonly slot 1
+		[4, 4, 0, 1], // writable `program_id` in slots 0 and 1
+		[5, 0, 1, 1], // readonly `program_id` in slot 0
+		[0, 5, 0, 1], // readonly `program_id` in slot 1 + slot 0 == slot 2
+		[0, 1, 4, 5], // distinct low mutables + sentinel in slots 2/3
+	];
+
+	// Tail fillers applied from index 4..len (covering indices 32, 63, and
+	// wrap-around indices 64..=68): readonly sentinel, writable sentinel,
+	// readonly non-sentinel, and writable account aliasing `pool[0]`.
+	let tail_fillers: &[usize] = &[5, 4, 3, 0];
+
+	let mut buf = [pool[1]; 69];
+	let mut saw_wide_over64_outcomes = [false; 3];
+	for &(mut_mask, opt_mask) in layouts {
+		let opt_mut_mask = opt_mask & mut_mask;
+		let is_wide = (mut_mask & (1_u64 << 32)) != 0;
+		let layout = __AliasLayout {
+			static_layout: true,
+			mut_mask: [mut_mask, 0, 0, 0],
+			optional_mask: [opt_mask, 0, 0, 0],
+			unique_mask: [0; 4],
+			remaining_mut_start: usize::MAX,
+			remaining_mut_distinct: true,
+		};
+		let fits_compact_32 = ((mut_mask | opt_mask) >> 32) == 0;
+		let mut_and_opt =
+			(mut_mask & u64::from(u32::MAX)) | ((opt_mask & u64::from(u32::MAX)) << 32);
+		let unique_and_rem = 0xFF_u64 << 32;
+		// For the wide layout, test both the raw tail filler at slot 63
+		// (omitted sentinel, readonly, or aliased to slot 0) and a dedicated
+		// distinct writable account so present slot 63 + wrap-around slots
+		// 64..68 are exercised on valid (`0`) results as well.
+		let slot63_overrides: &[Option<usize>] = if is_wide { &[None, Some(7)] } else { &[None] };
+
+		for head in heads {
+			for &tail in tail_fillers {
+				for &slot63_override in slot63_overrides {
+					for slot in &mut buf[4..] {
+						*slot = pool[tail];
+					}
+					for (idx, &p) in head.iter().enumerate() {
+						buf[idx] = pool[p];
+					}
+					if is_wide {
+						// Use a writable account unused by any head or tail
+						// filler so bit 32 never collides with slots 0..3 or
+						// 63 before reaching wrap-around slots 64..68.
+						buf[32] = pool[6];
+						if let Some(slot63) = slot63_override {
+							buf[63] = pool[slot63];
+						}
+					}
+
+					for len in 0_usize..=69 {
+						let slice = &buf[..len];
+						let fast = validate_opt_mut_aliasing_64(&ID, slice, mut_mask, opt_mut_mask);
+						let general = validate_account_aliasing(&ID, slice, usize::MAX, &layout);
+						assert_eq!(
+							fast, general,
+							"mismatch vs general for mut={mut_mask:#x} opt={opt_mask:#x} head={head:?} tail={tail} slot63={slot63_override:?} len={len}"
+						);
+						if is_wide && len >= 65 {
+							saw_wide_over64_outcomes[usize::from(fast)] = true;
+						}
+						if fits_compact_32 {
+							let compact = validate_account_aliasing_compact(
+								&ID,
+								slice,
+								mut_and_opt,
+								unique_and_rem,
+							);
+							assert_eq!(
+								fast, compact,
+								"mismatch vs compact_32 for mut={mut_mask:#x} opt={opt_mask:#x} head={head:?} tail={tail} len={len}"
+							);
+						}
+					}
+				}
+			}
+		}
+	}
+	assert_eq!(
+		saw_wide_over64_outcomes,
+		[true, true, true],
+		"wide layout at len >= 65 must exercise ok (0), not-writable (1), and duplicate (2) outcomes"
+	);
+}
+
 #[test]
 fn validate_opt_mut_aliasing_64_matches_general_validators_exhaustively() {
 	use pinocchio::account::NOT_BORROWED;

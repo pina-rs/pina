@@ -652,6 +652,11 @@ fn benchmark_accounts_parse_optional_mut_aliasing() {
 		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut d)) },
 	];
 
+	let parsed = BenchOptionalMutAccounts::try_from((&SYSTEM_ID, &mut views[..]))
+		.expect("optional-mutable benchmark fixture must parse");
+	assert!(parsed.opt_a.is_some());
+	assert!(parsed.opt_b.is_none());
+
 	bench(
 		"Accounts::try_from (1 ro + 1 mut + 2 opt mut, validate_opt_mut_aliasing_64)",
 		|| {
