@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.25.1](https://github.com/pina-rs/pina/releases/tag/v0.25.1) (2026-11-27)
+
+Grouped release for `core`.
+
+### Fixes
+
+#### Inline route parsing, validation, and opt-mut aliasing
+
+_Packages:_ 🟢 _pina_, 🟢 _pina_macros_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #730](https://github.com/pina-rs/pina/pull/730)
+
+Fixes binary-size and compute-unit regressions introduced in `0.25.0` for programs that share `#[derive(Accounts)]` structs across multiple `dispatch_entrypoint!` variants, use `Option<&mut AccountView>` fields, validate program accounts with `#[pina(validate(program = ...))]`, or use `dispatch_entrypoint!` with shared account walks:
+
+- Always inline derived account parsing along `dispatch_entrypoint!` routes (`__parse_accounts_inlined`) so `AccountsCursor::from_verified` (`check_duplicates = false`) and exact route lengths constant-fold even when one `#[derive(Accounts)]` struct is shared by multiple variants, while leaving `TryFromAccountInfos::try_from_account_infos` (`nostd_entrypoint!`) codegen unchanged.
+- Always inline generated `PinaValidate::validate` implementations for `#[derive(Accounts)]` structs and factor program-account checks through `program_matches` behind `validate_program` so repeated program checks can be outlined cleanly without pushing `validate` out of line.
+- Add `validate_opt_mut_aliasing_64` for mutable-only layouts (indices `< 64`, no `#[pina(unique)]`, no trailing mutable `#[pina(remaining)]`) with `Option<&mut AccountView>` slots, skip inline 3/4-way and compact unique-<=4 alias unrolling inside already-cold `dispatch_entrypoint!` duplicate branches (`COLD_ROUTE`), and use `wrapping_add(1)` for slice-bounded loop indices across aliasing validators to eliminate `overflow-checks = true` panic metadata.
+- Parameterize `entry::walk_accounts` over its return encoding so `walk_accounts_shared` returns a bare `u8` status register without packing/unpacking `Result<u8, ProgramError>` while inlined (`SHARED = false`) walks still return `Result` directly.
+
+##### User impact
+
+Deployed SBF binaries are smaller and instructions consume fewer compute units across `dispatch_entrypoint!`, optional-mutable, and validated-accounts programs. All account, signer, owner, writable, PDA, program-ID, and duplicate-account checks — including writability-before-duplicate error precedence and `program_id` optional-sentinel semantics — are unchanged.
+
+#### Optimize SBF/host, CLI discovery, and docs delivery
+
+_Packages:_ 🟢 _pina_, 🟢 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #725](https://github.com/pina-rs/pina/pull/725)
+
+- Add a dedicated `sbf_derive_ata` kernel in `pina` that coalesces `[bump || ATA_PROGRAM_ID]` into a single 33-byte stack slice for Agave's `sol_sha256` metering (`-108 CU` on legacy ATA, `-75 CU` on Token-2022 ATA), keep `bump` as `u64` in `sbf_derive_pda` (`-16 B` / `-2 CU`), inline legacy `AsTokenAccount` loaders (`-8` to `-10 CU`), avoid stack buffers on empty Token-2022 extension allow-lists, and precompute upgradeable loader `PROGRAM_DATA` PDAs at compile time in `multisig_program` and `privacy_pool_program` (`-4,880 B` total across 8 of 28 SBF ELFs, 0 regressions).
+- Accelerate host PDA derivation with `Fe51::square`, branchless tiered `jacobi_is_non_negative_mod_p`, and zero-allocation SHA-256 prefix state cloning (`2.76x–3.07x` faster across all 11 host PDA benchmarks), and add compile-time inline pair checks in `run_static_alias_check` for compact `<= 4`-account layouts with `#[pina(unique)]` (`6.5x–9.1x` faster).
+- Speed up `pina_cli` by eliminating the `cargo metadata` subprocess via direct manifest/workspace discovery, removing `rayon` thread-pool startup, keeping `RootNode` in memory across IDL/client rendering, avoiding unchanged atomic IDL rewrites, fast-pathing `--version`/`-V`/`docs`, and parsing workspace dependency keys with `IgnoredAny` (`17.9x` faster `pina generate`, `3.73x` faster `pina docs`, `-5 MB` release binary).
+- Optimize `pina.rs` landing page and mdBook documentation builds with subsetted WOFF2 fonts, SVG logo replacement, build-time syntax highlighting, single hashed CSS/JS bundles, static SSR chrome, and compact on-demand search (`-69.5%` to `-77.5%` wire bytes).
+
+- **Accept operator-configured external Cargo target directories.** Pina now accepts an external `build.target-dir` configured in an operator Cargo config outside the repository (such as a parent worktree `.cargo/config.toml` or `$CARGO_HOME/config.toml`) and normalizes any `..` segments Cargo leaves in `target_directory`, while repository-local Cargo configuration inside the worktree or workspace still cannot redirect builds outside the tree. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #728](https://github.com/pina-rs/pina/pull/728)
+
 ## [0.25.0](https://github.com/pina-rs/pina/releases/tag/v0.25.0) (2026-11-24)
 
 Grouped release for `core`.

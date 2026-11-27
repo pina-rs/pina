@@ -1,0 +1,822 @@
+{
+	"schema_version": "0.10",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-11-27T08:39:24Z",
+	"command": "release",
+	"version": "0.25.1",
+	"versions": {
+		"core": "0.25.1"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.25.1",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.25.1",
+			"rendered_title": "v0.25.1 (2026-11-27)",
+			"rendered_changelog_title": "[0.25.1](https://github.com/pina-rs/pina/releases/tag/v0.25.1) (2026-11-27)",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.25.1",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/external-target-dir-gates.md",
+		".changeset/perf-inline-parse-and-validate.md",
+		".changeset/perf-sbf-host-cli-docs.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/external-target-dir-gates.md",
+			"summary": "Accept operator-configured external Cargo target directories",
+			"details": "Pina now accepts an external `build.target-dir` configured in an operator Cargo config outside the repository (such as a parent worktree `.cargo/config.toml` or `$CARGO_HOME/config.toml`) and normalizes any `..` segments Cargo leaves in `target_directory`, while repository-local Cargo configuration inside the worktree or workspace still cannot redirect builds outside the tree.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "1b3c94e801c016cc8437d1cc5312384559c5dda4",
+						"short_sha": "1b3c94e",
+						"url": "https://github.com/pina-rs/pina/commit/1b3c94e801c016cc8437d1cc5312384559c5dda4",
+						"authored_at": "2026-11-27T07:21:34Z",
+						"committed_at": "2026-11-27T07:21:34Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#728",
+						"title": "fix(pina_cli): support external Cargo target directories across gates and operator configs",
+						"url": "https://github.com/pina-rs/pina/pull/728",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "1b3c94e801c016cc8437d1cc5312384559c5dda4",
+						"short_sha": "1b3c94e",
+						"url": "https://github.com/pina-rs/pina/commit/1b3c94e801c016cc8437d1cc5312384559c5dda4",
+						"authored_at": "2026-11-27T07:21:34Z",
+						"committed_at": "2026-11-27T07:21:34Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#728",
+						"title": "fix(pina_cli): support external Cargo target directories across gates and operator configs",
+						"url": "https://github.com/pina-rs/pina/pull/728",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/perf-inline-parse-and-validate.md",
+			"summary": "Inline route parsing, validation, and opt-mut aliasing",
+			"details": "Fixes binary-size and compute-unit regressions introduced in `0.25.0` for programs that share `#[derive(Accounts)]` structs across multiple `dispatch_entrypoint!` variants, use `Option<&mut AccountView>` fields, validate program accounts with `#[pina(validate(program = ...))]`, or use `dispatch_entrypoint!` with shared account walks:\n\n- Always inline derived account parsing along `dispatch_entrypoint!` routes (`__parse_accounts_inlined`) so `AccountsCursor::from_verified` (`check_duplicates = false`) and exact route lengths constant-fold even when one `#[derive(Accounts)]` struct is shared by multiple variants, while leaving `TryFromAccountInfos::try_from_account_infos` (`nostd_entrypoint!`) codegen unchanged.\n- Always inline generated `PinaValidate::validate` implementations for `#[derive(Accounts)]` structs and factor program-account checks through `program_matches` behind `validate_program` so repeated program checks can be outlined cleanly without pushing `validate` out of line.\n- Add `validate_opt_mut_aliasing_64` for mutable-only layouts (indices `< 64`, no `#[pina(unique)]`, no trailing mutable `#[pina(remaining)]`) with `Option<&mut AccountView>` slots, skip inline 3/4-way and compact unique-<=4 alias unrolling inside already-cold `dispatch_entrypoint!` duplicate branches (`COLD_ROUTE`), and use `wrapping_add(1)` for slice-bounded loop indices across aliasing validators to eliminate `overflow-checks = true` panic metadata.\n- Parameterize `entry::walk_accounts` over its return encoding so `walk_accounts_shared` returns a bare `u8` status register without packing/unpacking `Result<u8, ProgramError>` while inlined (`SHARED = false`) walks still return `Result` directly.\n\n##### User impact\n\nDeployed SBF binaries are smaller and instructions consume fewer compute units across `dispatch_entrypoint!`, optional-mutable, and validated-accounts programs. All account, signer, owner, writable, PDA, program-ID, and duplicate-account checks — including writability-before-duplicate error precedence and `program_id` optional-sentinel semantics — are unchanged.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_macros",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "94adc0f40372ed0ceae1fdd0b0e30402d96f2406",
+						"short_sha": "94adc0f",
+						"url": "https://github.com/pina-rs/pina/commit/94adc0f40372ed0ceae1fdd0b0e30402d96f2406",
+						"authored_at": "2026-11-27T08:37:47Z",
+						"committed_at": "2026-11-27T08:37:47Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#730",
+						"title": "perf(pina): inline route parsing/validation and compact opt-mut aliasing",
+						"url": "https://github.com/pina-rs/pina/pull/730",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "94adc0f40372ed0ceae1fdd0b0e30402d96f2406",
+						"short_sha": "94adc0f",
+						"url": "https://github.com/pina-rs/pina/commit/94adc0f40372ed0ceae1fdd0b0e30402d96f2406",
+						"authored_at": "2026-11-27T08:37:47Z",
+						"committed_at": "2026-11-27T08:37:47Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#730",
+						"title": "perf(pina): inline route parsing/validation and compact opt-mut aliasing",
+						"url": "https://github.com/pina-rs/pina/pull/730",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/perf-sbf-host-cli-docs.md",
+			"summary": "Optimize SBF/host, CLI discovery, and docs delivery",
+			"details": "- Add a dedicated `sbf_derive_ata` kernel in `pina` that coalesces `[bump || ATA_PROGRAM_ID]` into a single 33-byte stack slice for Agave's `sol_sha256` metering (`-108 CU` on legacy ATA, `-75 CU` on Token-2022 ATA), keep `bump` as `u64` in `sbf_derive_pda` (`-16 B` / `-2 CU`), inline legacy `AsTokenAccount` loaders (`-8` to `-10 CU`), avoid stack buffers on empty Token-2022 extension allow-lists, and precompute upgradeable loader `PROGRAM_DATA` PDAs at compile time in `multisig_program` and `privacy_pool_program` (`-4,880 B` total across 8 of 28 SBF ELFs, 0 regressions).\n- Accelerate host PDA derivation with `Fe51::square`, branchless tiered `jacobi_is_non_negative_mod_p`, and zero-allocation SHA-256 prefix state cloning (`2.76x–3.07x` faster across all 11 host PDA benchmarks), and add compile-time inline pair checks in `run_static_alias_check` for compact `<= 4`-account layouts with `#[pina(unique)]` (`6.5x–9.1x` faster).\n- Speed up `pina_cli` by eliminating the `cargo metadata` subprocess via direct manifest/workspace discovery, removing `rayon` thread-pool startup, keeping `RootNode` in memory across IDL/client rendering, avoiding unchanged atomic IDL rewrites, fast-pathing `--version`/`-V`/`docs`, and parsing workspace dependency keys with `IgnoredAny` (`17.9x` faster `pina generate`, `3.73x` faster `pina docs`, `-5 MB` release binary).\n- Optimize `pina.rs` landing page and mdBook documentation builds with subsetted WOFF2 fonts, SVG logo replacement, build-time syntax highlighting, single hashed CSS/JS bundles, static SSR chrome, and compact on-demand search (`-69.5%` to `-77.5%` wire bytes).",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				},
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "dbfe7fbf3986f749a8dacf00c245f3e86a4d0029",
+						"short_sha": "dbfe7fb",
+						"url": "https://github.com/pina-rs/pina/commit/dbfe7fbf3986f749a8dacf00c245f3e86a4d0029",
+						"authored_at": "2026-11-26T14:08:15Z",
+						"committed_at": "2026-11-26T14:08:15Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#725",
+						"title": "perf(pina): accelerate SBF/host hot paths, CLI discovery, and docs delivery",
+						"url": "https://github.com/pina-rs/pina/pull/725",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "dbfe7fbf3986f749a8dacf00c245f3e86a4d0029",
+						"short_sha": "dbfe7fb",
+						"url": "https://github.com/pina-rs/pina/commit/dbfe7fbf3986f749a8dacf00c245f3e86a4d0029",
+						"authored_at": "2026-11-26T14:08:15Z",
+						"committed_at": "2026-11-26T14:08:15Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#725",
+						"title": "perf(pina): accelerate SBF/host hot paths, CLI discovery, and docs delivery",
+						"url": "https://github.com/pina-rs/pina/pull/725",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.25.1](https://github.com/pina-rs/pina/releases/tag/v0.25.1) (2026-11-27)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"#### Inline route parsing, validation, and opt-mut aliasing\n\n_Packages:_ 🟢 _pina_, 🟢 _pina_macros_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #730](https://github.com/pina-rs/pina/pull/730)\n\nFixes binary-size and compute-unit regressions introduced in `0.25.0` for programs that share `#[derive(Accounts)]` structs across multiple `dispatch_entrypoint!` variants, use `Option<&mut AccountView>` fields, validate program accounts with `#[pina(validate(program = ...))]`, or use `dispatch_entrypoint!` with shared account walks:\n\n- Always inline derived account parsing along `dispatch_entrypoint!` routes (`__parse_accounts_inlined`) so `AccountsCursor::from_verified` (`check_duplicates = false`) and exact route lengths constant-fold even when one `#[derive(Accounts)]` struct is shared by multiple variants, while leaving `TryFromAccountInfos::try_from_account_infos` (`nostd_entrypoint!`) codegen unchanged.\n- Always inline generated `PinaValidate::validate` implementations for `#[derive(Accounts)]` structs and factor program-account checks through `program_matches` behind `validate_program` so repeated program checks can be outlined cleanly without pushing `validate` out of line.\n- Add `validate_opt_mut_aliasing_64` for mutable-only layouts (indices `< 64`, no `#[pina(unique)]`, no trailing mutable `#[pina(remaining)]`) with `Option<&mut AccountView>` slots, skip inline 3/4-way and compact unique-<=4 alias unrolling inside already-cold `dispatch_entrypoint!` duplicate branches (`COLD_ROUTE`), and use `wrapping_add(1)` for slice-bounded loop indices across aliasing validators to eliminate `overflow-checks = true` panic metadata.\n- Parameterize `entry::walk_accounts` over its return encoding so `walk_accounts_shared` returns a bare `u8` status register without packing/unpacking `Result<u8, ProgramError>` while inlined (`SHARED = false`) walks still return `Result` directly.\n\n##### User impact\n\nDeployed SBF binaries are smaller and instructions consume fewer compute units across `dispatch_entrypoint!`, optional-mutable, and validated-accounts programs. All account, signer, owner, writable, PDA, program-ID, and duplicate-account checks — including writability-before-duplicate error precedence and `program_id` optional-sentinel semantics — are unchanged.",
+							"#### Optimize SBF/host, CLI discovery, and docs delivery\n\n_Packages:_ 🟢 _pina_, 🟢 _pina_cli_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #725](https://github.com/pina-rs/pina/pull/725)\n\n- Add a dedicated `sbf_derive_ata` kernel in `pina` that coalesces `[bump || ATA_PROGRAM_ID]` into a single 33-byte stack slice for Agave's `sol_sha256` metering (`-108 CU` on legacy ATA, `-75 CU` on Token-2022 ATA), keep `bump` as `u64` in `sbf_derive_pda` (`-16 B` / `-2 CU`), inline legacy `AsTokenAccount` loaders (`-8` to `-10 CU`), avoid stack buffers on empty Token-2022 extension allow-lists, and precompute upgradeable loader `PROGRAM_DATA` PDAs at compile time in `multisig_program` and `privacy_pool_program` (`-4,880 B` total across 8 of 28 SBF ELFs, 0 regressions).\n- Accelerate host PDA derivation with `Fe51::square`, branchless tiered `jacobi_is_non_negative_mod_p`, and zero-allocation SHA-256 prefix state cloning (`2.76x–3.07x` faster across all 11 host PDA benchmarks), and add compile-time inline pair checks in `run_static_alias_check` for compact `<= 4`-account layouts with `#[pina(unique)]` (`6.5x–9.1x` faster).\n- Speed up `pina_cli` by eliminating the `cargo metadata` subprocess via direct manifest/workspace discovery, removing `rayon` thread-pool startup, keeping `RootNode` in memory across IDL/client rendering, avoiding unchanged atomic IDL rewrites, fast-pathing `--version`/`-V`/`docs`, and parsing workspace dependency keys with `IgnoredAny` (`17.9x` faster `pina generate`, `3.73x` faster `pina docs`, `-5 MB` release binary).\n- Optimize `pina.rs` landing page and mdBook documentation builds with subsetted WOFF2 fonts, SVG logo replacement, build-time syntax highlighting, single hashed CSS/JS bundles, static SSR chrome, and compact on-demand search (`-69.5%` to `-77.5%` wire bytes).",
+							"- **Accept operator-configured external Cargo target directories.** Pina now accepts an external `build.target-dir` configured in an operator Cargo config outside the repository (such as a parent worktree `.cargo/config.toml` or `$CARGO_HOME/config.toml`) and normalizes any `..` segments Cargo leaves in `target_directory`, while repository-local Cargo configuration inside the worktree or workspace still cannot redirect builds outside the tree.\n  _Packages:_ 🟢 _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #728](https://github.com/pina-rs/pina/pull/728)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.25.1](https://github.com/pina-rs/pina/releases/tag/v0.25.1) (2026-11-27)\n\nGrouped release for `core`.\n\n### Fixes\n\n#### Inline route parsing, validation, and opt-mut aliasing\n\n_Packages:_ 🟢 _pina_, 🟢 _pina_macros_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #730](https://github.com/pina-rs/pina/pull/730)\n\nFixes binary-size and compute-unit regressions introduced in `0.25.0` for programs that share `#[derive(Accounts)]` structs across multiple `dispatch_entrypoint!` variants, use `Option<&mut AccountView>` fields, validate program accounts with `#[pina(validate(program = ...))]`, or use `dispatch_entrypoint!` with shared account walks:\n\n- Always inline derived account parsing along `dispatch_entrypoint!` routes (`__parse_accounts_inlined`) so `AccountsCursor::from_verified` (`check_duplicates = false`) and exact route lengths constant-fold even when one `#[derive(Accounts)]` struct is shared by multiple variants, while leaving `TryFromAccountInfos::try_from_account_infos` (`nostd_entrypoint!`) codegen unchanged.\n- Always inline generated `PinaValidate::validate` implementations for `#[derive(Accounts)]` structs and factor program-account checks through `program_matches` behind `validate_program` so repeated program checks can be outlined cleanly without pushing `validate` out of line.\n- Add `validate_opt_mut_aliasing_64` for mutable-only layouts (indices `< 64`, no `#[pina(unique)]`, no trailing mutable `#[pina(remaining)]`) with `Option<&mut AccountView>` slots, skip inline 3/4-way and compact unique-<=4 alias unrolling inside already-cold `dispatch_entrypoint!` duplicate branches (`COLD_ROUTE`), and use `wrapping_add(1)` for slice-bounded loop indices across aliasing validators to eliminate `overflow-checks = true` panic metadata.\n- Parameterize `entry::walk_accounts` over its return encoding so `walk_accounts_shared` returns a bare `u8` status register without packing/unpacking `Result<u8, ProgramError>` while inlined (`SHARED = false`) walks still return `Result` directly.\n\n##### User impact\n\nDeployed SBF binaries are smaller and instructions consume fewer compute units across `dispatch_entrypoint!`, optional-mutable, and validated-accounts programs. All account, signer, owner, writable, PDA, program-ID, and duplicate-account checks — including writability-before-duplicate error precedence and `program_id` optional-sentinel semantics — are unchanged.\n\n#### Optimize SBF/host, CLI discovery, and docs delivery\n\n_Packages:_ 🟢 _pina_, 🟢 _pina_cli_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #725](https://github.com/pina-rs/pina/pull/725)\n\n- Add a dedicated `sbf_derive_ata` kernel in `pina` that coalesces `[bump || ATA_PROGRAM_ID]` into a single 33-byte stack slice for Agave's `sol_sha256` metering (`-108 CU` on legacy ATA, `-75 CU` on Token-2022 ATA), keep `bump` as `u64` in `sbf_derive_pda` (`-16 B` / `-2 CU`), inline legacy `AsTokenAccount` loaders (`-8` to `-10 CU`), avoid stack buffers on empty Token-2022 extension allow-lists, and precompute upgradeable loader `PROGRAM_DATA` PDAs at compile time in `multisig_program` and `privacy_pool_program` (`-4,880 B` total across 8 of 28 SBF ELFs, 0 regressions).\n- Accelerate host PDA derivation with `Fe51::square`, branchless tiered `jacobi_is_non_negative_mod_p`, and zero-allocation SHA-256 prefix state cloning (`2.76x–3.07x` faster across all 11 host PDA benchmarks), and add compile-time inline pair checks in `run_static_alias_check` for compact `<= 4`-account layouts with `#[pina(unique)]` (`6.5x–9.1x` faster).\n- Speed up `pina_cli` by eliminating the `cargo metadata` subprocess via direct manifest/workspace discovery, removing `rayon` thread-pool startup, keeping `RootNode` in memory across IDL/client rendering, avoiding unchanged atomic IDL rewrites, fast-pathing `--version`/`-V`/`docs`, and parsing workspace dependency keys with `IgnoredAny` (`17.9x` faster `pina generate`, `3.73x` faster `pina docs`, `-5 MB` release binary).\n- Optimize `pina.rs` landing page and mdBook documentation builds with subsetted WOFF2 fonts, SVG logo replacement, build-time syntax highlighting, single hashed CSS/JS bundles, static SSR chrome, and compact on-demand search (`-69.5%` to `-77.5%` wire bytes).\n\n- **Accept operator-configured external Cargo target directories.** Pina now accepts an external `build.target-dir` configured in an operator Cargo config outside the repository (such as a parent worktree `.cargo/config.toml` or `$CARGO_HOME/config.toml`) and normalizes any `..` segments Cargo leaves in `target_directory`, while repository-local Cargo configuration inside the worktree or workspace still cannot redirect builds outside the tree.\n  _Packages:_ 🟢 _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #728](https://github.com/pina-rs/pina/pull/728)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}
