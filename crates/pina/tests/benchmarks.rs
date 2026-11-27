@@ -549,6 +549,15 @@ impl<'a> TryFrom<(&Address, &'a mut [AccountView])> for BenchFourUniqueAccounts<
 	}
 }
 
+#[allow(dead_code)]
+#[derive(pina::Accounts)]
+struct BenchOptionalMutAccounts<'a> {
+	authority: &'a AccountView,
+	vault: &'a mut AccountView,
+	opt_a: Option<&'a mut AccountView>,
+	opt_b: Option<&'a mut AccountView>,
+}
+
 fn make_bench_account(key_byte: u8, writable: bool) -> RuntimeAccount {
 	RuntimeAccount {
 		borrow_state: NOT_BORROWED,
@@ -623,6 +632,34 @@ fn benchmark_accounts_parse_four_unique_aliasing() {
 		let parsed = BenchFourUniqueAccounts::try_from((&SYSTEM_ID, black_box(&mut views[..])));
 		let _ = black_box(parsed.is_ok());
 	});
+}
+
+#[test]
+#[allow(unsafe_code)]
+fn benchmark_accounts_parse_optional_mut_aliasing() {
+	let mut a = make_bench_account(1, false);
+	let mut b = make_bench_account(2, true);
+	let mut c = make_bench_account(3, true);
+	let mut d = RuntimeAccount {
+		address: SYSTEM_ID,
+		..make_bench_account(0, false)
+	};
+	// SAFETY: Each local RuntimeAccount stays pinned on the stack and outlives `views`.
+	let mut views = [
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut a)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut b)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut c)) },
+		unsafe { AccountView::new_unchecked(core::ptr::from_mut(&mut d)) },
+	];
+
+	bench(
+		"Accounts::try_from (1 ro + 1 mut + 2 opt mut, validate_opt_mut_aliasing_64)",
+		|| {
+			let parsed =
+				BenchOptionalMutAccounts::try_from((&SYSTEM_ID, black_box(&mut views[..])));
+			let _ = black_box(parsed.is_ok());
+		},
+	);
 }
 
 #[test]

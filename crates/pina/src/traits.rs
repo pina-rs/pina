@@ -1435,7 +1435,7 @@ impl<'a> AccountsCursor<'a> {
 			.remaining
 			.get(..T::ACCOUNT_LIMIT)
 			.unwrap_or(self.remaining);
-		run_static_alias_check::<T>(&self.program_id, bounded)
+		run_static_alias_check::<T, false>(&self.program_id, bounded)
 	}
 
 	/// Reject a mutable account that appears again in the cursor's remaining
@@ -1509,10 +1509,17 @@ impl __AliasLayout {
 	/// mutable slot below index 64).
 	#[inline(always)]
 	pub const fn is_simple_mut_64(&self) -> bool {
+		self.is_mut_only_64() && (self.optional_mask[0] & self.mut_mask[0]) == 0
+	}
+
+	/// Whether all aliasing constraints on this layout are mutable-vs-mutable
+	/// below index 64 (possibly with `Option<&mut AccountView>` slots), with no
+	/// `#[pina(unique)]` slots and no trailing mutable remaining slice.
+	#[inline(always)]
+	pub const fn is_mut_only_64(&self) -> bool {
 		self.remaining_mut_start == usize::MAX
 			&& !__mask256_any(self.unique_mask)
 			&& (self.mut_mask[1] | self.mut_mask[2] | self.mut_mask[3]) == 0
-			&& (self.optional_mask[0] & self.mut_mask[0]) == 0
 	}
 
 	/// Whether the compact 5-register validator
@@ -1608,21 +1615,60 @@ pub fn validate_mut_aliasing_64(accounts: &[AccountView], mut_mask: u64) -> u8 {
 				let _ = validate_writable(account_i);
 				return ALIAS_ERR_NOT_WRITABLE;
 			}
-			let mut j = i + 1;
+			let mut j = i.wrapping_add(1);
 			let mut mask_j = mask_i >> 1;
 			while j < len && mask_j != 0 {
 				if (mask_j & 1) != 0 && account_i == accounts[j] {
 					return ALIAS_ERR_DUPLICATE;
 				}
-				j += 1;
+				j = j.wrapping_add(1);
 				mask_j >>= 1;
 			}
 		}
-		i += 1;
+		i = i.wrapping_add(1);
 		mask_i >>= 1;
 	}
 
 	ALIAS_OK
+}
+
+/// Compact validator for mutable-only layouts (indices `< 64`, no
+/// `#[pina(unique)]`, no trailing mutable `#[pina(remaining)]`) that contain
+/// one or more `Option<&mut AccountView>` slots.
+///
+/// Scans every declared mutable slot in ascending index order: omits any
+/// optional-mutable slot holding `program_id` and rejects any present
+/// non-writable mutable slot first (preserving writability-before-duplicate
+/// error precedence with [`validate_account_aliasing_compact`] and
+/// [`validate_account_aliasing`]), then delegates pairwise duplicate detection
+/// to [`validate_mut_aliasing_64`].
+#[doc(hidden)]
+#[cold]
+#[inline(never)]
+pub fn validate_opt_mut_aliasing_64(
+	program_id: &Address,
+	accounts: &[AccountView],
+	mut mut_mask: u64,
+	opt_mut_mask: u64,
+) -> u8 {
+	let len = accounts.len().min(64);
+	let mut i = 0;
+
+	while i < len {
+		let bit = 1_u64.wrapping_shl(i as u32);
+		if (mut_mask & bit) != 0 {
+			let account = accounts[i];
+			if (opt_mut_mask & bit) != 0 && account.address() == program_id {
+				mut_mask ^= bit;
+			} else if !account.is_writable() {
+				let _ = validate_writable(account);
+				return ALIAS_ERR_NOT_WRITABLE;
+			}
+		}
+		i = i.wrapping_add(1);
+	}
+
+	validate_mut_aliasing_64(accounts, mut_mask)
 }
 
 #[cold]
@@ -1676,7 +1722,7 @@ pub fn validate_account_aliasing_compact(
 				return ALIAS_ERR_NOT_WRITABLE;
 			}
 		}
-		k += 1;
+		k = k.wrapping_add(1);
 	}
 
 	let mut i = 0;
@@ -1685,18 +1731,18 @@ pub fn validate_account_aliasing_compact(
 		let bit_i = if i < 32 { 1_u32 << i } else { 0 };
 
 		if (opt_mask & bit_i) != 0 && address_eq(account_i.address(), program_id) {
-			i += 1;
+			i = i.wrapping_add(1);
 			continue;
 		}
 
 		let mut_i = (mut_mask & bit_i) != 0 || i >= rem_start;
 		let unique_i = (unique_mask & bit_i) != 0;
 		if !mut_i && unique_mask == 0 {
-			i += 1;
+			i = i.wrapping_add(1);
 			continue;
 		}
 
-		let mut j = i + 1;
+		let mut j = i.wrapping_add(1);
 		while j < len {
 			let account_j = accounts[j];
 			if account_i == account_j {
@@ -1712,10 +1758,10 @@ pub fn validate_account_aliasing_compact(
 					}
 				}
 			}
-			j += 1;
+			j = j.wrapping_add(1);
 		}
 
-		i += 1;
+		i = i.wrapping_add(1);
 	}
 
 	ALIAS_OK
@@ -1770,25 +1816,25 @@ pub fn validate_account_aliasing(
 				return ALIAS_ERR_NOT_WRITABLE;
 			}
 		}
-		k += 1;
+		k = k.wrapping_add(1);
 	}
 
 	let mut i = 0;
 	while i < limit {
 		let account_i = accounts[i];
 		if bit_is_set(&layout.optional_mask, i) && account_i.address() == program_id {
-			i += 1;
+			i = i.wrapping_add(1);
 			continue;
 		}
 
 		let mut_i = bit_is_set(&layout.mut_mask, i) || i >= layout.remaining_mut_start;
 		let unique_i = bit_is_set(&layout.unique_mask, i);
 
-		let mut j = i + 1;
+		let mut j = i.wrapping_add(1);
 		while j < limit {
 			let account_j = accounts[j];
 			if bit_is_set(&layout.optional_mask, j) && account_j.address() == program_id {
-				j += 1;
+				j = j.wrapping_add(1);
 				continue;
 			}
 
@@ -1804,10 +1850,10 @@ pub fn validate_account_aliasing(
 				}
 			}
 
-			j += 1;
+			j = j.wrapping_add(1);
 		}
 
-		i += 1;
+		i = i.wrapping_add(1);
 	}
 
 	ALIAS_OK
@@ -1844,7 +1890,7 @@ const fn alias_pair_forbidden(
 }
 
 #[inline(always)]
-fn run_static_alias_check<'a, T: ParseAccounts<'a>>(
+fn run_static_alias_check<'a, T: ParseAccounts<'a>, const COLD_ROUTE: bool>(
 	program_id: &Address,
 	accounts: &[AccountView],
 ) -> ProgramResult {
@@ -1865,7 +1911,9 @@ fn run_static_alias_check<'a, T: ParseAccounts<'a>>(
 			ALIAS_OK
 		}
 	} else if const {
-		T::ALIAS_LAYOUT.is_simple_mut_64() && T::ALIAS_LAYOUT.mut_mask[0].count_ones() == 3
+		!COLD_ROUTE
+			&& T::ALIAS_LAYOUT.is_simple_mut_64()
+			&& T::ALIAS_LAYOUT.mut_mask[0].count_ones() == 3
 	} {
 		let idx_a = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 0) };
 		let idx_b = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 1) };
@@ -1881,7 +1929,9 @@ fn run_static_alias_check<'a, T: ParseAccounts<'a>>(
 			validate_mut_aliasing_64(accounts, const { T::ALIAS_LAYOUT.mut_mask[0] })
 		}
 	} else if const {
-		T::ALIAS_LAYOUT.is_simple_mut_64() && T::ALIAS_LAYOUT.mut_mask[0].count_ones() == 4
+		!COLD_ROUTE
+			&& T::ALIAS_LAYOUT.is_simple_mut_64()
+			&& T::ALIAS_LAYOUT.mut_mask[0].count_ones() == 4
 	} {
 		let idx_a = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 0) };
 		let idx_b = const { nth_set_bit(T::ALIAS_LAYOUT.mut_mask[0], 1) };
@@ -1901,8 +1951,16 @@ fn run_static_alias_check<'a, T: ParseAccounts<'a>>(
 		}
 	} else if const { T::ALIAS_LAYOUT.is_simple_mut_64() } {
 		validate_mut_aliasing_64(accounts, const { T::ALIAS_LAYOUT.mut_mask[0] })
+	} else if const { T::ALIAS_LAYOUT.is_mut_only_64() } {
+		validate_opt_mut_aliasing_64(
+			program_id,
+			accounts,
+			const { T::ALIAS_LAYOUT.mut_mask[0] },
+			const { T::ALIAS_LAYOUT.optional_mask[0] & T::ALIAS_LAYOUT.mut_mask[0] },
+		)
 	} else if const {
-		T::ALIAS_LAYOUT.is_compact_32()
+		!COLD_ROUTE
+			&& T::ALIAS_LAYOUT.is_compact_32()
 			&& T::ALIAS_LAYOUT.optional_mask[0] == 0
 			&& T::ALIAS_LAYOUT.remaining_mut_start == usize::MAX
 			&& T::ACCOUNT_LIMIT <= 4
@@ -2012,7 +2070,7 @@ where
 {
 	let mut cursor = if const { T::ALIAS_LAYOUT.static_layout } {
 		if const { T::ALIAS_LAYOUT.needs_alias_check() } {
-			run_static_alias_check::<T>(program_id, accounts)?;
+			run_static_alias_check::<T, false>(program_id, accounts)?;
 		}
 		AccountsCursor::from_verified(*program_id, accounts)
 	} else {
@@ -2055,7 +2113,7 @@ where
 		if const { T::ALIAS_LAYOUT.needs_alias_check() }
 			&& pinocchio::hint::unlikely((dup_flags & required_dup_mask) != 0)
 		{
-			run_static_alias_check::<T>(program_id, accounts)?;
+			run_static_alias_check::<T, true>(program_id, accounts)?;
 		}
 		AccountsCursor::from_verified(*program_id, accounts)
 	} else if pinocchio::hint::unlikely((dup_flags & crate::entry::DUP_ANY_MASK) != 0) {
@@ -2064,7 +2122,7 @@ where
 		AccountsCursor::from_verified(*program_id, accounts)
 	};
 
-	let parsed = T::parse_accounts(&mut cursor)?;
+	let parsed = T::__parse_accounts_inlined(&mut cursor)?;
 	if FINISH_EXACT {
 		cursor.finish_exact()?;
 	}
@@ -2129,6 +2187,19 @@ pub trait ParseAccounts<'a>: Sized {
 	/// Parse accounts from the cursor, preserving user-authored validation for
 	/// later instruction processing.
 	fn parse_accounts(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError>;
+
+	/// Always-inlined parsing entry point used by `dispatch_entrypoint!` routes
+	/// ([`__parse_derived_route`]), where `AccountsCursor::from_verified` and
+	/// `ROUTE_EXACT` fold away duplicate checks and length branches even when
+	/// multiple dispatch variants share one accounts struct.
+	///
+	/// Hand-written parsers inherit the default delegation to
+	/// [`Self::parse_accounts`].
+	#[doc(hidden)]
+	#[inline(always)]
+	fn __parse_accounts_inlined(cursor: &mut AccountsCursor<'a>) -> Result<Self, ProgramError> {
+		Self::parse_accounts(cursor)
+	}
 
 	/// Validate this parsed account group when it is nested in another account
 	/// struct.

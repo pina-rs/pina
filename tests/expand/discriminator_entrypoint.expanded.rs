@@ -849,6 +849,12 @@ impl<'a> pina::ParseAccounts<'a> for InitializeAccounts<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let authority = cursor.next()?;
         let counter = cursor.next_mut()?;
         let system_program = cursor.next()?;
@@ -893,7 +899,7 @@ for InitializeAccounts<'a> {
     }
 }
 impl<'a> pina::PinaValidate for InitializeAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }
@@ -963,6 +969,12 @@ impl<'a> pina::ParseAccounts<'a> for IncrementAccounts<'a> {
     fn parse_accounts(
         cursor: &mut pina::AccountsCursor<'a>,
     ) -> ::core::result::Result<Self, pina::ProgramError> {
+        Self::__parse_accounts_inlined(cursor)
+    }
+    #[inline(always)]
+    fn __parse_accounts_inlined(
+        cursor: &mut pina::AccountsCursor<'a>,
+    ) -> ::core::result::Result<Self, pina::ProgramError> {
         let authority = cursor.next()?;
         let counter = cursor.next_mut()?;
         Ok(Self { authority, counter })
@@ -1002,7 +1014,7 @@ for IncrementAccounts<'a> {
     }
 }
 impl<'a> pina::PinaValidate for IncrementAccounts<'a> {
-    #[inline]
+    #[inline(always)]
     fn validate(&self) -> pina::ProgramResult {
         Ok(())
     }

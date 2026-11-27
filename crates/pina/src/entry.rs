@@ -301,12 +301,16 @@ unsafe fn walk<const SHARED: bool>(
 ) -> Result<u8, ProgramError> {
 	if !SHARED {
 		// SAFETY: the caller upholds `walk_accounts`'s contract.
-		return unsafe { walk_accounts(input, views, count) };
+		return unsafe {
+			walk_accounts(input, views, count, Ok, || {
+				Err(ProgramError::InvalidAccountData)
+			})
+		};
 	}
 
 	// SAFETY: the caller upholds `walk_accounts`'s contract.
 	let status = unsafe { walk_accounts_shared(input, views, count) };
-	if status == WALK_ERR_INVALID_DATA {
+	if pinocchio::hint::unlikely(status == WALK_ERR_INVALID_DATA) {
 		return Err(ProgramError::InvalidAccountData);
 	}
 
@@ -324,19 +328,30 @@ unsafe fn walk<const SHARED: bool>(
 #[allow(unsafe_code)]
 unsafe fn walk_accounts_shared(input: *mut u8, views: *mut AccountView, count: usize) -> u8 {
 	// SAFETY: the caller upholds `walk_accounts`'s contract.
-	match unsafe { walk_accounts(input, views, count) } {
-		Ok(dup_flags) => dup_flags,
-		Err(_) => WALK_ERR_INVALID_DATA,
+	unsafe {
+		walk_accounts(
+			input,
+			views,
+			count,
+			|dup_flags| dup_flags,
+			|| WALK_ERR_INVALID_DATA,
+		)
 	}
 }
 
 /// Writes a view of each of the first `count` serialized accounts to `views`
-/// and returns the duplicate bit flags (`DUP_WRITABLE_MASK` / `DUP_ANY_MASK`).
+/// and passes the duplicate bit flags (`DUP_WRITABLE_MASK` / `DUP_ANY_MASK`)
+/// to `on_ok`, or invokes `on_invalid` for a duplicate marker that names a
+/// later slot.
 ///
 /// A duplicate marker copies the earlier view, as
 /// `pinocchio::entrypoint::deserialize` does. A marker that does not name an
-/// earlier slot fails with `InvalidAccountData`: the runtime never writes one,
-/// and the check costs nothing on the non-duplicate path.
+/// earlier slot fails: the runtime never writes one, and the check costs
+/// nothing on the non-duplicate path. Parameterizing the return encoding lets
+/// [`walk_accounts_shared`] return a bare `u8` status register without packing
+/// and unpacking a `Result<u8, ProgramError>`, while inlined (`SHARED = false`)
+/// walks still return `Result<u8, ProgramError>` directly without an extra
+/// `status == WALK_ERR_INVALID_DATA` check.
 ///
 /// # Safety
 ///
@@ -344,11 +359,13 @@ unsafe fn walk_accounts_shared(input: *mut u8, views: *mut AccountView, count: u
 /// `count` account records, and `views` must be valid for `count` writes.
 #[inline(always)]
 #[allow(unsafe_code)]
-unsafe fn walk_accounts(
+unsafe fn walk_accounts<R>(
 	input: *mut u8,
 	views: *mut AccountView,
 	count: usize,
-) -> Result<u8, ProgramError> {
+	on_ok: impl FnOnce(u8) -> R,
+	on_invalid: impl FnOnce() -> R,
+) -> R {
 	// SAFETY: the first record follows the eight-byte account count.
 	let mut cursor = unsafe { input.add(size_of::<u64>()) };
 	let mut index = 0;
@@ -377,7 +394,7 @@ unsafe fn walk_accounts(
 		} else {
 			let original = usize::from(marker);
 			if original >= index {
-				return Err(ProgramError::InvalidAccountData);
+				return on_invalid();
 			}
 			// SAFETY: slot `original` is below `index`, so it was written above,
 			// and a duplicate record is eight bytes long.
@@ -393,7 +410,7 @@ unsafe fn walk_accounts(
 		index += 1;
 	}
 
-	Ok(dup_flags)
+	on_ok(dup_flags)
 }
 
 /// Walks the first `MAX_ACCOUNTS` of the loader's serialized accounts into

@@ -208,8 +208,16 @@ fn validate_not_empty(account: AccountView) -> ProgramResult {
 #[inline(always)]
 #[cfg_attr(feature = "verbose-logs", track_caller)]
 fn validate_program(account: AccountView, program_id: &Address) -> ProgramResult {
-	validate_address(account, program_id)?;
-	validate_executable(account)
+	if pinocchio::hint::likely(program_matches(account, program_id)) {
+		return Ok(());
+	}
+
+	Err(ProgramError::InvalidAccountData)
+}
+
+#[cfg_attr(feature = "verbose-logs", track_caller)]
+fn program_matches(account: AccountView, program_id: &Address) -> bool {
+	address_matches(account, program_id) && executable_matches(account)
 }
 
 #[cfg_attr(feature = "verbose-logs", track_caller)]
