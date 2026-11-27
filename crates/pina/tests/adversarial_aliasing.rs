@@ -2435,13 +2435,20 @@ fn validate_opt_mut_aliasing_64_matches_general_across_lengths_0_to_69() {
 		make_runtime(addr(4), false), // 3: ro(4)
 		make_runtime(ID, true),       // 4: rw(ID)
 		make_runtime(ID, false),      // 5: ro(ID)
+		make_runtime(addr(5), true),  // 6: rw(5), dedicated to wide-layout slot 32
+		make_runtime(addr(6), true),  // 7: rw(6), dedicated to wide-layout slot 63
 	];
 	// SAFETY: `pool_raw` remains pinned for the duration of this test.
-	let pool: [AccountView; 6] = core::array::from_fn(|idx| unsafe {
+	let pool: [AccountView; 8] = core::array::from_fn(|idx| unsafe {
 		AccountView::new_unchecked(core::ptr::from_mut(&mut pool_raw[idx]))
 	});
 
 	let layouts: &[(u64, u64)] = &[
+		// Wide layout spanning low bits 0/1, mid bit 32, and bit 63.
+		(
+			(1_u64 << 0) | (1_u64 << 1) | (1_u64 << 32) | (1_u64 << 63),
+			(1_u64 << 0) | (1_u64 << 1) | (1_u64 << 63),
+		),
 		// Optional-mutable at bits 0 and 1.
 		(0b11, 0b11),
 		// Optional-mutable at bits 0, 1 + required mutable at bit 2.
@@ -2450,11 +2457,6 @@ fn validate_opt_mut_aliasing_64_matches_general_across_lengths_0_to_69() {
 		(0b111, 0b110),
 		// Mixed readonly (bit 1), required mut (bit 2), optional mut (bits 0, 3).
 		(0b1101, 0b1001),
-		// Wide layout spanning low bits 0/1, mid bit 32, and bit 63.
-		(
-			(1_u64 << 0) | (1_u64 << 1) | (1_u64 << 32) | (1_u64 << 63),
-			(1_u64 << 0) | (1_u64 << 1) | (1_u64 << 63),
-		),
 	];
 
 	// Adversarial head prefixes exercising duplicates, non-writable slots,
@@ -2478,8 +2480,10 @@ fn validate_opt_mut_aliasing_64_matches_general_across_lengths_0_to_69() {
 	let tail_fillers: &[usize] = &[5, 4, 3, 0];
 
 	let mut buf = [pool[1]; 69];
+	let mut saw_wide_over64_outcomes = [false; 3];
 	for &(mut_mask, opt_mask) in layouts {
 		let opt_mut_mask = opt_mask & mut_mask;
+		let is_wide = (mut_mask & (1_u64 << 32)) != 0;
 		let layout = __AliasLayout {
 			static_layout: true,
 			mut_mask: [mut_mask, 0, 0, 0],
@@ -2492,45 +2496,64 @@ fn validate_opt_mut_aliasing_64_matches_general_across_lengths_0_to_69() {
 		let mut_and_opt =
 			(mut_mask & u64::from(u32::MAX)) | ((opt_mask & u64::from(u32::MAX)) << 32);
 		let unique_and_rem = 0xFF_u64 << 32;
+		// For the wide layout, test both the raw tail filler at slot 63
+		// (omitted sentinel, readonly, or aliased to slot 0) and a dedicated
+		// distinct writable account so present slot 63 + wrap-around slots
+		// 64..68 are exercised on valid (`0`) results as well.
+		let slot63_overrides: &[Option<usize>] = if is_wide { &[None, Some(7)] } else { &[None] };
 
 		for head in heads {
 			for &tail in tail_fillers {
-				for slot in &mut buf[4..] {
-					*slot = pool[tail];
-				}
-				for (idx, &p) in head.iter().enumerate() {
-					buf[idx] = pool[p];
-				}
-				// Ensure bit 32 is distinct/writable when testing the wide layout
-				// so slot 63 and wrap-around slots 64..68 stay reachable.
-				if (mut_mask & (1_u64 << 32)) != 0 {
-					buf[32] = pool[1];
-				}
+				for &slot63_override in slot63_overrides {
+					for slot in &mut buf[4..] {
+						*slot = pool[tail];
+					}
+					for (idx, &p) in head.iter().enumerate() {
+						buf[idx] = pool[p];
+					}
+					if is_wide {
+						// Use a writable account unused by any head or tail
+						// filler so bit 32 never collides with slots 0..3 or
+						// 63 before reaching wrap-around slots 64..68.
+						buf[32] = pool[6];
+						if let Some(slot63) = slot63_override {
+							buf[63] = pool[slot63];
+						}
+					}
 
-				for len in 0_usize..=69 {
-					let slice = &buf[..len];
-					let fast = validate_opt_mut_aliasing_64(&ID, slice, mut_mask, opt_mut_mask);
-					let general = validate_account_aliasing(&ID, slice, usize::MAX, &layout);
-					assert_eq!(
-						fast, general,
-						"mismatch vs general for mut={mut_mask:#x} opt={opt_mask:#x} head={head:?} tail={tail} len={len}"
-					);
-					if fits_compact_32 {
-						let compact = validate_account_aliasing_compact(
-							&ID,
-							slice,
-							mut_and_opt,
-							unique_and_rem,
-						);
+					for len in 0_usize..=69 {
+						let slice = &buf[..len];
+						let fast = validate_opt_mut_aliasing_64(&ID, slice, mut_mask, opt_mut_mask);
+						let general = validate_account_aliasing(&ID, slice, usize::MAX, &layout);
 						assert_eq!(
-							fast, compact,
-							"mismatch vs compact_32 for mut={mut_mask:#x} opt={opt_mask:#x} head={head:?} tail={tail} len={len}"
+							fast, general,
+							"mismatch vs general for mut={mut_mask:#x} opt={opt_mask:#x} head={head:?} tail={tail} slot63={slot63_override:?} len={len}"
 						);
+						if is_wide && len >= 65 {
+							saw_wide_over64_outcomes[usize::from(fast)] = true;
+						}
+						if fits_compact_32 {
+							let compact = validate_account_aliasing_compact(
+								&ID,
+								slice,
+								mut_and_opt,
+								unique_and_rem,
+							);
+							assert_eq!(
+								fast, compact,
+								"mismatch vs compact_32 for mut={mut_mask:#x} opt={opt_mask:#x} head={head:?} tail={tail} len={len}"
+							);
+						}
 					}
 				}
 			}
 		}
 	}
+	assert_eq!(
+		saw_wide_over64_outcomes,
+		[true, true, true],
+		"wide layout at len >= 65 must exercise ok (0), not-writable (1), and duplicate (2) outcomes"
+	);
 }
 
 #[test]
