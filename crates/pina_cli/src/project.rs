@@ -531,6 +531,7 @@ impl Project {
 			&templates,
 			&workspace_root,
 			&target,
+			&root,
 			configured_idl_dir,
 		)?;
 		let clients_dir = templates.resolve_dir(&root, "clients.output", &config.clients.output)?;
@@ -566,6 +567,7 @@ impl Project {
 				&PathTemplates::empty(root.clone()),
 				&discovered.workspace_root,
 				&discovered.target_directory,
+				start,
 				None,
 			)?;
 			let clients_dir = root.join("clients");
@@ -638,6 +640,7 @@ impl Project {
 			&PathTemplates::empty(root.clone()),
 			metadata.workspace_root.as_std_path(),
 			metadata.target_directory.as_std_path(),
+			start,
 			None,
 		)?;
 		let clients_dir = root.join("clients");
@@ -1070,6 +1073,7 @@ fn resolve_build_output_dirs_from_paths(
 	templates: &PathTemplates,
 	workspace_root: &Path,
 	target: &Path,
+	metadata_cwd: &Path,
 	configured_idl_dir: Option<PathBuf>,
 ) -> Result<(PathBuf, PathBuf), ProjectError> {
 	let output_root = output_containment_root(
@@ -1077,11 +1081,31 @@ fn resolve_build_output_dirs_from_paths(
 		Some(workspace_root),
 		templates.discover_git_root(),
 	);
-	// The invoking environment is an operator choice. Repository Cargo
-	// configuration cannot grant itself permission to write outside the tree.
-	let operator_target = ["CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR"]
-		.into_iter()
-		.any(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()));
+	let normalized_target =
+		normalize_absolute(target, "target_directory", &target.to_string_lossy())?;
+	let normalized_root = normalize_absolute(
+		&output_root,
+		"target_directory",
+		&output_root.to_string_lossy(),
+	)?;
+	let contained_target = strip_output_root(&normalized_root, &normalized_target).is_some();
+	// The invoking environment and operator Cargo configuration outside the
+	// repository are operator choices. Repository Cargo configuration inside
+	// the tree cannot grant itself permission to write outside it.
+	let operator_target = if contained_target {
+		false
+	} else if has_operator_target_env() {
+		true
+	} else {
+		let normalized_cwd = normalize_absolute(
+			metadata_cwd,
+			"target_directory",
+			&metadata_cwd.to_string_lossy(),
+		)?;
+		let cargo_home = resolve_cargo_home(&normalized_cwd);
+		operator_cargo_config_target(&normalized_cwd, &normalized_root, cargo_home.as_deref())
+			.is_some_and(|configured| paths_match(&configured, &normalized_target))
+	};
 	let target_root = if operator_target {
 		target
 	} else {
@@ -1400,6 +1424,158 @@ fn has_cargo_config_target_dir_with_home(start_dir: &Path, cargo_home: Option<&P
 fn has_cargo_config_target_dir(start_dir: &Path) -> bool {
 	let cargo_home = resolve_cargo_home_dir(std::env::var_os("CARGO_HOME"), default_user_home());
 	has_cargo_config_target_dir_with_home(start_dir, cargo_home.as_deref())
+}
+
+fn has_operator_target_env() -> bool {
+	["CARGO_TARGET_DIR", "CARGO_BUILD_TARGET_DIR"]
+		.into_iter()
+		.any(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()))
+}
+
+fn resolve_cargo_home(metadata_cwd: &Path) -> Option<PathBuf> {
+	let user_home = ["HOME", "USERPROFILE"]
+		.into_iter()
+		.find_map(std::env::var_os);
+	resolve_cargo_home_from(metadata_cwd, std::env::var_os("CARGO_HOME"), user_home)
+}
+
+fn resolve_cargo_home_from(
+	metadata_cwd: &Path,
+	cargo_home: Option<OsString>,
+	user_home: Option<OsString>,
+) -> Option<PathBuf> {
+	let path = if let Some(home) = cargo_home.filter(|value| !value.is_empty()) {
+		let home = PathBuf::from(home);
+		if home.is_absolute() {
+			home
+		} else {
+			metadata_cwd.join(home)
+		}
+	} else {
+		PathBuf::from(user_home.filter(|value| !value.is_empty())?).join(".cargo")
+	};
+	normalize_absolute(&path, "target_directory", "").ok()
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum CargoConfigTarget {
+	None,
+	Configured(PathBuf),
+	Untrusted,
+}
+
+/// Inspect one Cargo configuration directory for a `build.target-dir` setting.
+///
+/// Inside the repository (`in_tree == true`), any `build.target-dir`,
+/// `include`, symbolic link, or unreadable/malformed config fails closed so
+/// repository-controlled Cargo configuration cannot bypass containment.
+/// Outside the repository (`in_tree == false`), a `build.target-dir` setting
+/// represents an operator-level configuration (such as a shared worktree
+/// parent `.cargo/config.toml` or `$CARGO_HOME/config.toml`).
+fn read_cargo_config_target(config_dir: &Path, in_tree: bool) -> CargoConfigTarget {
+	let Ok(dir_meta) = config_dir.symlink_metadata() else {
+		return CargoConfigTarget::None;
+	};
+	if in_tree && is_link_like(&dir_meta) {
+		return CargoConfigTarget::Untrusted;
+	}
+
+	for filename in ["config.toml", "config"] {
+		let config_path = config_dir.join(filename);
+		let Ok(meta) = config_path.symlink_metadata() else {
+			continue;
+		};
+		if in_tree && (is_link_like(&meta) || !meta.is_file()) {
+			return CargoConfigTarget::Untrusted;
+		}
+		if !in_tree && !config_path.is_file() {
+			continue;
+		}
+
+		let Some(table) = std::fs::read_to_string(&config_path)
+			.ok()
+			.and_then(|source| toml::from_str::<toml::Table>(&source).ok())
+		else {
+			return CargoConfigTarget::Untrusted;
+		};
+		if in_tree && table.contains_key("include") {
+			return CargoConfigTarget::Untrusted;
+		}
+		let Some(target_dir) = table
+			.get("build")
+			.and_then(toml::Value::as_table)
+			.and_then(|build| build.get("target-dir"))
+		else {
+			continue;
+		};
+		if in_tree {
+			return CargoConfigTarget::Untrusted;
+		}
+		let Some(raw) = target_dir.as_str().filter(|value| !value.is_empty()) else {
+			return CargoConfigTarget::Untrusted;
+		};
+		let base = config_dir.parent().unwrap_or(config_dir);
+		let resolved = if Path::new(raw).is_absolute() {
+			PathBuf::from(raw)
+		} else {
+			base.join(raw)
+		};
+		return CargoConfigTarget::Configured(resolved);
+	}
+
+	CargoConfigTarget::None
+}
+
+/// Find the winning operator-level `build.target-dir` outside `output_root`.
+///
+/// Mirrors Cargo's config discovery order: ancestors of `metadata_cwd` up to
+/// the filesystem root, then `cargo_home`. Any in-tree override or untrusted
+/// config stops discovery immediately and returns `None`.
+fn operator_cargo_config_target(
+	metadata_cwd: &Path,
+	output_root: &Path,
+	cargo_home: Option<&Path>,
+) -> Option<PathBuf> {
+	let mut visited = Vec::new();
+	for directory in metadata_cwd.ancestors() {
+		let config_dir = directory.join(".cargo");
+		let in_tree = strip_output_root(output_root, directory).is_some();
+		match read_cargo_config_target(&config_dir, in_tree) {
+			CargoConfigTarget::None => visited.push(config_dir),
+			CargoConfigTarget::Configured(path) => return Some(path),
+			CargoConfigTarget::Untrusted => return None,
+		}
+	}
+
+	let cargo_home = cargo_home?;
+	if visited.iter().any(|dir| dir == cargo_home)
+		|| strip_output_root(output_root, cargo_home).is_some()
+	{
+		return None;
+	}
+
+	match read_cargo_config_target(cargo_home, false) {
+		CargoConfigTarget::Configured(path) => Some(path),
+		CargoConfigTarget::None | CargoConfigTarget::Untrusted => None,
+	}
+}
+
+fn paths_match(configured: &Path, normalized_target: &Path) -> bool {
+	let Ok(configured) = normalize_absolute(configured, "target_directory", "") else {
+		return false;
+	};
+	if strip_output_root(&configured, normalized_target)
+		.is_some_and(|rest| rest.as_os_str().is_empty())
+	{
+		return true;
+	}
+	match (
+		std::fs::canonicalize(&configured),
+		std::fs::canonicalize(normalized_target),
+	) {
+		(Ok(left), Ok(right)) => left == right,
+		_ => false,
+	}
 }
 
 /// Normalize an output and require containment beneath its trusted root.
@@ -3119,6 +3295,186 @@ mode = "overwrite"
 		// The temporary directory sits outside any repository, so discovery
 		// finds nothing and the project directory is the containment root.
 		assert_eq!(generation_containment_root(&project), project);
+	}
+
+	#[test]
+	fn resolve_cargo_home_from_handles_absolute_relative_and_user_home() {
+		let cwd = Path::new("/work/repo/pkg");
+		assert_eq!(
+			resolve_cargo_home_from(cwd, Some(OsString::from("/opt/cargo")), None),
+			Some(PathBuf::from("/opt/cargo"))
+		);
+		assert_eq!(
+			resolve_cargo_home_from(cwd, Some(OsString::from("../cargo-home")), None),
+			Some(PathBuf::from("/work/repo/cargo-home"))
+		);
+		assert_eq!(
+			resolve_cargo_home_from(
+				cwd,
+				Some(OsString::new()),
+				Some(OsString::from("/Users/dev"))
+			),
+			Some(PathBuf::from("/Users/dev/.cargo"))
+		);
+		assert_eq!(resolve_cargo_home_from(cwd, None, None), None);
+	}
+
+	#[test]
+	fn operator_cargo_config_target_distinguishes_in_tree_and_out_of_tree_configs() {
+		let temp = TempDir::new().unwrap();
+		let base = fs::canonicalize(temp.path()).unwrap();
+		let worktrees = base.join("worktrees");
+		let repo = worktrees.join("repo");
+		let project = repo.join("project");
+		let cargo_home = base.join("cargo-home");
+		fs::create_dir_all(project.join(".cargo")).unwrap();
+		fs::create_dir_all(worktrees.join(".cargo")).unwrap();
+		fs::create_dir_all(&cargo_home).unwrap();
+
+		// A benign in-tree config without build.target-dir or include lets the
+		// parent operator config win.
+		fs::write(
+			project.join(".cargo/config.toml"),
+			"[alias]\ncheck-all = \"check\"\n",
+		)
+		.unwrap();
+		fs::write(
+			worktrees.join(".cargo/config.toml"),
+			"[build]\ntarget-dir = \"../shared-target\"\n",
+		)
+		.unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			Some(worktrees.join("../shared-target"))
+		);
+
+		// Absolute target-dir and extensionless `config` out-of-tree work too,
+		// and a non-file `config.toml` directory out-of-tree is skipped.
+		fs::remove_file(worktrees.join(".cargo/config.toml")).unwrap();
+		fs::create_dir(worktrees.join(".cargo/config.toml")).unwrap();
+		let absolute_target = base.join("abs-target");
+		fs::write(
+			worktrees.join(".cargo/config"),
+			format!(
+				"[build]\ntarget-dir = \"{}\"\n",
+				absolute_target.to_string_lossy().replace('\\', "\\\\")
+			),
+		)
+		.unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			Some(absolute_target)
+		);
+
+		// Empty or non-string target-dir fails closed.
+		fs::write(
+			worktrees.join(".cargo/config"),
+			"[build]\ntarget-dir = \"\"\n",
+		)
+		.unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			None
+		);
+
+		// Falling back to CARGO_HOME when no parent sets target-dir works,
+		// unless CARGO_HOME is inside the repository or already visited.
+		fs::remove_file(worktrees.join(".cargo/config")).unwrap();
+		fs::remove_dir(worktrees.join(".cargo/config.toml")).unwrap();
+		fs::write(
+			cargo_home.join("config.toml"),
+			"[build]\ntarget-dir = \"home-target\"\n",
+		)
+		.unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			Some(base.join("home-target"))
+		);
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, Some(&worktrees.join(".cargo"))),
+			None
+		);
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, Some(&repo.join(".cargo-home"))),
+			None
+		);
+		assert_eq!(operator_cargo_config_target(&project, &repo, None), None);
+		fs::remove_file(cargo_home.join("config.toml")).unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			None
+		);
+
+		// Any in-tree override, include, malformed TOML, or non-file fails closed
+		// even when a valid parent operator config exists.
+		fs::write(
+			worktrees.join(".cargo/config.toml"),
+			"[build]\ntarget-dir = \"../shared-target\"\n",
+		)
+		.unwrap();
+		for untrusted_toml in [
+			"[build]\ntarget-dir = \"../../outside\"\n",
+			"include = [\"extra.toml\"]\n",
+			"not valid toml =\n",
+		] {
+			fs::write(project.join(".cargo/config.toml"), untrusted_toml).unwrap();
+			assert_eq!(
+				operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+				None,
+				"in-tree config must fail closed: {untrusted_toml}"
+			);
+		}
+		fs::remove_file(project.join(".cargo/config.toml")).unwrap();
+		fs::create_dir(project.join(".cargo/config.toml")).unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			None
+		);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn in_tree_cargo_config_symlinks_fail_closed_and_paths_match_canonicalizes() {
+		use std::os::unix::fs::symlink;
+
+		let temp = TempDir::new().unwrap();
+		let base = fs::canonicalize(temp.path()).unwrap();
+		let worktrees = base.join("worktrees");
+		let repo = worktrees.join("repo");
+		let project = repo.join("project");
+		let external = base.join("external");
+		fs::create_dir_all(&project).unwrap();
+		fs::create_dir_all(worktrees.join(".cargo")).unwrap();
+		fs::create_dir_all(&external).unwrap();
+		fs::write(
+			worktrees.join(".cargo/config.toml"),
+			"[build]\ntarget-dir = \"../shared-target\"\n",
+		)
+		.unwrap();
+
+		// Symlinked in-tree `.cargo` directory fails closed.
+		symlink(&external, project.join(".cargo")).unwrap();
+		assert_eq!(operator_cargo_config_target(&project, &repo, None), None);
+		fs::remove_file(project.join(".cargo")).unwrap();
+
+		// Symlinked in-tree `.cargo/config.toml` fails closed.
+		fs::create_dir(project.join(".cargo")).unwrap();
+		fs::write(external.join("config.toml"), "").unwrap();
+		symlink(
+			external.join("config.toml"),
+			project.join(".cargo/config.toml"),
+		)
+		.unwrap();
+		assert_eq!(operator_cargo_config_target(&project, &repo, None), None);
+
+		// `paths_match` handles lexical normalization, symlink canonicalization,
+		// mismatches, and invalid paths traversing above the root.
+		let alias = base.join("alias-external");
+		symlink(&external, &alias).unwrap();
+		assert!(paths_match(&worktrees.join("../external"), &external));
+		assert!(paths_match(&alias, &external));
+		assert!(!paths_match(&base.join("other"), &external));
+		assert!(!paths_match(Path::new("/../above-root"), &external));
 	}
 
 	#[test]

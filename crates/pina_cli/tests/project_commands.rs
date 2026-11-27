@@ -570,6 +570,67 @@ fn build_and_generate_allow_sibling_outputs_within_a_cargo_workspace() {
 }
 
 #[test]
+fn parent_cargo_config_external_target_with_parent_segments_is_accepted_and_normalized() {
+	let temp = TempDir::new().unwrap();
+	let worktrees = temp.path().join("worktrees");
+	let repository = worktrees.join("repository");
+	let project = repository.join("project");
+	let shared_target = fs::canonicalize(temp.path()).unwrap().join("target");
+	write_project(&project);
+	fs::create_dir(repository.join(".git")).unwrap();
+	fs::create_dir(worktrees.join(".cargo")).unwrap();
+	fs::write(
+		worktrees.join(".cargo/config.toml"),
+		"[build]\ntarget-dir = \"../target\"\n",
+	)
+	.unwrap();
+	// A benign repository `.cargo/config.toml` (like Pina's own aliases/targets)
+	// must not block an operator parent config above the Git worktree.
+	fs::create_dir(repository.join(".cargo")).unwrap();
+	fs::write(
+		repository.join(".cargo/config.toml"),
+		"[alias]\ncheck-all = \"check\"\n",
+	)
+	.unwrap();
+	let cargo = fake_cargo(temp.path());
+
+	let output = project_command(&project, &cargo, &project.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(shared_target.join("idl/custom_program.json").is_file());
+	assert!(project.join("clients/rust/custom_program").is_dir());
+
+	// Even with a valid parent operator config, an in-tree Cargo config cannot
+	// redirect builds outside the repository.
+	let outside = temp.path().join("escaped");
+	fs::create_dir(project.join(".cargo")).unwrap();
+	fs::write(
+		project.join(".cargo/config.toml"),
+		"[build]\ntarget-dir = \"../../../escaped\"\n",
+	)
+	.unwrap();
+	let escaped = project_command(&project, &cargo, &project.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	let stderr = String::from_utf8_lossy(&escaped.stderr);
+	assert!(!escaped.status.success(), "{stderr}");
+	assert!(stderr.contains("must stay inside"), "{stderr}");
+	assert!(stderr.contains("target_directory"), "{stderr}");
+	assert!(!outside.exists());
+}
+
+#[test]
 fn operator_target_environment_overrides_remain_supported() {
 	let temp = TempDir::new().unwrap();
 	let project = temp.path().join("project");
