@@ -1102,9 +1102,17 @@ fn resolve_build_output_dirs_from_paths(
 			"target_directory",
 			&metadata_cwd.to_string_lossy(),
 		)?;
+		let home = current_user_home();
+		let (trust_root, allow_ancestor_configs) =
+			cargo_config_trust_boundary(&normalized_cwd, &normalized_root, home.as_deref());
 		let cargo_home = resolve_cargo_home(&normalized_cwd);
-		operator_cargo_config_target(&normalized_cwd, &normalized_root, cargo_home.as_deref())
-			.is_some_and(|configured| paths_match(&configured, &normalized_target))
+		operator_cargo_config_target(
+			&normalized_cwd,
+			&trust_root,
+			allow_ancestor_configs,
+			cargo_home.as_deref(),
+		)
+		.is_some_and(|configured| paths_match(&configured, &normalized_target))
 	};
 	let target_root = if operator_target {
 		target
@@ -1374,55 +1382,49 @@ fn workspace_pattern_matches(pattern: &str, rel_posix: &str) -> Option<bool> {
 	None
 }
 
-fn config_file_sets_target_dir(path: &Path) -> bool {
-	path.is_file()
-		&& std::fs::read_to_string(path)
-			.is_ok_and(|text| text.contains("target-dir") || text.contains("target_dir"))
+fn cargo_config_dir_needs_metadata(config_dir: &Path) -> bool {
+	let Ok(dir_meta) = config_dir.symlink_metadata() else {
+		return false;
+	};
+	if is_link_like(&dir_meta) {
+		return true;
+	}
+	["config", "config.toml"]
+		.into_iter()
+		.any(|name| config_file_needs_metadata(&config_dir.join(name)))
 }
 
-fn resolve_cargo_home_dir(
-	cargo_home: Option<OsString>,
-	user_home: Option<OsString>,
-) -> Option<PathBuf> {
-	if let Some(home) = cargo_home.filter(|value| !value.is_empty()) {
-		return Some(PathBuf::from(home));
+fn config_file_needs_metadata(path: &Path) -> bool {
+	let Ok(meta) = path.symlink_metadata() else {
+		return false;
+	};
+	if !is_plain_file(&meta) {
+		return true;
 	}
-	user_home
-		.filter(|value| !value.is_empty())
-		.map(|home| PathBuf::from(home).join(".cargo"))
+	match std::fs::read_to_string(path) {
+		Ok(text) => {
+			text.contains("target-dir") || text.contains("target_dir") || text.contains("include")
+		}
+		Err(_) => true,
+	}
 }
 
-fn default_user_home() -> Option<OsString> {
-	#[cfg(windows)]
-	{
-		std::env::var_os("USERPROFILE").filter(|value| !value.is_empty())
-	}
-	#[cfg(not(windows))]
-	{
-		std::env::var_os("HOME").filter(|value| !value.is_empty())
-	}
+fn current_user_home() -> Option<PathBuf> {
+	["HOME", "USERPROFILE"]
+		.into_iter()
+		.find_map(|name| std::env::var_os(name).filter(|value| !value.is_empty()))
+		.map(PathBuf::from)
 }
 
 fn has_cargo_config_target_dir_with_home(start_dir: &Path, cargo_home: Option<&Path>) -> bool {
-	let mut current = Some(start_dir);
-	while let Some(dir) = current {
-		if [".cargo/config.toml", ".cargo/config"]
-			.into_iter()
-			.any(|name| config_file_sets_target_dir(&dir.join(name)))
-		{
-			return true;
-		}
-		current = dir.parent();
-	}
-	cargo_home.is_some_and(|home| {
-		["config.toml", "config"]
-			.into_iter()
-			.any(|name| config_file_sets_target_dir(&home.join(name)))
-	})
+	start_dir
+		.ancestors()
+		.any(|dir| cargo_config_dir_needs_metadata(&dir.join(".cargo")))
+		|| cargo_home.is_some_and(cargo_config_dir_needs_metadata)
 }
 
 fn has_cargo_config_target_dir(start_dir: &Path) -> bool {
-	let cargo_home = resolve_cargo_home_dir(std::env::var_os("CARGO_HOME"), default_user_home());
+	let cargo_home = resolve_cargo_home(start_dir);
 	has_cargo_config_target_dir_with_home(start_dir, cargo_home.as_deref())
 }
 
@@ -1433,10 +1435,11 @@ fn has_operator_target_env() -> bool {
 }
 
 fn resolve_cargo_home(metadata_cwd: &Path) -> Option<PathBuf> {
-	let user_home = ["HOME", "USERPROFILE"]
-		.into_iter()
-		.find_map(std::env::var_os);
-	resolve_cargo_home_from(metadata_cwd, std::env::var_os("CARGO_HOME"), user_home)
+	resolve_cargo_home_from(
+		metadata_cwd,
+		std::env::var_os("CARGO_HOME"),
+		current_user_home().map(PathBuf::into_os_string),
+	)
 }
 
 fn resolve_cargo_home_from(
@@ -1469,9 +1472,10 @@ enum CargoConfigTarget {
 /// Inside the repository (`in_tree == true`), any `build.target-dir`,
 /// `include`, symbolic link, or unreadable/malformed config fails closed so
 /// repository-controlled Cargo configuration cannot bypass containment.
-/// Outside the repository (`in_tree == false`), a `build.target-dir` setting
-/// represents an operator-level configuration (such as a shared worktree
-/// parent `.cargo/config.toml` or `$CARGO_HOME/config.toml`).
+/// Outside the repository (`in_tree == false`), Cargo checks `config` before
+/// `config.toml` and ignores `config.toml` when `config` exists; a
+/// `build.target-dir` setting represents an operator-level configuration (such
+/// as a shared worktree parent `.cargo/config.toml` or `$CARGO_HOME/config.toml`).
 fn read_cargo_config_target(config_dir: &Path, in_tree: bool) -> CargoConfigTarget {
 	let Ok(dir_meta) = config_dir.symlink_metadata() else {
 		return CargoConfigTarget::None;
@@ -1480,16 +1484,17 @@ fn read_cargo_config_target(config_dir: &Path, in_tree: bool) -> CargoConfigTarg
 		return CargoConfigTarget::Untrusted;
 	}
 
-	for filename in ["config.toml", "config"] {
+	for filename in ["config", "config.toml"] {
 		let config_path = config_dir.join(filename);
 		let Ok(meta) = config_path.symlink_metadata() else {
 			continue;
 		};
-		if in_tree && (is_link_like(&meta) || !meta.is_file()) {
+		if in_tree {
+			if !is_plain_file(&meta) {
+				return CargoConfigTarget::Untrusted;
+			}
+		} else if !config_path.is_file() {
 			return CargoConfigTarget::Untrusted;
-		}
-		if !in_tree && !config_path.is_file() {
-			continue;
 		}
 
 		let Some(table) = std::fs::read_to_string(&config_path)
@@ -1501,56 +1506,110 @@ fn read_cargo_config_target(config_dir: &Path, in_tree: bool) -> CargoConfigTarg
 		if in_tree && table.contains_key("include") {
 			return CargoConfigTarget::Untrusted;
 		}
-		let Some(target_dir) = table
+		if let Some(target_dir) = table
 			.get("build")
 			.and_then(toml::Value::as_table)
 			.and_then(|build| build.get("target-dir"))
-		else {
-			continue;
-		};
-		if in_tree {
-			return CargoConfigTarget::Untrusted;
+		{
+			if in_tree {
+				return CargoConfigTarget::Untrusted;
+			}
+			let Some(raw) = target_dir.as_str().filter(|value| !value.is_empty()) else {
+				return CargoConfigTarget::Untrusted;
+			};
+			let base = config_dir.parent().unwrap_or(config_dir);
+			let resolved = if Path::new(raw).is_absolute() {
+				PathBuf::from(raw)
+			} else {
+				base.join(raw)
+			};
+			return CargoConfigTarget::Configured(resolved);
 		}
-		let Some(raw) = target_dir.as_str().filter(|value| !value.is_empty()) else {
-			return CargoConfigTarget::Untrusted;
-		};
-		let base = config_dir.parent().unwrap_or(config_dir);
-		let resolved = if Path::new(raw).is_absolute() {
-			PathBuf::from(raw)
-		} else {
-			base.join(raw)
-		};
-		return CargoConfigTarget::Configured(resolved);
+		if !in_tree {
+			return CargoConfigTarget::None;
+		}
 	}
 
 	CargoConfigTarget::None
 }
 
-/// Find the winning operator-level `build.target-dir` outside `output_root`.
+/// Compute the trust boundary separating repository-controlled Cargo configs
+/// from operator-level parent configs.
 ///
-/// Mirrors Cargo's config discovery order: ancestors of `metadata_cwd` up to
-/// the filesystem root, then `cargo_home`. Any in-tree override or untrusted
-/// config stops discovery immediately and returns `None`.
-fn operator_cargo_config_target(
+/// Any enclosing non-home Git repository (for submodules or vendored repos) or
+/// enclosing non-home `Cargo.toml` workspace/package keeps its configs inside
+/// the untrusted tree. Ancestor `.cargo/config[.toml]` directories strictly
+/// above the boundary are accepted only when an enclosing non-home Git
+/// repository defines that boundary; `$CARGO_HOME` remains accepted everywhere
+/// as long as it lies outside the trust root.
+fn cargo_config_trust_boundary(
 	metadata_cwd: &Path,
 	output_root: &Path,
+	home: Option<&Path>,
+) -> (PathBuf, bool) {
+	let mut trust_root = output_root.to_path_buf();
+	let mut has_git_boundary = false;
+
+	for directory in metadata_cwd.ancestors() {
+		if home.is_some_and(|home| is_within_root(directory, home)) {
+			break;
+		}
+		let has_git = directory.join(".git").symlink_metadata().is_ok();
+		if has_git {
+			has_git_boundary = true;
+		}
+		if (has_git || directory.join("Cargo.toml").symlink_metadata().is_ok())
+			&& strip_output_root(directory, &trust_root).is_some()
+		{
+			trust_root = directory.to_path_buf();
+		}
+	}
+
+	(trust_root, has_git_boundary)
+}
+
+/// Return whether `path` sits at or below `root`, checking both normalized
+/// lexical prefixes and canonicalized targets so symlinks, platform aliases
+/// (such as macOS `/tmp` -> `/private/tmp`), and case differences cannot place
+/// an in-tree directory outside `root`.
+fn is_within_root(root: &Path, path: &Path) -> bool {
+	if strip_output_root(root, path).is_some() {
+		return true;
+	}
+
+	matches!(
+		(std::fs::canonicalize(root), std::fs::canonicalize(path)),
+		(Ok(root), Ok(path)) if strip_output_root(&root, &path).is_some()
+	)
+}
+
+/// Find the winning operator-level `build.target-dir` outside `trust_root`.
+///
+/// Mirrors Cargo's config discovery order: ancestors of `metadata_cwd` up to
+/// the filesystem root (only above `trust_root` when `allow_ancestor_configs`
+/// is true), then `cargo_home`. Any in-tree override or untrusted config stops
+/// discovery immediately and returns `None`.
+fn operator_cargo_config_target(
+	metadata_cwd: &Path,
+	trust_root: &Path,
+	allow_ancestor_configs: bool,
 	cargo_home: Option<&Path>,
 ) -> Option<PathBuf> {
-	let mut visited = Vec::new();
 	for directory in metadata_cwd.ancestors() {
+		let in_tree = strip_output_root(trust_root, directory).is_some();
+		if !in_tree && !allow_ancestor_configs {
+			break;
+		}
 		let config_dir = directory.join(".cargo");
-		let in_tree = strip_output_root(output_root, directory).is_some();
 		match read_cargo_config_target(&config_dir, in_tree) {
-			CargoConfigTarget::None => visited.push(config_dir),
+			CargoConfigTarget::None => {}
 			CargoConfigTarget::Configured(path) => return Some(path),
 			CargoConfigTarget::Untrusted => return None,
 		}
 	}
 
 	let cargo_home = cargo_home?;
-	if visited.iter().any(|dir| dir == cargo_home)
-		|| strip_output_root(output_root, cargo_home).is_some()
-	{
+	if is_within_root(trust_root, cargo_home) {
 		return None;
 	}
 
@@ -1635,29 +1694,25 @@ fn normalize_within(
 	Ok(strip_output_root(&root, &normalized).map(|relative| root.join(relative)))
 }
 
-#[cfg(not(windows))]
-fn strip_output_root<'a>(root: &Path, path: &'a Path) -> Option<&'a Path> {
-	path.strip_prefix(root).ok()
-}
-
-#[cfg(windows)]
 fn strip_output_root<'a>(root: &Path, path: &'a Path) -> Option<&'a Path> {
 	let mut components = path.components();
 
 	for root_component in root.components() {
-		let matches = match (root_component, components.next()?) {
-			(Component::Prefix(left), Component::Prefix(right)) => {
-				output_prefixes_equal(left.kind(), right.kind())
-			}
-			(left, right) => left == right,
-		};
-
-		if !matches {
+		if !output_components_equal(&root_component, &components.next()?) {
 			return None;
 		}
 	}
 
 	Some(components.as_path())
+}
+
+fn output_components_equal(left: &Component<'_>, right: &Component<'_>) -> bool {
+	#[cfg(windows)]
+	if let (Component::Prefix(left), Component::Prefix(right)) = (left, right) {
+		return output_prefixes_equal(left.kind(), right.kind());
+	}
+
+	left == right
 }
 
 /// Cargo's canonical paths use verbatim prefixes; Git reports ordinary ones.
@@ -1701,38 +1756,27 @@ fn output_containment_root(
 	cargo_workspace: Option<&Path>,
 	git_root: Option<PathBuf>,
 ) -> PathBuf {
-	let home = ["HOME", "USERPROFILE"]
-		.into_iter()
-		.find_map(std::env::var_os)
-		.map(PathBuf::from);
+	let home = current_user_home();
+	let workspace = cargo_workspace
+		.filter(|workspace| project_root.starts_with(workspace))
+		.map(Path::to_path_buf);
 
-	containment_root(
-		git_root.or_else(|| {
-			cargo_workspace
-				.filter(|workspace| project_root.starts_with(workspace))
-				.map(Path::to_path_buf)
-		}),
-		project_root,
-		home.as_deref(),
-	)
+	containment_root(git_root, workspace, project_root, home.as_deref())
 }
 
 fn containment_root(
-	discovered: Option<PathBuf>,
+	git_root: Option<PathBuf>,
+	cargo_workspace: Option<PathBuf>,
 	project_root: &Path,
 	home: Option<&Path>,
 ) -> PathBuf {
-	let Some(root) = discovered else {
-		return project_root.to_path_buf();
-	};
-
-	if let Some(home) = home
-		&& home.starts_with(&root)
-	{
-		return project_root.to_path_buf();
+	for candidate in [git_root, cargo_workspace].into_iter().flatten() {
+		if !home.is_some_and(|home| is_within_root(&candidate, home)) {
+			return candidate;
+		}
 	}
 
-	root
+	project_root.to_path_buf()
 }
 
 pub(crate) fn sanitize_git_environment(command: &mut Command) {
@@ -1861,19 +1905,48 @@ fn resolve_lint_levels(
 	Ok(levels)
 }
 
+#[cfg(any(windows, test))]
+const WINDOWS_REPARSE_POINT_ATTRIBUTE: u32 = 0x0400;
+
+#[cfg(any(windows, test))]
+const fn is_windows_link_like(is_symlink: bool, file_attributes: u32) -> bool {
+	is_symlink || (file_attributes & WINDOWS_REPARSE_POINT_ATTRIBUTE) != 0
+}
+
+#[cfg(any(windows, test))]
+const fn is_windows_plain_file(is_file: bool, is_symlink: bool, file_attributes: u32) -> bool {
+	is_file && !is_windows_link_like(is_symlink, file_attributes)
+}
+
 fn is_link_like(metadata: &std::fs::Metadata) -> bool {
 	#[cfg(windows)]
 	{
 		use std::os::windows::fs::MetadataExt;
 
-		const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
-
-		metadata.file_type().is_symlink()
-			|| metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+		is_windows_link_like(
+			metadata.file_type().is_symlink(),
+			metadata.file_attributes(),
+		)
 	}
 
 	#[cfg(not(windows))]
 	metadata.file_type().is_symlink()
+}
+
+fn is_plain_file(metadata: &std::fs::Metadata) -> bool {
+	#[cfg(windows)]
+	{
+		use std::os::windows::fs::MetadataExt;
+
+		is_windows_plain_file(
+			metadata.is_file(),
+			metadata.file_type().is_symlink(),
+			metadata.file_attributes(),
+		)
+	}
+
+	#[cfg(not(windows))]
+	metadata.is_file()
 }
 
 fn package_for_manifest<'a>(
@@ -2930,6 +3003,247 @@ mode = "overwrite"
 		));
 	}
 
+	#[cfg(unix)]
+	#[test]
+	fn anchored_config_paths_reject_symlinks_under_repository_root() {
+		use std::os::unix::fs::symlink;
+
+		let temp = TempDir::new().expect("temp dir");
+		let repo = fs::canonicalize(temp.path())
+			.expect("canonicalize temp dir")
+			.join("repo");
+		let project_dir = repo.join("programs/counter");
+		let external = temp.path().join("external");
+		write_program(&project_dir, "counter");
+		write_program(&external, "external");
+		fs::create_dir(repo.join(".git")).expect("create .git directory");
+		symlink(&external, repo.join("linked-program")).expect("link program at repo root");
+		symlink(&external, repo.join("linked-clients")).expect("link clients at repo root");
+
+		for (field, config) in [
+			(
+				"project.program",
+				"[project]\nprogram = \"{{root}}/linked-program\"\n",
+			),
+			(
+				"clients.output",
+				"[project]\nprogram = \".\"\n\n[clients]\noutput = \"{{root}}/linked-clients\"\n",
+			),
+		] {
+			fs::write(project_dir.join(CONFIG_FILE_NAME), config).expect("write config");
+			assert!(
+				matches!(
+					Project::discover(&project_dir),
+					Err(ProjectError::InvalidConfigPath { field: actual, .. }) if actual == field
+				),
+				"expected symlink rejection for {field}"
+			);
+		}
+	}
+
+	#[test]
+	fn anchor_name_validation_and_extraction_cover_allowed_characters_and_short_anchors() {
+		for valid in ["root", "x", "_leading", "my_anchor", "my-anchor", "a1_b-2"] {
+			assert!(
+				is_valid_anchor_name(valid),
+				"expected {valid:?} to be a valid anchor name"
+			);
+		}
+		for invalid in ["", "1bad", "-bad", "bad.name", "bad/name", "bad space"] {
+			assert!(
+				!is_valid_anchor_name(invalid),
+				"expected {invalid:?} to be rejected as an anchor name"
+			);
+		}
+
+		assert_eq!(extract_anchors("{{x}}/clients"), Ok(vec!["x"]));
+		assert_eq!(
+			extract_anchors("{{root}}/{{a}}/{{b}}"),
+			Ok(vec!["root", "a", "b"])
+		);
+		assert!(extract_anchors("{{root/clients").is_err());
+
+		let temp = TempDir::new().expect("temp dir");
+		let project_dir = temp.path().join("proj");
+		write_program(&project_dir, "counter");
+		fs::create_dir(temp.path().join(".git")).expect("create .git directory");
+		fs::write(
+			project_dir.join(CONFIG_FILE_NAME),
+			"[project]\nprogram = \".\"\n\n[project.paths]\nmy_sdk-1 = \"{{root}}/sdks\"\nx = \
+			 \"{{root}}/x\"\n\n[clients]\noutput = \"{{ my_sdk-1 }}\"\n\n[clients.rust]\noutput \
+			 = \"{{ x }}/rust\"\n",
+		)
+		.expect("write config");
+
+		let project = Project::discover(&project_dir).expect("discover project");
+		let root = fs::canonicalize(temp.path()).expect("canonicalize root");
+		assert_eq!(project.clients_dir, root.join("sdks"));
+		assert_eq!(
+			project.client_generation[&ClientLanguage::Rust].output,
+			root.join("x/rust")
+		);
+	}
+
+	#[test]
+	fn sanitize_git_environment_removes_static_and_dynamic_git_config_vars() {
+		const CHILD_MARKER: &str = "PINA_TEST_SANITIZE_GIT_ENV";
+
+		if std::env::var_os(CHILD_MARKER).is_some() {
+			let mut command = Command::new("git");
+			sanitize_git_environment(&mut command);
+			let removed: Vec<_> = command
+				.get_envs()
+				.filter_map(|(key, value)| value.is_none().then_some(key.to_os_string()))
+				.collect();
+			for expected in [
+				"GIT_DIR",
+				"GIT_WORK_TREE",
+				"GIT_CONFIG_COUNT",
+				"GIT_CONFIG_KEY_0",
+				"GIT_CONFIG_VALUE_0",
+			] {
+				assert!(
+					removed.iter().any(|key| key == expected),
+					"expected {expected} to be removed, got {removed:?}"
+				);
+			}
+			return;
+		}
+
+		let output = Command::new(std::env::current_exe().expect("locate test binary"))
+			.args([
+				"project::tests::sanitize_git_environment_removes_static_and_dynamic_git_config_vars",
+				"--exact",
+				"--nocapture",
+			])
+			.env(CHILD_MARKER, "1")
+			.env("GIT_DIR", "/untrusted/repository.git")
+			.env("GIT_WORK_TREE", "/untrusted/worktree")
+			.env("GIT_CONFIG_COUNT", "1")
+			.env("GIT_CONFIG_KEY_0", "user.name")
+			.env("GIT_CONFIG_VALUE_0", "Injected")
+			.output()
+			.expect("run sanitize_git_environment child test");
+
+		assert!(
+			output.status.success(),
+			"sanitize_git_environment child failed:\n{}\n{}",
+			String::from_utf8_lossy(&output.stdout),
+			String::from_utf8_lossy(&output.stderr)
+		);
+	}
+
+	#[test]
+	fn windows_link_and_plain_file_predicates_classify_reparse_points() {
+		assert!(!is_windows_link_like(false, 0));
+		assert!(!is_windows_link_like(false, 0x0020));
+		assert!(is_windows_link_like(false, WINDOWS_REPARSE_POINT_ATTRIBUTE));
+		assert!(is_windows_link_like(
+			false,
+			WINDOWS_REPARSE_POINT_ATTRIBUTE | 0x0020
+		));
+		assert!(is_windows_link_like(true, 0));
+
+		assert!(is_windows_plain_file(true, false, 0));
+		assert!(is_windows_plain_file(true, false, 0x0020));
+		assert!(!is_windows_plain_file(false, false, 0));
+		assert!(!is_windows_plain_file(
+			true,
+			false,
+			WINDOWS_REPARSE_POINT_ATTRIBUTE
+		));
+		assert!(!is_windows_plain_file(
+			false,
+			true,
+			WINDOWS_REPARSE_POINT_ATTRIBUTE
+		));
+	}
+
+	#[test]
+	fn resolve_cargo_home_reads_process_cargo_home_and_user_home() {
+		const CHILD_MODE: &str = "PINA_TEST_RESOLVE_CARGO_HOME_MODE";
+
+		if let Some(mode) = std::env::var_os(CHILD_MODE) {
+			let cwd = Path::new("/work/repo/pkg");
+			let expected = PathBuf::from(
+				std::env::var_os("PINA_TEST_EXPECTED_CARGO_HOME").expect("expected path"),
+			);
+			assert_eq!(resolve_cargo_home(cwd), Some(expected));
+			if mode == "home" {
+				let expected_home = PathBuf::from(
+					std::env::var_os("PINA_TEST_EXPECTED_USER_HOME").expect("expected user home"),
+				);
+				assert_eq!(current_user_home(), Some(expected_home));
+			}
+			return;
+		}
+
+		let temp = TempDir::new().expect("temp dir");
+		let base = fs::canonicalize(temp.path()).expect("canonicalize temp dir");
+		let custom_cargo_home = base.join("custom-cargo-home");
+		let user_home = base.join("user-home");
+		let win_home = base.join("win-home");
+		let current_exe = std::env::current_exe().expect("locate test binary");
+
+		for (mode, cargo_home, home, userprofile, expected_cargo_home, expected_user_home) in [
+			(
+				"cargo_home",
+				Some(custom_cargo_home.as_os_str()),
+				Some(user_home.as_os_str()),
+				None,
+				custom_cargo_home.clone(),
+				user_home.clone(),
+			),
+			(
+				"home",
+				None,
+				Some(user_home.as_os_str()),
+				None,
+				user_home.join(".cargo"),
+				user_home.clone(),
+			),
+			(
+				"userprofile_fallback",
+				Some(std::ffi::OsStr::new("")),
+				Some(std::ffi::OsStr::new("")),
+				Some(win_home.as_os_str()),
+				win_home.join(".cargo"),
+				win_home.clone(),
+			),
+		] {
+			let mut command = Command::new(&current_exe);
+			command
+				.args([
+					"project::tests::resolve_cargo_home_reads_process_cargo_home_and_user_home",
+					"--exact",
+					"--nocapture",
+				])
+				.env(CHILD_MODE, mode)
+				.env("PINA_TEST_EXPECTED_CARGO_HOME", &expected_cargo_home)
+				.env("PINA_TEST_EXPECTED_USER_HOME", &expected_user_home)
+				.env_remove("CARGO_HOME")
+				.env_remove("HOME")
+				.env_remove("USERPROFILE");
+			for (name, value) in [
+				("CARGO_HOME", cargo_home),
+				("HOME", home),
+				("USERPROFILE", userprofile),
+			] {
+				if let Some(value) = value {
+					command.env(name, value);
+				}
+			}
+
+			let output = command.output().expect("run resolve_cargo_home child test");
+			assert!(
+				output.status.success(),
+				"mode {mode} failed:\n{}\n{}",
+				String::from_utf8_lossy(&output.stdout),
+				String::from_utf8_lossy(&output.stderr)
+			);
+		}
+	}
+
 	#[test]
 	fn cargo_metadata_discovers_single_package_without_config() {
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp dir failed: {error}"));
@@ -3256,22 +3570,43 @@ mode = "overwrite"
 	fn containment_root_uses_the_repository_and_rejects_homes() {
 		let project = Path::new("/work/repo/program");
 		let repository = Path::new("/work/repo");
+		let workspace = Path::new("/Users/dev/ws");
+		let ws_project = Path::new("/Users/dev/ws/program");
 		let home = Path::new("/Users/dev");
 
-		assert_eq!(containment_root(None, project, None), project);
-		assert_eq!(containment_root(None, project, Some(home)), project);
+		assert_eq!(containment_root(None, None, project, None), project);
+		assert_eq!(containment_root(None, None, project, Some(home)), project);
 		assert_eq!(
-			containment_root(Some(repository.to_path_buf()), project, None),
+			containment_root(Some(repository.to_path_buf()), None, project, None),
 			repository
 		);
 		// A repository that contains the home directory would contain
-		// everything, so the project directory is the boundary instead.
+		// everything, so containment falls back to the Cargo workspace when one
+		// sits below home, and otherwise to the project directory.
 		assert_eq!(
-			containment_root(Some(home.to_path_buf()), project, Some(home)),
+			containment_root(Some(home.to_path_buf()), None, project, Some(home)),
 			project
 		);
 		assert_eq!(
-			containment_root(Some(Path::new("/").to_path_buf()), project, Some(home)),
+			containment_root(
+				Some(home.to_path_buf()),
+				Some(workspace.to_path_buf()),
+				ws_project,
+				Some(home)
+			),
+			workspace
+		);
+		assert_eq!(
+			containment_root(None, Some(home.to_path_buf()), ws_project, Some(home)),
+			ws_project
+		);
+		assert_eq!(
+			containment_root(
+				Some(Path::new("/").to_path_buf()),
+				None,
+				project,
+				Some(home)
+			),
 			project
 		);
 		// A repository beside or below the home directory contains nothing
@@ -3279,6 +3614,7 @@ mode = "overwrite"
 		assert_eq!(
 			containment_root(
 				Some(Path::new("/Users/dev/code/repo").to_path_buf()),
+				None,
 				project,
 				Some(home)
 			),
@@ -3320,6 +3656,52 @@ mode = "overwrite"
 	}
 
 	#[test]
+	fn cargo_config_trust_boundary_encloses_submodules_workspaces_and_stops_at_home() {
+		let temp = TempDir::new().unwrap();
+		let base = fs::canonicalize(temp.path()).unwrap();
+		let home = base.join("home");
+		let worktrees = home.join("worktrees");
+		let repo = worktrees.join("repo");
+		let deep = repo.join("sub/deep");
+		fs::create_dir_all(home.join(".git")).unwrap();
+		fs::create_dir_all(repo.join(".git")).unwrap();
+		fs::create_dir_all(&deep).unwrap();
+		fs::write(deep.join("Cargo.toml"), "[package]\nname = \"d\"\n").unwrap();
+
+		// Normal repo below a `git init ~` home stops before home and keeps the
+		// repository root rather than shrinking to the nested package manifest.
+		assert_eq!(
+			cargo_config_trust_boundary(&deep, &repo, Some(&home)),
+			(repo.clone(), true)
+		);
+
+		// A submodule or vendored repo inside an outer repo without a root
+		// Cargo.toml lifts the trust boundary to the outer `.git` repository.
+		let outer = worktrees.join("outer-repo");
+		let submodule = outer.join("vendor/sub");
+		fs::create_dir_all(outer.join(".git")).unwrap();
+		fs::create_dir_all(&submodule).unwrap();
+		fs::write(submodule.join(".git"), "gitdir: ../../.git/modules/sub\n").unwrap();
+		assert_eq!(
+			cargo_config_trust_boundary(&submodule, &submodule, Some(&home)),
+			(outer, true)
+		);
+
+		// A non-git workspace lifts the trust boundary to the enclosing
+		// Cargo.toml and reports no git boundary so parent configs above it are
+		// not trusted.
+		let ws = worktrees.join("unpacked-ws");
+		let member = ws.join("programs/app");
+		fs::create_dir_all(&member).unwrap();
+		fs::write(ws.join("Cargo.toml"), "[workspace]\nmembers = []\n").unwrap();
+		fs::write(member.join("Cargo.toml"), "[package]\nname = \"a\"\n").unwrap();
+		assert_eq!(
+			cargo_config_trust_boundary(&member, &member, Some(&home)),
+			(ws, false)
+		);
+	}
+
+	#[test]
 	fn operator_cargo_config_target_distinguishes_in_tree_and_out_of_tree_configs() {
 		let temp = TempDir::new().unwrap();
 		let base = fs::canonicalize(temp.path()).unwrap();
@@ -3327,9 +3709,11 @@ mode = "overwrite"
 		let repo = worktrees.join("repo");
 		let project = repo.join("project");
 		let cargo_home = base.join("cargo-home");
+		let in_tree_cargo_home = repo.join(".cargo-home");
 		fs::create_dir_all(project.join(".cargo")).unwrap();
 		fs::create_dir_all(worktrees.join(".cargo")).unwrap();
 		fs::create_dir_all(&cargo_home).unwrap();
+		fs::create_dir_all(&in_tree_cargo_home).unwrap();
 
 		// A benign in-tree config without build.target-dir or include lets the
 		// parent operator config win.
@@ -3344,14 +3728,22 @@ mode = "overwrite"
 		)
 		.unwrap();
 		assert_eq!(
-			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
 			Some(worktrees.join("../shared-target"))
 		);
 
-		// Absolute target-dir and extensionless `config` out-of-tree work too,
-		// and a non-file `config.toml` directory out-of-tree is skipped.
-		fs::remove_file(worktrees.join(".cargo/config.toml")).unwrap();
-		fs::create_dir(worktrees.join(".cargo/config.toml")).unwrap();
+		// Without a repository boundary (`allow_ancestor_configs = false`),
+		// parent ancestor configs above the trust root are not trusted, while
+		// out-of-tree `$CARGO_HOME` still works.
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, false, Some(&cargo_home)),
+			None
+		);
+
+		// Extensionless `config` takes precedence over `config.toml` out of
+		// tree, matching Cargo: if `config` sets `target-dir`, it wins even
+		// when `config.toml` exists; if `config` omits `target-dir`, Cargo
+		// ignores `config.toml` rather than falling through to it.
 		let absolute_target = base.join("abs-target");
 		fs::write(
 			worktrees.join(".cargo/config"),
@@ -3362,9 +3754,42 @@ mode = "overwrite"
 		)
 		.unwrap();
 		assert_eq!(
-			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
+			Some(absolute_target.clone())
+		);
+		fs::write(
+			worktrees.join(".cargo/config"),
+			"[alias]\ncheck-all = \"check\"\n",
+		)
+		.unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
+			None
+		);
+
+		// A non-file `config.toml` directory out-of-tree is ignored when a file
+		// `config` exists, while a non-file `config` directory fails closed.
+		fs::remove_file(worktrees.join(".cargo/config.toml")).unwrap();
+		fs::create_dir(worktrees.join(".cargo/config.toml")).unwrap();
+		fs::write(
+			worktrees.join(".cargo/config"),
+			format!(
+				"[build]\ntarget-dir = \"{}\"\n",
+				absolute_target.to_string_lossy().replace('\\', "\\\\")
+			),
+		)
+		.unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
 			Some(absolute_target)
 		);
+		fs::remove_file(worktrees.join(".cargo/config")).unwrap();
+		fs::create_dir(worktrees.join(".cargo/config")).unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
+			None
+		);
+		fs::remove_dir(worktrees.join(".cargo/config")).unwrap();
 
 		// Empty or non-string target-dir fails closed.
 		fs::write(
@@ -3373,12 +3798,13 @@ mode = "overwrite"
 		)
 		.unwrap();
 		assert_eq!(
-			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
 			None
 		);
 
-		// Falling back to CARGO_HOME when no parent sets target-dir works,
-		// unless CARGO_HOME is inside the repository or already visited.
+		// Falling back to CARGO_HOME when no parent sets target-dir works
+		// (even when `allow_ancestor_configs` is false), unless CARGO_HOME is
+		// inside the trust root.
 		fs::remove_file(worktrees.join(".cargo/config")).unwrap();
 		fs::remove_dir(worktrees.join(".cargo/config.toml")).unwrap();
 		fs::write(
@@ -3386,30 +3812,53 @@ mode = "overwrite"
 			"[build]\ntarget-dir = \"home-target\"\n",
 		)
 		.unwrap();
+		fs::write(
+			in_tree_cargo_home.join("config.toml"),
+			"[build]\ntarget-dir = \"../../escaped\"\n",
+		)
+		.unwrap();
 		assert_eq!(
-			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
 			Some(base.join("home-target"))
 		);
 		assert_eq!(
-			operator_cargo_config_target(&project, &repo, Some(&worktrees.join(".cargo"))),
+			operator_cargo_config_target(&project, &repo, false, Some(&cargo_home)),
+			Some(base.join("home-target"))
+		);
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, true, Some(&worktrees.join(".cargo"))),
 			None
 		);
 		assert_eq!(
-			operator_cargo_config_target(&project, &repo, Some(&repo.join(".cargo-home"))),
+			operator_cargo_config_target(&project, &repo, true, Some(&in_tree_cargo_home)),
 			None
 		);
-		assert_eq!(operator_cargo_config_target(&project, &repo, None), None);
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, true, None),
+			None
+		);
 		fs::remove_file(cargo_home.join("config.toml")).unwrap();
 		assert_eq!(
-			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
 			None
 		);
 
 		// Any in-tree override, include, malformed TOML, or non-file fails closed
-		// even when a valid parent operator config exists.
+		// even when a valid parent operator config or `$CARGO_HOME` exists,
+		// including when an in-tree `config` is benign and `config.toml` is not.
 		fs::write(
 			worktrees.join(".cargo/config.toml"),
 			"[build]\ntarget-dir = \"../shared-target\"\n",
+		)
+		.unwrap();
+		fs::write(
+			cargo_home.join("config.toml"),
+			"[build]\ntarget-dir = \"home-target\"\n",
+		)
+		.unwrap();
+		fs::write(
+			project.join(".cargo/config"),
+			"[alias]\ncheck = \"check\"\n",
 		)
 		.unwrap();
 		for untrusted_toml in [
@@ -3419,15 +3868,21 @@ mode = "overwrite"
 		] {
 			fs::write(project.join(".cargo/config.toml"), untrusted_toml).unwrap();
 			assert_eq!(
-				operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+				operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
 				None,
 				"in-tree config must fail closed: {untrusted_toml}"
 			);
+			assert_eq!(
+				operator_cargo_config_target(&project, &repo, false, Some(&cargo_home)),
+				None,
+				"in-tree config must fail closed without ancestor configs: {untrusted_toml}"
+			);
 		}
+		fs::remove_file(project.join(".cargo/config")).unwrap();
 		fs::remove_file(project.join(".cargo/config.toml")).unwrap();
 		fs::create_dir(project.join(".cargo/config.toml")).unwrap();
 		assert_eq!(
-			operator_cargo_config_target(&project, &repo, Some(&cargo_home)),
+			operator_cargo_config_target(&project, &repo, true, Some(&cargo_home)),
 			None
 		);
 	}
@@ -3443,9 +3898,11 @@ mode = "overwrite"
 		let repo = worktrees.join("repo");
 		let project = repo.join("project");
 		let external = base.join("external");
+		let in_tree_cargo_home = repo.join(".cargo-home");
 		fs::create_dir_all(&project).unwrap();
 		fs::create_dir_all(worktrees.join(".cargo")).unwrap();
 		fs::create_dir_all(&external).unwrap();
+		fs::create_dir_all(&in_tree_cargo_home).unwrap();
 		fs::write(
 			worktrees.join(".cargo/config.toml"),
 			"[build]\ntarget-dir = \"../shared-target\"\n",
@@ -3454,7 +3911,10 @@ mode = "overwrite"
 
 		// Symlinked in-tree `.cargo` directory fails closed.
 		symlink(&external, project.join(".cargo")).unwrap();
-		assert_eq!(operator_cargo_config_target(&project, &repo, None), None);
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, true, None),
+			None
+		);
 		fs::remove_file(project.join(".cargo")).unwrap();
 
 		// Symlinked in-tree `.cargo/config.toml` fails closed.
@@ -3465,7 +3925,26 @@ mode = "overwrite"
 			project.join(".cargo/config.toml"),
 		)
 		.unwrap();
-		assert_eq!(operator_cargo_config_target(&project, &repo, None), None);
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, true, None),
+			None
+		);
+
+		// A symlinked `CARGO_HOME` outside the repo whose target is inside the
+		// repo still fails closed via canonical containment.
+		fs::remove_file(project.join(".cargo/config.toml")).unwrap();
+		fs::remove_file(worktrees.join(".cargo/config.toml")).unwrap();
+		fs::write(
+			in_tree_cargo_home.join("config.toml"),
+			"[build]\ntarget-dir = \"../../escaped\"\n",
+		)
+		.unwrap();
+		let linked_cargo_home = base.join("linked-cargo-home");
+		symlink(&in_tree_cargo_home, &linked_cargo_home).unwrap();
+		assert_eq!(
+			operator_cargo_config_target(&project, &repo, true, Some(&linked_cargo_home)),
+			None
+		);
 
 		// `paths_match` handles lexical normalization, symlink canonicalization,
 		// mismatches, and invalid paths traversing above the root.
@@ -3559,6 +4038,46 @@ mode = "overwrite"
 		assert_eq!(fast.library_source, standalone.join("src/entry.rs"));
 		assert_eq!(fast.library_crate_types, vec!["cdylib", "lib"]);
 		assert_eq!(fast.workspace_root, standalone);
+
+		// Package without an explicit [lib] table (implicit src/lib.rs) and a
+		// package with autolib = false plus an explicit [lib] both use the fast
+		// path.
+		let implicit_lib = root.join("implicit_lib");
+		fs::create_dir_all(implicit_lib.join("src")).unwrap();
+		fs::write(implicit_lib.join("src/lib.rs"), "").unwrap();
+		fs::write(
+			implicit_lib.join("Cargo.toml"),
+			"[package]\nname = \"implicit-prog\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+		)
+		.unwrap();
+		let implicit_fast =
+			try_discover_package_fast(&implicit_lib, &implicit_lib.join("Cargo.toml"))
+				.unwrap()
+				.expect("implicit lib package should use fast path");
+		assert_eq!(implicit_fast.library_name, "implicit_prog");
+		assert_eq!(
+			implicit_fast.library_source,
+			implicit_lib.join("src/lib.rs")
+		);
+		assert_eq!(implicit_fast.library_crate_types, vec!["lib"]);
+
+		let explicit_no_autolib = root.join("explicit_no_autolib");
+		fs::create_dir_all(explicit_no_autolib.join("src")).unwrap();
+		fs::write(explicit_no_autolib.join("src/lib.rs"), "").unwrap();
+		fs::write(
+			explicit_no_autolib.join("Cargo.toml"),
+			"[package]\nname = \"explicit-prog\"\nversion = \"0.1.0\"\nautolib = false\n\n\
+			 [lib]\npath = \"src/lib.rs\"\n",
+		)
+		.unwrap();
+		assert!(
+			try_discover_package_fast(
+				&explicit_no_autolib,
+				&explicit_no_autolib.join("Cargo.toml"),
+			)
+			.unwrap()
+			.is_some()
+		);
 
 		// Package with own [workspace] uses its own directory as workspace root.
 		let own_ws = root.join("own_ws");
@@ -3771,37 +4290,29 @@ mode = "overwrite"
 			None
 		);
 
-		// Cargo home resolution checks explicit CARGO_HOME, then default `$HOME/.cargo`.
-		let custom_cargo_home = root.join("custom_cargo_home");
-		let fake_user_home = root.join("fake_user_home");
-		assert_eq!(
-			resolve_cargo_home_dir(
-				Some(custom_cargo_home.as_os_str().to_os_string()),
-				Some(fake_user_home.as_os_str().to_os_string()),
-			),
-			Some(custom_cargo_home.clone())
-		);
-		assert_eq!(
-			resolve_cargo_home_dir(
-				Some(OsString::new()),
-				Some(fake_user_home.as_os_str().to_os_string()),
-			),
-			Some(fake_user_home.join(".cargo"))
-		);
-		assert_eq!(
-			resolve_cargo_home_dir(None, Some(fake_user_home.as_os_str().to_os_string())),
-			Some(fake_user_home.join(".cargo"))
-		);
-		assert_eq!(resolve_cargo_home_dir(None, None), None);
-
-		// Default Cargo home config setting target-dir forces metadata fallback.
-		let default_cargo = fake_user_home.join(".cargo");
+		// Default Cargo home and benign vs risky config handling for the fast
+		// discovery path.
+		let default_cargo = root.join("fake_user_home/.cargo");
 		fs::create_dir_all(&default_cargo).unwrap();
 		assert!(!has_cargo_config_target_dir_with_home(
 			&standalone,
 			Some(&default_cargo)
 		));
 		assert!(!has_cargo_config_target_dir_with_home(&standalone, None));
+
+		// A benign regular config without target-dir or include keeps the fast path.
+		fs::write(
+			default_cargo.join("config.toml"),
+			"[alias]\ncheck-all = \"check\"\n",
+		)
+		.unwrap();
+		assert!(!has_cargo_config_target_dir_with_home(
+			&standalone,
+			Some(&default_cargo)
+		));
+
+		// target-dir, target_dir, include, non-UTF8, and non-file configs force
+		// fallback to `cargo metadata`.
 		fs::write(
 			default_cargo.join("config.toml"),
 			"[build]\ntarget-dir = \"/work/custom-target\"\n",
@@ -3811,7 +4322,27 @@ mode = "overwrite"
 			&standalone,
 			Some(&default_cargo)
 		));
+		fs::write(
+			default_cargo.join("config.toml"),
+			"include = [\"extra.toml\"]\n",
+		)
+		.unwrap();
+		assert!(has_cargo_config_target_dir_with_home(
+			&standalone,
+			Some(&default_cargo)
+		));
+		fs::write(default_cargo.join("config.toml"), [0xff, 0xfe]).unwrap();
+		assert!(has_cargo_config_target_dir_with_home(
+			&standalone,
+			Some(&default_cargo)
+		));
 		fs::remove_file(default_cargo.join("config.toml")).unwrap();
+		fs::create_dir(default_cargo.join("config.toml")).unwrap();
+		assert!(has_cargo_config_target_dir_with_home(
+			&standalone,
+			Some(&default_cargo)
+		));
+		fs::remove_dir(default_cargo.join("config.toml")).unwrap();
 		fs::write(
 			default_cargo.join("config"),
 			"[build]\ntarget_dir = \"/work/custom-target\"\n",
@@ -3821,5 +4352,12 @@ mode = "overwrite"
 			&standalone,
 			Some(&default_cargo)
 		));
+
+		#[cfg(unix)]
+		{
+			let linked_dir = root.join("linked-cargo-dir");
+			std::os::unix::fs::symlink(&default_cargo, &linked_dir).unwrap();
+			assert!(cargo_config_dir_needs_metadata(&linked_dir));
+		}
 	}
 }

@@ -47,44 +47,56 @@ pub(crate) fn has_untrusted_link_component(path: &Path) -> Result<bool, std::io:
 		match fs::symlink_metadata(&current) {
 			Ok(metadata) if is_untrusted_link(&metadata, alias_position) => return Ok(true),
 			// A trusted alias is traversed, so its target decides whether a
-			// miss beneath it is an ordinary absent entry.
-			Ok(metadata) if is_link_like(&metadata) => parent_is_directory = current.is_dir(),
-			Ok(metadata) => parent_is_directory = metadata.is_dir(),
+			// miss beneath it is an ordinary absent entry. Non-link entries
+			// resolve identically through `Path::is_dir`.
+			Ok(_) => parent_is_directory = current.is_dir(),
 			// Plain misses below an existing directory are not link-like.
 			// Everything else through this lookup is either a real error or a
 			// traversal into a non-directory (`ENOTDIR` on unix, `NotFound` on
 			// Windows); both normalize to one synthetic error so the reported
 			// kind is identical on every platform.
-			Err(error) => {
-				let not_found = error.kind() == std::io::ErrorKind::NotFound;
-				if not_found && parent_is_directory {
-					return Ok(false);
-				}
-				if !not_found && error.kind() != std::io::ErrorKind::NotADirectory {
-					return Err(error);
-				}
-				return Err(std::io::Error::from(std::io::ErrorKind::NotADirectory));
-			}
+			Err(error) => return classify_metadata_error(error, parent_is_directory),
 		}
 	}
 
 	Ok(false)
 }
 
+fn classify_metadata_error(
+	error: std::io::Error,
+	parent_is_directory: bool,
+) -> Result<bool, std::io::Error> {
+	match error.kind() {
+		std::io::ErrorKind::NotFound if parent_is_directory => Ok(false),
+		std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory => {
+			Err(std::io::Error::from(std::io::ErrorKind::NotADirectory))
+		}
+		_ => Err(error),
+	}
+}
+
 pub(crate) fn is_untrusted_link(metadata: &fs::Metadata, alias_position: bool) -> bool {
 	is_link_like(metadata) && !(alias_position && is_owned_by_root(metadata))
 }
 
-#[cfg(unix)]
 fn is_owned_by_root(metadata: &fs::Metadata) -> bool {
-	use std::os::unix::fs::MetadataExt as _;
+	#[cfg(unix)]
+	{
+		use std::os::unix::fs::MetadataExt as _;
 
-	metadata.uid() == 0
+		uid_is_root(metadata.uid())
+	}
+
+	#[cfg(not(unix))]
+	{
+		let _ = metadata;
+		false
+	}
 }
 
-#[cfg(not(unix))]
-fn is_owned_by_root(_metadata: &fs::Metadata) -> bool {
-	false
+#[cfg(any(unix, test))]
+const fn uid_is_root(uid: u32) -> bool {
+	uid == 0
 }
 
 pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
@@ -92,14 +104,44 @@ pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
 	{
 		use std::os::windows::fs::MetadataExt;
 
-		const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-
-		metadata.file_type().is_symlink()
-			|| metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+		is_windows_link_like(
+			metadata.file_type().is_symlink(),
+			metadata.file_attributes(),
+		)
 	}
 
 	#[cfg(not(windows))]
 	metadata.file_type().is_symlink()
+}
+
+/// Return whether `symlink_metadata` describes a regular file rather than a
+/// directory, symbolic link, or Windows reparse point.
+pub(crate) fn is_plain_file(metadata: &fs::Metadata) -> bool {
+	#[cfg(windows)]
+	{
+		use std::os::windows::fs::MetadataExt;
+
+		is_windows_plain_file(
+			metadata.file_type().is_file(),
+			metadata.file_type().is_symlink(),
+			metadata.file_attributes(),
+		)
+	}
+
+	#[cfg(not(windows))]
+	metadata.file_type().is_file()
+}
+
+#[cfg(any(windows, test))]
+const fn is_windows_link_like(is_symlink: bool, file_attributes: u32) -> bool {
+	const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+
+	is_symlink || file_attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(any(windows, test))]
+const fn is_windows_plain_file(is_file: bool, is_symlink: bool, file_attributes: u32) -> bool {
+	is_file && !is_windows_link_like(is_symlink, file_attributes)
 }
 
 #[cfg(test)]
@@ -133,21 +175,88 @@ mod tests {
 	#[test]
 	fn path_inspection_errors_are_propagated() {
 		let invalid = PathBuf::from("x".repeat(32 * 1024));
+		let error = has_untrusted_link_component(&invalid)
+			.expect_err("oversize path component must return an inspection error");
+		assert_ne!(error.kind(), std::io::ErrorKind::NotADirectory);
+	}
 
-		assert!(has_untrusted_link_component(&invalid).is_err());
+	#[test]
+	fn classify_metadata_error_normalizes_non_directory_traversals_and_preserves_other_errors() {
+		assert!(
+			!classify_metadata_error(std::io::Error::from(std::io::ErrorKind::NotFound), true)
+				.expect("missing child below directory must succeed")
+		);
+
+		let windows_not_dir =
+			classify_metadata_error(std::io::Error::from(std::io::ErrorKind::NotFound), false)
+				.expect_err("missing child below file must fail");
+		assert_eq!(windows_not_dir.kind(), std::io::ErrorKind::NotADirectory);
+
+		let unix_not_dir = classify_metadata_error(
+			std::io::Error::new(std::io::ErrorKind::NotADirectory, "os error"),
+			false,
+		)
+		.expect_err("not-a-directory lookup must fail");
+		assert_eq!(unix_not_dir.kind(), std::io::ErrorKind::NotADirectory);
+		assert_eq!(unix_not_dir.raw_os_error(), None);
+
+		let denied = classify_metadata_error(
+			std::io::Error::from(std::io::ErrorKind::PermissionDenied),
+			true,
+		)
+		.expect_err("permission errors must propagate");
+		assert_eq!(denied.kind(), std::io::ErrorKind::PermissionDenied);
 	}
 
 	#[test]
 	fn traversal_through_a_file_is_an_error_on_every_platform() {
-		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
-		let root = fs::canonicalize(temp.path())
-			.unwrap_or_else(|error| panic!("canonicalize failed: {error}"));
+		let temp = TempDir::new().expect("temp dir");
+		let root = fs::canonicalize(temp.path()).expect("canonicalize temp dir");
 		let blocked = root.join("blocked");
-		fs::write(&blocked, b"not a directory")
-			.unwrap_or_else(|error| panic!("write failed: {error}"));
+		fs::write(&blocked, b"not a directory").expect("write file");
 
-		assert!(has_untrusted_link_component(&blocked.join("migrations")).is_err());
-		assert!(has_untrusted_link_component(&blocked.join("migrations/.lock")).is_err());
+		let direct = has_untrusted_link_component(&blocked.join("migrations"))
+			.expect_err("direct child beneath file must fail");
+		assert_eq!(direct.kind(), std::io::ErrorKind::NotADirectory);
+
+		let nested = has_untrusted_link_component(&blocked.join("migrations/.lock"))
+			.expect_err("nested child beneath file must fail");
+		assert_eq!(nested.kind(), std::io::ErrorKind::NotADirectory);
+	}
+
+	#[test]
+	fn plain_file_and_windows_reparse_point_checks_distinguish_entries() {
+		let temp = TempDir::new().expect("temp dir");
+		let file = temp.path().join("ordinary.txt");
+		fs::write(&file, b"ok").expect("write file");
+		let file_metadata = fs::symlink_metadata(&file).expect("file metadata");
+		let dir_metadata = fs::symlink_metadata(temp.path()).expect("dir metadata");
+
+		assert!(is_plain_file(&file_metadata));
+		assert!(!is_plain_file(&dir_metadata));
+
+		#[cfg(unix)]
+		{
+			let link = temp.path().join("link.txt");
+			std::os::unix::fs::symlink(&file, &link).expect("create symlink");
+			let link_metadata = fs::symlink_metadata(&link).expect("link metadata");
+			assert!(!is_plain_file(&link_metadata));
+		}
+
+		assert!(!is_windows_link_like(false, 0));
+		assert!(!is_windows_link_like(false, 0x0020));
+		assert!(is_windows_link_like(false, 0x0400));
+		assert!(is_windows_link_like(false, 0x0420));
+		assert!(is_windows_link_like(true, 0));
+
+		assert!(is_windows_plain_file(true, false, 0));
+		assert!(is_windows_plain_file(true, false, 0x0020));
+		assert!(!is_windows_plain_file(true, false, 0x0400));
+		assert!(!is_windows_plain_file(true, true, 0));
+		assert!(!is_windows_plain_file(false, false, 0));
+
+		assert!(uid_is_root(0));
+		assert!(!uid_is_root(1_000));
 	}
 
 	#[cfg(unix)]
@@ -172,6 +281,7 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn only_top_level_root_owned_links_are_trusted() {
+		use std::os::unix::fs::MetadataExt as _;
 		use std::os::unix::fs::symlink;
 
 		let temp = TempDir::new().unwrap_or_else(|error| panic!("temp failed: {error}"));
@@ -183,13 +293,17 @@ mod tests {
 			fs::symlink_metadata(&link).unwrap_or_else(|error| panic!("metadata failed: {error}"));
 		let directory_metadata =
 			fs::symlink_metadata(&root).unwrap_or_else(|error| panic!("metadata failed: {error}"));
+		let root_dir_metadata = fs::symlink_metadata("/").expect("root metadata");
+
+		assert!(is_owned_by_root(&root_dir_metadata));
+		assert_eq!(is_owned_by_root(&link_metadata), link_metadata.uid() == 0);
 
 		// Below the top level every link is untrusted, whoever owns it, so a
 		// command running as root still rejects a project's own links.
 		assert!(is_untrusted_link(&link_metadata, false));
 		assert_eq!(
 			is_untrusted_link(&link_metadata, true),
-			!is_owned_by_root(&link_metadata)
+			link_metadata.uid() != 0
 		);
 		assert!(!is_untrusted_link(&directory_metadata, true));
 		assert!(!is_untrusted_link(&directory_metadata, false));
@@ -198,13 +312,15 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn system_aliases_are_trusted_only_as_ancestors() {
+		use std::os::unix::fs::MetadataExt as _;
+
 		let entries = fs::read_dir("/").unwrap_or_else(|error| panic!("read / failed: {error}"));
 		let aliases = entries
 			.map(|entry| entry.unwrap_or_else(|error| panic!("root entry failed: {error}")))
 			.map(|entry| entry.path())
 			.filter(|path| {
 				fs::symlink_metadata(path)
-					.is_ok_and(|metadata| is_link_like(&metadata) && is_owned_by_root(&metadata))
+					.is_ok_and(|metadata| is_link_like(&metadata) && metadata.uid() == 0)
 					&& path.is_dir()
 			})
 			.collect::<Vec<_>>();

@@ -1014,6 +1014,48 @@ mod tests {
 	}
 
 	#[test]
+	fn read_source_enforces_two_mib_boundary() {
+		const TWO_MIB: usize = 2_097_152;
+		let temp = tempfile::tempdir().expect("temp dir");
+		let at_limit = temp.path().join("at-limit.rs");
+		fs::write(&at_limit, vec![b'a'; TWO_MIB]).expect("write at-limit source");
+
+		let content = read_source(&at_limit).expect("2 MiB source must be embedded");
+		assert_eq!(content.len(), TWO_MIB);
+
+		let over_limit = temp.path().join("over-limit.rs");
+		let file = fs::File::create(&over_limit).expect("create over-limit source");
+		file.set_len((TWO_MIB + 1) as u64)
+			.expect("grow over-limit source");
+		assert_eq!(read_source(&over_limit), None);
+	}
+
+	#[test]
+	fn run_traced_tests_reports_non_missing_trace_directory_cleanup_failure() {
+		let temp = tempfile::tempdir().expect("temp dir");
+		write_file(
+			&temp.path().join("Cargo.toml"),
+			"[package]\nname = \"demo-program\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+		);
+		write_file(&temp.path().join("src/lib.rs"), "");
+		let project = Project::discover(temp.path()).expect("discover project");
+		let layout = TraceLayout::new(&project);
+		write_file(&layout.traces, "regular file blocking trace dir");
+
+		let error = run_traced_tests(&project, &layout, None)
+			.expect_err("non-directory trace path must fail cleanup");
+		assert!(
+			matches!(
+				&error,
+				TraceError::Prepare { path, source }
+					if path == &layout.traces
+						&& source.kind() != std::io::ErrorKind::AlreadyExists
+			),
+			"expected remove_dir_all prepare error, got {error:?}"
+		);
+	}
+
+	#[test]
 	fn layout_keeps_every_file_under_the_trace_root() {
 		let temp = tempfile::tempdir().unwrap_or_else(|error| panic!("temp dir: {error}"));
 		write_file(

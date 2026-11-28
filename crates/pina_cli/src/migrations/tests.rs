@@ -5630,3 +5630,26 @@ fn a_published_enveloped_instruction_appends_optional_accounts_in_place() {
 		1
 	);
 }
+
+#[test]
+fn manifest_version_type_reports_absent_invalid_and_configured_widths() {
+	let temp = TempDir::new().expect("temp dir");
+	assert_eq!(manifest_version_type(temp.path()), None);
+
+	let manifest_path = temp.path().join(MANIFEST_PATH);
+	std::fs::create_dir_all(manifest_path.parent().expect("manifest parent"))
+		.expect("create manifest dir");
+	std::fs::write(&manifest_path, "not valid json").expect("write invalid manifest");
+	assert_eq!(manifest_version_type(temp.path()), None);
+
+	for version_type in [MigrationVersionType::U16, MigrationVersionType::U8] {
+		let manifest =
+			MigrationManifest::new("11111111111111111111111111111111".to_owned(), version_type);
+		std::fs::write(
+			&manifest_path,
+			serde_json::to_vec_pretty(&manifest).expect("serialize manifest"),
+		)
+		.expect("write manifest");
+		assert_eq!(manifest_version_type(temp.path()), Some(version_type));
+	}
+}

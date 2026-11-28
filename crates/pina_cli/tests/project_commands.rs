@@ -631,6 +631,211 @@ fn parent_cargo_config_external_target_with_parent_segments_is_accepted_and_norm
 }
 
 #[test]
+fn cargo_home_and_user_home_external_target_configs_are_accepted_while_in_tree_cargo_home_is_rejected()
+ {
+	let temp = TempDir::new().unwrap();
+	let base = fs::canonicalize(temp.path()).unwrap();
+	let repository = base.join("repository");
+	let project = repository.join("project");
+	let cargo = fake_cargo(&base);
+	write_project(&project);
+	fs::create_dir(repository.join(".git")).unwrap();
+
+	// Explicit out-of-tree `CARGO_HOME/config.toml` is accepted.
+	let cargo_home = base.join("cargo-home");
+	let ch_target = base.join("shared-ch-target");
+	fs::create_dir(&cargo_home).unwrap();
+	fs::write(
+		cargo_home.join("config.toml"),
+		"[build]\ntarget-dir = \"shared-ch-target\"\n",
+	)
+	.unwrap();
+	let output = project_command(&project, &cargo, &project.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.env("CARGO_HOME", &cargo_home)
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(ch_target.join("idl/custom_program.json").is_file());
+
+	// Default `$HOME/.cargo/config.toml` when `CARGO_HOME` is unset is accepted.
+	let user_home = base.join("user-home");
+	let home_target = base.join("shared-home-target");
+	fs::create_dir_all(user_home.join(".cargo")).unwrap();
+	fs::write(
+		user_home.join(".cargo/config.toml"),
+		"[build]\ntarget-dir = \"../shared-home-target\"\n",
+	)
+	.unwrap();
+	let output = project_command(&project, &cargo, &project.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.env_remove("CARGO_HOME")
+		.env("HOME", &user_home)
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	assert!(
+		output.status.success(),
+		"{}",
+		String::from_utf8_lossy(&output.stderr)
+	);
+	assert!(home_target.join("idl/custom_program.json").is_file());
+
+	// In-tree `CARGO_HOME` — both direct and through an external symlink — fails closed.
+	let in_tree_cargo_home = repository.join(".cargo-home");
+	let linked_cargo_home = base.join("linked-cargo-home");
+	let escaped = base.join("escaped-ch");
+	fs::create_dir(&in_tree_cargo_home).unwrap();
+	fs::write(
+		in_tree_cargo_home.join("config.toml"),
+		"[build]\ntarget-dir = \"../escaped-ch\"\n",
+	)
+	.unwrap();
+	std::os::unix::fs::symlink(&in_tree_cargo_home, &linked_cargo_home).unwrap();
+
+	for ch in [&in_tree_cargo_home, &linked_cargo_home] {
+		let output = project_command(&project, &cargo, &project.join("target"))
+			.env_remove("CARGO_TARGET_DIR")
+			.env_remove("CARGO_BUILD_TARGET_DIR")
+			.env("CARGO_HOME", ch)
+			.args(["generate", "--client", "rust"])
+			.output()
+			.unwrap();
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		assert!(!output.status.success(), "{}: {stderr}", ch.display());
+		assert!(stderr.contains("must stay inside"), "{stderr}");
+		assert!(stderr.contains("target_directory"), "{stderr}");
+		assert!(!escaped.exists());
+	}
+}
+
+#[test]
+fn submodule_and_non_git_archive_ancestor_cargo_configs_fail_closed() {
+	let temp = TempDir::new().unwrap();
+	let base = fs::canonicalize(temp.path()).unwrap();
+	let cargo = fake_cargo(&base);
+
+	// 1. Git submodule inside an attacker-controlled superproject with `.cargo/config.toml`.
+	let superproject = base.join("superproject");
+	let submodule = superproject.join("sub");
+	let escaped_sub = base.join("escaped-submodule");
+	write_project(&submodule);
+	fs::create_dir(superproject.join(".git")).unwrap();
+	fs::write(submodule.join(".git"), "gitdir: ../.git/modules/sub\n").unwrap();
+	fs::create_dir(superproject.join(".cargo")).unwrap();
+	fs::write(
+		superproject.join(".cargo/config.toml"),
+		"[build]\ntarget-dir = \"../escaped-submodule\"\n",
+	)
+	.unwrap();
+
+	let output = project_command(&submodule, &cargo, &submodule.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.env("CARGO_HOME", base.join("empty-cargo-home"))
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success(), "{stderr}");
+	assert!(stderr.contains("must stay inside"), "{stderr}");
+	assert!(stderr.contains("target_directory"), "{stderr}");
+	assert!(!escaped_sub.exists());
+
+	// 2. Superproject Cargo workspace whose sole member is a submodule, invoked from the
+	// superproject root without `pina.toml`.
+	fs::remove_file(submodule.join("pina.toml")).unwrap();
+	fs::write(
+		superproject.join("Cargo.toml"),
+		"[workspace]\nmembers = [\"sub\"]\nresolver = \"3\"\n",
+	)
+	.unwrap();
+	let output = project_command(&superproject, &cargo, &superproject.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.env("CARGO_HOME", base.join("empty-cargo-home"))
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success(), "{stderr}");
+	assert!(stderr.contains("must stay inside"), "{stderr}");
+	assert!(stderr.contains("target_directory"), "{stderr}");
+	assert!(!escaped_sub.exists());
+
+	// 3. Unpacked non-git archive with `.cargo/config.toml` at archive root and nested crate.
+	let archive = base.join("archive");
+	let nested_app = archive.join("programs/app");
+	let escaped_archive = base.join("escaped-archive");
+	write_project(&nested_app);
+	fs::create_dir(archive.join(".cargo")).unwrap();
+	fs::write(
+		archive.join(".cargo/config.toml"),
+		"[build]\ntarget-dir = \"../escaped-archive\"\n",
+	)
+	.unwrap();
+	let output = project_command(&nested_app, &cargo, &nested_app.join("target"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.env("CARGO_HOME", base.join("empty-cargo-home"))
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success(), "{stderr}");
+	assert!(stderr.contains("must stay inside"), "{stderr}");
+	assert!(stderr.contains("target_directory"), "{stderr}");
+	assert!(!escaped_archive.exists());
+}
+
+#[test]
+fn in_tree_cargo_config_include_escape_fails_closed_without_custom_cargo_wrapper() {
+	let temp = TempDir::new().unwrap();
+	let base = fs::canonicalize(temp.path()).unwrap();
+	let repository = base.join("repository");
+	let escaped = base.join("escaped-include");
+	write_project(&repository);
+	fs::create_dir(repository.join(".git")).unwrap();
+	fs::create_dir(repository.join(".cargo")).unwrap();
+	fs::write(
+		repository.join(".cargo/config.toml"),
+		"include = [\"evil.toml\"]\n",
+	)
+	.unwrap();
+	fs::write(
+		repository.join(".cargo/evil.toml"),
+		"[build]\ntarget-dir = \"../escaped-include\"\n",
+	)
+	.unwrap();
+
+	// Use the real `cargo` binary (not a custom wrapper) so the fast discovery
+	// path is active and must still fall back to `cargo metadata` and fail closed.
+	let mut command = Command::new(env!("CARGO_BIN_EXE_pina"));
+	sanitize_git_environment(&mut command);
+	let output = command
+		.current_dir(&repository)
+		.env("CARGO", env!("CARGO"))
+		.env("CARGO_HOME", base.join("empty-cargo-home"))
+		.env_remove("CARGO_TARGET_DIR")
+		.env_remove("CARGO_BUILD_TARGET_DIR")
+		.args(["generate", "--client", "rust"])
+		.output()
+		.unwrap();
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success(), "{stderr}");
+	assert!(stderr.contains("must stay inside"), "{stderr}");
+	assert!(stderr.contains("target_directory"), "{stderr}");
+	assert!(!escaped.exists());
+}
+
+#[test]
 fn operator_target_environment_overrides_remain_supported() {
 	let temp = TempDir::new().unwrap();
 	let project = temp.path().join("project");
