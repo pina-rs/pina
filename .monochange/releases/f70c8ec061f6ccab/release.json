@@ -1,0 +1,1174 @@
+{
+	"schema_version": "0.10",
+	"kind": "monochange.releaseRecord",
+	"created_at": "2026-11-28T20:22:00Z",
+	"command": "release",
+	"version": "0.26.0",
+	"versions": {
+		"core": "0.26.0"
+	},
+	"release_targets": [
+		{
+			"id": "core",
+			"kind": "group",
+			"version": "0.26.0",
+			"version_format": "primary",
+			"tag": true,
+			"release": true,
+			"tag_name": "v0.26.0",
+			"rendered_title": "v0.26.0 (2026-11-28)",
+			"rendered_changelog_title": "[0.26.0](https://github.com/pina-rs/pina/releases/tag/v0.26.0) (2026-11-28)",
+			"members": [
+				"pina",
+				"pina_cli",
+				"pina_lints",
+				"pina_macros",
+				"pina_cli_renderer",
+				"pina_codama_renderer",
+				"pina_cpi_renderer",
+				"pina_profile",
+				"pina_sdk_ids",
+				"pina_test",
+				"pina_codama_nodes",
+				"pina_codama_renderer_cpi",
+				"pina_codama_renderer_cli",
+				"pina_cli_npm",
+				"pina_cli_darwin_arm64",
+				"pina_cli_darwin_x64",
+				"pina_cli_freebsd_x64",
+				"pina_cli_linux_arm64_gnu",
+				"pina_cli_linux_arm64_musl",
+				"pina_cli_linux_x64_gnu",
+				"pina_cli_linux_x64_musl",
+				"pina_cli_win32_arm64_msvc",
+				"pina_cli_win32_x64_msvc",
+				"pina_skill"
+			]
+		}
+	],
+	"released_packages": [
+		"@pina-rs/cli",
+		"@pina-rs/cli-darwin-arm64",
+		"@pina-rs/cli-darwin-x64",
+		"@pina-rs/cli-freebsd-x64",
+		"@pina-rs/cli-linux-arm64-gnu",
+		"@pina-rs/cli-linux-arm64-musl",
+		"@pina-rs/cli-linux-x64-gnu",
+		"@pina-rs/cli-linux-x64-musl",
+		"@pina-rs/cli-win32-arm64-msvc",
+		"@pina-rs/cli-win32-x64-msvc",
+		"@pina-rs/codama-nodes",
+		"@pina-rs/codama-renderer-cli",
+		"@pina-rs/codama-renderer-cpi",
+		"@pina-rs/skill",
+		"pina",
+		"pina_cli",
+		"pina_cli_renderer",
+		"pina_codama_renderer",
+		"pina_cpi_renderer",
+		"pina_lints",
+		"pina_macros",
+		"pina_profile",
+		"pina_sdk_ids",
+		"pina_test"
+	],
+	"changed_files": [
+		"Cargo.lock",
+		"Cargo.toml",
+		"changelog.md",
+		"crates/pina/Cargo.toml",
+		"crates/pina_cli/Cargo.toml",
+		"crates/pina_cli_renderer/Cargo.toml",
+		"crates/pina_codama_renderer/Cargo.toml",
+		"crates/pina_cpi_renderer/Cargo.toml",
+		"crates/pina_lints/Cargo.toml",
+		"crates/pina_macros/Cargo.toml",
+		"crates/pina_profile/Cargo.toml",
+		"crates/pina_sdk_ids/Cargo.toml",
+		"crates/pina_test/Cargo.toml",
+		"packages/codama-renderer-cli/package.json",
+		"packages/codama-renderer-cpi/package.json",
+		"packages/nodes-from-pina/package.json",
+		"packages/pina__cli/package.json",
+		"packages/pina__cli-darwin-arm64/package.json",
+		"packages/pina__cli-darwin-x64/package.json",
+		"packages/pina__cli-freebsd-x64/package.json",
+		"packages/pina__cli-linux-arm64-gnu/package.json",
+		"packages/pina__cli-linux-arm64-musl/package.json",
+		"packages/pina__cli-linux-x64-gnu/package.json",
+		"packages/pina__cli-linux-x64-musl/package.json",
+		"packages/pina__cli-win32-arm64-msvc/package.json",
+		"packages/pina__cli-win32-x64-msvc/package.json",
+		"packages/pina__skill/package.json",
+		"pnpm-lock.yaml"
+	],
+	"package_publications": [
+		{
+			"package": "pina",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_arm64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_darwin_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_freebsd_x64",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_arm64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_gnu",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_linux_x64_musl",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_npm",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_arm64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cli_win32_x64_msvc",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_nodes",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cli",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_codama_renderer_cpi",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_cpi_renderer",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_lints",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_macros",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_profile",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_sdk_ids",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_skill",
+			"ecosystem": "npm",
+			"registry": "npm",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			}
+		},
+		{
+			"package": "pina_test",
+			"ecosystem": "cargo",
+			"registry": "crates_io",
+			"version": "0.26.0",
+			"mode": "builtin",
+			"trusted_publishing": {
+				"enabled": true,
+				"mode": "required",
+				"repository": "pina-rs/pina",
+				"workflow": "publish.yml",
+				"environment": "publisher"
+			},
+			"timeout": {
+				"timeout_seconds": 900,
+				"retries": 2
+			}
+		}
+	],
+	"updated_changelogs": [
+		"changelog.md"
+	],
+	"deleted_changesets": [
+		".changeset/js-generated-client-contract-tests.md",
+		".changeset/loopback-deploy-identity.md",
+		".changeset/pin-opt-mut-aliasing-clamp-tests.md",
+		".changeset/pina-cli-js-client-plugin-mutants.md",
+		".changeset/pina-cli-js-codec-source-tests.md",
+		".changeset/pina-cli-project-containment-and-mutants.md"
+	],
+	"changesets": [
+		{
+			"path": ".changeset/js-generated-client-contract-tests.md",
+			"summary": "Exercise generated TypeScript client contracts",
+			"details": "Check the reserved migration instruction's account types, roles, and optional slots, and verify event parsing at the boundary between a multibyte discriminator and the version field.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c0e1d7bf16c81ff32f598c989ac6f239203f2c05",
+						"short_sha": "c0e1d7b",
+						"url": "https://github.com/pina-rs/pina/commit/c0e1d7bf16c81ff32f598c989ac6f239203f2c05",
+						"authored_at": "2026-11-28T20:21:04Z",
+						"committed_at": "2026-11-28T20:21:04Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#736",
+						"title": "test(pina_cli): add generated JS client contract and codec source tests",
+						"url": "https://github.com/pina-rs/pina/pull/736",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c0e1d7bf16c81ff32f598c989ac6f239203f2c05",
+						"short_sha": "c0e1d7b",
+						"url": "https://github.com/pina-rs/pina/commit/c0e1d7bf16c81ff32f598c989ac6f239203f2c05",
+						"authored_at": "2026-11-28T20:21:04Z",
+						"committed_at": "2026-11-28T20:21:04Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#736",
+						"title": "test(pina_cli): add generated JS client contract and codec source tests",
+						"url": "https://github.com/pina-rs/pina/pull/736",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#641",
+						"title": "Nightly mutation testing failed",
+						"url": "https://github.com/pina-rs/pina/issues/641",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/loopback-deploy-identity.md",
+			"summary": "Identify the cluster behind a loopback deploy target",
+			"details": "`pina deploy` used to treat every loopback target, `localnet` included, as local. A local target skips confirmation, `--allow-mainnet`, and the publication receipt. A loopback port can be an SSH tunnel or a proxy to a live cluster, so a deploy through a forwarded `127.0.0.1:8899` reached that cluster with none of those safeguards (SEC-13).\n\nBefore planning, Pina now asks a loopback endpoint for its genesis hash and version. A devnet, testnet, or mainnet-beta genesis hash gets that cluster's safeguards. Surfpool reports the genesis hash of the cluster it forks, but its `getVersion` answer names Surfpool and every transaction it accepts stays local, so it remains local. Any other genesis hash is a local validator. When the initial probe obtains an identity, the plan pins it: Pina asks again just before the deploy starts and stops if the genesis hash or Surfpool answer changed (an unidentified endpoint already requires confirmation and `--allow-mainnet`, without a stored identity to recheck), and publication verification requires the same genesis hash and Surfpool answer after the deploy.\n\n##### User impact\n\nDeploys to `solana-test-validator` or Surfpool work as before. Start the validator before you plan a deploy to it: an endpoint that does not answer is now treated as an unknown cluster, so the plan reports `requires_mainnet_acknowledgement: true` with a warning, and execution needs `--allow-mainnet`. A loopback port that forwards to devnet or testnet now asks for confirmation, and one that forwards to mainnet-beta also needs `--allow-mainnet`.\n\nAdd `DeployError::TargetChanged` for a loopback endpoint that answers differently at launch than at planning, and `DeploymentPlan::verify_target_unchanged` to check it. Rust callers that exhaustively match `DeployError` must handle the new variant.\n\nThe agent skill's CLI reference describes the new loopback rule.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "major",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "breaking"
+				},
+				{
+					"id": "pina_skill",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "docs"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "7e87b9a2ca4fea4eecb0f756ad73fb5657b0565f",
+						"short_sha": "7e87b9a",
+						"url": "https://github.com/pina-rs/pina/commit/7e87b9a2ca4fea4eecb0f756ad73fb5657b0565f",
+						"authored_at": "2026-11-28T04:41:46Z",
+						"committed_at": "2026-11-28T04:41:46Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#732",
+						"title": "fix(pina_cli)!: identify the cluster behind a loopback deploy target",
+						"url": "https://github.com/pina-rs/pina/pull/732",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "7e87b9a2ca4fea4eecb0f756ad73fb5657b0565f",
+						"short_sha": "7e87b9a",
+						"url": "https://github.com/pina-rs/pina/commit/7e87b9a2ca4fea4eecb0f756ad73fb5657b0565f",
+						"authored_at": "2026-11-28T04:41:46Z",
+						"committed_at": "2026-11-28T04:41:46Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#732",
+						"title": "fix(pina_cli)!: identify the cluster behind a loopback deploy target",
+						"url": "https://github.com/pina-rs/pina/pull/732",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#504",
+						"title": "Harden the CLI Host Boundary: Loopback Policy, Ledger Locking, Redirect Validation, Symlinked Ancestors, and Subprocess Timeouts",
+						"url": "https://github.com/pina-rs/pina/issues/504",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pin-opt-mut-aliasing-clamp-tests.md",
+			"summary": "Pin the 64-slot clamp in opt-mut aliasing tests",
+			"details": "Add adversarial regression tests and host benchmark coverage pinning the 64-slot clamp in `validate_opt_mut_aliasing_64` against `wrapping_shl` wrap-around on slices with 65 or more accounts. Test-only; no version bump.",
+			"targets": [
+				{
+					"id": "pina",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "e4696908e930429e89ecba352495bd272ea8c175",
+						"short_sha": "e469690",
+						"url": "https://github.com/pina-rs/pina/commit/e4696908e930429e89ecba352495bd272ea8c175",
+						"authored_at": "2026-11-27T11:29:25Z",
+						"committed_at": "2026-11-27T11:29:25Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#731",
+						"title": "test(pina): pin the 64-slot clamp in the optional-mutable aliasing validator",
+						"url": "https://github.com/pina-rs/pina/pull/731",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "e4696908e930429e89ecba352495bd272ea8c175",
+						"short_sha": "e469690",
+						"url": "https://github.com/pina-rs/pina/commit/e4696908e930429e89ecba352495bd272ea8c175",
+						"authored_at": "2026-11-27T11:29:25Z",
+						"committed_at": "2026-11-27T11:29:25Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#731",
+						"title": "test(pina): pin the 64-slot clamp in the optional-mutable aliasing validator",
+						"url": "https://github.com/pina-rs/pina/pull/731",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-cli-js-client-plugin-mutants.md",
+			"summary": "Fix JS program plugin brace offset and mutant coverage",
+			"details": "Fix an off-by-one slice offset in `patch_js_program_plugin` that swallowed the character immediately following `instructions: {`, and add focused unit tests covering single- and double-quoted generated imports, retained instructions, empty instruction maps, and repeat-call idempotency.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "ead3a5fa5a2b09ff0909011b7111a5a8145007ce",
+						"short_sha": "ead3a5f",
+						"url": "https://github.com/pina-rs/pina/commit/ead3a5fa5a2b09ff0909011b7111a5a8145007ce",
+						"authored_at": "2026-11-28T14:51:28Z",
+						"committed_at": "2026-11-28T14:51:28Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#735",
+						"title": "fix(pina_cli): fix JS program plugin brace offset and close mutant gaps",
+						"url": "https://github.com/pina-rs/pina/pull/735",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "ead3a5fa5a2b09ff0909011b7111a5a8145007ce",
+						"short_sha": "ead3a5f",
+						"url": "https://github.com/pina-rs/pina/commit/ead3a5fa5a2b09ff0909011b7111a5a8145007ce",
+						"authored_at": "2026-11-28T14:51:28Z",
+						"committed_at": "2026-11-28T14:51:28Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#735",
+						"title": "fix(pina_cli): fix JS program plugin brace offset and close mutant gaps",
+						"url": "https://github.com/pina-rs/pina/pull/735",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		},
+		{
+			"path": ".changeset/pina-cli-js-codec-source-tests.md",
+			"summary": "Cover generated JavaScript codec source selection",
+			"details": "Test source selection for generated account, instruction, type, and event modules, including directory and TypeScript extension boundaries.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "none",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "none"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c0e1d7bf16c81ff32f598c989ac6f239203f2c05",
+						"short_sha": "c0e1d7b",
+						"url": "https://github.com/pina-rs/pina/commit/c0e1d7bf16c81ff32f598c989ac6f239203f2c05",
+						"authored_at": "2026-11-28T20:21:04Z",
+						"committed_at": "2026-11-28T20:21:04Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#736",
+						"title": "test(pina_cli): add generated JS client contract and codec source tests",
+						"url": "https://github.com/pina-rs/pina/pull/736",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "c0e1d7bf16c81ff32f598c989ac6f239203f2c05",
+						"short_sha": "c0e1d7b",
+						"url": "https://github.com/pina-rs/pina/commit/c0e1d7bf16c81ff32f598c989ac6f239203f2c05",
+						"authored_at": "2026-11-28T20:21:04Z",
+						"committed_at": "2026-11-28T20:21:04Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#736",
+						"title": "test(pina_cli): add generated JS client contract and codec source tests",
+						"url": "https://github.com/pina-rs/pina/pull/736",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": [
+					{
+						"provider": "github",
+						"host": "github.com",
+						"id": "#641",
+						"title": "Nightly mutation testing failed",
+						"url": "https://github.com/pina-rs/pina/issues/641",
+						"relationship": "referenced_by_review_request"
+					}
+				]
+			}
+		},
+		{
+			"path": ".changeset/pina-cli-project-containment-and-mutants.md",
+			"summary": "Harden CLI containment, verification, and mutation coverage",
+			"details": "Fix containment escapes in `pina_cli` where repository-controlled Cargo configurations in enclosing Git superprojects/submodules, enclosing Cargo workspaces (including under `git init ~`), unpacked non-Git archives, in-tree `include` directives on the fast discovery path, and symlinked or aliased in-tree `CARGO_HOME` directories could redirect build outputs outside the repository. Match Cargo's `config`-before-`config.toml` precedence for out-of-tree operator configs, fix a wire-offset bug in `validate_transaction_wire` that skipped advancing past instruction `program_id_index`, share regular-file/reparse-point validation across CLI modules via `path_security::is_plain_file`, replace `verification::read_bounded`'s manual read loop with `Read::take` + `io::copy`, add focused behavioral tests covering all remaining nightly mutation survivors across `migrations`, `path_security`, `profile_trace`, `project`, `verification`, and `workflow`, and make `mutants-pr` fail when PR diffs introduce surviving mutants or timeouts.",
+			"targets": [
+				{
+					"id": "pina_cli",
+					"kind": "package",
+					"bump": "patch",
+					"origin": "direct-change",
+					"evidence_refs": [],
+					"change_type": "fix"
+				}
+			],
+			"context": {
+				"provider": "github",
+				"host": "github.com",
+				"capabilities": {
+					"commit_web_urls": true,
+					"actor_profiles": true,
+					"review_request_lookup": true,
+					"related_issues": true,
+					"issue_comments": true
+				},
+				"introduced": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d87f23bafdc4661d4b3f6289285f403205ea6dac",
+						"short_sha": "d87f23b",
+						"url": "https://github.com/pina-rs/pina/commit/d87f23bafdc4661d4b3f6289285f403205ea6dac",
+						"authored_at": "2026-11-28T09:49:19Z",
+						"committed_at": "2026-11-28T09:49:19Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#733",
+						"title": "fix(pina_cli): harden Cargo config containment and close nightly CLI mutant gaps",
+						"url": "https://github.com/pina-rs/pina/pull/733",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"last_updated": {
+					"actor": {
+						"provider": "github",
+						"host": "github.com",
+						"id": null,
+						"login": "ifiokjr",
+						"display_name": "ifiokjr",
+						"url": "https://github.com/ifiokjr",
+						"source": "review_request_author"
+					},
+					"commit": {
+						"provider": "github",
+						"host": "github.com",
+						"sha": "d87f23bafdc4661d4b3f6289285f403205ea6dac",
+						"short_sha": "d87f23b",
+						"url": "https://github.com/pina-rs/pina/commit/d87f23bafdc4661d4b3f6289285f403205ea6dac",
+						"authored_at": "2026-11-28T09:49:19Z",
+						"committed_at": "2026-11-28T09:49:19Z",
+						"author_name": "Ifiok Jr.",
+						"author_email": "1160934+ifiokjr@users.noreply.github.com"
+					},
+					"review_request": {
+						"provider": "github",
+						"host": "github.com",
+						"kind": "pull_request",
+						"id": "#733",
+						"title": "fix(pina_cli): harden Cargo config containment and close nightly CLI mutant gaps",
+						"url": "https://github.com/pina-rs/pina/pull/733",
+						"author": {
+							"provider": "github",
+							"host": "github.com",
+							"id": null,
+							"login": "ifiokjr",
+							"display_name": "ifiokjr",
+							"url": "https://github.com/ifiokjr",
+							"source": "review_request_author"
+						}
+					}
+				},
+				"related_issues": []
+			}
+		}
+	],
+	"changelogs": [
+		{
+			"owner_id": "core",
+			"owner_kind": "group",
+			"output": "default",
+			"stream": "default",
+			"path": "changelog.md",
+			"format": "keep_a_changelog",
+			"notes": {
+				"title": "[0.26.0](https://github.com/pina-rs/pina/releases/tag/v0.26.0) (2026-11-28)",
+				"summary": [
+					"Grouped release for `core`."
+				],
+				"sections": [
+					{
+						"title": "Breaking Changes",
+						"collapsed": false,
+						"entries": [
+							"#### Identify the cluster behind a loopback deploy target\n\n_Packages:_ 🔴 _pina_cli_, ⚪ _pina_skill_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #732](https://github.com/pina-rs/pina/pull/732) · _Related issues:_ [#504](https://github.com/pina-rs/pina/issues/504)\n\n`pina deploy` used to treat every loopback target, `localnet` included, as local. A local target skips confirmation, `--allow-mainnet`, and the publication receipt. A loopback port can be an SSH tunnel or a proxy to a live cluster, so a deploy through a forwarded `127.0.0.1:8899` reached that cluster with none of those safeguards (SEC-13).\n\nBefore planning, Pina now asks a loopback endpoint for its genesis hash and version. A devnet, testnet, or mainnet-beta genesis hash gets that cluster's safeguards. Surfpool reports the genesis hash of the cluster it forks, but its `getVersion` answer names Surfpool and every transaction it accepts stays local, so it remains local. Any other genesis hash is a local validator. When the initial probe obtains an identity, the plan pins it: Pina asks again just before the deploy starts and stops if the genesis hash or Surfpool answer changed (an unidentified endpoint already requires confirmation and `--allow-mainnet`, without a stored identity to recheck), and publication verification requires the same genesis hash and Surfpool answer after the deploy.\n\n##### User impact\n\nDeploys to `solana-test-validator` or Surfpool work as before. Start the validator before you plan a deploy to it: an endpoint that does not answer is now treated as an unknown cluster, so the plan reports `requires_mainnet_acknowledgement: true` with a warning, and execution needs `--allow-mainnet`. A loopback port that forwards to devnet or testnet now asks for confirmation, and one that forwards to mainnet-beta also needs `--allow-mainnet`.\n\nAdd `DeployError::TargetChanged` for a loopback endpoint that answers differently at launch than at planning, and `DeploymentPlan::verify_target_unchanged` to check it. Rust callers that exhaustively match `DeployError` must handle the new variant.\n\nThe agent skill's CLI reference describes the new loopback rule."
+						]
+					},
+					{
+						"title": "Fixes",
+						"collapsed": false,
+						"entries": [
+							"- **Fix JS program plugin brace offset and mutant coverage.** Fix an off-by-one slice offset in `patch_js_program_plugin` that swallowed the character immediately following `instructions: {`, and add focused unit tests covering single- and double-quoted generated imports, retained instructions, empty instruction maps, and repeat-call idempotency.\n  _Packages:_ 🟢 _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #735](https://github.com/pina-rs/pina/pull/735)",
+							"#### Harden CLI containment, verification, and mutation coverage\n\n_Packages:_ 🟢 _pina_cli_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #733](https://github.com/pina-rs/pina/pull/733)\n\nFix containment escapes in `pina_cli` where repository-controlled Cargo configurations in enclosing Git superprojects/submodules, enclosing Cargo workspaces (including under `git init ~`), unpacked non-Git archives, in-tree `include` directives on the fast discovery path, and symlinked or aliased in-tree `CARGO_HOME` directories could redirect build outputs outside the repository. Match Cargo's `config`-before-`config.toml` precedence for out-of-tree operator configs, fix a wire-offset bug in `validate_transaction_wire` that skipped advancing past instruction `program_id_index`, share regular-file/reparse-point validation across CLI modules via `path_security::is_plain_file`, replace `verification::read_bounded`'s manual read loop with `Read::take` + `io::copy`, add focused behavioral tests covering all remaining nightly mutation survivors across `migrations`, `path_security`, `profile_trace`, `project`, `verification`, and `workflow`, and make `mutants-pr` fail when PR diffs introduce surviving mutants or timeouts."
+						]
+					},
+					{
+						"title": "Notes",
+						"collapsed": false,
+						"entries": [
+							"- **Pin the 64-slot clamp in opt-mut aliasing tests.** Add adversarial regression tests and host benchmark coverage pinning the 64-slot clamp in `validate_opt_mut_aliasing_64` against `wrapping_shl` wrap-around on slices with 65 or more accounts. Test-only; no version bump.\n  _Packages:_ ⚪ _pina_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #731](https://github.com/pina-rs/pina/pull/731)",
+							"#### Exercise generated TypeScript client contracts\n\n_Packages:_ ⚪ _pina_cli_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #736](https://github.com/pina-rs/pina/pull/736) · _Related issues:_ [#641](https://github.com/pina-rs/pina/issues/641)\n\nCheck the reserved migration instruction's account types, roles, and optional slots, and verify event parsing at the boundary between a multibyte discriminator and the version field.",
+							"- **Cover generated JavaScript codec source selection.** Test source selection for generated account, instruction, type, and event modules, including directory and TypeScript extension boundaries.\n  _Packages:_ ⚪ _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #736](https://github.com/pina-rs/pina/pull/736) · _Related issues:_ [#641](https://github.com/pina-rs/pina/issues/641)"
+						]
+					}
+				]
+			},
+			"rendered": "## [0.26.0](https://github.com/pina-rs/pina/releases/tag/v0.26.0) (2026-11-28)\n\nGrouped release for `core`.\n\n### Breaking Changes\n\n#### Identify the cluster behind a loopback deploy target\n\n_Packages:_ 🔴 _pina_cli_, ⚪ _pina_skill_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #732](https://github.com/pina-rs/pina/pull/732) · _Related issues:_ [#504](https://github.com/pina-rs/pina/issues/504)\n\n`pina deploy` used to treat every loopback target, `localnet` included, as local. A local target skips confirmation, `--allow-mainnet`, and the publication receipt. A loopback port can be an SSH tunnel or a proxy to a live cluster, so a deploy through a forwarded `127.0.0.1:8899` reached that cluster with none of those safeguards (SEC-13).\n\nBefore planning, Pina now asks a loopback endpoint for its genesis hash and version. A devnet, testnet, or mainnet-beta genesis hash gets that cluster's safeguards. Surfpool reports the genesis hash of the cluster it forks, but its `getVersion` answer names Surfpool and every transaction it accepts stays local, so it remains local. Any other genesis hash is a local validator. When the initial probe obtains an identity, the plan pins it: Pina asks again just before the deploy starts and stops if the genesis hash or Surfpool answer changed (an unidentified endpoint already requires confirmation and `--allow-mainnet`, without a stored identity to recheck), and publication verification requires the same genesis hash and Surfpool answer after the deploy.\n\n##### User impact\n\nDeploys to `solana-test-validator` or Surfpool work as before. Start the validator before you plan a deploy to it: an endpoint that does not answer is now treated as an unknown cluster, so the plan reports `requires_mainnet_acknowledgement: true` with a warning, and execution needs `--allow-mainnet`. A loopback port that forwards to devnet or testnet now asks for confirmation, and one that forwards to mainnet-beta also needs `--allow-mainnet`.\n\nAdd `DeployError::TargetChanged` for a loopback endpoint that answers differently at launch than at planning, and `DeploymentPlan::verify_target_unchanged` to check it. Rust callers that exhaustively match `DeployError` must handle the new variant.\n\nThe agent skill's CLI reference describes the new loopback rule.\n\n### Fixes\n\n- **Fix JS program plugin brace offset and mutant coverage.** Fix an off-by-one slice offset in `patch_js_program_plugin` that swallowed the character immediately following `instructions: {`, and add focused unit tests covering single- and double-quoted generated imports, retained instructions, empty instruction maps, and repeat-call idempotency.\n  _Packages:_ 🟢 _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #735](https://github.com/pina-rs/pina/pull/735)\n#### Harden CLI containment, verification, and mutation coverage\n\n_Packages:_ 🟢 _pina_cli_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #733](https://github.com/pina-rs/pina/pull/733)\n\nFix containment escapes in `pina_cli` where repository-controlled Cargo configurations in enclosing Git superprojects/submodules, enclosing Cargo workspaces (including under `git init ~`), unpacked non-Git archives, in-tree `include` directives on the fast discovery path, and symlinked or aliased in-tree `CARGO_HOME` directories could redirect build outputs outside the repository. Match Cargo's `config`-before-`config.toml` precedence for out-of-tree operator configs, fix a wire-offset bug in `validate_transaction_wire` that skipped advancing past instruction `program_id_index`, share regular-file/reparse-point validation across CLI modules via `path_security::is_plain_file`, replace `verification::read_bounded`'s manual read loop with `Read::take` + `io::copy`, add focused behavioral tests covering all remaining nightly mutation survivors across `migrations`, `path_security`, `profile_trace`, `project`, `verification`, and `workflow`, and make `mutants-pr` fail when PR diffs introduce surviving mutants or timeouts.\n\n### Notes\n\n- **Pin the 64-slot clamp in opt-mut aliasing tests.** Add adversarial regression tests and host benchmark coverage pinning the 64-slot clamp in `validate_opt_mut_aliasing_64` against `wrapping_shl` wrap-around on slices with 65 or more accounts. Test-only; no version bump.\n  _Packages:_ ⚪ _pina_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #731](https://github.com/pina-rs/pina/pull/731)\n#### Exercise generated TypeScript client contracts\n\n_Packages:_ ⚪ _pina_cli_\n\n_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #736](https://github.com/pina-rs/pina/pull/736) · _Related issues:_ [#641](https://github.com/pina-rs/pina/issues/641)\n\nCheck the reserved migration instruction's account types, roles, and optional slots, and verify event parsing at the boundary between a multibyte discriminator and the version field.\n\n- **Cover generated JavaScript codec source selection.** Test source selection for generated account, instruction, type, and event modules, including directory and TypeScript extension boundaries.\n  _Packages:_ ⚪ _pina_cli_\n  _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #736](https://github.com/pina-rs/pina/pull/736) · _Related issues:_ [#641](https://github.com/pina-rs/pina/issues/641)"
+		}
+	],
+	"provider": {
+		"kind": "github",
+		"owner": "pina-rs",
+		"repo": "pina",
+		"host": null
+	}
+}

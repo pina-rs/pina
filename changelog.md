@@ -4,6 +4,56 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [0.26.0](https://github.com/pina-rs/pina/releases/tag/v0.26.0) (2026-11-28)
+
+Grouped release for `core`.
+
+### Breaking Changes
+
+#### Identify the cluster behind a loopback deploy target
+
+_Packages:_ 🔴 _pina_cli_, ⚪ _pina_skill_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #732](https://github.com/pina-rs/pina/pull/732) · _Related issues:_ [#504](https://github.com/pina-rs/pina/issues/504)
+
+`pina deploy` used to treat every loopback target, `localnet` included, as local. A local target skips confirmation, `--allow-mainnet`, and the publication receipt. A loopback port can be an SSH tunnel or a proxy to a live cluster, so a deploy through a forwarded `127.0.0.1:8899` reached that cluster with none of those safeguards (SEC-13).
+
+Before planning, Pina now asks a loopback endpoint for its genesis hash and version. A devnet, testnet, or mainnet-beta genesis hash gets that cluster's safeguards. Surfpool reports the genesis hash of the cluster it forks, but its `getVersion` answer names Surfpool and every transaction it accepts stays local, so it remains local. Any other genesis hash is a local validator. When the initial probe obtains an identity, the plan pins it: Pina asks again just before the deploy starts and stops if the genesis hash or Surfpool answer changed (an unidentified endpoint already requires confirmation and `--allow-mainnet`, without a stored identity to recheck), and publication verification requires the same genesis hash and Surfpool answer after the deploy.
+
+##### User impact
+
+Deploys to `solana-test-validator` or Surfpool work as before. Start the validator before you plan a deploy to it: an endpoint that does not answer is now treated as an unknown cluster, so the plan reports `requires_mainnet_acknowledgement: true` with a warning, and execution needs `--allow-mainnet`. A loopback port that forwards to devnet or testnet now asks for confirmation, and one that forwards to mainnet-beta also needs `--allow-mainnet`.
+
+Add `DeployError::TargetChanged` for a loopback endpoint that answers differently at launch than at planning, and `DeploymentPlan::verify_target_unchanged` to check it. Rust callers that exhaustively match `DeployError` must handle the new variant.
+
+The agent skill's CLI reference describes the new loopback rule.
+
+### Fixes
+
+- **Fix JS program plugin brace offset and mutant coverage.** Fix an off-by-one slice offset in `patch_js_program_plugin` that swallowed the character immediately following `instructions: {`, and add focused unit tests covering single- and double-quoted generated imports, retained instructions, empty instruction maps, and repeat-call idempotency. _Packages:_ 🟢 _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #735](https://github.com/pina-rs/pina/pull/735)
+
+#### Harden CLI containment, verification, and mutation coverage
+
+_Packages:_ 🟢 _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #733](https://github.com/pina-rs/pina/pull/733)
+
+Fix containment escapes in `pina_cli` where repository-controlled Cargo configurations in enclosing Git superprojects/submodules, enclosing Cargo workspaces (including under `git init ~`), unpacked non-Git archives, in-tree `include` directives on the fast discovery path, and symlinked or aliased in-tree `CARGO_HOME` directories could redirect build outputs outside the repository. Match Cargo's `config`-before-`config.toml` precedence for out-of-tree operator configs, fix a wire-offset bug in `validate_transaction_wire` that skipped advancing past instruction `program_id_index`, share regular-file/reparse-point validation across CLI modules via `path_security::is_plain_file`, replace `verification::read_bounded`'s manual read loop with `Read::take` + `io::copy`, add focused behavioral tests covering all remaining nightly mutation survivors across `migrations`, `path_security`, `profile_trace`, `project`, `verification`, and `workflow`, and make `mutants-pr` fail when PR diffs introduce surviving mutants or timeouts.
+
+### Notes
+
+- **Pin the 64-slot clamp in opt-mut aliasing tests.** Add adversarial regression tests and host benchmark coverage pinning the 64-slot clamp in `validate_opt_mut_aliasing_64` against `wrapping_shl` wrap-around on slices with 65 or more accounts. Test-only; no version bump. _Packages:_ ⚪ _pina_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #731](https://github.com/pina-rs/pina/pull/731)
+
+#### Exercise generated TypeScript client contracts
+
+_Packages:_ ⚪ _pina_cli_
+
+_Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #736](https://github.com/pina-rs/pina/pull/736) · _Related issues:_ [#641](https://github.com/pina-rs/pina/issues/641)
+
+Check the reserved migration instruction's account types, roles, and optional slots, and verify event parsing at the boundary between a multibyte discriminator and the version field.
+
+- **Cover generated JavaScript codec source selection.** Test source selection for generated account, instruction, type, and event modules, including directory and TypeScript extension boundaries. _Packages:_ ⚪ _pina_cli_ _Owner:_ [@ifiokjr](https://github.com/ifiokjr) · _Review:_ [PR #736](https://github.com/pina-rs/pina/pull/736) · _Related issues:_ [#641](https://github.com/pina-rs/pina/issues/641)
+
 ## [0.25.1](https://github.com/pina-rs/pina/releases/tag/v0.25.1) (2026-11-27)
 
 Grouped release for `core`.
