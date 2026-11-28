@@ -1124,6 +1124,57 @@ mod tests {
 	use super::*;
 
 	#[test]
+	fn selects_generated_typescript_codec_sources() {
+		let generated = Path::new("src").join("generated");
+
+		for (directory, file) in [
+			("accounts", "journal.ts"),
+			("instructions", "initialize.ts"),
+			("types", "index.ts"),
+			("events", "myEvent.ts"),
+		] {
+			let path = generated.join(directory).join(file);
+			assert!(is_codec_source(&path), "expected to select {path:?}");
+		}
+	}
+
+	#[test]
+	fn skips_paths_outside_codec_directories() {
+		let generated = Path::new("src").join("generated");
+
+		for path in [
+			generated.join("programs").join("eventsProgram.ts"),
+			generated.join("accountsBackup").join("journal.ts"),
+			generated.join("old-accounts").join("journal.ts"),
+			generated.join("Accounts").join("journal.ts"),
+			generated
+				.join("accounts")
+				.join("archive")
+				.join("journal.ts"),
+			generated.join("pinaPodCodecs.ts"),
+			Path::new("journal.ts").to_path_buf(),
+		] {
+			assert!(!is_codec_source(&path), "expected to skip {path:?}");
+		}
+	}
+
+	#[test]
+	fn skips_codec_paths_without_the_ts_extension() {
+		let accounts = Path::new("src").join("generated").join("accounts");
+
+		for file in [
+			"journal",
+			".ts",
+			"journal.TS",
+			"journal.mts",
+			"journal.ts.bak",
+		] {
+			let path = accounts.join(file);
+			assert!(!is_codec_source(&path), "expected to skip {path:?}");
+		}
+	}
+
+	#[test]
 	fn event_log_emission_failures_propagate() {
 		let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
 		let idl = workspace.join("codama/idls/events_program.json");
