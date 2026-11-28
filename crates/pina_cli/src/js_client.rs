@@ -1474,6 +1474,141 @@ const decoder = getStructDecoder([
 	}
 
 	#[test]
+	fn program_plugin_patch_registers_migrate_for_single_and_double_quoted_imports() {
+		let raw_single_quoted = concat!(
+			"import { getInitializeInstruction, type InitializeInput } from '../instructions';\n",
+			"import { findStatePda } from '../pdas';\n",
+			"\n",
+			"export function demoProgram() {\n",
+			"\treturn extendClient(client, {\n",
+			"\t\tdemo: {\n",
+			"\t\t\taccounts: { state: addSelfFetchFunctions(client, getStateCodec()) },\n",
+			"\t\t\tinstructions: { initialize: (input: InitializeInput) => \
+			 addSelfPlanAndSendFunctions(client, getInitializeInstruction(input)) },\n",
+			"\t\t},\n",
+			"\t});\n",
+			"}\n",
+		);
+		let formatted_double_quoted = concat!(
+			"import {\n",
+			"\tgetInitializeInstructionAsync,\n",
+			"\ttype InitializeAsyncInput,\n",
+			"} from \"../instructions\";\n",
+			"import { findJournalPda } from \"../pdas\";\n",
+			"\n",
+			"export function demoProgram() {\n",
+			"\treturn extendClient(client, {\n",
+			"\t\tdemo: {\n",
+			"\t\t\taccounts: { journal: addSelfFetchFunctions(client, getJournalCodec()) },\n",
+			"\t\t\tinstructions: {\n",
+			"\t\t\t\tinitialize: (input: InitializeAsyncInput) =>\n",
+			"\t\t\t\t\taddSelfPlanAndSendFunctions(client, getInitializeInstructionAsync(input)),\n",
+			"\t\t\t},\n",
+			"\t\t},\n",
+			"\t});\n",
+			"}\n",
+		);
+
+		let cases = [
+			(
+				raw_single_quoted,
+				"import { getInitializeInstruction, type InitializeInput } from '../instructions';",
+				"import { findStatePda } from '../pdas';",
+				"accounts: { state: addSelfFetchFunctions(client, getStateCodec()) },",
+				"getMigrateInstruction(input)), initialize: (input: InitializeInput) =>",
+			),
+			(
+				formatted_double_quoted,
+				"} from \"../instructions\";",
+				"import { findJournalPda } from \"../pdas\";",
+				"accounts: { journal: addSelfFetchFunctions(client, getJournalCodec()) },",
+				"getMigrateInstruction(input)),\n\t\t\t\tinitialize: (input: InitializeAsyncInput) =>",
+			),
+		];
+
+		for (
+			source,
+			retained_import,
+			retained_following_import,
+			retained_accounts,
+			retained_instruction_boundary,
+		) in cases
+		{
+			let patched = patch_js_program_plugin(source)
+				.expect("unpatched program plugin should be patched");
+
+			assert!(
+				patched.contains(&format!(
+					"{retained_import}\nimport {{ getMigrateInstruction, type MigrateInput }} from \
+					 \"../instructions\";\n\n{retained_following_import}"
+				)),
+				"expected retained instructions import followed by Migrate import:\n{patched}"
+			);
+			assert!(
+				patched.contains(retained_accounts),
+				"expected accounts block to remain intact:\n{patched}"
+			);
+			assert!(
+				patched.contains(concat!(
+					"instructions: {\n",
+					"\t\t\tmigrate: (input: MigrateInput) =>\n",
+					"\t\t\t\taddSelfPlanAndSendFunctions(client, getMigrateInstruction(input)),",
+				)),
+				"expected migrate arm directly inside instructions map:\n{patched}"
+			);
+			assert!(
+				patched.contains(retained_instruction_boundary),
+				"expected existing instruction retained cleanly after migrate arm:\n{patched}"
+			);
+
+			let instructions_open = patched
+				.find("instructions: {")
+				.expect("instructions map must remain present");
+			let migrate_arm = patched
+				.find("migrate: (input: MigrateInput) =>")
+				.expect("migrate arm must be registered");
+			let existing_arm = patched
+				.find("initialize:")
+				.expect("existing instruction must remain registered");
+			assert!(instructions_open < migrate_arm && migrate_arm < existing_arm);
+
+			// Repeat application is idempotent and returns None.
+			assert_eq!(patch_js_program_plugin(&patched), None);
+		}
+	}
+
+	#[test]
+	fn program_plugin_patch_handles_empty_instruction_map_and_non_matching_plugins() {
+		let empty_instructions = concat!(
+			"import { type Unused } from \"../instructions\";\n",
+			"export const plugin = { instructions: {} };\n",
+		);
+		let patched = patch_js_program_plugin(empty_instructions)
+			.expect("empty instructions map should still register migrate inside braces");
+		let migrate_arm = patched
+			.find("getMigrateInstruction(input)),")
+			.expect("migrate arm must be inserted");
+		let closing_brace = patched[migrate_arm..]
+			.find('}')
+			.expect("closing brace must follow migrate arm");
+		assert!(closing_brace > 0);
+		assert_eq!(patch_js_program_plugin(&patched), None);
+
+		let without_instructions_import = "export const plugin = { instructions: {} };\n";
+		assert_eq!(patch_js_program_plugin(without_instructions_import), None);
+
+		let without_semicolon = "import { getInit } from \"../instructions\"\nexport const plugin = { instructions: {} }\n";
+		assert_eq!(patch_js_program_plugin(without_semicolon), None);
+
+		let semicolon_after_instructions = "import { getInit } from \"../instructions\"\nexport const plugin = { instructions: {} };\n";
+		assert_eq!(patch_js_program_plugin(semicolon_after_instructions), None);
+
+		let without_instructions_map =
+			"import { getInit } from \"../instructions\";\nexport const x = 1;\n";
+		assert_eq!(patch_js_program_plugin(without_instructions_map), None);
+	}
+
+	#[test]
 	fn leaves_non_codec_sources_unchanged() {
 		let source = "export const value = 1;\n";
 		assert_eq!(harden_codec_source(source), source);
@@ -1719,7 +1854,8 @@ fn patch_js_program_plugin(plugin: &str) -> Option<String> {
 	let import = "\nimport { getMigrateInstruction, type MigrateInput } from \"../instructions\";";
 
 	let marker = plugin.find("instructions: {")?;
-	let brace = marker + "instructions: {".len();
+	let after_brace = marker + "instructions: {".len();
+	let between = plugin.get(statement_end..after_brace)?;
 	// Fixed relative indentation: the raw generator output places
 	// `instructions: {` mid-line, so the arm carries its own leading newline
 	// and the formatter normalizes the result.
@@ -1730,9 +1866,9 @@ fn patch_js_program_plugin(plugin: &str) -> Option<String> {
 	patched.push_str(&plugin[..statement_end]);
 	patched.push_str(import);
 	patched.push('\n');
-	patched.push_str(&plugin[statement_end..=brace]);
+	patched.push_str(between);
 	patched.push_str(arm);
-	patched.push_str(&plugin[brace + 1..]);
+	patched.push_str(&plugin[after_brace..]);
 	Some(patched)
 }
 
