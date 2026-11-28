@@ -39,7 +39,7 @@ With `--dry-run`, a rehearsal reports what the deployment would do and exits wit
 
 ## Safe planning
 
-Review a deployment without building, contacting an RPC endpoint (unless `--rehearse` replays its traffic), or invoking the Solana CLI:
+Review a deployment without building or invoking the Solana CLI. A dry run contacts an RPC endpoint only to identify a loopback target (see [Targets and confirmation](#targets-and-confirmation)) and when `--rehearse` replays its traffic:
 
 ```bash
 pina deploy \
@@ -89,9 +89,16 @@ One explicit target is required:
 
 Custom endpoints reject URL user information, query parameters, and fragments. The Solana CLI accepts its RPC endpoint through `--url`, so every accepted host and path is visible in the dry-run plan, confirmation, and operating-system process listings. Pina cannot distinguish a provider token embedded in a path from a legitimate endpoint path. Never put a secret anywhere in a custom URL; prefer a named cluster when possible.
 
-Local endpoints execute after displaying the plan. Every remote endpoint prompts the operator to type `deploy`. Non-interactive remote deployment fails before starting a child process unless `--yes` is supplied. Named mainnet and every custom remote endpoint additionally require `--allow-mainnet`, because Pina cannot prove which Solana cluster an arbitrary URL serves. The flag is rejected for localnet, devnet, testnet, and custom loopback endpoints.
+Local endpoints execute after displaying the plan. Every other endpoint prompts the operator to type `deploy`. Non-interactive deployment to it fails before starting a child process unless `--yes` is supplied. Named mainnet, every custom remote endpoint, and a loopback endpoint Pina cannot identify additionally require `--allow-mainnet`, because Pina cannot prove which Solana cluster they serve. The flag is rejected for every other target.
 
-Local means the parsed host is a loopback address (`localhost`, `127.0.0.0/8`, or `[::1]`), so spellings such as `localhost.example.com`, `127.0.0.1.nip.io`, or `http://127.0.0.1@example.com` are classified as remote or rejected. A loopback port is still not proof of a local cluster: an SSH tunnel or proxy that forwards `127.0.0.1:8899` to a live cluster would skip confirmation and record no publication receipt. Deploy to a forwarded cluster through its real URL instead.
+A loopback endpoint is `localnet` or a URL whose parsed host is a loopback address (`localhost`, `127.0.0.0/8`, or `[::1]`), so spellings such as `localhost.example.com`, `127.0.0.1.nip.io`, or `http://127.0.0.1@example.com` are classified as remote or rejected. A loopback port is not proof of a local cluster, because an SSH tunnel or proxy can forward it to a live one. So before planning, Pina asks a loopback endpoint for its genesis hash (`getGenesisHash`) and version (`getVersion`), and the answer decides its safeguards:
+
+- An endpoint that reports the devnet, testnet, or mainnet-beta genesis hash gets that cluster's safeguards, and the plan warns that it is not a local validator.
+- Surfpool reports the genesis hash of the cluster it forks, but it runs every transaction locally. Its `getVersion` answer carries a `surfnet-version`, so a Surfpool endpoint is local whatever genesis hash it reports.
+- Any other genesis hash, such as the one `solana-test-validator` creates, belongs to a local validator.
+- An endpoint that does not answer both requests, or answers with an invalid hash, is treated as an unknown cluster that may be mainnet, and the plan says why. Start the validator before deploying to it.
+
+The plan pins any genesis hash and Surfpool answer it received. A rehearsal or a confirmation prompt can take minutes, so when the initial probe obtained an identity, Pina asks again right before it reserves publication and starts the deploy program, stopping if the genesis hash or Surfpool answer changed. (If the initial probe failed to obtain an identity, the endpoint already requires confirmation and `--allow-mainnet`, and Pina does not recheck before launch.) Publication verification asks once more before and after it reads the deployed accounts. The probe catches a forwarded port, not a hostile endpoint: whatever listens on the port can answer anything.
 
 ## Build and external requirements
 
@@ -119,7 +126,7 @@ Quote the variables inside the command (`"$PINA_DEPLOY_PAYER"`), and treat an ex
 
 ## Migration publication receipts
 
-For a program with checked-in migrations, a deployment to any non-loopback target freezes the ABI versions it ships. Before starting the deploy program, Pina writes a pending record to `migrations/publications.json`; after the program succeeds, it appends that record as a receipt pinning the schema of every version it shipped. From then on `pina migrations create` advances those contracts to a new version instead of rewriting them. `--record-publication` opts a loopback deployment into the same lifecycle, which is how a Surfpool run exercises it.
+For a program with checked-in migrations, a deployment to any target that is not identified as local freezes the ABI versions it ships. Before starting the deploy program, Pina writes a pending record to `migrations/publications.json`; after the program succeeds, it appends that record as a receipt pinning the schema of every version it shipped. From then on `pina migrations create` advances those contracts to a new version instead of rewriting them. `--record-publication` opts a local deployment into the same lifecycle, which is how a Surfpool run exercises it.
 
 If the deploy program starts and then fails, the pending record stays, because the program may already be live. Rerunning the exact same deployment reconciles it, and `pina migrations reconcile` explains the state. If the deploy program never started, for example because `solana` is not installed, Pina discards the pending record it just wrote and says so, because nothing can have reached the cluster. A pending record left by an earlier attempt is never discarded this way.
 

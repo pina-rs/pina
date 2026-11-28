@@ -1569,6 +1569,9 @@ fn run_deploy(
 			}
 		};
 	unwrap_or_exit(plan.verify_inputs_unchanged());
+	// The rehearsal and confirmation can take minutes, so a loopback endpoint
+	// answers again before anything is reserved or sent.
+	unwrap_or_exit(plan.verify_target_unchanged());
 
 	let pending_publication = if plan.is_local() && !record_publication {
 		None

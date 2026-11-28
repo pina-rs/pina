@@ -1,5 +1,6 @@
 //! Safe planning and execution for `pina deploy`.
 
+mod identity;
 mod publication;
 
 use std::ffi::OsStr;
@@ -418,7 +419,8 @@ impl DeploymentPlan {
 		&self.target.rpc_url
 	}
 
-	/// Whether the endpoint is provably local.
+	/// Whether the endpoint is a loopback address that identified itself as a
+	/// private validator or Surfpool when the plan was prepared.
 	#[must_use]
 	pub fn is_local(&self) -> bool {
 		self.target.policy == TargetPolicy::Local
@@ -479,6 +481,17 @@ impl DeploymentPlan {
 	/// a concurrently replaced artifact cannot be bound to the receipt.
 	pub fn verify_inputs_unchanged(&self) -> Result<(), DeployError> {
 		self.revalidate()
+	}
+
+	/// Ask a loopback endpoint again which cluster it serves, and refuse one
+	/// that answers differently than it did at planning time.
+	///
+	/// A rehearsal or a slow confirmation can leave minutes between planning
+	/// and launch, in which a tunnel can take the validator's port. Call this
+	/// after approval and immediately before reserving publication and
+	/// starting the deploy program. Other targets make no request.
+	pub fn verify_target_unchanged(&self) -> Result<(), DeployError> {
+		self.target.verify_unchanged(identity::probe)
 	}
 
 	/// Independently verify finalized loader state before recording publication.
@@ -782,18 +795,29 @@ pub enum DeployError {
 
 	/// Mainnet execution was not explicitly acknowledged.
 	#[error(
-		"mainnet and custom remote deployment require --allow-mainnet in addition to confirmation \
-		 or --yes"
+		"mainnet, custom remote, and unidentified loopback deployment require --allow-mainnet in \
+		 addition to confirmation or --yes"
 	)]
 	MainnetNotAllowed,
 
 	/// Mainnet acknowledgement was supplied for another target.
-	#[error("--allow-mainnet is valid only for mainnet-beta or a custom remote endpoint")]
+	#[error(
+		"--allow-mainnet is valid only for mainnet-beta, a custom remote endpoint, or a loopback \
+		 endpoint that reports mainnet-beta or cannot be identified"
+	)]
 	UnexpectedMainnetAcknowledgement,
 
 	/// A validated input changed after the plan was displayed.
 	#[error("deployment inputs changed after planning; review a new plan before deploying")]
 	InputsChanged,
+
+	/// A loopback endpoint answered differently than when the plan was
+	/// prepared, so it may now forward to another cluster.
+	#[error(
+		"{url} no longer identifies as the cluster it reported when the deployment was planned \
+		 ({reason}); check where the port leads, then review a new plan before deploying"
+	)]
+	TargetChanged { url: String, reason: String },
 
 	/// A consequential remote deployment was rejected or could not be confirmed.
 	#[error(
@@ -928,7 +952,17 @@ pub struct RehearsedDeploymentPlan<'a> {
 }
 
 /// Resolve and validate an inspectable deployment plan without executing it.
+///
+/// A loopback target, `localnet` included, is asked which cluster it serves
+/// before the plan settles its policy, so this makes up to two RPC requests.
 pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan, DeployError> {
+	prepare_deployment_with(request, identity::probe)
+}
+
+fn prepare_deployment_with(
+	request: &DeploymentRequest,
+	probe: impl FnOnce(&str) -> Result<identity::Identity, String>,
+) -> Result<DeploymentPlan, DeployError> {
 	let project = Project::discover(&request.project).map_err(|error| {
 		DeployError::Project {
 			path: request.project.clone(),
@@ -989,7 +1023,7 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 		});
 	}
 
-	let target = ResolvedTarget::resolve(&request.target)?;
+	let mut target = ResolvedTarget::resolve(&request.target)?;
 	let program = path_string(&program_path, "program")?;
 	let program_keypair = match &program_keypair_path {
 		Some(path) => Some(path_string(path, "program keypair")?),
@@ -1007,7 +1041,9 @@ pub fn prepare_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan,
 		upgrade_authority: authority_digest,
 		payer: file_digest(&payer_path, "fee payer")?,
 	};
-	let warnings = deployment_warnings(&program_path, &authority_bytes, &declared_program_id);
+	let mut warnings = deployment_warnings(&program_path, &authority_bytes, &declared_program_id);
+	// Every local input is valid before anything is sent to the endpoint.
+	warnings.extend(target.identify(probe));
 
 	Ok(DeploymentPlan {
 		remote_command: request.remote_command.clone(),
@@ -1288,6 +1324,11 @@ struct ResolvedTarget {
 	policy: TargetPolicy,
 	/// The named cluster, or `None` for a custom URL.
 	named: Option<Cluster>,
+	/// Whether the endpoint's host is a loopback address, including `localnet`.
+	loopback: bool,
+	/// What a loopback endpoint reported at planning time. Launch and
+	/// publication verification require the same answer.
+	identity: Option<identity::Identity>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -1304,12 +1345,15 @@ impl ResolvedTarget {
 				Ok(Self {
 					cluster: cluster.name().to_owned(),
 					rpc_url: cluster.rpc_url().to_owned(),
+					// `localnet` is a loopback endpoint like any other, so it
+					// stays unknown until `identify` hears from it.
 					policy: match cluster {
-						Cluster::Localnet => TargetPolicy::Local,
 						Cluster::Devnet | Cluster::Testnet => TargetPolicy::KnownRemote,
-						Cluster::MainnetBeta => TargetPolicy::MainnetOrUnknown,
+						Cluster::Localnet | Cluster::MainnetBeta => TargetPolicy::MainnetOrUnknown,
 					},
 					named: Some(*cluster),
+					loopback: *cluster == Cluster::Localnet,
+					identity: None,
 				})
 			}
 			DeploymentTarget::RpcUrl(value) => Self::custom(value),
@@ -1374,7 +1418,7 @@ impl ResolvedTarget {
 			});
 		}
 
-		let is_local = match host {
+		let loopback = match host {
 			Host::Domain(domain) => domain.eq_ignore_ascii_case("localhost"),
 			Host::Ipv4(address) => address.is_loopback(),
 			Host::Ipv6(address) => address.is_loopback(),
@@ -1382,15 +1426,89 @@ impl ResolvedTarget {
 
 		let rpc_url = parsed.to_string();
 
+		// Every custom URL starts unknown. A loopback one can still prove it is
+		// local through `identify`.
 		Ok(Self {
 			cluster: "custom".to_owned(),
 			rpc_url,
-			policy: if is_local {
-				TargetPolicy::Local
-			} else {
-				TargetPolicy::MainnetOrUnknown
-			},
+			policy: TargetPolicy::MainnetOrUnknown,
 			named: None,
+			loopback,
+			identity: None,
+		})
+	}
+
+	/// Settle a loopback endpoint's policy from the cluster it reports, and
+	/// return a plan warning when that is not a local validator.
+	///
+	/// A port on this machine can forward to a live cluster, so a loopback
+	/// endpoint is local only once it answers as a private validator or as
+	/// Surfpool. One that reports a public cluster's genesis hash gets that
+	/// cluster's safeguards, and one that cannot be identified stays unknown.
+	fn identify(
+		&mut self,
+		probe: impl FnOnce(&str) -> Result<identity::Identity, String>,
+	) -> Option<String> {
+		if !self.loopback {
+			return None;
+		}
+
+		let url = self.rpc_url.clone();
+		let classified = probe(&url).and_then(|identity| {
+			let public = identity.public_cluster().map_err(str::to_owned);
+			// A hash is pinned even when `getVersion` failed, so publication
+			// can still tell whether the endpoint changed cluster.
+			self.identity = Some(identity);
+			public
+		});
+		match classified {
+			Ok(None) => {
+				self.policy = TargetPolicy::Local;
+				None
+			}
+			Ok(Some(cluster)) => {
+				self.policy = if cluster == Cluster::MainnetBeta {
+					TargetPolicy::MainnetOrUnknown
+				} else {
+					TargetPolicy::KnownRemote
+				};
+				Some(format!(
+					"{url} reports the {name} genesis hash, so it gets {name} safeguards instead \
+					 of being treated as a local validator; a loopback port can forward to a live \
+					 cluster",
+					name = cluster.name()
+				))
+			}
+			Err(reason) => {
+				self.policy = TargetPolicy::MainnetOrUnknown;
+				Some(format!(
+					"could not identify the cluster at {url} ({reason}), so it is treated as an \
+					 unknown cluster that may be mainnet; start the local validator, or review \
+					 the endpoint before passing --allow-mainnet"
+				))
+			}
+		}
+	}
+
+	/// Refuse a loopback endpoint that no longer answers as it did when the
+	/// plan was prepared.
+	fn verify_unchanged(
+		&self,
+		probe: impl FnOnce(&str) -> Result<identity::Identity, String>,
+	) -> Result<(), DeployError> {
+		let Some(planned) = &self.identity else {
+			return Ok(());
+		};
+
+		let reason = match probe(&self.rpc_url) {
+			Ok(current) if planned.matches(&current) => return Ok(()),
+			Ok(_) => "it now reports a different genesis hash or version".to_owned(),
+			Err(reason) => reason,
+		};
+
+		Err(DeployError::TargetChanged {
+			url: self.rpc_url.clone(),
+			reason,
 		})
 	}
 }
@@ -1694,6 +1812,20 @@ fn path_string(path: &Path, kind: &'static str) -> Result<String, DeployError> {
 	})
 }
 
+/// Plan as if every loopback endpoint were a private validator, so a unit test
+/// never depends on what listens on this machine's port 8899. Test modules
+/// import it as `prepare_deployment`; tests of the identification itself call
+/// [`prepare_deployment_with`].
+#[cfg(test)]
+fn prepare_private_deployment(request: &DeploymentRequest) -> Result<DeploymentPlan, DeployError> {
+	prepare_deployment_with(request, |_| {
+		Ok(identity::Identity {
+			genesis_hash: "11111111111111111111111111111111".to_owned(),
+			surfpool: Ok(false),
+		})
+	})
+}
+
 #[cfg(test)]
 #[path = "deploy_rehearsal_tests.rs"]
 mod rehearsal_tests;
@@ -1707,6 +1839,7 @@ mod tests {
 
 	use tempfile::TempDir;
 
+	use super::prepare_private_deployment as prepare_deployment;
 	use super::*;
 
 	struct Fixture {
@@ -2218,6 +2351,270 @@ mod tests {
 					.unwrap_or_else(|error| panic!("prepare loopback deployment: {error}"));
 			assert!(plan.is_local());
 		}
+	}
+
+	type Probe = Box<dyn FnOnce(&str) -> Result<identity::Identity, String>>;
+
+	/// A probe that hears `genesis_hash`, from Surfpool when `surfpool` is set.
+	fn reports(genesis_hash: &'static str, surfpool: bool) -> Probe {
+		Box::new(move |_| {
+			Ok(identity::Identity {
+				genesis_hash: genesis_hash.to_owned(),
+				surfpool: Ok(surfpool),
+			})
+		})
+	}
+
+	fn identity_warnings(plan: &DeploymentPlan) -> Vec<&str> {
+		plan.warnings
+			.iter()
+			.map(String::as_str)
+			.filter(|warning| warning.contains("genesis hash") || warning.contains("identify"))
+			.collect()
+	}
+
+	/// SEC-13: a loopback port proves where the socket is, not which cluster
+	/// answers it. Every loopback target, `localnet` included, is classified by
+	/// the cluster it reports, and the reported hash is pinned for publication.
+	#[test]
+	fn audit_sec_13_loopback_targets_are_classified_by_the_cluster_they_report() {
+		let fixture = Fixture::new();
+		let private = "11111111111111111111111111111111";
+
+		for target in [
+			DeploymentTarget::Cluster(Cluster::Localnet),
+			DeploymentTarget::RpcUrl("http://localhost:8899".to_owned()),
+			DeploymentTarget::RpcUrl("http://127.0.0.1:8899".to_owned()),
+			DeploymentTarget::RpcUrl("http://127.1:8899".to_owned()),
+			DeploymentTarget::RpcUrl("http://[::1]:8899".to_owned()),
+		] {
+			let request = fixture.request(target.clone());
+			// New lines in this module stay on `unwrap`, because an error closure
+			// that never runs counts against patch coverage.
+			let plan = |probe: Probe| prepare_deployment_with(&request, probe).unwrap();
+
+			// A private validator and a Surfpool fork of mainnet stay local.
+			for (genesis_hash, surfpool) in [(private, false), (identity::MAINNET_GENESIS, true)] {
+				let local = plan(reports(genesis_hash, surfpool));
+				assert!(local.is_local(), "{target:?}");
+				assert!(!local.requires_mainnet_acknowledgement());
+				let pinned = local.target.identity.as_ref().unwrap();
+				assert_eq!(pinned.genesis_hash, genesis_hash);
+				assert_eq!(pinned.surfpool, Ok(surfpool));
+				assert!(identity_warnings(&local).is_empty(), "{target:?}");
+			}
+
+			// A tunnel to mainnet gets mainnet's safeguards.
+			let mainnet = plan(reports(identity::MAINNET_GENESIS, false));
+			assert!(!mainnet.is_local());
+			assert!(mainnet.requires_mainnet_acknowledgement());
+			assert!(
+				mainnet
+					.render_text()
+					.contains("reports the mainnet-beta genesis hash"),
+				"{}",
+				mainnet.render_text()
+			);
+
+			// A tunnel to devnet or testnet needs confirmation, not --allow-mainnet.
+			for (genesis_hash, name) in [
+				(identity::DEVNET_GENESIS, "devnet"),
+				(identity::TESTNET_GENESIS, "testnet"),
+			] {
+				let remote = plan(reports(genesis_hash, false));
+				assert!(!remote.is_local());
+				assert!(!remote.requires_mainnet_acknowledgement());
+				assert_eq!(
+					identity_warnings(&remote),
+					[format!(
+						"{} reports the {name} genesis hash, so it gets {name} safeguards instead \
+						 of being treated as a local validator; a loopback port can forward to a \
+						 live cluster",
+						remote.rpc_url()
+					)]
+				);
+			}
+
+			// An endpoint that cannot be identified stays unknown.
+			let unknown = plan(Box::new(|_| {
+				Err("getGenesisHash request failed: connection refused".to_owned())
+			}));
+			assert!(!unknown.is_local());
+			assert!(unknown.requires_mainnet_acknowledgement());
+			assert_eq!(unknown.target.identity, None);
+			let warnings = identity_warnings(&unknown);
+			assert_eq!(warnings.len(), 1);
+			assert!(
+				warnings[0].contains("could not identify the cluster")
+					&& warnings[0].contains("connection refused"),
+				"{warnings:?}"
+			);
+
+			// Without a `getVersion` answer the endpoint stays unknown, but the
+			// genesis hash it did report is pinned for publication.
+			let unversioned = identity::Identity {
+				genesis_hash: identity::DEVNET_GENESIS.to_owned(),
+				surfpool: Err("getVersion request failed: timed out".to_owned()),
+			};
+			let pinned = unversioned.clone();
+			let unknown = plan(Box::new(move |_| Ok(pinned)));
+			assert!(unknown.requires_mainnet_acknowledgement());
+			assert_eq!(unknown.target.identity.as_ref(), Some(&unversioned));
+			let warnings = identity_warnings(&unknown);
+			assert!(
+				warnings.len() == 1
+					&& warnings[0].contains("(getVersion request failed: timed out)"),
+				"{warnings:?}"
+			);
+		}
+
+		// Only loopback endpoints are asked: a private validator's answer would
+		// have made these local and pinned its hash.
+		for target in [
+			DeploymentTarget::Cluster(Cluster::Devnet),
+			DeploymentTarget::RpcUrl("https://rpc.example.com".to_owned()),
+		] {
+			let plan =
+				prepare_deployment_with(&fixture.request(target), reports(private, false)).unwrap();
+			assert!(!plan.is_local());
+			assert_eq!(plan.target.identity, None);
+			assert!(identity_warnings(&plan).is_empty());
+		}
+	}
+
+	/// A tunnel can take a validator's port while the operator rehearses or
+	/// confirms, so a loopback endpoint must answer as it did at planning time
+	/// right before launch.
+	#[test]
+	fn audit_sec_13_a_loopback_endpoint_must_answer_as_planned_before_launch() {
+		let fixture = Fixture::new();
+		let request = fixture.request(DeploymentTarget::Cluster(Cluster::Localnet));
+		let private = "11111111111111111111111111111111";
+		let local = prepare_deployment_with(&request, reports(private, false)).unwrap();
+		local
+			.target
+			.verify_unchanged(reports(private, false))
+			.unwrap();
+
+		let changes: [(Probe, &str); 4] = [
+			(
+				reports(identity::MAINNET_GENESIS, false),
+				"(it now reports a different genesis hash or version)",
+			),
+			(
+				reports(private, true),
+				"(it now reports a different genesis hash or version)",
+			),
+			(
+				Box::new(|_| {
+					Ok(identity::Identity {
+						genesis_hash: private.to_owned(),
+						surfpool: Err("getVersion request failed: timed out".to_owned()),
+					})
+				}),
+				"(it now reports a different genesis hash or version)",
+			),
+			(
+				Box::new(|_| Err("getGenesisHash request failed: connection refused".to_owned())),
+				"(getGenesisHash request failed: connection refused)",
+			),
+		];
+		for (probe, reason) in changes {
+			let error = local.target.verify_unchanged(probe).unwrap_err();
+			assert!(
+				matches!(error, DeployError::TargetChanged { .. })
+					&& error.to_string().starts_with(
+						"http://127.0.0.1:8899 no longer identifies as the cluster it reported"
+					) && error.to_string().contains(reason),
+				"{error}"
+			);
+			assert!(error.is_unsent());
+		}
+
+		// A plan that could not read the version pinned only the hash.
+		let unversioned = prepare_deployment_with(&request, |_| {
+			Ok(identity::Identity {
+				genesis_hash: identity::DEVNET_GENESIS.to_owned(),
+				surfpool: Err("getVersion request failed: timed out".to_owned()),
+			})
+		})
+		.unwrap();
+		unversioned
+			.target
+			.verify_unchanged(reports(identity::DEVNET_GENESIS, true))
+			.unwrap();
+		unversioned
+			.target
+			.verify_unchanged(reports(identity::MAINNET_GENESIS, false))
+			.unwrap_err();
+
+		// Nothing is pinned for an unidentified loopback endpoint or a remote
+		// target, so neither is asked again.
+		let unknown = prepare_deployment_with(&request, |_| Err("no answer".to_owned())).unwrap();
+		let devnet = prepare_deployment_with(
+			&fixture.request(DeploymentTarget::Cluster(Cluster::Devnet)),
+			reports(private, false),
+		)
+		.unwrap();
+		for plan in [&unknown, &devnet] {
+			plan.verify_target_unchanged().unwrap();
+		}
+	}
+
+	/// The audit's reproduction: an explicit `127.0.0.1` target, run without a
+	/// terminal, `--yes`, or `--allow-mainnet`, deployed. It must now stop
+	/// before the child unless the endpoint identifies as a local validator.
+	#[test]
+	fn audit_sec_13_a_loopback_tunnel_needs_the_safeguards_of_its_cluster() {
+		let fixture = Fixture::new();
+		let request = fixture.request(DeploymentTarget::RpcUrl("http://127.0.0.1:8899".to_owned()));
+		let mut runner = FakeRunner::default();
+		let mut confirmer = rejecting_confirmer();
+
+		let unknown = prepare_deployment_with(&request, |_| Err("no answer".to_owned())).unwrap();
+		let mainnet =
+			prepare_deployment_with(&request, reports(identity::MAINNET_GENESIS, false)).unwrap();
+
+		for plan in [&unknown, &mainnet] {
+			for yes in [false, true] {
+				let error =
+					execute_deployment(plan, yes, false, &mut runner, &mut confirmer).unwrap_err();
+				assert!(matches!(error, DeployError::MainnetNotAllowed), "{error}");
+			}
+			let error =
+				execute_deployment(plan, false, true, &mut runner, &mut confirmer).unwrap_err();
+			assert!(
+				matches!(error, DeployError::ConfirmationRequired),
+				"{error}"
+			);
+		}
+		assert!(runner.calls.is_empty(), "no unacknowledged child may run");
+
+		let devnet =
+			prepare_deployment_with(&request, reports(identity::DEVNET_GENESIS, false)).unwrap();
+		let error =
+			execute_deployment(&devnet, false, false, &mut runner, &mut confirmer).unwrap_err();
+		assert!(
+			matches!(error, DeployError::ConfirmationRequired),
+			"{error}"
+		);
+		let error =
+			execute_deployment(&devnet, true, true, &mut runner, &mut confirmer).unwrap_err();
+		assert!(
+			matches!(error, DeployError::UnexpectedMainnetAcknowledgement),
+			"{error}"
+		);
+		assert!(runner.calls.is_empty());
+
+		// An acknowledged mainnet tunnel, a confirmed devnet tunnel, and an
+		// unconfirmed private validator each deploy.
+		execute_deployment(&mainnet, true, true, &mut runner, &mut confirmer).unwrap();
+		execute_deployment(&devnet, true, false, &mut runner, &mut confirmer).unwrap();
+		let local =
+			prepare_deployment_with(&request, reports("11111111111111111111111111111111", false))
+				.unwrap();
+		execute_deployment(&local, false, false, &mut runner, &mut confirmer).unwrap();
+		assert_eq!(runner.calls.len(), 3);
 	}
 
 	#[test]

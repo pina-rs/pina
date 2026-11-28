@@ -14,6 +14,7 @@ use super::Cluster;
 use super::DeployError;
 use super::DeployError::PublicationUnverified;
 use super::DeploymentPlan;
+use super::identity;
 use crate::rehearse::rpc::JsonRpc;
 use crate::rehearse::rpc::parse_accounts;
 
@@ -39,9 +40,19 @@ pub(super) fn verify(plan: &DeploymentPlan) -> Result<(), DeployError> {
 		return Err(PublicationUnverified("approved deployment inputs changed"));
 	}
 
-	let client = JsonRpc::new(plan.rpc_url(), Duration::from_secs(30), plan.is_local());
+	let client = JsonRpc::new(
+		plan.rpc_url(),
+		Duration::from_secs(30),
+		plan.target.loopback,
+	);
 	let genesis = genesis(&client)?;
-	verify_genesis(plan.target.named, &genesis)?;
+	let pinned = plan.target.identity.as_ref();
+	verify_genesis(
+		plan.target.named,
+		pinned.map(|identity| identity.genesis_hash.as_str()),
+		&genesis,
+	)?;
+	verify_surfpool(&client, pinned)?;
 	let result = client
 		.call(
 			"getMultipleAccounts",
@@ -110,6 +121,29 @@ pub(super) fn verify(plan: &DeploymentPlan) -> Result<(), DeployError> {
 			"RPC cluster changed during verification",
 		));
 	}
+	verify_surfpool(&client, pinned)?;
+
+	Ok(())
+}
+
+/// A Surfpool fork reports the genesis hash of the cluster it forks, so
+/// only `getVersion` tells it apart from a port now forwarding to that
+/// cluster.
+fn verify_surfpool(
+	client: &JsonRpc,
+	pinned: Option<&identity::Identity>,
+) -> Result<(), DeployError> {
+	let Some(Ok(surfpool)) = pinned.map(|identity| &identity.surfpool) else {
+		return Ok(());
+	};
+	let version = client
+		.call("getVersion", &json!([]))
+		.map_err(|_| PublicationUnverified("could not read the RPC version"))?;
+	if identity::is_surfpool(&version) != *surfpool {
+		return Err(PublicationUnverified(
+			"RPC endpoint changed between Surfpool and another validator since planning",
+		));
+	}
 
 	Ok(())
 }
@@ -118,25 +152,26 @@ fn genesis(client: &JsonRpc) -> Result<Value, DeployError> {
 	let value = client
 		.call("getGenesisHash", &json!([]))
 		.map_err(|_| PublicationUnverified("could not read the RPC genesis hash"))?;
-	let valid = value.as_str().is_some_and(|hash| {
-		bs58::decode(hash)
-			.into_vec()
-			.is_ok_and(|bytes| bytes.len() == 32)
-	});
-
-	if !valid {
+	if identity::genesis_hash(&value).is_none() {
 		return Err(PublicationUnverified("invalid RPC genesis hash"));
 	}
 
 	Ok(value)
 }
 
-fn verify_genesis(cluster: Option<Cluster>, actual: &Value) -> Result<(), DeployError> {
-	let expected = match cluster {
-		Some(Cluster::Devnet) => "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
-		Some(Cluster::Testnet) => "4uhcVJyU9pJkvQyS88uRDiswHXSCkY3zQawwpjk2NsNY",
-		Some(Cluster::MainnetBeta) => "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
-		Some(Cluster::Localnet) | None => return Ok(()),
+/// A loopback endpoint must still report the genesis hash it reported when
+/// the plan was prepared, and a named public cluster its own.
+fn verify_genesis(
+	cluster: Option<Cluster>,
+	pinned: Option<&str>,
+	actual: &Value,
+) -> Result<(), DeployError> {
+	let expected = match (pinned, cluster) {
+		(Some(pinned), _) => pinned,
+		(None, Some(Cluster::Devnet)) => identity::DEVNET_GENESIS,
+		(None, Some(Cluster::Testnet)) => identity::TESTNET_GENESIS,
+		(None, Some(Cluster::MainnetBeta)) => identity::MAINNET_GENESIS,
+		(None, Some(Cluster::Localnet) | None) => return Ok(()),
 	};
 
 	if actual != expected {

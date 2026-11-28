@@ -975,7 +975,9 @@ Network safety:
 	/// and invokes `solana program deploy`. A cluster or RPC URL is always
 	/// required. Remote writes require confirmation or --yes; mainnet also
 	/// requires --allow-mainnet. Custom remote URLs require the same acknowledgement
-	/// because their cluster identity cannot be proven.
+	/// because their cluster identity cannot be proven. A loopback endpoint,
+	/// localnet included, is asked for its genesis hash and is local only when it
+	/// identifies as a local validator or Surfpool.
 	#[command(after_help = r"Examples:
   pina deploy --cluster localnet \
     --payer ~/.config/solana/id.json \
@@ -1002,6 +1004,11 @@ Safety:
   Prefer a named cluster when possible.
   Remote deployment prompts for the word deploy; use --yes only in reviewed automation.
   Mainnet and custom remote deployment additionally require --allow-mainnet.
+  A loopback endpoint may forward to a live cluster, so Pina asks it for its genesis hash and
+  version: a public cluster's hash gets that cluster's safeguards, except Surfpool forks which
+  stay local even when reporting a public cluster's hash, and an endpoint that does not answer
+  needs --allow-mainnet. When the initial probe obtained an identity, Pina rechecks it just
+  before launch and stops if the answer changed.
   --dry-run never builds or deploys and --json is available only with --dry-run.
   --upgrade-only upgrades the program already deployed at the declared program ID and never
   reads a program keypair, so automation need not hold the key that owns the address on
@@ -1067,11 +1074,13 @@ Rehearsal:
 		#[arg(long)]
 		yes: bool,
 
-		/// Acknowledge that mainnet-beta or a custom remote endpoint can affect real assets.
+		/// Acknowledge that mainnet-beta, a custom remote endpoint, or a loopback
+		/// endpoint that reports mainnet-beta or cannot be identified can affect
+		/// real assets.
 		#[arg(long, conflicts_with = "dry_run")]
 		allow_mainnet: bool,
 
-		/// Record migration publication receipts even for loopback targets.
+		/// Record migration publication receipts even for local targets.
 		/// Useful for exercising the full publication lifecycle against a
 		/// local network such as Surfpool.
 		#[arg(long)]
