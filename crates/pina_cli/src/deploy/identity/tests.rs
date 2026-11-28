@@ -26,7 +26,7 @@ fn reads_the_genesis_hash_and_whether_the_endpoint_is_surfpool() {
 		probe(&validator.url),
 		Ok(Identity {
 			genesis_hash: PRIVATE_GENESIS.to_owned(),
-			surfpool: false,
+			surfpool: Ok(false),
 		})
 	);
 	assert_eq!(validator.methods(), ["getGenesisHash", "getVersion"]);
@@ -39,7 +39,7 @@ fn reads_the_genesis_hash_and_whether_the_endpoint_is_surfpool() {
 		probe(&surfnet.url),
 		Ok(Identity {
 			genesis_hash: MAINNET_GENESIS.to_owned(),
-			surfpool: true,
+			surfpool: Ok(true),
 		})
 	);
 }
@@ -51,17 +51,49 @@ fn names_only_the_public_clusters_an_agave_endpoint_reports() {
 			genesis_hash: genesis_hash.to_owned(),
 			surfpool,
 		}
-		.public_cluster()
+	};
+	let cluster = |genesis_hash, surfpool| {
+		identity(genesis_hash, Ok(surfpool))
+			.public_cluster()
+			.map_err(str::to_owned)
 	};
 
-	assert_eq!(identity(DEVNET_GENESIS, false), Some(Cluster::Devnet));
-	assert_eq!(identity(TESTNET_GENESIS, false), Some(Cluster::Testnet));
-	assert_eq!(identity(MAINNET_GENESIS, false), Some(Cluster::MainnetBeta));
-	assert_eq!(identity(PRIVATE_GENESIS, false), None);
+	assert_eq!(cluster(DEVNET_GENESIS, false), Ok(Some(Cluster::Devnet)));
+	assert_eq!(cluster(TESTNET_GENESIS, false), Ok(Some(Cluster::Testnet)));
+	assert_eq!(
+		cluster(MAINNET_GENESIS, false),
+		Ok(Some(Cluster::MainnetBeta))
+	);
+	assert_eq!(cluster(PRIVATE_GENESIS, false), Ok(None));
 
 	for genesis in [DEVNET_GENESIS, TESTNET_GENESIS, MAINNET_GENESIS] {
-		assert_eq!(identity(genesis, true), None);
+		assert_eq!(cluster(genesis, true), Ok(None));
 	}
+
+	// Without a `getVersion` answer, even a private hash cannot be classified.
+	let unversioned = identity(PRIVATE_GENESIS, Err("getVersion timed out".to_owned()));
+	assert_eq!(unversioned.public_cluster(), Err("getVersion timed out"));
+}
+
+#[test]
+fn an_endpoint_matches_only_the_answers_it_gave_at_planning() {
+	let identity = |genesis_hash: &str, surfpool: Result<bool, &str>| {
+		Identity {
+			genesis_hash: genesis_hash.to_owned(),
+			surfpool: surfpool.map_err(str::to_owned),
+		}
+	};
+	let surfnet = identity(MAINNET_GENESIS, Ok(true));
+
+	assert!(surfnet.matches(&identity(MAINNET_GENESIS, Ok(true))));
+	assert!(!surfnet.matches(&identity(MAINNET_GENESIS, Ok(false))));
+	assert!(!surfnet.matches(&identity(MAINNET_GENESIS, Err("timed out"))));
+	assert!(!surfnet.matches(&identity(DEVNET_GENESIS, Ok(true))));
+
+	// A plan that never read the version pinned only the hash.
+	let unversioned = identity(DEVNET_GENESIS, Err("timed out"));
+	assert!(unversioned.matches(&identity(DEVNET_GENESIS, Ok(false))));
+	assert!(!unversioned.matches(&identity(MAINNET_GENESIS, Ok(false))));
 }
 
 #[test]
@@ -78,18 +110,24 @@ fn an_endpoint_that_cannot_prove_its_identity_is_unidentified() {
 		);
 	}
 
+	// A failed `getVersion` leaves the endpoint unclassified, but keeps the hash.
 	let no_version = fakes::FakeRpcServer::start(|method, _| {
 		match method {
 			"getGenesisHash" => fakes::Reply::Result(json!(PRIVATE_GENESIS)),
 			_ => fakes::Reply::Error(-32601, format!("method {method} not found")),
 		}
 	});
-	let error = probe(&no_version.url).unwrap_err();
+	let identity = probe(&no_version.url).unwrap();
+	assert_eq!(identity.genesis_hash, PRIVATE_GENESIS);
+	let error = identity.public_cluster().unwrap_err();
 	assert!(error.starts_with("getVersion "), "{error}");
 
-	let closed = std::net::TcpListener::bind("127.0.0.1:0")
-		.and_then(|listener| listener.local_addr())
-		.unwrap_or_else(|error| panic!("reserve a closed port: {error}"));
-	let error = probe(&format!("http://{closed}")).unwrap_err();
+	// The listener stays bound, so no other test can take the port, and it
+	// closes the connection without answering.
+	let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+	let address = listener.local_addr().unwrap();
+	let closer = std::thread::spawn(move || drop(listener.accept()));
+	let error = probe(&format!("http://{address}")).unwrap_err();
+	closer.join().unwrap();
 	assert!(error.starts_with("getGenesisHash "), "{error}");
 }

@@ -13,6 +13,11 @@
 //! carries a `surfnet-version`, which no Agave RPC reports, so a Surfpool
 //! endpoint stays local whatever genesis hash it reports.
 //!
+//! The plan pins what the endpoint reported. The CLI asks again just before
+//! the deploy program starts, and publication verification asks again before
+//! it reads the deployed accounts, so an endpoint that starts answering for
+//! another cluster after planning is refused.
+//!
 //! The probe guards against an operator's mistake, not against the endpoint:
 //! whatever listens on the loopback port can answer anything.
 
@@ -36,31 +41,47 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 pub(crate) struct Identity {
 	/// The endpoint's `getGenesisHash` answer.
 	pub(crate) genesis_hash: String,
-	/// Whether `getVersion` carried Surfpool's `surfnet-version`.
-	pub(crate) surfpool: bool,
+	/// Whether `getVersion` carried Surfpool's `surfnet-version`, or why
+	/// `getVersion` failed. A failed `getVersion` leaves the endpoint
+	/// unclassified, but its genesis hash is still pinned.
+	pub(crate) surfpool: Result<bool, String>,
 }
 
 impl Identity {
-	/// The public cluster this endpoint serves, or `None` for a private
-	/// validator or any Surfpool network.
-	pub(super) fn public_cluster(&self) -> Option<Cluster> {
-		if self.surfpool {
-			return None;
+	/// The public cluster this endpoint serves, `None` for a private validator
+	/// or any Surfpool network, or why the endpoint cannot be classified.
+	pub(super) fn public_cluster(&self) -> Result<Option<Cluster>, &str> {
+		if *self.surfpool.as_ref().map_err(String::as_str)? {
+			return Ok(None);
 		}
 
-		match self.genesis_hash.as_str() {
+		Ok(match self.genesis_hash.as_str() {
 			DEVNET_GENESIS => Some(Cluster::Devnet),
 			TESTNET_GENESIS => Some(Cluster::Testnet),
 			MAINNET_GENESIS => Some(Cluster::MainnetBeta),
 			_ => None,
-		}
+		})
+	}
+
+	/// Whether `current` is the endpoint this identity was read from: the same
+	/// genesis hash and, when this identity has one, the same `getVersion`
+	/// answer about Surfpool.
+	pub(super) fn matches(&self, current: &Self) -> bool {
+		self.genesis_hash == current.genesis_hash
+			&& match (&self.surfpool, &current.surfpool) {
+				(Ok(planned), Ok(current)) => planned == current,
+				(Ok(_), Err(_)) => false,
+				(Err(_), _) => true,
+			}
 	}
 }
 
 /// Ask a loopback endpoint which cluster it serves.
 ///
 /// The error is a short reason for the plan's warning: a probe that fails
-/// leaves the endpoint unidentified, and the caller treats it as unknown.
+/// leaves the endpoint unidentified, and the caller treats it as unknown. A
+/// failed `getVersion` is not an error, because the genesis hash it follows
+/// can still be pinned; it leaves the reason in [`Identity::surfpool`].
 pub(super) fn probe(rpc_url: &str) -> Result<Identity, String> {
 	let client = JsonRpc::new(rpc_url, PROBE_TIMEOUT, true);
 	let genesis = client
@@ -69,14 +90,21 @@ pub(super) fn probe(rpc_url: &str) -> Result<Identity, String> {
 	let genesis_hash = genesis_hash(&genesis)
 		.ok_or("getGenesisHash returned an invalid hash")?
 		.to_owned();
-	let version = client
+	let surfpool = client
 		.call("getVersion", &json!([]))
-		.map_err(|error| format!("getVersion {error}"))?;
+		.map(|version| is_surfpool(&version))
+		.map_err(|error| format!("getVersion {error}"));
 
 	Ok(Identity {
 		genesis_hash,
-		surfpool: version.get("surfnet-version").is_some_and(Value::is_string),
+		surfpool,
 	})
+}
+
+/// Whether a `getVersion` result carries Surfpool's `surfnet-version`, which
+/// no Agave RPC reports.
+pub(super) fn is_surfpool(version: &Value) -> bool {
+	version.get("surfnet-version").is_some_and(Value::is_string)
 }
 
 /// A `getGenesisHash` result that is a base58 32-byte hash.

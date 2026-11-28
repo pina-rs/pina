@@ -285,6 +285,47 @@ fn audit_sec_13_a_loopback_endpoint_reporting_mainnet_needs_mainnet_safeguards()
 		String::from_utf8_lossy(&output.stderr)
 	);
 	assert!(marker.exists());
+
+	// A tunnel that takes a private validator's port after planning is refused
+	// before the deployment child starts.
+	fs::remove_file(&marker).unwrap_or_else(|error| panic!("reset the marker: {error}"));
+	let answers = std::sync::atomic::AtomicUsize::new(0);
+	let swapped = rpc_support::FakeRpcServer::start(move |method, _| {
+		let genesis = if method == "getGenesisHash"
+			&& answers.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0
+		{
+			MAINNET_GENESIS
+		} else {
+			PRIVATE_GENESIS
+		};
+		identity_reply(method, genesis, false)
+	});
+	let output = fixture
+		.command()
+		.args([
+			"--cluster",
+			&swapped.url,
+			"--remote-command",
+			marker_command,
+		])
+		.output()
+		.unwrap_or_else(|error| panic!("deploy through a swapped port: {error}"));
+	let stderr = String::from_utf8_lossy(&output.stderr);
+	assert!(!output.status.success());
+	assert!(
+		stderr.contains("no longer identifies as the cluster it reported"),
+		"{stderr}"
+	);
+	assert!(!marker.exists(), "the deployment child must not run");
+	assert_eq!(
+		swapped.methods(),
+		[
+			"getGenesisHash",
+			"getVersion",
+			"getGenesisHash",
+			"getVersion"
+		]
+	);
 }
 
 #[test]
