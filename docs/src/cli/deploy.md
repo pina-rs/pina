@@ -98,7 +98,7 @@ A loopback endpoint is `localnet` or a URL whose parsed host is a loopback addre
 - Any other genesis hash, such as the one `solana-test-validator` creates, belongs to a local validator.
 - An endpoint that does not answer both requests, or answers with an invalid hash, is treated as an unknown cluster that may be mainnet, and the plan says why. Start the validator before deploying to it.
 
-The plan pins the answer. A rehearsal or a confirmation prompt can take minutes, so right before it reserves publication and starts the deploy program, Pina asks again and stops if the genesis hash or the Surfpool answer changed. Publication verification asks once more before it reads the deployed accounts. The probe catches a forwarded port, not a hostile endpoint: whatever listens on the port can answer anything.
+The plan pins any genesis hash and Surfpool answer it received. A rehearsal or a confirmation prompt can take minutes, so when the initial probe obtained an identity, Pina asks again right before it reserves publication and starts the deploy program, stopping if the genesis hash or Surfpool answer changed. (If the initial probe failed to obtain an identity, the endpoint already requires confirmation and `--allow-mainnet`, and Pina does not recheck before launch.) Publication verification asks once more before and after it reads the deployed accounts. The probe catches a forwarded port, not a hostile endpoint: whatever listens on the port can answer anything.
 
 ## Build and external requirements
 

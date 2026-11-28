@@ -52,19 +52,7 @@ pub(super) fn verify(plan: &DeploymentPlan) -> Result<(), DeployError> {
 		pinned.map(|identity| identity.genesis_hash.as_str()),
 		&genesis,
 	)?;
-	// A Surfpool fork reports the genesis hash of the cluster it forks, so
-	// only `getVersion` tells it apart from a port now forwarding to that
-	// cluster.
-	if let Some(Ok(surfpool)) = pinned.map(|identity| &identity.surfpool) {
-		let version = client
-			.call("getVersion", &json!([]))
-			.map_err(|_| PublicationUnverified("could not read the RPC version"))?;
-		if identity::is_surfpool(&version) != *surfpool {
-			return Err(PublicationUnverified(
-				"RPC endpoint changed between Surfpool and another validator since planning",
-			));
-		}
-	}
+	verify_surfpool(&client, pinned)?;
 	let result = client
 		.call(
 			"getMultipleAccounts",
@@ -131,6 +119,29 @@ pub(super) fn verify(plan: &DeploymentPlan) -> Result<(), DeployError> {
 	if genesis != self::genesis(&client)? {
 		return Err(PublicationUnverified(
 			"RPC cluster changed during verification",
+		));
+	}
+	verify_surfpool(&client, pinned)?;
+
+	Ok(())
+}
+
+/// A Surfpool fork reports the genesis hash of the cluster it forks, so
+/// only `getVersion` tells it apart from a port now forwarding to that
+/// cluster.
+fn verify_surfpool(
+	client: &JsonRpc,
+	pinned: Option<&identity::Identity>,
+) -> Result<(), DeployError> {
+	let Some(Ok(surfpool)) = pinned.map(|identity| &identity.surfpool) else {
+		return Ok(());
+	};
+	let version = client
+		.call("getVersion", &json!([]))
+		.map_err(|_| PublicationUnverified("could not read the RPC version"))?;
+	if identity::is_surfpool(&version) != *surfpool {
+		return Err(PublicationUnverified(
+			"RPC endpoint changed between Surfpool and another validator since planning",
 		));
 	}
 

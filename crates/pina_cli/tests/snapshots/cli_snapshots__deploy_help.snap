@@ -100,9 +100,11 @@ Safety:
   Prefer a named cluster when possible.
   Remote deployment prompts for the word deploy; use --yes only in reviewed automation.
   Mainnet and custom remote deployment additionally require --allow-mainnet.
-  A loopback endpoint may forward to a live cluster, so Pina asks it for its genesis hash: a
-  public cluster's hash gets that cluster's safeguards, and an endpoint that does not answer
-  needs --allow-mainnet. Pina asks again just before launch and stops if the answer changed.
+  A loopback endpoint may forward to a live cluster, so Pina asks it for its genesis hash and
+  version: a public cluster's hash gets that cluster's safeguards, except Surfpool forks which
+  stay local even when reporting a public cluster's hash, and an endpoint that does not answer
+  needs --allow-mainnet. When the initial probe obtained an identity, Pina rechecks it just
+  before launch and stops if the answer changed.
   --dry-run never builds or deploys and --json is available only with --dry-run.
   --upgrade-only upgrades the program already deployed at the declared program ID and never
   reads a program keypair, so automation need not hold the key that owns the address on

@@ -7,7 +7,7 @@ pina_skill: docs
 
 `pina deploy` used to treat every loopback target, `localnet` included, as local. A local target skips confirmation, `--allow-mainnet`, and the publication receipt. A loopback port can be an SSH tunnel or a proxy to a live cluster, so a deploy through a forwarded `127.0.0.1:8899` reached that cluster with none of those safeguards (SEC-13).
 
-Before planning, Pina now asks a loopback endpoint for its genesis hash and version. A devnet, testnet, or mainnet-beta genesis hash gets that cluster's safeguards. Surfpool reports the genesis hash of the cluster it forks, but its `getVersion` answer names Surfpool and every transaction it accepts stays local, so it remains local. Any other genesis hash is a local validator. The plan pins the answer: Pina asks again just before the deploy starts and stops if it changed, and publication verification requires the same genesis hash and Surfpool answer after the deploy.
+Before planning, Pina now asks a loopback endpoint for its genesis hash and version. A devnet, testnet, or mainnet-beta genesis hash gets that cluster's safeguards. Surfpool reports the genesis hash of the cluster it forks, but its `getVersion` answer names Surfpool and every transaction it accepts stays local, so it remains local. Any other genesis hash is a local validator. When the initial probe obtains an identity, the plan pins it: Pina asks again just before the deploy starts and stops if the genesis hash or Surfpool answer changed (an unidentified endpoint already requires confirmation and `--allow-mainnet`, without a stored identity to recheck), and publication verification requires the same genesis hash and Surfpool answer after the deploy.
 
 ## User impact
 

@@ -178,7 +178,8 @@ fn refuses_a_loopback_endpoint_that_changed_between_surfpool_and_a_validator() {
 			"getGenesisHash",
 			"getVersion",
 			"getMultipleAccounts",
-			"getGenesisHash"
+			"getGenesisHash",
+			"getVersion",
 		]
 	);
 
@@ -189,6 +190,57 @@ fn refuses_a_loopback_endpoint_that_changed_between_surfpool_and_a_validator() {
 		server.methods(),
 		["getGenesisHash", "getMultipleAccounts", "getGenesisHash"]
 	);
+}
+
+#[test]
+fn refuses_a_loopback_endpoint_that_changed_surfpool_classification_during_read() {
+	let (_temp, mut plan, accounts) = fixture();
+
+	for (planned, flipped) in [(true, false), (false, true)] {
+		let accounts = accounts.clone();
+		let version_calls = AtomicUsize::new(0);
+		let server = fakes::FakeRpcServer::start(move |method, _| {
+			match method {
+				"getGenesisHash" => fakes::Reply::Result(json!(identity::MAINNET_GENESIS)),
+				"getVersion" => {
+					let call = version_calls.fetch_add(1, Ordering::SeqCst);
+					let is_surfpool = if call == 0 { planned } else { flipped };
+					if is_surfpool {
+						fakes::Reply::Result(json!({ "surfnet-version": "1.7.0" }))
+					} else {
+						fakes::Reply::Result(json!({ "solana-core": "3.0.0" }))
+					}
+				}
+				"getMultipleAccounts" => fakes::Reply::Result(accounts.clone()),
+				_ => panic!("unexpected method: {method}"),
+			}
+		});
+		plan.target.rpc_url.clone_from(&server.url);
+		plan.target.identity = Some(identity::Identity {
+			genesis_hash: identity::MAINNET_GENESIS.to_owned(),
+			surfpool: Ok(planned),
+		});
+		let error = plan.verify_publication().unwrap_err();
+		assert!(
+			matches!(
+				error,
+				PublicationUnverified(
+					"RPC endpoint changed between Surfpool and another validator since planning"
+				)
+			),
+			"{error}"
+		);
+		assert_eq!(
+			server.methods(),
+			[
+				"getGenesisHash",
+				"getVersion",
+				"getMultipleAccounts",
+				"getGenesisHash",
+				"getVersion",
+			]
+		);
+	}
 }
 
 #[test]
