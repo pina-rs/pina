@@ -144,10 +144,10 @@ jobs:
           exit "$status"
         shell: bash
 
-      # Missed mutants and timeouts (cargo-mutants exits 2 and 3) are advisory
-      # on pull requests, but the failed step and summary must remain visible
-      # instead of presenting a false-green run. Any other failure means no
-      # mutant was tested, such as a failing baseline, so it fails the job.
+      # Missed mutants and timeouts (cargo-mutants exits 2 and 3) fail the PR
+      # job so new survivors are caught before merge instead of hiding behind a
+      # green check until nightly. Any other non-zero exit means no mutant was
+      # tested, such as a failing baseline, and also fails the job.
       - name: report mutation test outcome
         if: always() && steps.mutation_tests.outcome == 'failure'
         env:
@@ -156,9 +156,11 @@ jobs:
           status="$(cat target/mutants/exit-status 2>/dev/null || echo missing)"
           case "$status" in
             2 | 3)
-              echo "::warning::Mutation testing found surviving mutants or timeouts for ${PACKAGE}. Review the uploaded report."
-              echo "### Mutation testing needs attention: \`${PACKAGE}\`" >> "$GITHUB_STEP_SUMMARY"
-              echo "cargo-mutants exited ${status}: some mutants survived or timed out. Review the uploaded report." >> "$GITHUB_STEP_SUMMARY"
+              summary="$(jq -r '"\(.total_mutants) mutants tested: \(.missed) missed, \(.timeout) timed out, \(.caught) caught, \(.unviable) unviable."' target/mutants/mutants.out/outcomes.json 2>/dev/null || echo "cargo-mutants exited ${status}.")"
+              echo "::error::Mutation testing found surviving mutants or timeouts for ${PACKAGE} (${summary}). Review the uploaded report."
+              echo "### Mutation testing failed: \`${PACKAGE}\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "${summary} Review the uploaded report." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
               ;;
             *)
               echo "::error::Mutation testing could not run for ${PACKAGE} (exit status ${status}). Check the mutation step's log."
