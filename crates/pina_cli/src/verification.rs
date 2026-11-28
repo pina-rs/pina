@@ -470,18 +470,11 @@ impl VerifyExecutor for SystemVerifyExecutor {
 
 fn read_bounded(mut reader: impl Read) -> Result<Vec<u8>, std::io::Error> {
 	let mut captured = Vec::new();
-	let mut chunk = [0_u8; 8_192];
-
-	loop {
-		let read = reader.read(&mut chunk)?;
-
-		if read == 0 {
-			break;
-		}
-
-		let remaining = MAX_CAPTURED_OUTPUT.saturating_sub(captured.len());
-		captured.extend_from_slice(&chunk[..read.min(remaining)]);
-	}
+	reader
+		.by_ref()
+		.take(MAX_CAPTURED_OUTPUT as u64)
+		.read_to_end(&mut captured)?;
+	std::io::copy(&mut reader, &mut std::io::sink())?;
 
 	Ok(captured)
 }
@@ -533,10 +526,7 @@ fn append_tail(captured: &mut Vec<u8>, chunk: &[u8]) {
 		.saturating_add(chunk.len())
 		.saturating_sub(MAX_CAPTURED_OUTPUT);
 
-	if overflow > 0 {
-		captured.drain(..overflow);
-	}
-
+	captured.drain(..overflow);
 	captured.extend_from_slice(chunk);
 }
 
@@ -1008,19 +998,8 @@ struct ValidatedKeypair {
 fn read_keypair(path: &Path) -> Result<ValidatedKeypair, VerifyError> {
 	let initial_metadata = map_keypair_io(path, fs::symlink_metadata(path))?;
 
-	if !initial_metadata.file_type().is_file() {
+	if !crate::path_security::is_plain_file(&initial_metadata) {
 		return Err(VerifyError::UnsafeKeypair(path.to_path_buf()));
-	}
-
-	#[cfg(windows)]
-	{
-		use std::os::windows::fs::MetadataExt;
-
-		const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-
-		if initial_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-			return Err(VerifyError::UnsafeKeypair(path.to_path_buf()));
-		}
 	}
 
 	let mut file = map_keypair_io(path, fs::File::open(path))?;
@@ -1521,6 +1500,7 @@ fn validate_transaction_wire(bytes: &[u8]) -> Result<(), ()> {
 	}
 	for _ in 0..instruction_count {
 		let program_index = usize::from(*bytes.get(offset).ok_or(())?);
+		offset += 1;
 		let accounts_len = read_compact_u16(bytes, &mut offset)?;
 		if program_index >= account_count || accounts_len > account_count {
 			return Err(());
@@ -1744,9 +1724,28 @@ mod tests {
 		assert!(format!("{:?}", SystemVerifyExecutor::default()).contains("solana-verify"));
 
 		let mut tail = vec![1_u8; 12];
-		append_tail(&mut tail, &vec![2_u8; MAX_CAPTURED_OUTPUT + 1]);
+		append_tail(&mut tail, &[5_u8, 6_u8]);
+		assert_eq!(tail.len(), 14);
+		assert_eq!(&tail[12..], &[5_u8, 6_u8]);
+
+		let mut oversized_chunk = vec![2_u8; MAX_CAPTURED_OUTPUT + 5];
+		oversized_chunk[..5].fill(9_u8);
+		oversized_chunk[5] = 3_u8;
+		oversized_chunk[MAX_CAPTURED_OUTPUT + 4] = 4_u8;
+		append_tail(&mut tail, &oversized_chunk);
 		assert_eq!(tail.len(), MAX_CAPTURED_OUTPUT);
-		assert!(tail.iter().all(|byte| *byte == 2));
+		assert_eq!(tail[0], 3_u8);
+		assert_eq!(tail[MAX_CAPTURED_OUTPUT - 1], 4_u8);
+
+		assert_eq!(read_bounded(std::io::empty()).unwrap(), Vec::<u8>::new());
+		assert_eq!(read_bounded(&b"hello"[..]).unwrap(), b"hello");
+		let mut long_input = vec![b'a'; MAX_CAPTURED_OUTPUT];
+		long_input.extend_from_slice(&[b'z'; 64]);
+		let mut cursor = std::io::Cursor::new(long_input);
+		let bounded = read_bounded(&mut cursor).unwrap();
+		assert_eq!(bounded.len(), MAX_CAPTURED_OUTPUT);
+		assert!(bounded.iter().all(|byte| *byte == b'a'));
+		assert_eq!(cursor.position(), (MAX_CAPTURED_OUTPUT + 64) as u64);
 
 		struct ErrorReader;
 		impl Read for ErrorReader {
@@ -1759,20 +1758,41 @@ mod tests {
 			Err(Box::new("fixture panic"));
 		assert!(flatten_reader(panic_result).is_err());
 
+		let mut context = ProjectContext {
+			repository: RepositoryUrl::from_str("https://github.com/pina-rs/pina").unwrap(),
+			revision: Revision::from_str(REVISION).unwrap(),
+			mount_path: ".".to_owned(),
+			workspace_path: ".".to_owned(),
+			library_name: "fixture".to_owned(),
+			features: Vec::new(),
+			default_features: true,
+		};
 		let mut arguments = Vec::new();
-		append_cargo_arguments(
-			&mut arguments,
-			&ProjectContext {
-				repository: RepositoryUrl::from_str("https://github.com/pina-rs/pina").unwrap(),
-				revision: Revision::from_str(REVISION).unwrap(),
-				mount_path: ".".to_owned(),
-				workspace_path: ".".to_owned(),
-				library_name: "fixture".to_owned(),
-				features: Vec::new(),
-				default_features: true,
-			},
-		);
+		append_cargo_arguments(&mut arguments, &context);
 		assert!(arguments.is_empty());
+
+		context.features = vec!["bpf-entrypoint".to_owned()];
+		append_cargo_arguments(&mut arguments, &context);
+		assert_eq!(
+			arguments,
+			vec![
+				OsString::from("--"),
+				OsString::from("--features"),
+				OsString::from("bpf-entrypoint"),
+			]
+		);
+
+		arguments.clear();
+		context.features.clear();
+		context.default_features = false;
+		append_cargo_arguments(&mut arguments, &context);
+		assert_eq!(
+			arguments,
+			vec![
+				OsString::from("--"),
+				OsString::from("--no-default-features")
+			]
+		);
 	}
 
 	#[test]
@@ -1903,6 +1923,18 @@ mod tests {
 			},
 		);
 		assert!(matches!(result, Err(VerifyError::InvalidHash { .. })));
+
+		let short_hex = FakeExecutor::with([output(0, format!("{}\n", "a".repeat(63)), "")]);
+		assert!(matches!(
+			run_hash(&short_hex, "get-program-hash", []),
+			Err(VerifyError::InvalidHash { .. })
+		));
+
+		let non_hex = FakeExecutor::with([output(0, format!("{}\n", "g".repeat(64)), "")]);
+		assert!(matches!(
+			run_hash(&non_hex, "get-program-hash", []),
+			Err(VerifyError::InvalidHash { .. })
+		));
 	}
 
 	#[test]
@@ -1945,31 +1977,42 @@ mod tests {
 		assert!(submit_program(&FakeExecutor::default(), PROGRAM_ID, "invalid").is_err());
 	}
 
-	/// Encodes a minimal valid Solana transaction in the real wire layout:
+	/// Encodes a synthetic Solana transaction in the real wire layout:
 	/// `[compact-u16 signature count][signatures][message]`, where a versioned
 	/// message opens with the `0x80` prefix and closes with an empty
-	/// address-table-lookup section. One signature, a two-account message, one
-	/// instruction carrying `data`.
-	fn encode_tx_wire(data: &[u8], versioned: bool) -> Vec<u8> {
+	/// address-table-lookup section.
+	fn encode_tx_wire_with(
+		signature_count: u16,
+		account_count: u16,
+		program_index: u8,
+		accounts: &[u8],
+		data: &[u8],
+		versioned: bool,
+	) -> Vec<u8> {
 		let mut bytes = Vec::new();
-		bytes.push(1); // compact-u16: one signature
-		bytes.extend_from_slice(&[9_u8; 64]);
+		bytes.extend_from_slice(&encode_compact_u16(signature_count));
+		bytes.resize(bytes.len() + usize::from(signature_count) * 64, 9_u8);
 		if versioned {
 			bytes.push(0x80); // v0 message prefix, after the signatures
 		}
 		bytes.extend_from_slice(&[1, 0, 1]); // header: one required signer
-		bytes.push(2); // compact-u16: two accounts
-		bytes.extend_from_slice(&[9_u8; 64]); // two 32-byte keys
+		bytes.extend_from_slice(&encode_compact_u16(account_count));
+		bytes.resize(bytes.len() + usize::from(account_count) * 32, 9_u8);
 		bytes.extend_from_slice(&[9_u8; 32]); // recent blockhash
 		bytes.push(1); // compact-u16: one instruction
-		bytes.push(1); // program id index
-		bytes.push(0); // compact-u16: no account indices
+		bytes.push(program_index); // program id index
+		bytes.extend_from_slice(&encode_compact_u16(accounts.len() as u16));
+		bytes.extend_from_slice(accounts);
 		bytes.extend_from_slice(&encode_compact_u16(data.len() as u16));
 		bytes.extend_from_slice(data);
 		if versioned {
 			bytes.push(0); // compact-u16: no address-table lookups
 		}
 		bytes
+	}
+
+	fn encode_tx_wire(data: &[u8], versioned: bool) -> Vec<u8> {
+		encode_tx_wire_with(1, 2, 1, &[], data, versioned)
 	}
 
 	/// A minimal valid legacy transaction, for export fixtures.
@@ -2180,6 +2223,14 @@ mod tests {
 			output(0, format!("{payload}\n"), ""),
 		]);
 		record_program_for_test(&executor, &options).unwrap();
+
+		options.export_authority = None;
+		let executor = FakeExecutor::with([
+			version(),
+			output(0, format!("{}\n", record_hash()), ""),
+			output(0, format!("{payload}\n"), ""),
+		]);
+		record_program_for_test(&executor, &options).unwrap();
 	}
 
 	#[test]
@@ -2203,7 +2254,7 @@ mod tests {
 					"Program hash matches ✅\nExecutable Program Hash from repo: {hash}\nOn-chain \
 					 Program Hash: {hash}\nProgram uploaded successfully.\n"
 				),
-				"",
+				"streaming progress\n",
 			),
 		]);
 		let result = record_program_for_test(
@@ -2223,6 +2274,7 @@ mod tests {
 		.unwrap();
 
 		assert!(result.stdout.is_empty());
+		assert!(result.stderr.is_empty());
 		let arguments = &executor.calls.borrow()[2];
 		assert!(arguments.contains(&OsString::from("https://github.com/pina-rs/pina")));
 		assert!(arguments.contains(&OsString::from(REVISION)));
@@ -2338,10 +2390,27 @@ mod tests {
 			),
 			Err(VerifyError::UnsafeKeypair(_))
 		));
+		let exact_contents = read_keypair_contents(
+			&fixture_path,
+			&mut std::io::Cursor::new(vec![b' '; MAX_KEYPAIR_BYTES]),
+		)
+		.unwrap();
+		assert_eq!(exact_contents.len(), MAX_KEYPAIR_BYTES);
 		assert!(matches!(
 			read_keypair(temp.path()),
 			Err(VerifyError::UnsafeKeypair(_))
 		));
+
+		let exact_size = temp.path().join("exact.json");
+		fs::write(&exact_size, vec![b' '; MAX_KEYPAIR_BYTES]).unwrap();
+		#[cfg(unix)]
+		fs::set_permissions(&exact_size, {
+			use std::os::unix::fs::PermissionsExt;
+			fs::Permissions::from_mode(0o600)
+		})
+		.unwrap();
+		let exact_meta = fs::metadata(&exact_size).unwrap();
+		assert!(validate_keypair_metadata(&exact_size, &exact_meta, &exact_meta).is_ok());
 
 		let too_large = temp.path().join("large.json");
 		fs::write(&too_large, vec![0_u8; 4_097]).unwrap();
@@ -2351,6 +2420,11 @@ mod tests {
 			fs::Permissions::from_mode(0o600)
 		})
 		.unwrap();
+		let large_meta = fs::metadata(&too_large).unwrap();
+		assert!(matches!(
+			validate_keypair_metadata(&too_large, &large_meta, &large_meta),
+			Err(VerifyError::UnsafeKeypair(_))
+		));
 		assert!(matches!(
 			read_keypair(&too_large),
 			Err(VerifyError::UnsafeKeypair(_))
@@ -2419,15 +2493,20 @@ mod tests {
 
 		let legacy = encode_tx_wire(&big_payload, false);
 		assert!(validate_transaction_wire(&legacy).is_ok());
+
+		let max_signatures = encode_tx_wire_with(16, 2, 1, &[0, 1], &[1, 2, 3], false);
+		assert!(validate_transaction_wire(&max_signatures).is_ok());
+
+		let zero_program_index = encode_tx_wire_with(1, 3, 0, &[1, 2], &[4], false);
+		assert!(validate_transaction_wire(&zero_program_index).is_ok());
 	}
 
 	#[test]
 	fn transaction_wire_rejects_structurally_broken_payloads() {
 		let base = || encode_tx_wire(&[], false);
 
-		// Signature count of zero.
-		let mut zero_signatures = base();
-		zero_signatures[0] = 0;
+		// Signature count of zero with an otherwise well-formed message.
+		let zero_signatures = encode_tx_wire_with(0, 2, 1, &[], &[], false);
 		assert!(validate_transaction_wire(&zero_signatures).is_err());
 
 		// A compact-u16 that never terminates: three continuation bytes would
@@ -2438,10 +2517,11 @@ mod tests {
 		unterminated_compact.insert(2, 0x80);
 		assert!(validate_transaction_wire(&unterminated_compact).is_err());
 
-		// Signature count above the accepted bound.
-		let mut absurd_signatures = base();
-		absurd_signatures[0] = 17;
-		assert!(validate_transaction_wire(&absurd_signatures).is_err());
+		// Signature counts above the accepted bound (with full signature payloads).
+		let seventeen_signatures = encode_tx_wire_with(17, 2, 1, &[], &[], false);
+		assert!(validate_transaction_wire(&seventeen_signatures).is_err());
+		let eighteen_signatures = encode_tx_wire_with(18, 2, 1, &[], &[], false);
+		assert!(validate_transaction_wire(&eighteen_signatures).is_err());
 
 		// Truncated inside the signature list.
 		assert!(validate_transaction_wire(&base()[..40]).is_err());
@@ -2459,10 +2539,15 @@ mod tests {
 		no_instructions[165] = 0;
 		assert!(validate_transaction_wire(&no_instructions).is_err());
 
-		// Program id index beyond the account table.
-		let mut bad_program_index = base();
-		bad_program_index[166] = 9;
+		// Program id index at or beyond the account table with valid accounts_len.
+		let bad_program_index = encode_tx_wire_with(1, 2, 2, &[], &[], false);
 		assert!(validate_transaction_wire(&bad_program_index).is_err());
+
+		// Instruction account list exceeding the static account table.
+		let too_many_accounts = encode_tx_wire_with(1, 2, 0, &[0, 1, 0], &[], false);
+		assert!(validate_transaction_wire(&too_many_accounts).is_err());
+		let extra_accounts = encode_tx_wire_with(1, 2, 0, &[0, 1, 0, 1], &[], false);
+		assert!(validate_transaction_wire(&extra_accounts).is_err());
 
 		// Truncated mid-blockhash.
 		assert!(validate_transaction_wire(&base()[..160]).is_err());
@@ -2586,7 +2671,25 @@ mod tests {
 			),
 		]);
 		let error = record_program_for_test(&executor, &options).unwrap_err();
-		assert!(matches!(error, VerifyError::RecordMismatch { .. }));
+		assert!(matches!(
+			&error,
+			VerifyError::RecordMismatch { local, deployed }
+				if local == &"c".repeat(64) && deployed == &"d".repeat(64)
+		));
+
+		assert_eq!(
+			transcript_hash(&format!("Hash: {}\n", "A".repeat(64)), "Hash:"),
+			Some("a".repeat(64))
+		);
+		assert_eq!(
+			transcript_hash(&format!("Hash: {}\n", "a".repeat(63)), "Hash:"),
+			None
+		);
+		assert_eq!(
+			transcript_hash(&format!("Hash: {}\n", "g".repeat(64)), "Hash:"),
+			None
+		);
+		assert_eq!(transcript_hash("Other: value\n", "Hash:"), None);
 
 		let invalid_hash = FakeExecutor::with([version(), output(0, "invalid", "")]);
 		assert!(matches!(

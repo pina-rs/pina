@@ -309,33 +309,13 @@ fn validate_runbook_metadata(
 		}
 	};
 
-	if metadata_is_path_indirection(&metadata) || !metadata.is_file() {
+	if !crate::path_security::is_plain_file(&metadata) {
 		return Err(WorkflowError::UnsafeSurfpoolRunbook {
 			path: path.to_path_buf(),
 		});
 	}
 
 	Ok(true)
-}
-
-fn metadata_is_path_indirection(metadata: &fs::Metadata) -> bool {
-	#[cfg(windows)]
-	{
-		use std::os::windows::fs::MetadataExt;
-
-		metadata.file_type().is_symlink()
-			|| windows_attributes_indicate_reparse_point(metadata.file_attributes())
-	}
-
-	#[cfg(not(windows))]
-	metadata.file_type().is_symlink()
-}
-
-#[cfg(any(windows, test))]
-const fn windows_attributes_indicate_reparse_point(attributes: u32) -> bool {
-	const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
-
-	attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
 }
 
 fn require_surfpool_test(project: &Project) -> Result<(), WorkflowError> {
@@ -685,11 +665,17 @@ mod tests {
 
 	#[test]
 	fn bounds_and_sanitizes_version_diagnostics() {
+		let at_limit = vec![b'v'; 4_096];
+		let captured_exact = read_bounded_version_output(io::Cursor::new(at_limit))
+			.expect("capture exact version output");
+		assert_eq!(captured_exact.bytes.len(), 4_096);
+		assert!(!captured_exact.truncated);
+
 		let mut output = b"\x1b[31munknown".to_vec();
-		output.resize(VERSION_OUTPUT_LIMIT + 512, b'x');
-		let captured = read_bounded_version_output(io::Cursor::new(output))
-			.unwrap_or_else(|error| panic!("capture version output: {error}"));
-		assert_eq!(captured.bytes.len(), VERSION_OUTPUT_LIMIT);
+		output.resize(4_096 + 512, b'x');
+		let captured =
+			read_bounded_version_output(io::Cursor::new(output)).expect("capture version output");
+		assert_eq!(captured.bytes.len(), 4_096);
 		assert!(captured.truncated);
 
 		let output = String::from_utf8_lossy(&captured.bytes);
@@ -967,14 +953,6 @@ mod tests {
 			validate_runbook(&runbook),
 			Err(WorkflowError::UnsafeSurfpoolRunbook { .. })
 		));
-	}
-
-	#[test]
-	fn detects_windows_reparse_point_attributes() {
-		assert!(windows_attributes_indicate_reparse_point(0x0400));
-		assert!(windows_attributes_indicate_reparse_point(0x0401));
-		assert!(!windows_attributes_indicate_reparse_point(0));
-		assert!(!windows_attributes_indicate_reparse_point(0x0020));
 	}
 
 	#[cfg(unix)]
