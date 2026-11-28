@@ -2116,6 +2116,9 @@ export function getMigrateInstruction<
 	)
 }
 
+#[cfg(test)]
+mod generated_contract_tests;
+
 /// Fix the generated event decoders' discriminator guard.
 ///
 /// The upstream Codama JavaScript renderer emits
