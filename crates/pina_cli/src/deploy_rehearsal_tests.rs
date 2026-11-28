@@ -2,6 +2,7 @@
 //! JSON document. The rehearsal itself runs in the CLI suites, which provide a
 //! fake Surfpool.
 
+use super::prepare_private_deployment as prepare_deployment;
 use super::*;
 use crate::rehearse::REPORT_SCHEMA_VERSION;
 use crate::rehearse::RehearsalSummary;
